@@ -1,0 +1,45 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Herkesin kendi hesabına tam erişimi var
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Görevler ve Denetimler için "Kişisel Alan" / "Ortak Alan" (is_public=true) mantığı
+    match /audits/{auditId} {
+      // Bir rapor eğer is_public == true ise herkes OKUYABİLİR
+      allow read: if request.auth != null && (
+        resource.data.is_public == true || 
+        resource.data.owner_id == request.auth.uid
+      );
+      
+      // Oluşturma, Güncelleme veya Silme için sahibi olmak DİREKT şarttır.
+      allow create: if request.auth != null && request.resource.data.owner_id == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.owner_id == request.auth.uid;
+    }
+
+    match /tasks/{taskId} {
+      allow read: if request.auth != null && (
+        resource.data.is_public == true || 
+        resource.data.owner_id == request.auth.uid
+      );
+      allow create: if request.auth != null && request.resource.data.owner_id == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.owner_id == request.auth.uid;
+    }
+
+    // Ortak chat paneli loglaması yapılırsa herkes yazıp okuyabilir
+    match /chat_messages/{messageId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Takvim notları: sadece sahibi erişebilir (backend Admin SDK üzerinden yazılır)
+    match /calendar_notes/{noteId} {
+      allow read, delete: if request.auth != null && resource.data.owner_id == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.owner_id == request.auth.uid;
+      allow update: if false;
+    }
+  }
+}

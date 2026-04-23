@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Production builds
+dist/
+release/
+frontend/dist/
+frontend/release/
+backend/dist/
+backend/build/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+backend/.venv/
+
+# Firebase & Secrets (VERY IMPORTANT)
+firebase-credentials.json
+backend/firebase-credentials.json
+credentials.json
+backend/credentials.json
+.env
+backend/.env
+*.local
+secrets.json
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Large data files
+*.xlsx
+backend/rehber.xlsx
+backend/import_mevzuat/
+Mevzuat/

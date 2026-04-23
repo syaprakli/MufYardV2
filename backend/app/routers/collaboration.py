@@ -1,0 +1,316 @@
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query
+from typing import List, Dict, Optional, Any
+from app.services.collaboration_service import CollaborationService
+from app.schemas.messaging import MessageCreate, MessageResponse, DirectMessageCreate, DirectMessageResponse
+from app.schemas.post import PostCreate, PostResponse, PostUpdate, CommentUpdate
+from app.services.notification_service import NotificationService
+from app.schemas.notification import NotificationCreate
+
+router = APIRouter(prefix="", tags=["collaboration"])
+
+# --- PERSISTENT MESSAGING (CHAT) ---
+
+@router.get("/messages", response_model=List[MessageResponse])
+async def get_message_history(limit: int = 50):
+    try:
+        return await CollaborationService.get_messages(limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/messages/{message_id}")
+async def delete_message(message_id: str):
+    if await CollaborationService.delete_message(message_id):
+        return {"status": "success", "message": "Mesaj silindi."}
+    raise HTTPException(status_code=404, detail="Mesaj bulunamadı.")
+
+# --- PRIVATE MESSAGING (DM) ---
+
+@router.get("/dm/history", response_model=List[DirectMessageResponse])
+async def get_dm_history(uid1: str, uid2: str, limit: int = 50):
+    try:
+        return await CollaborationService.get_private_messages(uid1, uid2, limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/dm/send", response_model=DirectMessageResponse)
+async def send_dm(msg: DirectMessageCreate, uid: str, name: str):
+    try:
+        new_msg = await CollaborationService.save_private_message(uid, name, msg)
+        
+        # Alıcıyı bilgilendir
+        notif = NotificationCreate(
+            user_id=msg.recipient_id,
+            title=f"Yeni Mesaj: {name}",
+            message=msg.content[:100] + ("..." if len(msg.content) > 100 else ""),
+            type="collaboration",
+            chat_room_id="_".join(sorted([uid, msg.recipient_id]))
+        )
+        await NotificationService.create_notification(notif)
+        
+        return new_msg
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/dm/{room_id}/{message_id}")
+async def delete_dm(room_id: str, message_id: str, uid: str):
+    success = await CollaborationService.delete_private_message(room_id, message_id, uid)
+    if success:
+        # WebSocket üzerinden diğer tarafa bildir
+        import json
+        delete_event = json.dumps({
+            "type": "delete_message",
+            "message_id": message_id,
+            "room_id": room_id
+        })
+        await chat_manager.broadcast(room_id, delete_event)
+        return {"status": "success"}
+    raise HTTPException(status_code=403, detail="Mesaj silinemedi veya yetkiniz yok.")
+
+# --- FORUM / PUBLIC FEED ---
+
+@router.get("/posts", response_model=List[PostResponse])
+async def get_public_posts(category: Optional[str] = Query(None), user_id: Optional[str] = Query(None)):
+    try:
+        return await CollaborationService.get_posts(category, user_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/posts", response_model=PostResponse)
+async def create_public_post(post: PostCreate):
+    try:
+        return await CollaborationService.create_post(post)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/posts/{post_id}")
+async def delete_public_post(post_id: str):
+    if await CollaborationService.delete_post(post_id):
+        return {"status": "success", "message": "Paylaşım silindi."}
+    raise HTTPException(status_code=404, detail="Paylaşım bulunamadı.")
+
+@router.post("/posts/{post_id}/like")
+async def like_public_post(post_id: str):
+    result = await CollaborationService.toggle_like(post_id)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+@router.get("/posts/{post_id}/comments")
+async def get_post_comments(post_id: str):
+    try:
+        return await CollaborationService.get_comments(post_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/posts/{post_id}/comments")
+async def add_post_comment(post_id: str, comment: Dict[str, Any]):
+    try:
+        return await CollaborationService.add_comment(post_id, comment)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.patch("/posts/{post_id}")
+async def update_public_post(post_id: str, post_update: PostUpdate):
+    result = await CollaborationService.update_post(post_id, post_update)
+    if result:
+        return result
+    raise HTTPException(status_code=404, detail="Paylaşım bulunamadı.")
+
+@router.patch("/posts/{post_id}/comments/{comment_id}")
+async def update_post_comment(post_id: str, comment_id: str, comment: Dict[str, Any]):
+    # Note: Use comment.get('content') if it's passed as a dict
+    content = comment.get('content')
+    if not content:
+        raise HTTPException(status_code=400, detail="İçerik boş olamaz.")
+        
+    result = await CollaborationService.update_comment(post_id, comment_id, content)
+    if result:
+        return result
+    raise HTTPException(status_code=404, detail="Yorum bulunamadı.")
+
+@router.delete("/posts/{post_id}/comments/{comment_id}")
+async def delete_post_comment(post_id: str, comment_id: str):
+    if await CollaborationService.delete_comment(post_id, comment_id):
+        return {"status": "success", "message": "Yorum silindi."}
+    raise HTTPException(status_code=404, detail="Yorum bulunamadı.")
+
+# --- WEBSOCKET LIVE SYNC ---
+
+# --- WEBSOCKET LIVE SYNC (ROOM-BASED) ---
+
+class ChatConnectionManager:
+    def __init__(self):
+        # dictionary of room_id -> {websocket -> user_info}
+        self.rooms: Dict[str, Dict[WebSocket, Dict[str, str]]] = {}
+        # Global presence: user_id -> set of active websockets (handling multiple tabs)
+        self.global_online_users: Dict[str, set] = {}
+
+    async def connect(self, websocket: WebSocket, room_id: str, user_id: str, user_name: str):
+        await websocket.accept()
+        if room_id not in self.rooms:
+            self.rooms[room_id] = {}
+        self.rooms[room_id][websocket] = {"uid": user_id, "name": user_name}
+
+        # Update global presence
+        if user_id not in self.global_online_users:
+            self.global_online_users[user_id] = set()
+        self.global_online_users[user_id].add(websocket)
+
+        await self.broadcast_presence(room_id)
+
+    async def disconnect(self, websocket: WebSocket, room_id: str):
+        # Remove from room
+        if room_id in self.rooms and websocket in self.rooms[room_id]:
+            user_info = self.rooms[room_id][websocket]
+            user_id = user_info["uid"]
+            del self.rooms[room_id][websocket]
+            
+            # Remove from global presence
+            if user_id in self.global_online_users:
+                self.global_online_users[user_id].discard(websocket)
+                if not self.global_online_users[user_id]:
+                    del self.global_online_users[user_id]
+
+            if not self.rooms[room_id]:
+                del self.rooms[room_id]
+            else:
+                await self.broadcast_presence(room_id)
+
+    async def broadcast_presence(self, room_id: str):
+        if room_id not in self.rooms:
+            return
+            
+        users = []
+        seen_uids = set()
+        for info in self.rooms[room_id].values():
+            if info["uid"] not in seen_uids:
+                users.append({"uid": info["uid"], "name": info["name"]})
+                seen_uids.add(info["uid"])
+        
+        import json
+        presence_msg = json.dumps({"type": "presence", "users": users})
+        for connection in self.rooms[room_id].keys():
+            try:
+                await connection.send_text(presence_msg)
+            except Exception:
+                pass
+
+    async def broadcast(self, room_id: str, message: str):
+        if room_id not in self.rooms:
+            return
+            
+        for connection in self.rooms[room_id].keys():
+            try:
+                await connection.send_text(message)
+            except Exception:
+                pass
+
+    def get_online_uids(self) -> List[str]:
+        return list(self.global_online_users.keys())
+
+chat_manager = ChatConnectionManager()
+
+@router.get("/online-users")
+async def get_online_users():
+    return chat_manager.get_online_uids()
+
+@router.websocket("/chat")
+async def chat_endpoint(websocket: WebSocket):
+    uid = websocket.query_params.get("uid", "guest")
+    name = websocket.query_params.get("name", "Müfettiş")
+    room_id = websocket.query_params.get("room_id", "global")
+    
+    await chat_manager.connect(websocket, room_id, uid, name)
+    try:
+        while True:
+            raw_data = await websocket.receive_text()
+            data = json.loads(raw_data)
+            
+            # Eğer DM odasıysa ve mesaj geliyorsa, veri tabanına kaydet
+            if room_id.startswith("dm_") and data.get("type", "message") == "message":
+                # Alıcıyı room_id'den bul (dm_uid1_uid2)
+                parts = room_id.split("_")
+                recipient_id = parts[1] if parts[2] == uid else parts[2]
+                
+                # Servis üzerinden kaydet (persistent)
+                dm_create = DirectMessageCreate(
+                    recipient_id=recipient_id,
+                    content=data.get("content", ""),
+                    attachment=data.get("attachment")
+                )
+                new_db_msg = await CollaborationService.save_private_message(uid, name, dm_create)
+                
+                # Bildirim gönder (async)
+                notif = NotificationCreate(
+                    user_id=recipient_id,
+                    title=f"Yeni Mesaj: {name}",
+                    message=data.get("content", "")[:100],
+                    type="collaboration",
+                    chat_room_id=room_id
+                )
+                asyncio.create_task(NotificationService.create_notification(notif))
+                
+                # Mesajın ID'sini geri dönen dataya ekle
+                data["id"] = new_db_msg["id"]
+                data["timestamp"] = new_db_msg["timestamp"]
+                raw_data = json.dumps(data)
+
+            await chat_manager.broadcast(room_id, raw_data)
+    except WebSocketDisconnect:
+        await chat_manager.disconnect(websocket, room_id)
+    except Exception as e:
+        print(f"Chat WS Error: {e}")
+        await chat_manager.disconnect(websocket, room_id)
+
+
+# --- REPORT COLLABORATION ---
+
+class DocumentConnectionManager:
+    def __init__(self):
+        self.rooms: Dict[str, List[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, room_id: str):
+        await websocket.accept()
+        if room_id not in self.rooms:
+            self.rooms[room_id] = []
+        self.rooms[room_id].append(websocket)
+
+    def disconnect(self, websocket: WebSocket, room_id: str):
+        if room_id in self.rooms and websocket in self.rooms[room_id]:
+            self.rooms[room_id].remove(websocket)
+            if not self.rooms[room_id]:
+                del self.rooms[room_id]
+
+    async def broadcast(self, message: bytes, sender: WebSocket, room_id: str):
+        if room_id in self.rooms:
+            for connection in self.rooms[room_id]:
+                if connection != sender:
+                    try:
+                        await connection.send_bytes(message)
+                    except Exception:
+                        pass
+
+doc_manager = DocumentConnectionManager()
+
+@router.websocket("/report/{audit_id}")
+async def report_collab_endpoint(websocket: WebSocket, audit_id: str):
+    await doc_manager.connect(websocket, audit_id)
+    try:
+        while True:
+            data = await websocket.receive_bytes()
+            await doc_manager.broadcast(data, sender=websocket, room_id=audit_id)
+    except WebSocketDisconnect:
+        doc_manager.disconnect(websocket, audit_id)
+
+# --- CATEGORY MANAGEMENT ---
+
+@router.get("/categories", response_model=List[str])
+async def get_collaboration_categories():
+    return await CollaborationService.get_categories()
+
+@router.post("/categories")
+async def add_collaboration_category(category: Dict[str, str]):
+    success = await CollaborationService.add_category(category.get('name'))
+    if success:
+        return {"status": "success"}
+    raise HTTPException(status_code=500, detail="Kategori eklenemedi.")
