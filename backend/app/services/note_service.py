@@ -19,7 +19,15 @@ class NoteService:
             notes.append(note_data)
         
         # Sort in memory: Pinned first, then by created_at descending
-        notes.sort(key=lambda x: (x.get('is_pinned', False), x.get('created_at', '')), reverse=True)
+        def sort_key(x):
+            pinned = 1 if x.get('is_pinned', False) else 0
+            # Handle different date types safely
+            created = x.get('created_at', '')
+            if hasattr(created, 'timestamp'):
+                created = created.isoformat()
+            return (pinned, str(created))
+
+        notes.sort(key=sort_key, reverse=True)
         return notes
 
 

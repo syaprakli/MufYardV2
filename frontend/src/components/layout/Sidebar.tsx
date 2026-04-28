@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 
+
 const navItems = [
     { icon: LayoutDashboard, label: "Genel Bakış", href: "/" },
     { icon: CheckSquare, label: "Görevler", href: "/tasks" },

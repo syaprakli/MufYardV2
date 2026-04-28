@@ -3,6 +3,7 @@ from firebase_admin import credentials, firestore, storage, messaging
 import os
 import uuid
 import logging
+import json
 from app.config import get_settings
 
 settings = get_settings()
@@ -14,13 +15,34 @@ _messaging = None
 is_mock = True
 
 try:
-    # Service account JSON dosyasının yolunu al
-    cert_path = settings.FIREBASE_SERVICE_ACCOUNT_PATH
-    if cert_path and os.path.exists(cert_path):
-        # Prevent double initialization
+    cred = None
+    
+    # 1. Try from Environment Variable (JSON String) - Best for Railway/Cloud
+    if settings.FIREBASE_SERVICE_ACCOUNT_JSON:
+        try:
+            cred_dict = json.loads(settings.FIREBASE_SERVICE_ACCOUNT_JSON)
+            cred = credentials.Certificate(cred_dict)
+            logger.info("Firebase: Using credentials from Environment Variable.")
+        except Exception as json_err:
+            logger.error(f"Firebase: Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON: {json_err}")
+
+    # 2. Try from Local Secrets File (Internal)
+    if not cred:
+        try:
+            from app.lib.firebase_secrets import FIREBASE_CONFIG
+            if FIREBASE_CONFIG:
+                cred = credentials.Certificate(FIREBASE_CONFIG)
+                logger.info("Firebase: Using credentials from app.lib.firebase_secrets.")
+        except (ImportError, Exception):
+            pass
+
+    # 3. Try from Local File Path
+    if not cred and os.path.exists(settings.FIREBASE_SERVICE_ACCOUNT_PATH):
+        cred = credentials.Certificate(settings.FIREBASE_SERVICE_ACCOUNT_PATH)
+        logger.info(f"Firebase: Using credentials from file: {settings.FIREBASE_SERVICE_ACCOUNT_PATH}")
+
+    if cred:
         if not firebase_admin._apps:
-            cred = credentials.Certificate(cert_path)
-            # Initialize with storage bucket if provided
             init_kwargs = {}
             if settings.FIREBASE_STORAGE_BUCKET:
                 init_kwargs["storageBucket"] = settings.FIREBASE_STORAGE_BUCKET
@@ -28,20 +50,30 @@ try:
             
             _db = firestore.client()
             _messaging = messaging
-            try:
-                # Fallback bucket check
-                bucket_name = settings.FIREBASE_STORAGE_BUCKET or "mufyardv2.appspot.com"
-                _bucket = storage.bucket(bucket_name)
-                logger.info(f"Firebase Storage initialized with bucket: {bucket_name}")
-            except Exception as bucket_err:
-                logger.warning(f"Storage bucket could not be initialized: {bucket_err}")
             
-        is_mock = False
-        logger.info("Firebase Admin and Storage initialized successfully.")
+            # --- AUTH CHECK ---
+            try:
+                _db.collection('health').document('check').get(timeout=5)
+                logger.info("Firebase Firestore connectivity verified.")
+                is_mock = False
+            except Exception as auth_err:
+                logger.error(f"Firebase Connectivity Check FAILED: {auth_err}")
+                is_mock = True
+                _db = None
+            # ------------------
+
+            if not is_mock:
+                try:
+                    bucket_name = settings.FIREBASE_STORAGE_BUCKET or "mufyardv2.appspot.com"
+                    _bucket = storage.bucket(bucket_name)
+                    logger.info(f"Firebase Storage initialized with bucket: {bucket_name}")
+                except Exception as bucket_err:
+                    logger.warning(f"Storage bucket could not be initialized: {bucket_err}")
     else:
-        logger.warning(f"Firebase certificate not found at {cert_path}. Using Demo Mock DB.")
+        logger.warning("Firebase certificate not found. Using Demo Mock DB.")
 except Exception as e:
     logger.error(f"Failed to initialize Firebase: {e}. Falling back to Mock DB.")
+    is_mock = True
 
 # --- MOCK DB Fallback (Geri Dönüş) Kodları ---
 _MOCK_DATA = {}

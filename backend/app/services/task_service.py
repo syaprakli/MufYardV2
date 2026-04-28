@@ -66,7 +66,12 @@ class TaskService:
                     unique_tasks[doc.id] = d
             
             res = list(unique_tasks.values())
-            res.sort(key=lambda x: x.get('created_at') or '', reverse=True)
+            def sort_key(x):
+                val = x.get('created_at', '')
+                if hasattr(val, 'timestamp'): return val.timestamp()
+                return str(val)
+
+            res.sort(key=sort_key, reverse=True)
             return res
         except Exception as e:
             print(f"Task query error: {e}")

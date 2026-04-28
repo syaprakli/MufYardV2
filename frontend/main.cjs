@@ -111,14 +111,29 @@ function startBackend() {
         });
     } else {
         const backendPath = getBackendPath();
+        // Use venv python if available, fallback to system python
+        const venvPython = path.join(backendPath, '.venv', 'Scripts', 'python.exe');
+        const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python';
         const args = ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8000'];
-        backendProcess = spawn('python', args, {
+        
+        console.log(`[DEV] Backend başlatılıyor: ${pythonCmd} ${args.join(' ')}`);
+        console.log(`[DEV] CWD: ${backendPath}`);
+        
+        backendProcess = spawn(pythonCmd, args, {
             cwd: backendPath,
-            stdio: 'ignore',
+            stdio: ['ignore', 'pipe', 'pipe'],
             windowsHide: true,
         });
+        
+        backendProcess.stdout.on('data', (d) => console.log('[BACKEND]', d.toString().trim()));
+        backendProcess.stderr.on('data', (d) => console.error('[BACKEND]', d.toString().trim()));
+        
         backendProcess.on('error', (error) => {
-            console.error('Backend baslatilamadi:', error.message);
+            console.error('[DEV] Backend başlatılamadı:', error.message);
+        });
+        
+        backendProcess.on('exit', (code) => {
+            console.log(`[DEV] Backend kapandı (kod: ${code})`);
         });
     }
 }
@@ -147,16 +162,16 @@ function createWindow() {
     // Pencereyi ekranı kaplayacak şekilde aç (başlık çubuğu görünür kalır)
     win.maximize();
 
-    // Menü çubuğunu kaldır (File, Edit, View vs.)
-    Menu.setApplicationMenu(null);
-
+    // Menü çubuğunu gizle ama kısayolları (Ctrl+R, Ctrl+Shift+I) aktif bırak
+    win.setMenuBarVisibility(false);
+    
     if (app.isPackaged) {
         win.loadFile(path.join(__dirname, 'dist', 'index.html'));
         return;
     }
 
-    // Geliştirici araçlarını kapat (Hata ayıklama bitti)
-    // win.webContents.openDevTools();
+    // Geliştirici araçlarını aç (Sorunu anlamak için geçici olarak aktif)
+    win.webContents.openDevTools();
 
     // Vite sunucusuna hem localhost hem 127.0.0.1 üzerinden erişimi dene
     win.loadURL('http://localhost:5173').catch(() => {
@@ -166,8 +181,20 @@ function createWindow() {
     });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
     startBackend();
+    
+    if (!app.isPackaged) {
+        // Dev modda backend'in hazır olmasını bekle
+        console.log('[DEV] Backend hazır olması bekleniyor...');
+        try {
+            await waitForPort(8000, 15, 1500); // 15 deneme, 1.5s aralık = max ~22s
+            console.log('[DEV] Backend hazır! Pencere açılıyor.');
+        } catch (e) {
+            console.error('[DEV] Backend başlatılamadı, pencere yine de açılacak.');
+        }
+    }
+    
     createWindow();
 });
 

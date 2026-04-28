@@ -17,3 +17,4 @@ langchain
 langchain-openai
 langchain-community
 python-multipart
+gunicorn

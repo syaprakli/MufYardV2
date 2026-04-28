@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword as firebaseSignIn, createUserWithEmailAndPassword as firebaseSignUp, GoogleAuthProvider, signInWithPopup, updateProfile } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const isDummy = !import.meta.env.VITE_FIREBASE_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY === "AIzaSy_FAKE_KEY_PLEASE_CHANGE";
@@ -22,20 +22,11 @@ try {
 }
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
 
-// Optimize: Enable Offline Persistence (Data Caching)
-// This makes the app feel instant by loading from local disk first.
-import { enableIndexedDbPersistence } from "firebase/firestore";
-if (typeof window !== 'undefined') {
-  enableIndexedDbPersistence(db).catch((err) => {
-      if (err.code === 'failed-precondition') {
-          console.warn("Birden fazla sekme açık, önbellekleme sadece birinde çalışır.");
-      } else if (err.code === 'unimplemented') {
-          console.warn("Tarayıcı önbellekleme özelliğini desteklemiyor.");
-      }
-  });
-}
+// Offline Persistence with new API (replaces deprecated enableIndexedDbPersistence)
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
 
 export const storage = getStorage(app);
 export const messaging = null; // Mobil Bildirimler Devre Dışı

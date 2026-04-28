@@ -24,7 +24,7 @@ export function useVersionCheck() {
                     }
                 }
             } catch (error) {
-                console.error("Sürüm kontrolü hatası:", error);
+                console.warn("Sürüm kontrolü atlandı (izin/bağlantı hatası):", (error as any)?.code || error);
             }
         };
 

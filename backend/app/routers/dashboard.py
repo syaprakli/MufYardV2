@@ -50,17 +50,19 @@ def format_relative_time(dt):
 
 @router.get("/stats", response_model=DashboardStats)
 async def get_dashboard_stats():
-    # Fetch real announcements for news
-    duyurular = await CollaborationService.get_posts(category="Duyurular", limit=3)
-    news_items = []
-    
-    for d in duyurular:
-        news_items.append({
-            "id": d.get('id', ''),
-            "title": d.get('title', ''),
-            "date": format_relative_time(d.get('created_at')),
-            "category": d.get('category', 'Duyuru')
-        })
+    try:
+        duyurular = await CollaborationService.get_posts(category="Duyurular", limit=3)
+        news_items = []
+        for d in duyurular:
+            news_items.append({
+                "id": d.get('id', ''),
+                "title": d.get('title', ''),
+                "date": format_relative_time(d.get('created_at')),
+                "category": d.get('category', 'Duyuru')
+            })
+    except Exception as e:
+        print(f"Dashboard news fetch error: {e}")
+        news_items = []
 
     return {
         "stats": [

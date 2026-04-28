@@ -1,4 +1,4 @@
-import { User, Bell, Shield, Wand2, Database, LogOut, Loader2, Save, Monitor, FileText, CheckCircle2, Upload, Users, X, Camera, Sun, AlertTriangle, Key, Download, HardDrive, Globe, ShieldAlert, Plus, Search, MoreVertical, Edit2, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { User, Bell, Shield, Wand2, Database, LogOut, Loader2, Save, FileText, CheckCircle2, Upload, Users, X, Camera, AlertTriangle, Key, Download, HardDrive, Globe, ShieldAlert, Plus, Search, MoreVertical, Edit2, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -14,10 +14,9 @@ import { API_URL } from "../lib/config";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
 
 const GEMINI_MODELS = [
-    { value: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro (Yeni Mevzuat Uzmanı)" },
-    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Süper Hızlı)" },
-    { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash (Önerilen - Ekonomik)" },
-    { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro (Klasik Uzman)" },
+    { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro (Mevzuat Uzmanı)" },
+    { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash (Önerilen - Güncel)" },
+    { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash (Hızlı ve Ekonomik)" },
 ];
 
 // --- Gemini API Key Bölümü (Kullanıcı Bazlı) ---
@@ -1293,26 +1292,7 @@ function SettingsNav({ icon: Icon, label, active, onClick }: { icon: any, label:
     );
 }
 
-function ThemeOption({ active, label, desc, onClick, icon: Icon, color }: any) {
-    return (
-        <button
-            onClick={onClick}
-            className={cn(
-                "p-6 rounded-3xl border-4 transition-all flex flex-col items-center text-center gap-3 relative overflow-hidden group",
-                active ? "border-primary bg-primary/5 dark:bg-primary/10 shadow-xl scale-105" : "border-slate-50 dark:border-slate-800 bg-muted dark:bg-slate-800 hover:border-primary/20"
-            )}
-        >
-            <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg group-hover:rotate-12 transition-transform", color, active ? "text-white" : "text-slate-400 dark:text-slate-600")}>
-                <Icon size={32} />
-            </div>
-            <div>
-                <p className={cn("text-sm font-black tracking-tight", active ? "text-primary" : "text-slate-600 dark:text-slate-300")}>{label}</p>
-                <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500 mt-1">{desc}</p>
-            </div>
-            {active && <CheckCircle2 size={16} className="absolute top-4 right-4 text-primary" />}
-        </button>
-    );
-}
+
 
 function NotificationToggle({ label, desc, active, onToggle }: { label: string, desc: string, active: boolean, onToggle: () => void }) {
     return (

@@ -41,5 +41,10 @@ service cloud.firestore {
       allow create: if request.auth != null && request.resource.data.owner_id == request.auth.uid;
       allow update: if false;
     }
+
+    // Sistem ayarları (Sürüm kontrolü vb. için)
+    match /system/{document=**} {
+      allow read: if request.auth != null;
+    }
   }
 }

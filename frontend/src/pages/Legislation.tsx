@@ -9,6 +9,7 @@ import { RefreshCcw, UserCheck } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
 import { Lock, Globe } from "lucide-react";
+import { isElectron } from "../lib/firebase";
 
 
 const CATEGORIES = ["Tümü", "GSB", "KYK", "Federasyon", "Özel Yurt", "Spor Kulüpleri", "Genel"];
@@ -322,16 +323,20 @@ export default function Legislation() {
                         </button>
                     </div>
 
-                    <Button 
-                        onClick={handleSync} 
-                        variant="outline" 
-                        className="h-9 px-3 rounded-lg border-emerald-200 dark:border-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-50 dark:hover:bg-emerald-950/20 bg-emerald-50/20 dark:bg-emerald-950/10"
-                    >
-                        <RefreshCcw size={14} className="mr-1.5" /> Senkronize Et
-                    </Button>
-                    <Button onClick={() => handleOpenFolder()} variant="outline" className="h-9 px-3 rounded-lg border-border dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold hover:bg-muted dark:hover:bg-slate-800">
-                        <Folder size={14} className="mr-1.5" /> Klasörü Aç
-                    </Button>
+                    {isElectron && (
+                    <>
+                        <Button 
+                            onClick={handleSync} 
+                            variant="outline" 
+                            className="h-9 px-3 rounded-lg border-emerald-200 dark:border-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-50 dark:hover:bg-emerald-950/20 bg-emerald-50/20 dark:bg-emerald-950/10"
+                        >
+                            <RefreshCcw size={14} className="mr-1.5" /> Senkronize Et
+                        </Button>
+                        <Button onClick={() => handleOpenFolder()} variant="outline" className="h-9 px-3 rounded-lg border-border dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold hover:bg-muted dark:hover:bg-slate-800">
+                            <Folder size={14} className="mr-1.5" /> Klasörü Aç
+                        </Button>
+                    </>
+                    )}
                     <Button onClick={() => setIsModalOpen(true)} className="h-9 px-4 rounded-lg shadow-md shadow-primary/10 bg-primary text-white text-xs font-bold">
                         <Plus size={16} className="mr-1.5" /> Yeni Mevzuat Ekle
                     </Button>
@@ -375,7 +380,7 @@ export default function Legislation() {
                                             <span className="truncate">{cat}</span>
                                         </div>
                                         
-                                        {cat !== "Tümü" && (
+                                        {cat !== "Tümü" && isElectron && (
                                             <button 
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -510,9 +515,11 @@ export default function Legislation() {
                         </div>
                     )}
                     
+                    {isElectron && (
                     <div className="absolute top-2 right-2 text-[7px] font-black uppercase tracking-widest bg-primary/10 text-primary/60 px-2 py-0.5 rounded-full">
                         OS INTERFACE ACTIVE
                     </div>
+                    )}
                 </div>
 
                 <form onSubmit={handleCreateLeg} className="space-y-4">

@@ -2,6 +2,7 @@ import os
 import json
 import asyncio
 import logging
+import shutil
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -54,31 +55,83 @@ app = FastAPI(title=settings.APP_NAME)
 
 @app.on_event("startup")
 async def startup_event():
-    logger.info("Startup süreci başladı...")
-    
-    # Kritik dosya kontrolleri
-    files_to_check = {
-        "Firebase Anahtarı": settings.FIREBASE_SERVICE_ACCOUNT_PATH,
-        "Rehber Excel": os.path.join(BASE_DIR, "rehber.xlsx"),
-        ".env Dosyası": os.path.join(BASE_DIR, ".env")
-    }
-    
-    for name, path in files_to_check.items():
-        if os.path.exists(path):
-            logger.info(f"KONTROL: {name} bulundu -> {path}")
-        else:
-            logger.error(f"KONTROL: {name} BULUNAMADI! -> {path}")
+    try:
+        logger.info("Startup süreci başladı...")
+        
+        # Kritik dosya kontrolleri
+        files_to_check = {
+            "Firebase Anahtarı": settings.FIREBASE_SERVICE_ACCOUNT_PATH,
+            "Rehber Excel": os.path.join(BASE_DIR, "rehber.xlsx"),
+            ".env Dosyası": os.path.join(BASE_DIR, ".env")
+        }
+        
+        for name, path in files_to_check.items():
+            if os.path.exists(path):
+                logger.info(f"KONTROL: {name} bulundu -> {path}")
+            else:
+                logger.error(f"KONTROL: {name} BULUNAMADI! -> {path}")
 
-    if settings.STARTUP_SYNC_ENABLED:
-        try:
-            logger.info("Otomatik senkronizasyon başlatılıyor...")
-            asyncio.create_task(ContactService.sync_from_rdb_rehber_v6())
-            asyncio.create_task(InspectorService.sync_from_excel())
-            logger.info("Senkronizasyon görevleri arka plana atıldı.")
-        except Exception as e:
-            logger.error(f"Startup senkronizasyon hatası: {str(e)}")
-    else:
-        logger.info("Startup senkronizasyonu ayarlar gereği devre dışı.")
+        if settings.STARTUP_SYNC_ENABLED:
+            try:
+                logger.info("Otomatik senkronizasyon başlatılıyor...")
+                asyncio.create_task(ContactService.sync_from_rdb_rehber_v6())
+                asyncio.create_task(InspectorService.sync_from_excel())
+                logger.info("Senkronizasyon görevleri arka plana atıldı.")
+            except Exception as e:
+                logger.error(f"Startup senkronizasyon hatası: {str(e)}")
+        else:
+            logger.info("Startup senkronizasyonu ayarlar gereği devre dışı.")
+
+        # Bundled content sync to DATA_DIR (Background)
+        asyncio.create_task(sync_bundled_content())
+    except Exception as e:
+        logger.error(f"KRİTİK STARTUP HATASI: {e}")
+
+async def sync_bundled_content():
+    """Bundled folder'ları DATA_DIR içine kopyalar (eğer DATA_DIR farklı ve hedef boşsa)."""
+    if os.path.abspath(BASE_DIR) == os.path.abspath(DATA_DIR):
+        logger.info("BASE_DIR ve DATA_DIR aynı, senkronizasyon atlanıyor.")
+        return
+
+    folders_to_sync = ["Mevzuat", "Raporlar", "uploads"]
+    
+    def _sync_logic():
+        for folder in folders_to_sync:
+            source = os.path.join(BASE_DIR, folder)
+            destination = os.path.join(DATA_DIR, folder)
+            
+            if not os.path.exists(source):
+                continue
+                
+            try:
+                should_copy = False
+                if not os.path.exists(destination):
+                    should_copy = True
+                else:
+                    # Klasör boş mu bak
+                    if not os.listdir(destination):
+                        should_copy = True
+                
+                if should_copy:
+                    logger.info(f"Senkronizasyon başlatıldı: {folder} -> {destination}")
+                    if os.path.exists(destination):
+                        # Klasör mevcut ama boş, içindekileri kopyala
+                        for item in os.listdir(source):
+                            s = os.path.join(source, item)
+                            d = os.path.join(destination, item)
+                            if os.path.isdir(s):
+                                if not os.path.exists(d):
+                                    shutil.copytree(s, d)
+                            else:
+                                if not os.path.exists(d):
+                                    shutil.copy2(s, d)
+                    else:
+                        shutil.copytree(source, destination)
+                    logger.info(f"Senkronizasyon tamamlandı: {folder}")
+            except Exception as e:
+                logger.error(f"Senkronizasyon hatası ({folder}): {e}")
+
+    await asyncio.to_thread(_sync_logic)
 
 # Mount static files
 def mount_static_dir(path_name, route_path):
@@ -125,3 +178,14 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "version": "1.0.1-antigravity"}
+
+@app.get("/health/detail")
+async def health_detail():
+    from app.lib.firebase_admin import is_mock
+    return {
+        "status": "healthy",
+        "firebase_mode": "mock" if is_mock else "real",
+        "firebase_key": settings.FIREBASE_SERVICE_ACCOUNT_PATH,
+        "base_dir": BASE_DIR,
+        "data_dir": DATA_DIR
+    }

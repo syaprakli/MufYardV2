@@ -16,7 +16,7 @@ cd /d "%~dp0backend"
 REM --- [2/4] PyInstaller - Her zaman guncel kodu derle ---
 echo [2/4] Guncer backend kodu derleniyor (PyInstaller)...
 "%PYTHON_EXE%" -m pip install pyinstaller -q || goto :fail
-"%PYTHON_EXE%" -m PyInstaller --noconfirm --clean --onefile --name mufyard-backend ^
+"%PYTHON_EXE%" -m PyInstaller --noconfirm --clean --onedir --name mufyard-backend ^
     --collect-all app ^
     --paths "%~dp0backend" ^
     "%~dp0backend\run_backend.py" || goto :fail

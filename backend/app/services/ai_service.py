@@ -10,7 +10,7 @@ import os
 from io import BytesIO
 from pypdf import PdfReader
 from docx import Document as DocxDocument
-from app.config import settings
+from app.config import settings, BASE_DIR
 from app.lib.firebase_admin import db, bucket
 from app.lib.local_settings import get_local_ai_settings
 from app.services.audit_service import AuditService
@@ -20,7 +20,9 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("ai_service")
 
-MEVZUAT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "Mevzuat")
+from app.config import get_settings
+settings_val = get_settings()
+MEVZUAT_DIR = settings_val.MEVZUAT_DIR
 
 
 def _build_model(api_key: str, model_name: str, system_instruction: str | None = None):
@@ -30,11 +32,30 @@ def _build_model(api_key: str, model_name: str, system_instruction: str | None =
         kwargs["system_instruction"] = system_instruction
         
     # Google SDK models/ prefix'i ve slug formatı bekler
-    # Normalizasyon: "Gemini 1.5 Pro" -> "gemini-1.5-pro"
-    full_model_name = (model_name or "gemini-2.0-flash").lower().strip().replace(" ", "-")
+    # Normalizasyon: "Gemini 2.5 Flash" -> "gemini-2.5-flash"
+    model_slug = (model_name or "gemini-2.5-flash").lower().strip().replace(" ", "-")
     
-    if not full_model_name.startswith("models/"):
-        full_model_name = f"models/{full_model_name}"
+    # Özel İsim Eşleştirme
+    model_mapping = {
+        "gemini-3.1-pro": "gemini-2.5-pro",
+        "gemini-2.5-flash": "gemini-2.5-flash",
+        "gemini-2.0-flash": "gemini-2.5-flash",
+        "gemini-1.5-flash": "gemini-2.5-flash",
+        "gemini-test-model": "gemini-2.5-flash"
+    }
+    
+    # Eğer eşleşme varsa gerçek modeli kullan
+    if model_slug in model_mapping:
+        logger.info(f"Mapping custom model name '{model_slug}' to '{model_mapping[model_slug]}'")
+        model_slug = model_mapping[model_slug]
+
+    # Geçersiz modeller için son güvenlik kontrolü
+    valid_models = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-flash-latest"]
+    if not any(m in model_slug for m in valid_models):
+        logger.warning(f"Invalid model name '{model_slug}' detected. Falling back to gemini-2.5-flash.")
+        model_slug = "gemini-2.5-flash"
+
+    full_model_name = model_slug if model_slug.startswith("models/") else f"models/{model_slug}"
         
     return genai.GenerativeModel(full_model_name, **kwargs)
 
@@ -45,7 +66,7 @@ async def _get_user_ai_settings(uid: str) -> tuple[str, str, float, str]:
     """
     # Varsayılan Değerler
     res_key = ""
-    res_model = "gemini-2.0-flash"
+    res_model = "gemini-2.5-flash"
     res_temp = 0.7
     res_sp = ""
 

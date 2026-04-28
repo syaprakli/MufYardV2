@@ -1,4 +1,4 @@
-import { Sparkles, Download, X, Rocket } from "lucide-react";
+import { Sparkles, Download, Rocket } from "lucide-react";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
 

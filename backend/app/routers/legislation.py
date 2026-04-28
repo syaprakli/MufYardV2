@@ -5,10 +5,10 @@ from typing import List, Optional
 import asyncio
 from app.services.legislation_service import LegislationService
 from app.services.extractor_service import ExtractorService
+from app.config import get_settings
+settings = get_settings()
 
-# Adjusting MEVZUAT_DIR calculation
-BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-MEVZUAT_DIR = os.path.join(BACKEND_DIR, "Mevzuat")
+MEVZUAT_DIR = settings.MEVZUAT_DIR
 
 router = APIRouter(tags=["legislation"])
 

@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from app.services.ai_service import AIService
 from app.lib.auth import get_current_user, require_roles
+from app.config import BASE_DIR
 import os
 import re
 import logging
@@ -85,7 +86,7 @@ def _normalize_gemini_error(err: Exception) -> tuple[int, str]:
     return 500, "MODEL HATASI: AI şu an yanıt veremiyor. Lütfen bu mesajı kopyalayıp bana iletin."
 
 # .env dosyasının yolu
-ENV_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")
+ENV_PATH = os.path.join(BASE_DIR, ".env")
 
 
 class ChatMessage(BaseModel):
@@ -127,9 +128,14 @@ async def get_my_ai_settings(
     
     # Yerelde yoksa Firestore'dan (eski yöntem) çekmeyi deneme but let's stick to local if we want to move away
     if not key:
-        key, firebase_model, _, _ = await _get_user_ai_settings(current_user["uid"])
-        if not model:
-            model = firebase_model
+        try:
+            # Firestore'dan çek (4 değer döner: key, model, has_key, masked)
+            key, firebase_model, _, _ = await _get_user_ai_settings(current_user["uid"])
+            if not model:
+                model = firebase_model
+        except Exception as e:
+            logger.warning(f"Firestore AI ayarları çekilemedi: {e}")
+            key, model = None, None
 
     masked = ""
     if key:
@@ -260,9 +266,18 @@ async def test_gemini_connection(
         genai.configure(api_key=key)
         
         # Google SDK models/ prefix'i ve slug formatı bekler
-        full_model_name = (model_name or "gemini-2.0-flash").lower().strip().replace(" ", "-")
-        if not full_model_name.startswith("models/"):
-            full_model_name = f"models/{full_model_name}"
+        model_slug = (model_name or "gemini-2.0-flash").lower().strip().replace(" ", "-")
+        
+        # Mapping (AIService ile aynı olmalı)
+        model_mapping = {
+            "gemini-3.1-pro": "gemini-1.5-pro",
+            "gemini-2.5-flash": "gemini-2.0-flash",
+            "gemini-test-model": "gemini-2.0-flash"
+        }
+        if model_slug in model_mapping:
+            model_slug = model_mapping[model_slug]
+
+        full_model_name = model_slug if model_slug.startswith("models/") else f"models/{model_slug}"
             
         logger.info(f"[AI TEST] Testing connection with model: {full_model_name}")
         model = genai.GenerativeModel(full_model_name)

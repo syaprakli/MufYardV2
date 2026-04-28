@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { fetchFileTree, uploadFile, createFolder, deleteItem, openFolder, type FileItem } from "../lib/api/files";
 import { aiSearch } from "../lib/api/ai";
 import { cn } from "../lib/utils";
+import { isElectron } from "../lib/firebase";
 
 
 export default function Files() {
@@ -362,6 +363,7 @@ export default function Files() {
                                             </div>
                                             
                                             <div className={cn("flex items-center gap-1", viewMode === 'list' ? "opacity-0 group-hover:opacity-100 transition-opacity" : "absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity")}>
+                                                {isElectron && (
                                                 <Button 
                                                     size="icon" 
                                                     variant="ghost" 
@@ -371,6 +373,7 @@ export default function Files() {
                                                 >
                                                     <FolderOpen size={14} />
                                                 </Button>
+                                                )}
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
@@ -433,6 +436,7 @@ export default function Files() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
+                                    {isElectron && (
                                     <Button 
                                         size="icon" 
                                         variant="outline" 
@@ -442,6 +446,7 @@ export default function Files() {
                                     >
                                         <FolderOpen size={18} />
                                     </Button>
+                                    )}
                                     <Button
                                         size="icon"
                                         variant="outline"

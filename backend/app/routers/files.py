@@ -7,6 +7,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
 from app.lib.folder_manager import FolderManager, BASE_REPORTS_DIR, STANDARD_SUBFOLDERS
+from app.config import BASE_DIR
 def get_current_user_id():
     # Gerçek uygulamada auth'dan alınmalı, örnek için sabit
     return "user_1"
@@ -72,7 +73,10 @@ async def upload_file(
         elif "pdf" in mime_type: media_type = "pdf"
 
         # Return relative URL for front-end access if mounted
-        relative_url = os.path.relpath(file_path, os.path.dirname(os.path.dirname(os.path.dirname(__file__)))).replace("\\", "/")
+        # We use the mount points defined in main.py (/Raporlar, /uploads, etc.)
+        from app.config import DATA_DIR
+        relative_path_from_data = os.path.relpath(file_path, DATA_DIR).replace("\\", "/")
+        relative_url = f"/{relative_path_from_data}"
         
         # Dosya izinlerini kaydet
         rel_file_id = os.path.relpath(file_path, BASE_REPORTS_DIR).replace("\\", "/")

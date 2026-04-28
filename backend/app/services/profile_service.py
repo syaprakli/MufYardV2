@@ -4,6 +4,7 @@ import logging
 from typing import Optional, Dict, Any, List
 from app.lib.firebase_admin import db, bucket, messenger, messaging
 from app.schemas.profile import ProfileUpdate
+from app.config import BASE_DIR
 from fastapi import UploadFile
 import os
 
@@ -18,8 +19,9 @@ class ProfileService:
         relative_path = os.path.join("profiles", uid)
         
         # Absolute path for the backend system
-        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        upload_dir = os.path.join(backend_dir, "uploads", relative_path)
+        from app.config import get_settings
+        settings = get_settings()
+        upload_dir = os.path.join(settings.UPLOADS_DIR, relative_path)
         
         # Ensure directory exists
         os.makedirs(upload_dir, exist_ok=True)

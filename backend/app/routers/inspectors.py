@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, File, UploadFile
 from typing import List, Dict, Any
 from app.services.inspector_service import InspectorService
 from app.schemas.inspector import InspectorCreate, InspectorResponse
+from app.config import BASE_DIR
 
 router = APIRouter(tags=["inspectors"])
 
@@ -35,8 +36,8 @@ async def upload_and_sync_inspectors(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Sadece Excel dosyaları (.xlsx, .xls) kabul edilir.")
         
     try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        file_path = os.path.join(base_dir, "rehber.xlsx")
+        from app.config import DATA_DIR
+        file_path = os.path.join(DATA_DIR, "rehber.xlsx")
         
         # Save file to disk
         content = await file.read()

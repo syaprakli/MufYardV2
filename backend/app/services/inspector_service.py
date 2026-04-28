@@ -1,10 +1,13 @@
 from datetime import datetime
 import asyncio
+import logging
 from typing import List, Optional, Dict, Any
 import uuid
 from app.lib.firebase_admin import db
 from app.schemas.inspector import InspectorCreate
 import hashlib
+
+logger = logging.getLogger(__name__)
 
 class InspectorService:
     @staticmethod
@@ -178,9 +181,11 @@ class InspectorService:
                 sync_count += 1
                 
             await asyncio.to_thread(batch.commit)
+            logger.info(f"Müfettiş senkronizasyonu tamamlandı. {sync_count} kayıt aktarıldı.")
             return {"status": "success", "processed": sync_count, "message": f"{sync_count} müfettiş başarıyla senkronize edildi."}
             
         except Exception as e:
+            logger.error(f"Müfettiş senkronizasyon hatası: {str(e)}")
             return {"status": "error", "message": f"Müfettiş senkronizasyon hatası: {str(e)}"}
 
     @staticmethod

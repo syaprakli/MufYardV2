@@ -8,7 +8,9 @@ from app.lib.firebase_admin import db, bucket
 from app.schemas.legislation import LegislationCreate, LegislationUpdate
 from fastapi import UploadFile
 
-MEVZUAT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "Mevzuat")
+from app.config import get_settings
+settings = get_settings()
+MEVZUAT_DIR = settings.MEVZUAT_DIR
 
 class LegislationService:
     @staticmethod

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, UploadFile, File
 from typing import List, Optional, Dict, Any
 from app.services.contact_service import ContactService
 from app.schemas.contact import ContactCreate, ContactUpdate, ContactResponse
+from app.config import BASE_DIR
 
 router = APIRouter(tags=["contacts"])
 
@@ -34,9 +35,9 @@ async def upload_and_sync(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Sadece Excel dosyaları (.xlsx, .xls) kabul edilir.")
         
     try:
-        # Path to root directory (backend/)
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        file_path = os.path.join(base_dir, "rehber.xlsx")
+        # Path to data directory
+        from app.config import DATA_DIR
+        file_path = os.path.join(DATA_DIR, "rehber.xlsx")
         
         # Save file to disk
         content = await file.read()

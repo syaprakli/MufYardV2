@@ -482,7 +482,10 @@ Lütfen şunları analiz et:
                         <h3 className="font-black text-[11px] text-slate-500 uppercase tracking-widest">Görev Süre Durumu</h3>
                     </div>
                     <div className="h-[300px] w-full relative">
-                        <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                        {sureData.every(d => d.value === 0) ? (
+                            <div className="flex items-center justify-center h-full text-slate-400 text-xs font-bold">Henüz veri yok</div>
+                        ) : (
+                        <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={0}>
                             <BarChart data={sureData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={(theme as string) === 'dark' ? '#1e293b' : '#f8fafc'} />
                                 <XAxis 
@@ -516,6 +519,7 @@ Lütfen şunları analiz et:
                                 </Bar>
                             </BarChart>
                         </ResponsiveContainer>
+                        )}
                     </div>
                 </Card>
 
@@ -526,7 +530,10 @@ Lütfen şunları analiz et:
                         <h3 className="font-black text-[11px] text-slate-500 uppercase tracking-widest">Görev Türü Analizi</h3>
                     </div>
                     <div className="h-[300px] w-full relative">
-                        <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                        {typeData.length === 0 ? (
+                            <div className="flex items-center justify-center h-full text-slate-400 text-xs font-bold">Henüz veri yok</div>
+                        ) : (
+                        <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={0}>
                             <PieChart>
                                 <Pie
                                     data={typeData}
@@ -541,6 +548,7 @@ Lütfen şunları analiz et:
                                 <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{fontSize: '9px', fontWeight: 'bold'}} />
                             </PieChart>
                         </ResponsiveContainer>
+                        )}
                     </div>
                 </Card>
 
@@ -551,7 +559,10 @@ Lütfen şunları analiz et:
                         <h3 className="font-black text-[11px] text-slate-500 uppercase tracking-widest">Rapor Yazım Süreci</h3>
                     </div>
                     <div className="h-[300px] w-full relative">
-                        <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                        {statusCounts.length === 0 ? (
+                            <div className="flex items-center justify-center h-full text-slate-400 text-xs font-bold">Henüz veri yok</div>
+                        ) : (
+                        <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={0}>
                             <PieChart>
                                 <Pie
                                     data={statusCounts}
@@ -566,6 +577,7 @@ Lütfen şunları analiz et:
                                 <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{fontSize: '9px', fontWeight: 'bold'}} />
                             </PieChart>
                         </ResponsiveContainer>
+                        )}
                     </div>
                 </Card>
             </div>

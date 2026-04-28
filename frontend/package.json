@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "electron": "electron .",
+    "build:web": "tsc -b && vite build --mode web",
     "dist:win": "npm run build && electron-builder --win nsis"
   },
   "dependencies": {
@@ -68,20 +69,28 @@
     ],
     "extraResources": [
       {
-        "from": "../backend/dist/mufyard-backend.exe",
-        "to": "backend-dist/mufyard-backend.exe"
+        "from": "../backend/dist/mufyard-backend",
+        "to": "backend-dist"
       },
       {
         "from": "../backend/.env",
         "to": "backend-dist/.env"
       },
       {
-        "from": "../backend/firebase-credentials.json",
-        "to": "backend-dist/firebase-credentials.json"
-      },
-      {
         "from": "../backend/rehber.xlsx",
         "to": "backend-dist/rehber.xlsx"
+      },
+      {
+        "from": "../backend/Mevzuat",
+        "to": "backend-dist/Mevzuat"
+      },
+      {
+        "from": "../backend/Raporlar",
+        "to": "backend-dist/Raporlar"
+      },
+      {
+        "from": "../backend/uploads",
+        "to": "backend-dist/uploads"
       }
     ],
     "win": {

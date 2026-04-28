@@ -2,12 +2,14 @@ import os
 import json
 from typing import Optional
 from datetime import datetime
+from app.config import get_settings
+settings = get_settings()
 
 # Root directory for reports
-BASE_REPORTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "Raporlar")
+BASE_REPORTS_DIR = settings.REPORTS_DIR
 
 # Dosya izinleri metadata dosyasının yolu
-PERMISSIONS_FILE = os.path.join(os.path.dirname(__file__), "file_permissions.json")
+PERMISSIONS_FILE = settings.PERMISSIONS_FILE
 
 # Standard subfolders
 STANDARD_SUBFOLDERS = [

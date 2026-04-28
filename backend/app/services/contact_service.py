@@ -1,8 +1,11 @@
 from datetime import datetime
 import asyncio
+import logging
 from typing import List, Optional, Dict, Any
 from app.lib.firebase_admin import db
 from app.schemas.contact import ContactCreate, ContactUpdate
+
+logger = logging.getLogger(__name__)
 
 class ContactService:
     @staticmethod
@@ -341,10 +344,12 @@ class ContactService:
             if sync_count % 400 != 0:
                 await asyncio.to_thread(batch.commit)
             
+            logger.info(f"Rehber senkronizasyonu tamamlandı. {sync_count} kayıt aktarıldı.")
             return {
                 "status": "success", "processed": sync_count,
                 "message": f"{sync_count} personel rehbere aktarıldı/güncellendi. Mailler otomatik eşitlendi."
             }
-            
+        
         except Exception as e:
+            logger.error(f"Rehber senkronizasyon hatası: {str(e)}")
             return {"status": "error", "message": f"V6 senkronizasyon hatası: {str(e)}"}

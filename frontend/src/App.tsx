@@ -6,7 +6,7 @@ import { NotificationProvider } from "./lib/context/NotificationContext";
 import { ThemeProvider } from "./lib/context/ThemeContext";
 
 import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth";
-import { auth } from "./lib/firebase";
+import { auth, isElectron } from "./lib/firebase";
 import { Toaster } from "react-hot-toast";
 
 import { MainLayout } from "./components/layout/MainLayout";
@@ -37,7 +37,7 @@ function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
 
   useEffect(() => {
-    if (updateAvailable) {
+    if (updateAvailable && isElectron) {
       setShowUpdateModal(true);
     }
   }, [updateAvailable]);
@@ -77,7 +77,7 @@ function App() {
                 }
               }} 
             />
-            {updateAvailable && (
+            {updateAvailable && isElectron && (
               <UpdateModal 
                 isOpen={showUpdateModal} 
                 onClose={() => setShowUpdateModal(false)}
