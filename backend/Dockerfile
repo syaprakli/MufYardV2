@@ -26,5 +26,5 @@ ENV PORT=8000
 # Expose port
 EXPOSE 8000
 
-# Start application using uvicorn (or gunicorn for higher performance)
-CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT
+# Start application using uvicorn
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

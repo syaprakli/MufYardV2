@@ -30,6 +30,7 @@ function GeminiKeySection() {
     const [statusMsg, setStatusMsg] = useState("");
     const [maskedKey, setMaskedKey] = useState("");
     const [hasKey, setHasKey] = useState(false);
+    const [isPremium, setIsPremium] = useState(false);
 
     // Açılışta mevcut ayarları çek
     useEffect(() => {
@@ -40,6 +41,7 @@ function GeminiKeySection() {
                 if (res.ok) {
                     const data = await res.json();
                     setHasKey(data.has_key);
+                    setIsPremium(data.has_premium_ai);
                     setMaskedKey(data.masked_key || "");
                     if (data.gemini_model) setModel(data.gemini_model);
                 }

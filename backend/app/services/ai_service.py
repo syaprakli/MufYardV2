@@ -60,8 +60,8 @@ def _build_model(api_key: str, model_name: str, system_instruction: str | None =
     return genai.GenerativeModel(full_model_name, **kwargs)
 
 
-async def _get_user_ai_settings(uid: str) -> tuple[str, str, float, str]:
-    """Kullanıcının profilindeki AI ayarlarını çeker: api_key, model, temperature, system_prompt.
+async def _get_user_ai_settings(uid: str) -> tuple[str, str, float, str, bool]:
+    """Kullanıcının profilindeki AI ayarlarını çeker: api_key, model, temperature, system_prompt, is_premium.
     Yerel ayarlar (local_settings.json) Firestore'dan gelenlerin üzerini yazar.
     """
     # Varsayılan Değerler
@@ -69,6 +69,7 @@ async def _get_user_ai_settings(uid: str) -> tuple[str, str, float, str]:
     res_model = "gemini-2.5-flash"
     res_temp = 0.7
     res_sp = ""
+    res_premium = False
 
     # 1. Firestore'dan (Cloud) genel ayarları çek
     try:
@@ -80,6 +81,7 @@ async def _get_user_ai_settings(uid: str) -> tuple[str, str, float, str]:
             res_model = (data.get("gemini_model") or data.get("ai_model") or res_model).strip()
             res_temp = float(data.get("ai_temperature") or res_temp)
             res_sp = (data.get("ai_system_prompt") or "").strip()
+            res_premium = bool(data.get("has_premium_ai") or False)
     except Exception as e:
         logger.warning(f"Error fetching Firestore AI settings: {e}")
 
@@ -98,7 +100,7 @@ async def _get_user_ai_settings(uid: str) -> tuple[str, str, float, str]:
     except Exception as e:
         logger.error(f"Error merging local AI settings: {e}")
 
-    return res_key, res_model, res_temp, res_sp
+    return res_key, res_model, res_temp, res_sp, res_premium
 
 
 def _extract_text_from_pdf(file_bytes: bytes) -> str:
@@ -127,9 +129,15 @@ class AIService:
         if not user or not user.get("uid"):
             raise ValueError("Kullanıcı doğrulaması eksik.")
 
-        api_key, model_name, temperature, user_system_prompt = await _get_user_ai_settings(user["uid"])
+        api_key, model_name, temperature, user_system_prompt, is_premium = await _get_user_ai_settings(user["uid"])
+        
+        # Premium veya sistem anahtarı kullanımı kontrolü
         if not api_key:
-            raise ValueError("Henüz bir Gemini API anahtarı tanımlanmamış. Ayarlar sayfasından kendi anahtarınızı girin.")
+            if is_premium and settings.GEMINI_API_KEY:
+                api_key = settings.GEMINI_API_KEY
+                logger.info(f"User {user['uid']} using system premium API key.")
+            else:
+                raise ValueError("Henüz bir Gemini API anahtarı tanımlanmamış. Ayarlar sayfasından kendi anahtarınızı girin veya sistem yetkisi isteyin.")
 
         # Tüm bağlamları paralel topla
         audit_ctx, contacts_ctx, knowledge_ctx, legislation_ctx = await asyncio.gather(
@@ -302,9 +310,12 @@ TALİMATLAR:
         if not user or not user.get("uid"):
             raise ValueError("Kullanıcı doğrulaması eksik.")
 
-        api_key, model_name, _temperature, _user_sp = await _get_user_ai_settings(user["uid"])
+        api_key, model_name, _temperature, _user_sp, is_premium = await _get_user_ai_settings(user["uid"])
         if not api_key:
-            raise ValueError("Henüz bir Gemini API anahtarı tanımlanmamış.")
+            if is_premium and settings.GEMINI_API_KEY:
+                api_key = settings.GEMINI_API_KEY
+            else:
+                raise ValueError("Henüz bir Gemini API anahtarı tanımlanmamış.")
 
         # Denetim verisini çek
         audit = await AuditService.get_audit(audit_id)
@@ -397,9 +408,12 @@ GÜNCEL TARİH: {datetime.now().strftime('%d.%m.%Y')}
         if not user or not user.get("uid"):
             raise ValueError("Kullanıcı doğrulaması eksik.")
 
-        api_key, model_name, _temperature, _user_sp = await _get_user_ai_settings(user["uid"])
+        api_key, model_name, _temperature, _user_sp, is_premium = await _get_user_ai_settings(user["uid"])
         if not api_key:
-            raise ValueError("Henüz bir Gemini API anahtarı tanımlanmamış.")
+            if is_premium and settings.GEMINI_API_KEY:
+                api_key = settings.GEMINI_API_KEY
+            else:
+                raise ValueError("Henüz bir Gemini API anahtarı tanımlanmamış.")
 
         # Belirli bir belge mi yoksa tümü mü?
         if legislation_id:

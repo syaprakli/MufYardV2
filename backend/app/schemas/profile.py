@@ -10,6 +10,7 @@ class ProfileBase(BaseModel):
     avatar_url: Optional[str] = None
     theme: str = Field(default="navy", example="dark") # "navy", "dark", "light"
     ai_enabled: bool = True
+    has_premium_ai: bool = False
     notifications_enabled: bool = True
     role: str = Field(default="user", example="admin") # "admin", "moderator", "user"
     fcm_token: Optional[str] = None
@@ -33,6 +34,7 @@ class ProfileUpdate(BaseModel):
     avatar_url: Optional[str] = None
     theme: Optional[str] = None
     ai_enabled: Optional[bool] = None
+    has_premium_ai: Optional[bool] = None
     notifications_enabled: Optional[bool] = None
     role: Optional[str] = None
     fcm_token: Optional[str] = None

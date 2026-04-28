@@ -10,12 +10,23 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import get_settings, BASE_DIR, DATA_DIR
 
 # --- KARAKUTU (LOG) SİSTEMİ ---
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR, exist_ok=True)
+
 log_file = os.path.join(DATA_DIR, "backend_logs.txt")
+
+# Hem dosyaya hem konsola (Railway logları için) yaz
+log_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+file_handler = logging.FileHandler(log_file, encoding='utf-8')
+file_handler.setFormatter(log_format)
+
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(log_format)
+
 logging.basicConfig(
-    filename=log_file,
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    encoding='utf-8'
+    handlers=[file_handler, stream_handler]
 )
 logger = logging.getLogger(__name__)
 logger.info("--- MufYARD Arka Plan Servisi Başlatılıyor ---")
