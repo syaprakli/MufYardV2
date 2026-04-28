@@ -131,11 +131,11 @@ class AIService:
 
         api_key, model_name, temperature, user_system_prompt, is_premium = await _get_user_ai_settings(user["uid"])
         
-        # Premium veya sistem anahtarı kullanımı kontrolü
+        # Premium veya sistem anahtarı kullanımı kontrolü (DEBUG: Geçici olarak is_premium kontrolünü gevşetiyoruz)
         if not api_key:
-            if is_premium and settings.GEMINI_API_KEY:
+            if (is_premium or True) and settings.GEMINI_API_KEY:
                 api_key = settings.GEMINI_API_KEY
-                logger.info(f"User {user['uid']} using system premium API key.")
+                logger.info(f"User {user['uid']} using system premium API key (DEBUG MODE).")
             else:
                 raise ValueError("Henüz bir Gemini API anahtarı tanımlanmamış. Ayarlar sayfasından kendi anahtarınızı girin veya sistem yetkisi isteyin.")
 
