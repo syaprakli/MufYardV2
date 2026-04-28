@@ -126,11 +126,12 @@ async def get_my_ai_settings(
     key = local_settings.get("gemini_api_key")
     model = local_settings.get("gemini_model")
     
-    # Yerelde yoksa Firestore'dan (eski yöntem) çekmeyi deneme but let's stick to local if we want to move away
+    # Yerelde yoksa Firestore'dan çekmeyi deneme
+    has_premium_ai = False
     if not key:
         try:
-            # Firestore'dan çek (4 değer döner: key, model, has_key, masked)
-            key, firebase_model, _, _ = await _get_user_ai_settings(current_user["uid"])
+            # Firestore'dan çek (5 değer döner: key, model, temp, prompt, is_premium)
+            key, firebase_model, _, _, has_premium_ai = await _get_user_ai_settings(current_user["uid"])
             if not model:
                 model = firebase_model
         except Exception as e:
@@ -141,7 +142,12 @@ async def get_my_ai_settings(
     if key:
         masked = key[:6] + "*" * max(0, len(key) - 10) + key[-4:] if len(key) > 10 else "****"
     
-    return {"has_key": bool(key), "masked_key": masked, "gemini_model": model or "gemini-2.0-flash"}
+    return {
+        "has_key": bool(key), 
+        "masked_key": masked, 
+        "gemini_model": model or "gemini-2.0-flash",
+        "has_premium_ai": has_premium_ai
+    }
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -259,9 +265,18 @@ async def test_gemini_connection(
     """Kullanıcının kendi Gemini API anahtarını test eder."""
     try:
         import google.generativeai as genai
-        key, model_name, _, _ = await _get_user_ai_settings(current_user["uid"])
+        from app.config import get_settings
+        settings = get_settings()
+        
+        key, model_name, _, _, is_premium = await _get_user_ai_settings(current_user["uid"])
+        
+        # Premium anahtarı kontrolü
         if not key:
-            return {"connected": False, "message": "Henüz API anahtarı girilmemiş. Ayarlardan anahtarınızı kaydedin."}
+            if is_premium and settings.GEMINI_API_KEY:
+                key = settings.GEMINI_API_KEY
+                logger.info(f"Testing connection for premium user {current_user['uid']} using system key.")
+            else:
+                return {"connected": False, "message": "Henüz API anahtarı girilmemiş. Ayarlar sayfasına gidip kendi anahtarınızı girin veya sistem yetkisi isteyin."}
             
         genai.configure(api_key=key)
         
