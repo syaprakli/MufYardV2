@@ -10,6 +10,7 @@ export interface Profile {
     avatar_url: string | null;
     theme: string;
     ai_enabled: boolean;
+    has_premium_ai: boolean;
     notifications_enabled: boolean;
     ai_model?: string;
     ai_temperature?: number;

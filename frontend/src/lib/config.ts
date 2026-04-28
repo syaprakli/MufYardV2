@@ -1,8 +1,7 @@
 import { isElectron } from "./firebase";
 
-// Backend'i yayınladığınızda bu adresi güncelleyeceğiz.
-// Şimdilik VITE_PUBLIC_API_URL varsa onu kullan, yoksa yereli dene (Web'de çalışmayabilir).
-const PUBLIC_BACKEND_URL = import.meta.env.VITE_PUBLIC_API_URL || "http://127.0.0.1:8000"; 
+// Backend'i yayınladık: Railway adresi
+const PUBLIC_BACKEND_URL = "https://mufyardv2.up.railway.app"; 
 
 export const API_URL = isElectron 
     ? "http://127.0.0.1:8000/api" 

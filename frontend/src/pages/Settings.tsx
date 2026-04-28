@@ -100,12 +100,24 @@ function GeminiKeySection() {
             <div className="flex items-center gap-3">
                 <Key className="text-primary" size={22} />
                 <div>
-                    <h3 className="font-black text-lg text-slate-900 dark:text-slate-100 tracking-tight">Gemini API Anahtarınız</h3>
+                    <div className="flex items-center gap-2">
+                        <h3 className="font-black text-lg text-slate-900 dark:text-slate-100 tracking-tight">Gemini API Anahtarınız</h3>
+                        {isPremium && (
+                            <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[9px] font-black uppercase tracking-widest rounded-full border border-amber-200 dark:border-amber-800/50">
+                                Premium AI Aktif
+                            </span>
+                        )}
+                    </div>
                     <p className="text-[12px] text-slate-400 dark:text-slate-500 font-medium">
-                        Her kullanıcı kendi anahtarını kullanır. Maliyet size ait değildir.{" "}
-                        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                            Buradan ücretsiz al →
-                        </a>
+                        {isPremium 
+                            ? "Kurucu anahtarı kullanıyorsunuz. Kendi anahtarınızı girmenize gerek yoktur." 
+                            : "Her kullanıcı kendi anahtarını kullanır. Maliyet size ait değildir."
+                        }
+                        {!isPremium && (
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary hover:underline ml-1">
+                                Buradan ücretsiz al →
+                            </a>
+                        )}
                     </p>
                 </div>
             </div>
