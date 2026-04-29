@@ -12,9 +12,15 @@ import {
     Bot,
     HelpCircle,
     Sparkles,
-    MessageSquare
+    MessageSquare,
+    X
 } from "lucide-react";
 import { cn } from "../../lib/utils";
+
+interface SidebarProps {
+    isOpen: boolean;
+    onClose: () => void;
+}
 
 
 const navItems = [
@@ -40,12 +46,25 @@ const bottomNavItems = [
     { icon: Settings, label: "Ayarlar", href: "/settings" },
 ];
 
-export function Sidebar() {
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
     return (
-        <aside className="w-64 bg-slate-950 text-white h-screen flex flex-col fixed left-0 top-0 z-20 border-r border-slate-900/50">
-            <div className="p-6 border-b border-primary-light">
-                <h1 className="text-2xl font-black font-outfit tracking-tight">MüfYard</h1>
-                <p className="text-[10px] font-bold text-white tracking-widest mt-1">DİJİTAL MÜFETTİŞ YARDIMCISI</p>
+        <aside className={cn(
+            "w-64 bg-slate-950 text-white h-screen flex flex-col fixed left-0 top-0 z-50 border-r border-slate-900/50 transition-all duration-300 ease-in-out",
+            "lg:translate-x-0", // Always show on desktop
+            isOpen ? "translate-x-0" : "-translate-x-full" // Toggle on mobile
+        )}>
+            <div className="p-6 border-b border-primary-light flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-black font-outfit tracking-tight text-white">MüfYard</h1>
+                    <p className="text-[10px] font-bold text-white/60 tracking-widest mt-1">DİJİTAL MÜFETTİŞ YARDIMCISI</p>
+                </div>
+                {/* Close button for mobile */}
+                <button 
+                    onClick={onClose}
+                    className="lg:hidden p-2 text-white/50 hover:text-white transition-colors"
+                >
+                    <X size={20} />
+                </button>
             </div>
 
             <nav className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-0.5">
@@ -53,6 +72,9 @@ export function Sidebar() {
                     <NavLink
                         key={item.href}
                         to={item.href}
+                        onClick={() => {
+                            if (window.innerWidth < 1024) onClose();
+                        }}
                         className={({ isActive }) => cn(
                             "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200",
                             isActive
@@ -86,6 +108,9 @@ export function Sidebar() {
                     <NavLink
                         key={item.href}
                         to={item.href}
+                        onClick={() => {
+                            if (window.innerWidth < 1024) onClose();
+                        }}
                         className={({ isActive }) => cn(
                             "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
                             isActive

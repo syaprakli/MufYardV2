@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword as firebaseSignIn, createUserWithEmailAndPassword as firebaseSignUp, GoogleAuthProvider, signInWithPopup, updateProfile } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword as firebaseSignIn, createUserWithEmailAndPassword as firebaseSignUp, GoogleAuthProvider, signInWithPopup, updateProfile, sendEmailVerification } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -78,6 +78,8 @@ export const signUp = async (email: string, pass: string, name: string) => {
     const result = await firebaseSignUp(auth, email, pass);
     if (result.user) {
       await updateProfile(result.user, { displayName: name });
+      // Kayıt sonrası doğrulama maili gönder
+      await sendEmailVerification(result.user);
     }
     return result;
   } catch (error) {

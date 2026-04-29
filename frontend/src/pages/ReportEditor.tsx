@@ -406,33 +406,24 @@ export default function ReportEditor() {
     return (
         <div className="h-screen flex flex-col bg-[#f3f4f6]">
             {/* Toolbar */}
-            <div className="bg-white border-b border-border px-8 py-3.5 flex items-center justify-between shadow-sm shrink-0 z-50">
+            <div className="bg-white border-b border-border px-6 py-2 flex items-center justify-between shadow-sm shrink-0 z-50">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="rounded-full">
+                    <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="rounded-full w-8 h-8 p-0">
                         <ArrowLeft size={18} />
                     </Button>
-                    <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h2 className="font-bold text-lg text-primary font-outfit">{audit?.title}</h2>
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-nowrap">
+                            <h2 className="font-bold text-base text-primary font-outfit truncate max-w-[200px] md:max-w-[400px]">{audit?.title}</h2>
                             {providerStatus === "connected" && (
-                                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-full border border-emerald-100">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Canlı Senkronizasyon
-                                </span>
-                            )}
-                            <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-600 whitespace-nowrap">
-                                <span className={`w-1.5 h-1.5 rounded-full ${providerStatus === 'connected' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                                Çevrimiçi: {providerStatus === 'connected' ? onlineUsers.length : 0}
-                            </span>
-                            {providerStatus === 'connected' && onlineUsers.length > 0 && (
-                                <span className="text-[11px] font-semibold text-slate-500 truncate max-w-[320px]" title={onlineUsers.map((u) => u.name).join(', ')}>
-                                    {onlineUsers.map((u) => u.name).join(', ')}
+                                <span className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase rounded-full border border-emerald-100">
+                                    <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" /> Canlı
                                 </span>
                             )}
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground font-bold tracking-wide">
-                            <FileText size={12} /> Rapor Düzenleyici
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-bold tracking-wide">
+                            <FileText size={10} /> Rapor Düzenleyici
                             {lastSaved && (
-                                <span className="flex items-center gap-1 text-success ml-2 font-black">
+                                <span className="flex items-center gap-1 text-success font-black">
                                     <CheckCircle size={10} /> {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                             )}
@@ -440,16 +431,25 @@ export default function ReportEditor() {
                     </div>
                 </div>
 
-                <div className="flex flex-col items-end gap-2">
-                    <div className="flex items-center gap-3 flex-wrap justify-end">
-                        {/* Active Collaborators */}
+                <div className="flex items-center gap-4">
+                    <div className="hidden lg:flex items-center gap-2">
+                        <div className="flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1 bg-slate-50/50">
+                            <button type="button" onClick={() => setZoom((z) => Math.max(70, z - 10))} className="text-[10px] font-black text-slate-400 hover:text-slate-800 px-1">-</button>
+                            <span className="text-[10px] font-black text-slate-600 min-w-[32px] text-center">{zoom}%</span>
+                            <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="text-[10px] font-black text-slate-400 hover:text-slate-800 px-1">+</button>
+                        </div>
+                        <button type="button" onClick={() => setPageMode((v) => !v)} className="text-[10px] font-bold text-slate-500 hover:text-slate-800 px-2 border-l">{pageMode ? 'Sayfa' : 'Akış'}</button>
+                        <button type="button" onClick={() => setShowOutline((v) => !v)} className="text-[10px] font-bold text-slate-500 hover:text-slate-800 px-2 border-l">{showOutline ? 'Anahat' : 'Tam'}</button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
                         {providerStatus === 'connected' && onlineUsers.length > 0 && (
-                            <div className="flex -space-x-2 mr-1">
+                            <div className="flex -space-x-1.5 mr-2">
                                 {onlineUsers.map((u, i) => (
                                     <div
                                         key={i}
                                         title={u.name}
-                                        className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-black text-white shadow-sm transition-transform hover:scale-110 hover:z-10 cursor-help"
+                                        className="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[9px] font-black text-white shadow-sm"
                                         style={{ backgroundColor: u.color }}
                                     >
                                         {u.name.substring(0, 2).toUpperCase()}
@@ -457,42 +457,29 @@ export default function ReportEditor() {
                                 ))}
                             </div>
                         )}
-                        <Button variant="ghost" onClick={() => setIsShareModalOpen(true)} className="rounded-xl border border-border bg-slate-50 hover:bg-slate-100 text-slate-700 h-9 px-4">
-                            <Users size={16} className="mr-2" />
-                            Paylaşım
-                        </Button>
-                        <Button variant="ghost" onClick={() => setIsHistoryOpen(true)} className="rounded-xl border border-border bg-slate-50 hover:bg-slate-100 text-slate-700 h-9 px-4">
-                            <History size={16} className="mr-2" />
-                            Sürümler
-                        </Button>
-                        <Button variant="ghost" onClick={() => openChat(`audit_${id}`, audit?.title || "Denetim Raporu", "audit")} className="rounded-xl border border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary h-9 px-4">
-                            <MessageSquare size={16} className="mr-2" />
-                            Ekip Sohbeti
-                        </Button>
-                        <Button variant="ghost" onClick={() => setIsAIPanelOpen(true)} className="rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 h-9 px-4 font-bold">
-                            <Wand2 size={16} className="mr-2" />
-                            AI ile Rapor Yaz
-                        </Button>
-                        <Button variant="outline" onClick={handleSave} disabled={saving} className="rounded-xl border-primary/20 h-9 px-4">
-                            {saving ? <Loader2 size={16} className="animate-spin mr-2" /> : <Save size={16} className="mr-2" />}
-                            Kaydet
-                        </Button>
-                        <Button onClick={handleExportWord} className="rounded-xl bg-[#0f172a] hover:bg-black text-white shadow-lg h-9 px-4">
-                            <Download size={16} className="mr-2" /> Word
-                        </Button>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-nowrap justify-end w-full overflow-x-auto pb-1">
-                        <div className="flex items-center gap-1 border border-slate-200 rounded-xl px-2 py-1 bg-slate-50">
-                            <button type="button" onClick={() => setZoom((z) => Math.max(70, z - 10))} className="text-xs font-black text-slate-500 hover:text-slate-800">-</button>
-                            <span className="text-[11px] font-black text-slate-600 min-w-[42px] text-center">{zoom}%</span>
-                            <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="text-xs font-black text-slate-500 hover:text-slate-800">+</button>
-                            <button type="button" onClick={() => setZoom(100)} className="ml-1 text-[10px] font-bold text-slate-500 hover:text-slate-700">Sıfırla</button>
+                        
+                        <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100">
+                            <Button variant="ghost" onClick={() => setIsShareModalOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all">
+                                <Users size={14} className="mr-1.5" /> <span className="hidden xl:inline">Paylaşım</span>
+                            </Button>
+                            <Button variant="ghost" onClick={() => setIsHistoryOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all">
+                                <History size={14} className="mr-1.5" /> <span className="hidden xl:inline">Sürümler</span>
+                            </Button>
+                            <Button variant="ghost" onClick={() => openChat(`audit_${id}`, audit?.title || "Denetim Raporu", "audit")} className="h-8 px-3 text-[11px] font-bold text-primary rounded-lg hover:bg-white hover:shadow-sm transition-all">
+                                <MessageSquare size={14} className="mr-1.5" /> <span className="hidden xl:inline">Sohbet</span>
+                            </Button>
                         </div>
-                        <div className="flex items-center gap-1 border border-slate-200 rounded-xl px-2 py-1 bg-slate-50">
-                            <button type="button" onClick={() => setPageMode((v) => !v)} className="text-[10px] font-bold text-slate-600 hover:text-slate-800">{pageMode ? 'Sayfa Modu Açık' : 'Sayfa Modu Kapalı'}</button>
-                            <span className="text-slate-300">|</span>
-                            <button type="button" onClick={() => setShowOutline((v) => !v)} className="text-[10px] font-bold text-slate-600 hover:text-slate-800">{showOutline ? 'Anahat Açık' : 'Anahat Kapalı'}</button>
+
+                        <div className="flex items-center gap-1">
+                            <Button variant="ghost" onClick={() => setIsAIPanelOpen(true)} className="h-8 px-3 text-[11px] font-black text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg">
+                                <Wand2 size={14} className="mr-1.5" /> AI
+                            </Button>
+                            <Button variant="outline" onClick={handleSave} disabled={saving} className="h-8 px-3 text-[11px] font-bold border-primary/20 rounded-lg">
+                                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="mr-1.5" />} Kaydet
+                            </Button>
+                            <Button onClick={handleExportWord} className="h-8 px-3 text-[11px] font-black bg-slate-900 text-white rounded-lg shadow-sm">
+                                <Download size={14} className="mr-1.5" /> Word
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -725,7 +712,7 @@ export default function ReportEditor() {
             `}</style>
             {/* AI Rapor Üretme Paneli */}
             {isAIPanelOpen && (
-                <div className="fixed inset-y-0 right-0 w-[420px] bg-white shadow-2xl z-[100] border-l border-border flex flex-col animate-in slide-in-from-right-10 duration-300">
+                <div className="fixed inset-y-0 right-0 w-full md:w-[420px] bg-white shadow-2xl z-[100] border-l border-border flex flex-col animate-in slide-in-from-right-10 duration-300">
                     <div className="p-5 border-b border-violet-100 flex items-center justify-between bg-gradient-to-r from-violet-50 to-purple-50">
                         <h3 className="font-bold flex items-center gap-2 text-violet-800">
                             <Wand2 size={18} className="text-violet-600"/> AI Rapor Asistanı
@@ -846,7 +833,7 @@ export default function ReportEditor() {
 
             {/* Sürüm Geçmişi Çekmecesi (Drawer) */}
             {isHistoryOpen && (
-                <div className="fixed inset-y-0 right-0 w-80 bg-white shadow-2xl z-[100] border-l border-border flex flex-col animate-in slide-in-from-right-10 duration-300">
+                <div className="fixed inset-y-0 right-0 w-full md:w-80 bg-white shadow-2xl z-[100] border-l border-border flex flex-col animate-in slide-in-from-right-10 duration-300">
                     <div className="p-5 border-b border-border flex items-center justify-between bg-slate-50">
                         <h3 className="font-bold flex items-center gap-2"><History size={18} className="text-primary"/> Sürüm Geçmişi</h3>
                         <Button variant="ghost" size="sm" onClick={() => setIsHistoryOpen(false)} className="rounded-full w-8 h-8 p-0">

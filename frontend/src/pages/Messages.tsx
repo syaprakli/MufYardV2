@@ -296,7 +296,7 @@ export default function Messages() {
         </div>
 
         {/* Main: Empty State or Active Conversation (Not implemented here since we use FloatingChat) */}
-        <div className="md:col-span-8 bg-card/50 border border-slate-200 dark:border-slate-800 border-dashed rounded-3xl flex flex-col items-center justify-center text-center p-12 space-y-6">
+        <div className="hidden md:flex md:col-span-8 bg-card/50 border border-slate-200 dark:border-slate-800 border-dashed rounded-3xl flex-col items-center justify-center text-center p-12 space-y-6">
           <div className="w-20 h-20 rounded-3xl bg-muted flex items-center justify-center text-slate-300 dark:text-slate-600">
             <MessageSquare size={40} />
           </div>

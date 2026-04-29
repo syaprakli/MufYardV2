@@ -49,8 +49,7 @@ class TaskService:
                 tasks_ref.where('accepted_collaborators', 'array_contains', user_id) if user_id else None,
                 tasks_ref.where('accepted_collaborators', 'array_contains', user_email) if user_email else None,
                 tasks_ref.where('pending_collaborators', 'array_contains', user_id) if user_id else None,
-                tasks_ref.where('pending_collaborators', 'array_contains', user_email) if user_email else None,
-                tasks_ref.where('is_public', '==', True)
+                tasks_ref.where('pending_collaborators', 'array_contains', user_email) if user_email else None
             ]
 
             results = await asyncio.gather(*(run_query(q) for q in queries))

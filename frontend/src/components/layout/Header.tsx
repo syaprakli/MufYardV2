@@ -4,16 +4,15 @@ import { NotificationDropdown } from "./NotificationDropdown";
 import { useAuth } from "../../lib/hooks/useAuth";
 import { useConfirm } from "../../lib/context/ConfirmContext";
 import { useNotifications } from "../../lib/context/NotificationContext";
-import { Search, Bell, ChevronDown, User, LogOut } from "lucide-react";
+import { Search, Bell, ChevronDown, User, LogOut, Menu } from "lucide-react";
 import { fetchProfile } from "../../lib/api/profiles";
-
-
-
 import { cn } from "../../lib/utils";
 
+interface HeaderProps {
+    toggleSidebar: () => void;
+}
 
-
-export function Header() {
+export function Header({ toggleSidebar }: HeaderProps) {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const confirm = useConfirm();
@@ -80,15 +79,27 @@ export function Header() {
 
 
     return (
-        <header className="fixed top-0 right-0 left-64 h-16 border-b border-border bg-background flex items-center justify-between px-8 z-50 transition-all duration-300">
+        <header className={cn(
+            "fixed top-0 right-0 h-16 border-b border-border bg-background flex items-center justify-between px-4 lg:px-8 z-40 transition-all duration-300",
+            "lg:left-64 left-0"
+        )}>
+            <div className="flex items-center gap-4">
+                {/* Menu Toggle for Mobile */}
+                <button 
+                    onClick={toggleSidebar}
+                    className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                    <Menu size={24} />
+                </button>
 
-            <div className="flex items-center bg-muted border border-border rounded-full px-4 py-2 w-96 focus-within:ring-2 focus-within:ring-primary/5 transition-all">
-                <Search size={18} className="text-slate-400 mr-2" />
-                <input
-                    type="text"
-                    placeholder="Sistem genelinde ara..."
-                    className="bg-transparent border-none outline-none text-sm w-full font-medium"
-                />
+                <div className="hidden md:flex items-center bg-muted border border-border rounded-full px-4 py-2 w-64 lg:w-96 focus-within:ring-2 focus-within:ring-primary/5 transition-all">
+                    <Search size={18} className="text-slate-400 mr-2" />
+                    <input
+                        type="text"
+                        placeholder="Sistem genelinde ara..."
+                        className="bg-transparent border-none outline-none text-sm w-full font-medium"
+                    />
+                </div>
             </div>
 
             <div className="flex items-center gap-6">

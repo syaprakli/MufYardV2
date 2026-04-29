@@ -131,7 +131,7 @@ function GeminiKeySection() {
             )}
 
             {/* API Key + Model satırı */}
-            <div className="flex gap-3">
+            <div className="flex flex-col md:flex-row gap-3">
                 <div className="relative flex-1">
                     <input
                         type={showKey ? "text" : "password"}
@@ -151,7 +151,7 @@ function GeminiKeySection() {
                 <select
                     value={model}
                     onChange={e => setModel(e.target.value)}
-                    className="h-12 px-4 rounded-2xl border border-slate-200 dark:border-slate-700 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all bg-muted dark:bg-slate-800 dark:text-slate-100 cursor-pointer"
+                    className="h-12 px-4 rounded-2xl border border-slate-200 dark:border-slate-700 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all bg-muted dark:bg-slate-800 dark:text-slate-100 cursor-pointer w-full md:w-auto"
                 >
                     {GEMINI_MODELS.map(m => (
                         <option key={m.value} value={m.value}>{m.label}</option>
@@ -160,7 +160,7 @@ function GeminiKeySection() {
             </div>
 
             {/* Kaydet + Test satırı */}
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
                 <Button onClick={handleSave} disabled={saving} className="flex-1 h-12 rounded-2xl shadow-md shadow-primary/20 font-black">
                     {saving
                         ? <><Loader2 size={15} className="animate-spin mr-2" />Kaydediliyor</>  
@@ -556,37 +556,38 @@ export default function Settings() {
 
     return (
         <div className="space-y-8 max-w-6xl animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-            <div className="flex justify-between items-start">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div>
                     <h2 className="text-2xl font-black tracking-tight text-primary dark:text-primary/90 font-outfit">Sistem Ayarları</h2>
                     <p className="text-muted-foreground dark:text-slate-400 mt-2 font-medium">Hesap bilgilerinizi, uygulama tercihlerini ve güvenlik ayarlarını yönetin.</p>
                 </div>
-                <Button variant="outline" onClick={logout} className="text-rose-500 border-rose-100 dark:border-rose-900/30 bg-rose-50 dark:bg-rose-950/20 hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-xl px-8 h-12 shadow-sm font-semibold">
+                <Button variant="outline" onClick={logout} className="w-full sm:w-auto text-rose-500 border-rose-100 dark:border-rose-900/30 bg-rose-50 dark:bg-rose-950/20 hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-xl px-8 h-12 shadow-sm font-semibold">
                     <LogOut size={18} className="mr-2" /> Güvenli Çıkış
                 </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-                {/* Navigation Sidebar */}
-                <div className="md:col-span-3 space-y-2">
-                    <SettingsNav icon={User} label="Profil" active={activeTab === "Profil"} onClick={() => setActiveTab("Profil")} />
-                    <SettingsNav icon={FileText} label="Rapor Ayarları" active={activeTab === "Rapor Ayarları"} onClick={() => setActiveTab("Rapor Ayarları")} />
-                    <SettingsNav icon={Wand2} label="Yapay Zeka" active={activeTab === "Yapay Zeka"} onClick={() => setActiveTab("Yapay Zeka")} />
-                    <SettingsNav icon={Bell} label="Bildirimler" active={activeTab === "Bildirimler"} onClick={() => setActiveTab("Bildirimler")} />
-                    {/* <SettingsNav icon={Wand2} label="Bilgi Bankası (AI)" active={activeTab === "Bilgi Bankası (AI)"} onClick={() => setActiveTab("Bilgi Bankası (AI)")} /> */}
-                    <SettingsNav icon={Users} label="Müfettiş Listesi" active={activeTab === "Müfettiş Listesi"} onClick={() => setActiveTab("Müfettiş Listesi")} />
-                    <SettingsNav icon={Shield} label="Güvenlik" active={activeTab === "Güvenlik"} onClick={() => setActiveTab("Güvenlik")} />
-                    <SettingsNav icon={Database} label="Veri Ayarları" active={activeTab === "Veri Ayarları"} onClick={() => setActiveTab("Veri Ayarları")} />
+            <div className="flex flex-col md:grid md:grid-cols-12 gap-6 md:gap-8 min-h-0">
+                {/* Navigation Sidebar / Mobile Top Nav */}
+                <div className="md:col-span-3">
+                    <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-hide snap-x">
+                        <SettingsNav icon={User} label="Profil" active={activeTab === "Profil"} onClick={() => setActiveTab("Profil")} />
+                        <SettingsNav icon={FileText} label="Rapor Ayarları" active={activeTab === "Rapor Ayarları"} onClick={() => setActiveTab("Rapor Ayarları")} />
+                        <SettingsNav icon={Wand2} label="Yapay Zeka" active={activeTab === "Yapay Zeka"} onClick={() => setActiveTab("Yapay Zeka")} />
+                        <SettingsNav icon={Bell} label="Bildirimler" active={activeTab === "Bildirimler"} onClick={() => setActiveTab("Bildirimler")} />
+                        <SettingsNav icon={Users} label="Müfettiş Listesi" active={activeTab === "Müfettiş Listesi"} onClick={() => setActiveTab("Müfettiş Listesi")} />
+                        <SettingsNav icon={Shield} label="Güvenlik" active={activeTab === "Güvenlik"} onClick={() => setActiveTab("Güvenlik")} />
+                        <SettingsNav icon={Database} label="Veri Ayarları" active={activeTab === "Veri Ayarları"} onClick={() => setActiveTab("Veri Ayarları")} />
+                    </div>
                 </div>
 
                 {/* Content Area */}
-                <div className="md:col-span-9 space-y-6">
+                <div className="md:col-span-9 space-y-6 min-w-0">
                     {/* Profil Sekmesi */}
                     {activeTab === "Profil" && (
-                        <Card className="p-10 space-y-8 rounded-3xl border-none shadow-xl bg-card group overflow-hidden">
-                            <div className="flex items-center gap-8 border-b border-slate-100 dark:border-slate-800 pb-8 relative z-10">
-                                <div className="relative">
-                                    <div className="w-28 h-28 rounded-full bg-primary/5 dark:bg-primary/10 flex items-center justify-center overflow-hidden border-4 border-border shadow-xl ring-2 ring-primary/10">
+                        <Card className="p-4 sm:p-6 md:p-10 space-y-6 md:space-y-8 rounded-3xl border-none shadow-xl bg-card group">
+                            <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8 border-b border-slate-100 dark:border-slate-800 pb-8 relative z-10 text-center md:text-left">
+                                <div className="relative group/avatar">
+                                    <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-primary/5 dark:bg-primary/10 flex items-center justify-center overflow-hidden border-4 border-border shadow-xl ring-2 ring-primary/10 mx-auto transition-transform group-hover/avatar:scale-105">
                                         {uploadingAvatar ? (
                                             <Loader2 size={32} className="text-primary animate-spin" />
                                         ) : profile?.avatar_url ? (
@@ -598,29 +599,30 @@ export default function Settings() {
                                     <input 
                                         type="file" 
                                         className="hidden" 
+                                        id="avatar-input"
                                         accept="image/*"
                                         onChange={handleAvatarUpload}
                                         ref={avatarInputRef}
                                     />
                                     <button 
                                         onClick={() => avatarInputRef.current?.click()}
-                                        disabled={uploadingAvatar}
-                                        className="absolute bottom-0 right-0 p-2.5 bg-primary text-white rounded-full shadow-lg border-4 border-border hover:scale-110 transition-transform disabled:opacity-50"
+                                        className="absolute -bottom-1 -right-1 w-8 h-8 md:w-10 md:h-10 bg-primary text-white rounded-xl shadow-lg border-2 border-card flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
                                     >
-                                        <Camera size={18} />
+                                        <Camera size={14} className="md:size-5" />
                                     </button>
                                 </div>
-                                <div>
-                                    <h3 className="text-xl font-black font-outfit text-primary dark:text-primary/90 tracking-tight">{profile?.full_name}</h3>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="px-3 py-1 bg-primary text-white text-[10px] font-bold rounded-full">{profile?.title}</span>
-                                        <span className="text-sm font-bold text-muted-foreground dark:text-slate-400">{profile?.institution}</span>
+                                
+                                <div className="space-y-1.5 md:space-y-2 flex-1 min-w-0">
+                                    <h3 className="text-lg md:text-2xl font-black text-foreground tracking-tight uppercase font-outfit truncate">{profile?.full_name || "Müfettiş"}</h3>
+                                    <div className="flex flex-wrap justify-center md:justify-start items-center gap-2 mt-2">
+                                        <span className="px-3 py-1 rounded-full bg-primary text-white text-[10px] md:text-xs font-black uppercase tracking-widest">{profile?.title || "Müfettiş"}</span>
+                                        <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] md:text-xs font-bold">{profile?.institution || "GSB"}</span>
                                     </div>
-                                    <p className="text-xs text-muted-foreground dark:text-slate-500 mt-2 font-medium opacity-70 italic">{profile?.email}</p>
+                                    <p className="text-[10px] md:text-xs text-muted-foreground font-medium truncate italic mt-2">{profile?.email}</p>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-8 relative z-10">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 relative z-10">
                                 <div className="space-y-2">
                                     <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 ml-1">Ad Soyad</label>
                                     <input 
@@ -637,7 +639,7 @@ export default function Settings() {
                                         onChange={(e) => setProfile(prev => prev ? {...prev, title: e.target.value} : null)}
                                     />
                                 </div>
-                                <div className="space-y-2 col-span-2">
+                                <div className="space-y-2 md:col-span-2">
                                     <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-[0.2em] ml-1">Bağlı Olduğu Kurum</label>
                                     <input 
                                         className="w-full p-4 bg-muted border border-border rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 transition-all outline-none" 
@@ -645,7 +647,7 @@ export default function Settings() {
                                         onChange={(e) => setProfile(prev => prev ? {...prev, institution: e.target.value} : null)}
                                     />
                                 </div>
-                                <div className="space-y-2 col-span-2">
+                                <div className="space-y-2 md:col-span-2">
                                     <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-[0.2em] ml-1">Telefon Numarası</label>
                                     <input 
                                         className="w-full p-4 bg-muted border border-border rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 transition-all outline-none" 
@@ -670,7 +672,7 @@ export default function Settings() {
 
                     {/* Rapor Ayarları */}
                     {activeTab === "Rapor Ayarları" && (
-                        <Card className="p-10 space-y-8 rounded-3xl border-none shadow-xl bg-card">
+                        <Card className="p-4 sm:p-6 md:p-10 space-y-6 md:space-y-8 rounded-3xl border-none shadow-xl bg-card">
                             <div className="flex items-center gap-3">
                                 <FileText className="text-primary" size={24} />
                                 <h3 className="font-black text-xl font-outfit text-primary dark:text-primary/90 tracking-tight">Kodlama Standartları</h3>
@@ -678,7 +680,7 @@ export default function Settings() {
                             <div className="space-y-4">
                                 <div className="p-6 bg-muted dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
                                     <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-3 block">Varsayılan Rapor Kodu Ön Eki</label>
-                                    <div className="flex gap-4">
+                                    <div className="flex flex-col sm:flex-row gap-4">
                                         <input
                                             className="flex-1 p-4 bg-muted border border-border text-foreground rounded-xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 outline-none"
                                             value={raporOnek}
@@ -690,7 +692,7 @@ export default function Settings() {
                                                 localStorage.setItem('raporKoduOnek', raporOnek);
                                                 toast.success('Rapor öneki güncellendi.');
                                             }}
-                                            className="rounded-xl px-8 h-14 font-bold"
+                                            className="w-full sm:w-auto rounded-xl px-8 h-14 font-bold"
                                         >
                                             Güncelle
                                         </Button>
@@ -706,7 +708,7 @@ export default function Settings() {
 
                     {/* Bildirimler */}
                     {activeTab === "Bildirimler" && (
-                        <Card className="p-10 space-y-8 rounded-3xl border-none shadow-xl bg-card">
+                        <Card className="p-4 sm:p-6 md:p-10 space-y-6 md:space-y-8 rounded-3xl border-none shadow-xl bg-card">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <Bell className="text-primary" size={24} />
@@ -755,7 +757,7 @@ export default function Settings() {
 
                     {/* Güvenlik */}
                     {activeTab === "Güvenlik" && (
-                        <Card className="p-10 space-y-8 rounded-3xl border-none shadow-xl bg-card">
+                        <Card className="p-4 sm:p-6 md:p-10 space-y-6 md:space-y-8 rounded-3xl border-none shadow-xl bg-card">
                             <div className="flex items-center gap-3">
                                 <Shield className="text-primary" size={24} />
                                 <h3 className="font-black text-xl font-outfit text-primary dark:text-primary/90 tracking-tight">Hesap Güvenliği</h3>
@@ -775,7 +777,7 @@ export default function Settings() {
                     )}
                     {/* Yapay Zeka Sekmesi */}
                     {activeTab === "Yapay Zeka" && (
-                        <Card className="p-10 space-y-8 rounded-3xl border-none shadow-xl bg-card">
+                        <Card className="p-4 sm:p-6 md:p-10 space-y-6 md:space-y-8 rounded-3xl border-none shadow-xl bg-card">
                             {/* Gemini API Key */}
                             <GeminiKeySection />
                             <hr className="border-slate-100 dark:border-slate-800" />
@@ -798,7 +800,7 @@ export default function Settings() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 <div className="p-6 bg-muted dark:bg-slate-800 rounded-3xl space-y-4">
                                     <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-1 block">Zeka Modeli Seçimi</label>
                                     <select 
@@ -850,7 +852,7 @@ export default function Settings() {
 
                     {/* Veri Ayarları */}
                     {activeTab === "Veri Ayarları" && (
-                        <Card className="p-10 space-y-8 rounded-3xl border-none shadow-xl bg-card">
+                        <Card className="p-4 sm:p-6 md:p-10 space-y-6 md:space-y-8 rounded-3xl border-none shadow-xl bg-card">
                             <div className="flex items-center gap-3">
                                 <Database className="text-primary" size={24} />
                                 <h3 className="font-black text-xl font-outfit text-primary dark:text-primary/90 tracking-tight">Veri Yönetimi ve Yedekleme</h3>
@@ -945,8 +947,8 @@ export default function Settings() {
                             </div>
 
                             {/* Kritik İşlemler */}
-                            <div className="p-8 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-3xl flex items-center justify-between bg-muted/30 dark:bg-slate-800/10">
-                                <div className="flex items-center gap-4">
+                            <div className="p-6 md:p-8 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 bg-muted/30 dark:bg-slate-800/10">
+                                <div className="flex flex-col md:flex-row items-center gap-4 text-center md:text-left">
                                     <div className="p-3 bg-muted rounded-2xl text-rose-500 shadow-sm border border-rose-50 dark:border-rose-900/30">
                                         <ShieldAlert size={24} />
                                     </div>
@@ -980,13 +982,13 @@ export default function Settings() {
 
                     {/* Müfettiş Listesi Sekmesi */}
                     {activeTab === "Müfettiş Listesi" && (
-                        <Card className="p-10 space-y-8 rounded-3xl border-none shadow-xl bg-card">
-                            <div className="flex items-center justify-between">
+                        <Card className="p-4 sm:p-6 md:p-10 space-y-6 md:space-y-8 rounded-3xl border-none shadow-xl bg-card">
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                                 <div className="flex items-center gap-3">
                                     <Users className="text-primary" size={24} />
-                                    <h3 className="font-black text-xl font-outfit text-primary dark:text-primary/90 tracking-tight">Müfettiş Listesi (Ekip Yönetimi)</h3>
+                                    <h3 className="font-black text-xl font-outfit text-primary dark:text-primary/90 tracking-tight">Müfettiş Listesi</h3>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 w-full sm:w-auto">
                                     <input 
                                         type="file" 
                                         ref={excelInputRef}
@@ -998,10 +1000,10 @@ export default function Settings() {
                                         variant="outline"
                                         disabled={excelLoading}
                                         onClick={() => excelInputRef.current?.click()}
-                                        className="bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-xl px-6 h-12 font-bold"
+                                        className="w-full sm:w-auto bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-xl px-6 h-12 font-bold"
                                     >
                                         {excelLoading ? <Loader2 size={18} className="animate-spin mr-2" /> : <Upload size={18} className="mr-2" />}
-                                        Yeni Liste Ekle (xlsx)
+                                        Liste Yükle
                                     </Button>
                                 </div>
                             </div>
@@ -1014,7 +1016,7 @@ export default function Settings() {
                             {/* Yeni Müfettiş Ekleme Formu */}
                             <div className="p-8 bg-muted dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 space-y-6">
                                 <h4 className="text-xs font-bold text-primary dark:text-primary/90">Yeni Müfettiş Ekle</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest ml-1">Ad Soyad</label>
                                         <input 
@@ -1034,7 +1036,7 @@ export default function Settings() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 ml-1">İletişim Bilgileri</label>
+                                        <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 ml-1">Dahili / Cep</label>
                                         <div className="grid grid-cols-2 gap-2">
                                             <input 
                                                 className="w-full p-4 bg-card border border-border text-foreground rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 outline-none" 
@@ -1059,7 +1061,7 @@ export default function Settings() {
                                             onChange={(e) => setNewInspector(prev => ({...prev, room: e.target.value}))}
                                         />
                                     </div>
-                                    <div className="flex items-end">
+                                    <div className="flex items-end sm:col-span-2 lg:col-span-1">
                                         <Button onClick={handleAddInspector} className="h-14 w-full rounded-2xl font-bold">
                                             <Plus size={20} className="mr-2" /> Listeye Ekle
                                         </Button>
@@ -1093,23 +1095,25 @@ export default function Settings() {
                                     <div className="grid grid-cols-1 gap-3">
                                         {paginatedInspectors.map((ins) => (
                                             <div key={ins.id} className="flex items-center justify-between p-5 bg-card border border-slate-100 dark:border-slate-800 rounded-2xl hover:border-primary/20 dark:hover:border-primary/40 hover:shadow-md transition-all group">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-12 h-12 rounded-xl bg-primary/5 dark:bg-primary/10 text-primary dark:text-primary/90 flex items-center justify-center font-black">
+                                                <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-1 min-w-0">
+                                                    <div className="w-12 h-12 rounded-xl bg-primary/5 dark:bg-primary/10 text-primary dark:text-primary/90 flex items-center justify-center font-black shrink-0">
                                                         {ins.name.charAt(0)}
                                                     </div>
-                                                    <div>
-                                                        <p className="font-bold text-sm text-muted-foreground dark:text-slate-200">{ins.name}</p>
-                                                        <div className="flex items-center gap-3 mt-1">
-                                                            <p className="text-xs text-muted-foreground dark:text-slate-400 font-medium">{ins.email}</p>
-                                                            {ins.extension && (
-                                                                <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-bold text-slate-600 dark:text-slate-300">D: {ins.extension}</span>
-                                                            )}
-                                                            {ins.phone && (
-                                                                <span className="text-[10px] bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded font-bold text-emerald-600 dark:text-emerald-400">Cep: {ins.phone}</span>
-                                                            )}
-                                                            {ins.room && (
-                                                                <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-bold text-slate-600 dark:text-slate-300">Oda: {ins.room}</span>
-                                                            )}
+                                                    <div className="min-w-0">
+                                                        <p className="font-bold text-sm text-muted-foreground dark:text-slate-200 truncate">{ins.name}</p>
+                                                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                            <p className="text-[10px] text-muted-foreground dark:text-slate-400 font-medium truncate">{ins.email}</p>
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {ins.extension && (
+                                                                    <span className="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">D: {ins.extension}</span>
+                                                                )}
+                                                                {ins.phone && (
+                                                                    <span className="text-[9px] bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">Cep: {ins.phone}</span>
+                                                                )}
+                                                                {ins.room && (
+                                                                    <span className="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">Oda: {ins.room}</span>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1291,17 +1295,17 @@ export default function Settings() {
 
 function SettingsNav({ icon: Icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) {
     return (
-        <button
+        <button 
             onClick={onClick}
             className={cn(
-                "w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold text-sm",
+                "flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black uppercase tracking-widest transition-all w-full min-w-max md:min-w-0 snap-start",
                 active 
-                    ? "bg-primary text-white shadow-xl shadow-primary/20 translate-x-2" 
-                    : "text-slate-500 dark:text-slate-400 hover:bg-card dark:hover:bg-slate-800 hover:text-primary dark:hover:text-primary/90 hover:translate-x-1"
+                    ? "bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02] md:translate-x-2" 
+                    : "text-slate-400 dark:text-slate-500 hover:bg-muted dark:hover:bg-slate-800"
             )}
         >
-            <Icon size={20} />
-            <span className="font-outfit font-bold text-[12px]">{label}</span>
+            <Icon size={18} className={active ? "text-white" : "text-primary/40"} />
+            <span>{label}</span>
         </button>
     );
 }

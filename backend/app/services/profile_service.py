@@ -112,6 +112,18 @@ class ProfileService:
                 })
             
             await asyncio.to_thread(lambda: doc_ref.set(new_data, merge=True))
+            
+            # Welcome Notification
+            if not profile_data:
+                await asyncio.to_thread(db.collection('notifications').add, {
+                    "user_id": uid,
+                    "title": "Aramıza Hoş Geldiniz! 🚀",
+                    "message": "MufYard platformuna başarıyla kayıt oldunuz. Dijital denetim süreçlerinizi buradan yönetebilirsiniz.",
+                    "type": "system",
+                    "read": False,
+                    "created_at": datetime.utcnow()
+                })
+                
             return new_data
 
         if profile_data:
@@ -134,6 +146,17 @@ class ProfileService:
             "updated_at": datetime.utcnow()
         }
         await asyncio.to_thread(lambda: doc_ref.set(default_profile))
+        
+        # Welcome Notification
+        await asyncio.to_thread(db.collection('notifications').add, {
+            "user_id": uid,
+            "title": "Aramıza Hoş Geldiniz! 🚀",
+            "message": "MufYard platformuna başarıyla kayıt oldunuz. Hesabınızı kişiselleştirmek için ayarlar menüsünü kullanabilirsiniz.",
+            "type": "system",
+            "read": False,
+            "created_at": datetime.utcnow()
+        })
+        
         return default_profile
 
     @staticmethod

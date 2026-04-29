@@ -331,45 +331,46 @@ Lütfen şunları analiz et:
     }));
 
     return (
-        <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500 pb-12 pr-4 pl-2">
+        <div className="max-w-[1600px] mx-auto space-y-4 lg:space-y-8 animate-in fade-in duration-500 pb-12 pr-2 lg:pr-4 pl-2 lg:pl-2">
             {/* Standardized Page Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div>
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+                <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1 lg:mb-2">
                         <Shield size={10} className="text-primary/60" />
-                        <span>MufYard Platformu</span>
+                        <span>MufYard</span>
                         <ChevronRight size={10} />
                         <span className="text-primary opacity-80 uppercase tracking-widest">Genel Bakış</span>
                     </div>
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                    <h1 className="text-2xl lg:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
                         Hoş Geldiniz, <span className="text-primary">{profile?.full_name?.split(' ')[0] || user?.displayName?.split(' ')[0] || "Müfettiş"}</span>
                     </h1>
-                    <div className="flex items-center gap-3 mt-1">
-                         <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-tighter">
+                    <div className="flex flex-wrap items-center gap-2 lg:gap-3 mt-1">
+                         <span className="flex items-center gap-1.5 text-[10px] lg:text-xs font-bold text-slate-400 uppercase tracking-tighter">
                             <Clock size={14} className="text-primary/40" /> {todayStr}
                          </span>
-                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                         <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Sistem Aktif</span>
+                         <div className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span className="text-[9px] lg:text-[10px] font-black text-emerald-600 uppercase tracking-widest">Sistem Aktif</span>
+                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="relative" ref={filterRef}>
+                <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+                    <div className="relative flex-1 lg:flex-none" ref={filterRef}>
                         <Button 
                             variant="outline" 
                             size="sm" 
                             className={cn(
-                                "bg-card border-slate-100 dark:border-slate-800 border font-bold text-[11px] rounded-xl px-4 h-11 transition-all",
+                                "w-full lg:w-auto bg-card border-slate-100 dark:border-slate-800 border font-bold text-[11px] rounded-xl px-4 h-11 transition-all",
                                 isFilterActive ? "border-primary text-primary" : "text-slate-500"
                             )}
                             onClick={() => setShowFilters(!showFilters)}
                         >
                             <Filter size={14} className="mr-2" /> Filtrele
-                            {isFilterActive && <span className="ml-1.5 w-2 h-2 rounded-full bg-primary animate-pulse" />}
                         </Button>
 
                         {/* ─── Filtre Dropdown ─── */}
                         {showFilters && (
-                            <div className="absolute right-0 top-14 z-50 bg-card border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xl dark:shadow-black/40 p-5 w-[320px] space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="absolute left-0 lg:right-0 lg:left-auto top-14 z-50 bg-card border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xl dark:shadow-black/40 p-5 w-[280px] sm:w-[320px] space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Filtreler</span>
                                     {isFilterActive && (
@@ -422,17 +423,17 @@ Lütfen şunları analiz et:
                                 </div>
 
                                 <div className="text-[10px] font-semibold text-slate-400 text-center pt-1">
-                                    {filteredTasks.length} / {tasks.length} görev gösteriliyor
+                                    {filteredTasks.length} / {tasks.length} görev
                                 </div>
                             </div>
                         )}
                     </div>
                     <Button 
                         size="sm" 
-                        className="rounded-xl font-bold text-[11px] px-5 shadow-lg shadow-primary/20 h-11"
+                        className="flex-1 lg:flex-none rounded-xl font-bold text-[11px] px-5 shadow-lg shadow-primary/20 h-11"
                         onClick={handleAnalysis}
                     >
-                        <Sparkles size={14} className="mr-2" /> Analiz Raporu
+                        <Sparkles size={14} className="mr-2" /> Analiz
                     </Button>
                 </div>
             </div>
@@ -648,18 +649,56 @@ Lütfen şunları analiz et:
 
             {/* Alt Bölüm: Görevler (Özet) Tablosu (Görsele Birebir) */}
             <Card className="p-0 overflow-hidden shadow-none border-slate-100 dark:border-slate-800 bg-card">
-                <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-card">
-                    <h3 className="font-black text-xl text-slate-900 dark:text-slate-100 font-outfit tracking-tight">Görevler (Özet)</h3>
+                <div className="p-4 md:p-6 border-b border-slate-50 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card">
+                    <h3 className="font-black text-lg md:text-xl text-slate-900 dark:text-slate-100 font-outfit tracking-tight">Görevler (Özet)</h3>
                     <Button 
                         variant="outline" 
                         size="sm" 
-                        className="bg-card border-slate-100 dark:border-slate-800 border text-slate-400 dark:text-slate-500 font-black text-[10px] uppercase tracking-widest rounded-xl px-4 h-10 hover:border-primary/20 hover:text-primary transition-all"
+                        className="w-full sm:w-auto bg-card border-slate-100 dark:border-slate-800 border text-slate-400 dark:text-slate-500 font-black text-[10px] uppercase tracking-widest rounded-xl px-4 h-10 hover:border-primary/20 hover:text-primary transition-all"
                         onClick={handleExportExcel}
                     >
                         <Download size={16} className="mr-2 opacity-60" /> Excel'e Aktar
                     </Button>
                 </div>
-                <div className="overflow-x-auto">
+                
+                {/* Mobile List View (Hidden on Desktop) */}
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                    {filteredTasks.slice(0, 5).map(task => {
+                         const start = new Date(task.baslama_tarihi);
+                         const end = new Date(start);
+                         end.setDate(end.getDate() + task.sure_gun);
+                         const diff = Math.ceil((end.getTime() - Date.now()) / (1000 * 3600 * 24));
+                         const total = task.sure_gun;
+                         const color = getKalanColor(diff, total);
+                         const statusColor = getDurumColor(task.rapor_durumu);
+
+                         return (
+                             <div key={task.id} className="p-4 space-y-3">
+                                 <div className="flex justify-between items-start">
+                                     <div className="space-y-1">
+                                         <span className="text-[10px] font-black text-primary tracking-widest">{task.rapor_kodu}</span>
+                                         <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 line-clamp-1">{task.rapor_adi}</h4>
+                                     </div>
+                                     <span 
+                                         className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter"
+                                         style={{ backgroundColor: statusColor + '15', color: statusColor }}
+                                     >
+                                         {task.rapor_durumu}
+                                     </span>
+                                 </div>
+                                 <div className="flex items-center justify-between text-[11px] font-bold">
+                                     <span className="text-slate-400">{task.rapor_turu}</span>
+                                     <span className="flex items-center gap-1.5" style={{ color }}>
+                                         <Clock size={12} /> {diff} Gün
+                                     </span>
+                                 </div>
+                             </div>
+                         );
+                    })}
+                </div>
+
+                {/* Desktop Table View (Hidden on Mobile) */}
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead className="bg-[#f8fafc]/50 dark:bg-slate-950/50 text-slate-400/80 font-black uppercase text-[11px] tracking-[0.15em] border-b border-slate-100 dark:border-slate-800 font-outfit">
                             <tr>

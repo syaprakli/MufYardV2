@@ -1,4 +1,4 @@
-import { Search, Plus, Loader2, Tag, Pin, FileText, Trash2, Shield, ChevronRight, ChevronDown, Upload, Folder, Filter, Archive, ExternalLink } from "lucide-react";
+import { Search, Plus, Loader2, Tag, Pin, FileText, Trash2, Shield, ChevronRight, ChevronDown, Upload, Folder, Filter, Archive, ExternalLink, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { Button } from "../components/ui/Button";
@@ -28,6 +28,7 @@ export default function Legislation() {
     const [visibilityTab, setVisibilityTab] = useState<"all" | "personal">("all");
 
 
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [newLeg, setNewLeg] = useState({
         title: "",
         category: "Genel",
@@ -279,84 +280,92 @@ export default function Legislation() {
 
 
     return (
-        <div className="flex flex-col h-[calc(100vh-140px)] overflow-hidden animate-in fade-in duration-500">
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden animate-in fade-in duration-500">
             {/* Standardized Page Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6 px-1">
-                <div>
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6 mb-6 md:mb-8">
+                <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1 md:mb-2">
                         <Shield size={10} className="text-primary/60" />
-                        <span>MufYard Platform</span>
-                        <ChevronRight size={10} />
+                        <span className="hidden xs:inline">MufYard Platform</span>
+                        <ChevronRight size={10} className="hidden xs:inline" />
                         <span className="text-primary opacity-80 uppercase tracking-widest">Mevzuat Arşivi</span>
                     </div>
                     <div className="flex items-center gap-3">
-                        <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                        <button 
+                            onClick={() => setIsSidebarOpen(true)}
+                            className="md:hidden p-2.5 bg-primary/10 rounded-xl text-primary shadow-sm active:scale-95 transition-all"
+                        >
+                            <Folder size={18} />
+                        </button>
+                        <h1 className="text-xl md:text-2xl lg:text-3xl font-black text-foreground tracking-tight leading-tight">
                             Dijital Mevzuat Kütüphanesi
                         </h1>
-                        <div className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 border border-border dark:border-slate-700 text-[10px] font-black text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                            <Archive size={10} /> v2.5 HIERARCHICAL MODE
-                        </div>
                     </div>
                 </div>
-                <div className="flex gap-4 items-center">
-                    <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1 rounded-xl h-10 shadow-sm border border-border dark:border-slate-700">
-
+                <div className="flex flex-col md:flex-row gap-3 md:gap-4 items-stretch md:items-center w-full lg:w-auto">
+                    <div className="flex bg-slate-200/50 dark:bg-slate-800 p-1 rounded-xl h-11 md:h-10 shadow-sm border border-border dark:border-slate-700">
                         <button 
                             onClick={() => setVisibilityTab("all")}
                             className={cn(
-                                "px-6 rounded-lg text-xs font-bold transition-all flex items-center gap-2",
+                                "flex-1 md:flex-none px-4 md:px-6 rounded-lg text-[10px] md:text-xs font-bold transition-all flex items-center justify-center gap-2",
                                 visibilityTab === "all" ? "bg-card dark:bg-slate-700 text-primary dark:text-primary-light shadow-sm" : "text-slate-500 dark:text-slate-400"
                             )}
                         >
-                            <Globe size={12} /> Genel Mevzuat
+                            <Globe size={12} /> <span>Genel</span>
                         </button>
-
                         <button 
                             onClick={() => setVisibilityTab("personal")}
                             className={cn(
-                                "px-6 rounded-lg text-xs font-bold transition-all flex items-center gap-2",
+                                "flex-1 md:flex-none px-4 md:px-6 rounded-lg text-[10px] md:text-xs font-bold transition-all flex items-center justify-center gap-2",
                                 visibilityTab === "personal" ? "bg-card dark:bg-slate-700 text-primary dark:text-primary-light shadow-sm" : "text-slate-500 dark:text-slate-400"
                             )}
                         >
-                            <Lock size={12} /> Kişisel Dosyalarım
-
+                            <Lock size={12} /> <span>Kişisel</span>
                         </button>
                     </div>
 
-                    {isElectron && (
-                    <>
+                    <div className="flex items-center gap-2">
+                        {isElectron && (
+                            <Button 
+                                onClick={handleSync} 
+                                variant="outline" 
+                                className="flex-1 md:flex-none h-11 md:h-9 px-3 rounded-lg border-emerald-200 text-emerald-700 text-[9px] md:text-[10px] font-black uppercase tracking-widest bg-emerald-50/20"
+                            >
+                                <RefreshCcw size={14} className="mr-1.5" /> Senk
+                            </Button>
+                        )}
                         <Button 
-                            onClick={handleSync} 
-                            variant="outline" 
-                            className="h-9 px-3 rounded-lg border-emerald-200 dark:border-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-50 dark:hover:bg-emerald-950/20 bg-emerald-50/20 dark:bg-emerald-950/10"
+                            onClick={() => setIsModalOpen(true)} 
+                            className="flex-[2] md:flex-none h-11 md:h-9 px-6 rounded-lg shadow-lg shadow-primary/20 bg-primary text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest"
                         >
-                            <RefreshCcw size={14} className="mr-1.5" /> Senkronize Et
+                            <Plus size={16} className="mr-1.5" /> EKLE
                         </Button>
-                        <Button onClick={() => handleOpenFolder()} variant="outline" className="h-9 px-3 rounded-lg border-border dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold hover:bg-muted dark:hover:bg-slate-800">
-                            <Folder size={14} className="mr-1.5" /> Klasörü Aç
-                        </Button>
-                    </>
-                    )}
-                    <Button onClick={() => setIsModalOpen(true)} className="h-9 px-4 rounded-lg shadow-md shadow-primary/10 bg-primary text-white text-xs font-bold">
-                        <Plus size={16} className="mr-1.5" /> Yeni Mevzuat Ekle
-                    </Button>
-
-
+                    </div>
                 </div>
-
-
             </div>
 
-            <div className="flex flex-1 gap-4 min-h-0">
+            <div className="flex flex-1 gap-4 min-h-0 relative">
+                {/* Left Sidebar Overlay for mobile */}
+                <div className={cn(
+                    "fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm transition-opacity md:hidden",
+                    isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+                )} onClick={() => setIsSidebarOpen(false)} />
+
                 {/* Left Sidebar - Folder Browser Tree */}
-                <div className="w-72 flex flex-col gap-4">
-                    <div className="bg-card border border-border dark:border-slate-800 rounded-2xl flex flex-col h-full shadow-sm overflow-hidden border-border/60 dark:border-slate-800/60">
-                        <div className="p-4 border-b border-border dark:border-slate-800 bg-muted/50 dark:bg-slate-950/20 flex items-center justify-between">
+                <div className={cn(
+                    "fixed md:relative inset-y-0 left-0 z-[70] w-72 md:w-72 bg-card md:bg-transparent transform transition-transform duration-300 md:transform-none flex flex-col gap-4",
+                    isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+                )}>
+                    <div className="bg-card border border-border dark:border-slate-800 rounded-r-2xl md:rounded-2xl flex flex-col h-full shadow-2xl md:shadow-sm overflow-hidden border-border/60 dark:border-slate-800/60">
+                        <div className="p-5 md:p-4 border-b border-border dark:border-slate-800 bg-muted/50 dark:bg-slate-950/20 flex items-center justify-between">
                             <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2">
                                 <Folder size={14} className="text-primary dark:text-primary-light" /> Birim / Belge Ağacı
                             </h3>
+                            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-2 text-slate-400 hover:text-rose-500">
+                                <X size={20} />
+                            </button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-3 md:p-2 space-y-0.5 custom-scrollbar">
                             {CATEGORIES.map(cat => (
                                 <div key={cat} className="flex flex-col">
                                     <div className={cn(
@@ -429,28 +438,29 @@ export default function Legislation() {
                 {/* Main Content Area - File Browser View */}
                 <div className="flex-1 flex flex-col gap-3 min-w-0">
                     {/* Compact Search/Filter Bar */}
-                    <div className="flex gap-3">
-                        <div className="flex-1 bg-card border border-border dark:border-slate-800 rounded-xl px-4 py-2 flex items-center shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all bg-muted/20 border-border/60 dark:border-slate-800/60">
-                            <Search size={16} className="text-muted-foreground dark:text-slate-500 mr-2" />
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="flex-1 bg-card border border-border dark:border-slate-800 rounded-xl px-4 py-3 sm:py-2 flex items-center shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all bg-muted/20 border-border/60 dark:border-slate-800/60">
+                            <Search size={16} className="text-muted-foreground dark:text-slate-500 mr-2 shrink-0" />
                             <input
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Arşivde ara... (Başlık, Özet, Etiket)"
-                                className="bg-transparent border-none outline-none text-sm w-full font-outfit text-muted-foreground dark:text-slate-200 placeholder:text-slate-500"
+                                placeholder="Arşivde ara..."
+                                className="bg-transparent border-none outline-none text-[13px] sm:text-sm w-full font-outfit text-muted-foreground dark:text-slate-200 placeholder:text-slate-500"
                             />
                         </div>
-                        <div className="flex items-center gap-2 bg-card border border-border/60 dark:border-slate-800 rounded-xl px-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest whitespace-nowrap">
-                            <Filter size={12} className="text-primary dark:text-primary-light" /> 
-                            Yol: <span className="text-secondary dark:text-indigo-400 ml-1">{selectedCategory}</span> 
-                            {selectedSubType && <span className="flex items-center gap-1"><ChevronRight size={10} /> {selectedSubType}</span>}
+                        <div className="flex items-center gap-2 bg-card border border-border/60 dark:border-slate-800 rounded-xl px-4 h-11 sm:h-auto text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest whitespace-nowrap overflow-x-auto no-scrollbar shadow-sm">
+                            <Filter size={12} className="text-primary dark:text-primary-light shrink-0" /> 
+                            <span className="shrink-0">Yol:</span> 
+                            <span className="text-secondary dark:text-indigo-400 shrink-0">{selectedCategory}</span> 
+                            {selectedSubType && <span className="flex items-center gap-1 shrink-0"><ChevronRight size={10} /> {selectedSubType}</span>}
                         </div>
                     </div>
 
                     {/* High-Density Archive List */}
                     <div className="flex-1 bg-card border border-border/60 dark:border-slate-800/60 rounded-2xl shadow-sm overflow-hidden flex flex-col">
                         {/* Table Header */}
-                        <div className="grid grid-cols-12 gap-4 px-6 py-2.5 bg-muted/80 dark:bg-slate-950/40 border-b border-slate-100 dark:border-slate-800 text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                        <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-2.5 bg-muted/80 dark:bg-slate-950/40 border-b border-slate-100 dark:border-slate-800 text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
                             <div className="col-span-1">Tür</div>
                             <div className="col-span-5">Mevzuat Adı / Arşiv Notu</div>
                             <div className="col-span-2">Belge Türü</div>
@@ -523,7 +533,7 @@ export default function Legislation() {
                 </div>
 
                 <form onSubmit={handleCreateLeg} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mevzuat / Belge Adı</label>
                             <input 
@@ -572,7 +582,7 @@ export default function Legislation() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Belge Türü (Etiket)</label>
                             <div className="flex gap-2">
@@ -630,7 +640,7 @@ export default function Legislation() {
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2 text-outfit">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Akıllı Filtre Etiketleri</label>
                             <div className="relative">
@@ -654,7 +664,7 @@ export default function Legislation() {
                                         newLeg.is_public ? "bg-card text-primary shadow-sm" : "text-slate-500"
                                     )}
                                 >
-                                    <Globe size={14} /> Tüm Ekip / Genel
+                                    <Globe size={14} /> <span className="text-[10px]">Genel</span>
                                 </button>
                                 <button 
                                     type="button"
@@ -664,11 +674,11 @@ export default function Legislation() {
                                         !newLeg.is_public ? "bg-card text-primary shadow-sm" : "text-slate-500"
                                     )}
                                 >
-                                    <Lock size={14} /> Sadece Ben / Kişisel
+                                    <Lock size={14} /> <span className="text-[10px]">Kişisel</span>
                                 </button>
                              </div>
                         </div>
-                        <div className="flex items-center gap-2 pt-8">
+                        <div className="flex items-center gap-2 py-2 md:py-8">
                             <input 
                                 type="checkbox"
                                 id="pinCheck"
@@ -678,7 +688,6 @@ export default function Legislation() {
                             />
                             <label htmlFor="pinCheck" className="text-xs font-black text-slate-500 cursor-pointer uppercase tracking-tight">Üste İğnele</label>
                         </div>
-
                     </div>
 
                     <div className="pt-4 flex gap-3">
@@ -697,22 +706,34 @@ export default function Legislation() {
 function LegislationRow({ leg, isOwner, onDelete, onPromote }: { leg: Legislation, isOwner: boolean, onDelete: () => void, onPromote: () => void }) {
 
     return (
-        <div className="grid grid-cols-12 gap-4 px-6 py-2.5 hover:bg-muted/50 dark:hover:bg-slate-800/50 transition-all group items-center border-b border-slate-50 dark:border-slate-800/50 last:border-0 relative">
-            <div className="col-span-1">
+        <div className="flex flex-col md:grid md:grid-cols-12 gap-3 md:gap-4 px-4 md:px-6 py-4 md:py-2.5 hover:bg-muted/50 dark:hover:bg-slate-800/50 transition-all group items-center border-b border-slate-100 dark:border-slate-800/50 last:border-0 relative">
+            <div className="md:col-span-1 flex items-center justify-between md:justify-start w-full md:w-auto">
                 <div className={cn(
-                    "w-7 h-7 rounded-lg flex items-center justify-center transition-all",
+                    "w-8 h-8 md:w-7 md:h-7 rounded-lg flex items-center justify-center transition-all",
                     leg.is_pinned ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 shadow-sm" : "bg-muted text-slate-400 dark:text-slate-500"
                 )}>
                     {leg.is_pinned ? <Pin size={12} /> : <FileText size={12} />}
                 </div>
+                {/* Mobile tags */}
+                <div className="md:hidden flex gap-2">
+                    <span className="px-2 py-0.5 rounded bg-primary/5 text-primary text-[8px] font-black uppercase tracking-widest border border-primary/10">
+                        {leg.doc_type || 'Belge'}
+                    </span>
+                    <span className={cn(
+                        "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border shadow-sm",
+                        leg.is_public ? "bg-slate-50 text-slate-400" : "bg-indigo-50 text-indigo-500 border-indigo-100"
+                    )}>
+                        {leg.is_public ? "Genel" : "Kişisel"}
+                    </span>
+                </div>
             </div>
-            <div className="col-span-11 md:col-span-5 pr-4">
+            <div className="md:col-span-5 pr-0 md:pr-4 w-full">
                 <div className="flex flex-col min-w-0">
-                    <h4 className="text-[13px] font-bold text-muted-foreground dark:text-slate-200 group-hover:text-primary transition-colors truncate tracking-tight font-outfit uppercase">
+                    <h4 className="text-[13px] md:text-[13px] font-bold text-muted-foreground dark:text-slate-200 group-hover:text-primary transition-colors truncate tracking-tight font-outfit uppercase min-w-0">
                         {leg.title}
                     </h4>
                     {leg.summary && (
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate italic mt-0.5 max-w-[90%]">
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate italic mt-0.5 max-w-full md:max-w-[90%]">
                             {leg.summary}
                         </p>
                     )}
@@ -723,8 +744,8 @@ function LegislationRow({ leg, isOwner, onDelete, onPromote }: { leg: Legislatio
                     {leg.doc_type || 'Belge'}
                 </span>
                 {leg.last_updated_by_name && (
-                    <div className="flex items-center gap-1 mt-1 text-[8px] font-bold text-slate-400">
-                        <UserCheck size={10} /> {leg.last_updated_by_name}
+                    <div className="flex items-center gap-1 mt-1 text-[8px] font-bold text-slate-400 truncate">
+                        <UserCheck size={10} className="shrink-0" /> {leg.last_updated_by_name}
                     </div>
                 )}
             </div>
@@ -738,43 +759,38 @@ function LegislationRow({ leg, isOwner, onDelete, onPromote }: { leg: Legislatio
                 </div>
             </div>
 
-            <div className="col-span-12 md:col-span-2 flex justify-end gap-1 px-1">
+            <div className="md:col-span-2 flex items-center justify-end gap-1 px-0 md:px-1 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-slate-50">
                 {(leg.local_path || leg.document_url) && (
                     <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="w-7 h-7 rounded-lg text-primary dark:text-primary-light hover:bg-primary/10 border border-primary/5 dark:border-primary/20 shadow-sm bg-card"
+                        className="w-10 h-10 md:w-7 md:h-7 rounded-lg text-primary dark:text-primary-light hover:bg-primary/10 border border-primary/5 dark:border-primary/20 shadow-sm bg-card"
                         title="Dosyayı Görüntele"
                         onClick={() => {
-                            // local_path starting with /Mevzuat/ → personal file on local backend
-                            // local_path starting with https:// → public file on Firebase Storage
-                            // document_url → external link
                             const url = leg.local_path
                                 ? (leg.local_path.startsWith('http') ? leg.local_path : `http://localhost:8000${leg.local_path}`)
                                 : leg.document_url;
                             if (url) window.open(url, '_blank');
                         }}
                     >
-                        <ExternalLink size={12} />
+                        <ExternalLink size={14} className="md:w-3 md:h-3" />
                     </Button>
                 )}
-
-
                 
                 {!leg.is_public && isOwner && (
                     <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="w-7 h-7 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/30 shadow-sm bg-card"
+                        className="w-10 h-10 md:w-7 md:h-7 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/30 shadow-sm bg-card"
                         title="Genel Arşive Taşı (Paylaş)"
                         onClick={onPromote}
                     >
-                        <Globe size={12} />
+                        <Globe size={14} className="md:w-3 md:h-3" />
                     </Button>
                 )}
 
-                <Button variant="ghost" size="icon" onClick={onDelete} className="w-7 h-7 text-red-400 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg opacity-0 group-hover:opacity-100 transition-all border border-red-100 dark:border-red-900/30 bg-card ml-2">
-                    <Trash2 size={12} />
+                <Button variant="ghost" size="icon" onClick={onDelete} className="w-10 h-10 md:w-7 md:h-7 text-red-400 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg md:opacity-0 md:group-hover:opacity-100 transition-all border border-red-100 dark:border-red-900/30 bg-card ml-auto md:ml-2">
+                    <Trash2 size={14} className="md:w-3 md:h-3" />
                 </Button>
             </div>
 

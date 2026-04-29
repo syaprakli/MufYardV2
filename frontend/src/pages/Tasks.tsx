@@ -15,6 +15,8 @@ import { useAuth } from "../lib/hooks/useAuth";
 import { useTheme } from "../lib/context/ThemeContext";
 import ShareModal from "../components/ShareModal";
 import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { cn } from "../lib/utils";
 
 // Shared styles and sub-components
 function ActionBtn({ children, title, color, onClick }: { children: React.ReactNode; title: string; color: string; onClick: () => void }) {
@@ -52,7 +54,6 @@ export default function Tasks() {
 
     const labelStyle: React.CSSProperties = { display: "block", fontSize: "0.65rem", fontWeight: 900, color: "var(--secondary)", letterSpacing: "0.15em", marginBottom: "0.4rem", textTransform: "uppercase", fontFamily: "'Outfit', sans-serif" };
     const inputStyle: React.CSSProperties = { width: "100%", padding: "0.8rem 1rem", border: "1px solid var(--border)", borderRadius: "1rem", fontSize: "0.875rem", outline: "none", fontFamily: "'Inter', sans-serif", boxSizing: "border-box", background: "var(--background)", color: "var(--foreground)", transition: "all 0.2s" };
-    const tdStyle: React.CSSProperties = { padding: "1.2rem 1rem", fontSize: "13px", verticalAlign: "middle" };
     const overlayStyle: React.CSSProperties = { position: "fixed", inset: 0, zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" };
     const modalBoxStyle: React.CSSProperties = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: "1.5rem", boxShadow: "var(--shadow-lg)", width: "100%", maxWidth: "550px", padding: "2rem" };
 
@@ -471,33 +472,33 @@ export default function Tasks() {
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             {/* Standardized Page Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6 font-outfit">
                 <div>
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+                    <div className="flex items-center gap-2 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1 md:mb-2">
                         <Shield size={10} className="text-primary/60" />
-                        <span>MufYard Platform</span>
-                        <ChevronRight size={10} />
-                        <span className="text-primary opacity-80 tracking-widest">GÖREVLER</span>
+                        <span className="hidden xs:inline">MufYard Platform</span>
+                        <ChevronRight size={10} className="hidden xs:inline" />
+                        <span className="text-primary opacity-80 uppercase tracking-widest">GÖREVLER</span>
                     </div>
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-                        Görevler
+                    <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-tight">
+                        Görev Yönetimi
                     </h1>
-                    <p className="text-slate-500 text-sm font-medium mt-1 flex items-center gap-2">
-                        <Calendar size={14} className="text-primary/40" />
-                        {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' })}
+                    <p className="text-slate-500 text-[13px] font-medium mt-1 flex items-center gap-2">
+                        <Calendar size={14} className="text-primary/40 shrink-0" />
+                        <span className="truncate">{new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' })}</span>
                     </p>
                 </div>
 
-                <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1.5 rounded-xl">
+                <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-xl w-full lg:w-auto h-11 shrink-0">
                     <button 
                         onClick={() => setActiveTab("kisisel")}
-                        className={`px-6 py-2.5 rounded-lg font-bold text-xs transition-all tracking-widest ${activeTab === 'kisisel' ? 'bg-card text-primary shadow-sm' : 'text-slate-500 hover:text-muted-foreground dark:hover:text-slate-300'}`}
+                        className={`flex-1 lg:flex-none px-4 md:px-6 rounded-lg font-black text-[10px] uppercase transition-all tracking-widest whitespace-nowrap ${activeTab === 'kisisel' ? 'bg-card text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         Özel Kayıtlarım
                     </button>
                     <button 
                         onClick={() => setActiveTab("ortak")}
-                        className={`px-6 py-2.5 rounded-lg font-bold text-xs transition-all tracking-widest ${activeTab === 'ortak' ? 'bg-card text-primary shadow-sm' : 'text-slate-500 hover:text-muted-foreground dark:hover:text-slate-300'}`}
+                        className={`flex-1 lg:flex-none px-4 md:px-6 rounded-lg font-black text-[10px] uppercase transition-all tracking-widest whitespace-nowrap ${activeTab === 'ortak' ? 'bg-card text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         Kurumsal Arşiv
                     </button>
@@ -506,124 +507,103 @@ export default function Tasks() {
 
             {/* Görev Oluşturma Formu */}
             {activeTab === 'kisisel' && (
-                <div style={{ background: "var(--card)", borderRadius: "1.5rem", boxShadow: "var(--shadow)", padding: "2rem", marginBottom: "1.5rem", border: "1px solid var(--border)" }}>
-                    <form onSubmit={handleCreate}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-                            <div>
-                                <label style={labelStyle}>Rapor No</label>
+                <Card className="p-4 md:p-8 bg-card border border-border shadow-sm mb-6">
+                    <form onSubmit={handleCreate} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
+                            <div className="md:col-span-3 lg:col-span-2 space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Rapor No</label>
                                 <input
                                     placeholder={autoKodu}
                                     value={form.rapor_kodu}
                                     onChange={e => setForm({ ...form, rapor_kodu: e.target.value })}
-                                    style={inputStyle}
+                                    className="w-full px-4 py-3 rounded-xl border border-border bg-muted/30 focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold tracking-tight outline-none"
                                 />
                             </div>
-                            <div>
-                                <label style={labelStyle}>Rapor Adı</label>
+                            <div className="md:col-span-9 lg:col-span-7 space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Rapor Adı / Konusu</label>
                                 <input
                                     required
                                     placeholder="Örn: X Belediyesi İncelemesi"
                                     value={form.rapor_adi}
                                     onChange={e => setForm({ ...form, rapor_adi: e.target.value })}
-                                    style={inputStyle}
+                                    className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold outline-none"
                                 />
                             </div>
-                            <div>
-                                <label style={labelStyle}>Rapor Türü</label>
+                            <div className="md:col-span-12 lg:col-span-3 space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Rapor Türü</label>
                                 <select
                                     value={form.rapor_turu}
                                     onChange={e => setForm({ ...form, rapor_turu: e.target.value })}
-                                    style={inputStyle}
+                                    className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold outline-none cursor-pointer appearance-none"
                                 >
                                     {RAPOR_TURLERI.map(t => <option key={t}>{t}</option>)}
                                 </select>
                             </div>
                         </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 2fr", gap: "1rem", alignItems: "end" }}>
-                            <div>
-                                <label style={labelStyle}>Başlama Tarihi</label>
+
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
+                            <div className="md:col-span-6 lg:col-span-3 space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Başlama Tarihi</label>
                                 <input
                                     type="date"
                                     value={form.baslama_tarihi}
                                     onChange={e => setForm({ ...form, baslama_tarihi: e.target.value })}
-                                    style={inputStyle}
+                                    className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold outline-none"
                                 />
                             </div>
-                            <div>
-                                <label style={labelStyle}>Süre (Gün)</label>
+                            <div className="md:col-span-6 lg:col-span-2 space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Süre (Gün)</label>
                                 <input
                                     type="number"
                                     min={1}
                                     value={form.sure_gun}
                                     onChange={e => setForm({ ...form, sure_gun: parseInt(e.target.value) || 30 })}
-                                    style={inputStyle}
+                                    className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold outline-none"
                                 />
                             </div>
-                            <div ref={inspectorDropdownRef} style={{ position: "relative" }}>
-                                <label style={labelStyle}>Görevde Yer Alan Kişiler</label>
-                                {/* Trigger Box */}
+                            <div className="md:col-span-12 lg:col-span-7 space-y-1.5 relative" ref={inspectorDropdownRef}>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Görevde Yer Alan Kişiler</label>
                                 <div
                                     onClick={() => setShowInspectorDropdown(p => !p)}
-                                    style={{
-                                        ...inputStyle,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        cursor: "pointer",
-                                        userSelect: "none",
-                                        minHeight: "42px",
-                                        flexWrap: "wrap",
-                                        gap: "0.3rem",
-                                        borderColor: showInspectorDropdown ? (isDark ? "#3b82f6" : "#0f172a") : (isDark ? "#1e293b" : "#e2e8f0"),
-                                        boxShadow: showInspectorDropdown ? (isDark ? "0 0 0 3px rgba(59,130,246,0.1)" : "0 0 0 3px rgba(15,23,42,0.08)") : "none"
-                                    }}
+                                    className={cn(
+                                        "w-full min-h-[48px] px-4 py-2 rounded-xl border bg-card flex flex-wrap items-center gap-1.5 cursor-pointer transition-all focus-within:ring-4 focus-within:ring-primary/10",
+                                        showInspectorDropdown ? "border-primary ring-4 ring-primary/10" : "border-border"
+                                    )}
                                 >
                                     {form.assigned_to.length === 0 ? (
-                                        <span style={{ color: "#94a3b8", fontSize: "0.85rem" }}>Kişi seç veya ara...</span>
+                                        <span className="text-slate-400 text-sm font-medium">Kişi seç veya ara...</span>
                                     ) : (
                                         form.assigned_to.map(id => {
                                             const ins = inspectors.find(i => i.email === id);
                                             return ins ? (
-                                                <span key={id} style={{
-                                                    display: "inline-flex", alignItems: "center", gap: "0.3rem",
-                                                    background: "#0f172a", color: "white", borderRadius: "1rem",
-                                                    padding: "0.15rem 0.6rem", fontSize: "0.72rem", fontWeight: 700
-                                                }}>
-                                                    {ins.name}
+                                                <span key={id} className="inline-flex items-center gap-1 bg-slate-900 text-white rounded-lg px-2 py-1 text-[11px] font-bold">
+                                                    {ins.name.split(' ')[0]}
                                                     <span
                                                         onClick={e => { e.stopPropagation(); toggleInspector(id); }}
-                                                        style={{ cursor: "pointer", opacity: 0.6, fontWeight: 900, marginLeft: "0.1rem" }}
+                                                        className="hover:text-red-400 transition-colors ml-1 p-0.5"
                                                     >×</span>
                                                 </span>
                                             ) : null;
                                         })
                                     )}
-                                    <span style={{ marginLeft: "auto", color: "#94a3b8", fontSize: "0.75rem", flexShrink: 0 }}>
-                                        {showInspectorDropdown ? "▲" : "▼"}
+                                    <span className="ml-auto text-slate-400">
+                                        <ChevronRight size={16} className={cn("transition-transform", showInspectorDropdown ? "rotate-90" : "")} />
                                     </span>
                                 </div>
 
-                                {/* Dropdown Panel */}
                                 {showInspectorDropdown && (
-                                    <div style={{
-                                        position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0,
-                                        background: isDark ? "#1e293b" : "white", border: isDark ? "1px solid #334155" : "1px solid #e2e8f0",
-                                        borderRadius: "1rem", boxShadow: "0 12px 40px rgba(0,0,0,0.3)",
-                                        zIndex: 9999, overflow: "hidden"
-                                    }}>
-                                        {/* Search */}
-                                        <div style={{ padding: "0.6rem 0.8rem", borderBottom: "1px solid #f1f5f9" }}>
+                                    <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div className="p-3 border-b border-border bg-muted/30">
                                             <input
                                                 autoFocus
                                                 placeholder="İsim ara..."
                                                 value={inspectorSearch}
                                                 onChange={e => setInspectorSearch(e.target.value)}
                                                 onClick={e => e.stopPropagation()}
-                                                style={{ ...inputStyle, padding: "0.4rem 0.7rem", fontSize: "0.8rem", border: "1px solid #e2e8f0" }}
+                                                className="w-full px-4 py-2 rounded-xl border border-border bg-card text-sm font-bold outline-none"
                                             />
                                         </div>
-                                        {/* List */}
-                                        <div style={{ maxHeight: "220px", overflowY: "auto" }}>
+                                        <div className="max-h-60 overflow-y-auto p-2 space-y-1">
                                             {inspectors
                                                 .filter(ins => ins.name.toLowerCase().includes(inspectorSearch.toLowerCase()) || ins.email.toLowerCase().includes(inspectorSearch.toLowerCase()))
                                                 .map(inspector => {
@@ -632,70 +612,45 @@ export default function Tasks() {
                                                         <div
                                                             key={inspector.id}
                                                             onClick={() => toggleInspector(inspector.email)}
-                                                            style={{
-                                                                display: "flex", alignItems: "center", gap: "0.75rem",
-                                                                padding: "0.65rem 1rem",
-                                                                cursor: "pointer",
-                                                                background: isSelected ? (isDark ? "#334155" : "#f0f9ff") : (isDark ? "#1e293b" : "white"),
-                                                                borderBottom: isDark ? "1px solid #334155" : "1px solid #f8fafc",
-                                                                transition: "background 0.15s"
-                                                            }}
-                                                            onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = isDark ? "#334155" : "#f8fafc"; }}
-                                                            onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = isDark ? "#1e293b" : "white"; }}
+                                                            className={cn(
+                                                                "flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors",
+                                                                isSelected ? "bg-primary/5 text-primary" : "hover:bg-muted"
+                                                            )}
                                                         >
-                                                            <div style={{
-                                                                width: "18px", height: "18px", borderRadius: "5px", flexShrink: 0,
-                                                                border: isSelected ? "none" : (isDark ? "1.5px solid #475569" : "1.5px solid #cbd5e1"),
-                                                                background: isSelected ? (isDark ? "#3b82f6" : "#0f172a") : (isDark ? "#0f172a" : "white"),
-                                                                display: "flex", alignItems: "center", justifyContent: "center"
-                                                            }}>
-                                                                {isSelected && <span style={{ color: "white", fontSize: "11px", fontWeight: 900 }}>✓</span>}
+                                                            <div className={cn(
+                                                                "w-5 h-5 rounded-md flex items-center justify-center border transition-all",
+                                                                isSelected ? "bg-primary border-primary" : "bg-card border-border"
+                                                            )}>
+                                                                {isSelected && <span className="text-white text-[10px] font-black">✓</span>}
                                                             </div>
-                                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                                <div style={{ fontSize: "0.82rem", fontWeight: 700, color: isDark ? "#f1f5f9" : "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{inspector.name}</div>
-                                                                <div style={{ fontSize: "0.68rem", color: isDark ? "#94a3b8" : "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{inspector.email}</div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-sm font-bold truncate">{inspector.name}</div>
+                                                                <div className="text-[10px] text-slate-400 font-bold truncate uppercase tracking-tighter">{inspector.email}</div>
                                                             </div>
                                                         </div>
                                                     );
                                                 })
                                             }
-                                            {inspectors.filter(ins => ins.name.toLowerCase().includes(inspectorSearch.toLowerCase())).length === 0 && (
-                                                <div style={{ padding: "1rem", textAlign: "center", color: "#94a3b8", fontSize: "0.8rem" }}>
-                                                    Sonuç bulunamadı.
-                                                </div>
-                                            )}
                                         </div>
-                                        {/* Footer */}
-                                        <div style={{ padding: "0.5rem 1rem", background: isDark ? "#0f172a" : "#f8fafc", borderTop: isDark ? "1px solid #334155" : "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                            <span style={{ fontSize: "0.72rem", color: isDark ? "#94a3b8" : "#64748b", fontWeight: 700 }}>{form.assigned_to.length} kişi seçildi</span>
-                                            <button type="button" onClick={() => setShowInspectorDropdown(false)} style={{ fontSize: "0.72rem", fontWeight: 700, color: isDark ? "#3b82f6" : "#0f172a", background: "none", border: "none", cursor: "pointer" }}>Tamam</button>
+                                        <div className="p-3 bg-muted/30 border-t border-border flex justify-between items-center">
+                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{form.assigned_to.length} kişi seçildi</span>
+                                            <button type="button" onClick={() => setShowInspectorDropdown(false)} className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline">Tamam</button>
                                         </div>
                                     </div>
                                 )}
                             </div>
                         </div>
 
-                        {/* Rapor Oluştur — tam genişlik alt buton */}
-                        <div style={{ marginTop: "1.25rem", borderTop: "1px solid #f1f5f9", paddingTop: "1.25rem" }}>
-                            <button
-                                type="submit"
-                                disabled={saving}
-                                style={{
-                                    width: "100%", padding: "0.9rem", borderRadius: "0.625rem",
-                                    background: isDark ? "linear-gradient(135deg, #3b82f6 0%, #1e3a5f 100%)" : "linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)",
-                                    color: "white", fontWeight: 700, fontSize: "1rem",
-                                    border: "none", cursor: saving ? "not-allowed" : "pointer",
-                                    display: "flex", alignItems: "center", justifyContent: "center", gap: "0.6rem",
-                                    height: "48px", opacity: saving ? 0.7 : 1,
-                                    letterSpacing: "0.03em", boxShadow: isDark ? "0 4px 16px rgba(59,130,246,0.2)" : "0 4px 16px rgba(15,23,42,0.3)"
-                                }}
-                            >
-                                {saving ? <Loader2 size={20} className="animate-spin" /> : <FileText size={20} />}
-                                {saving ? "Oluşturuluyor..." : "Rapor Oluştur"}
-                            </button>
-                        </div>
+                        <Button
+                            type="submit"
+                            disabled={saving}
+                            className="w-full h-12 rounded-xl bg-primary text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-lg shadow-primary/20"
+                        >
+                            {saving ? <Loader2 size={18} className="animate-spin mr-2" /> : <FileText size={18} className="mr-2" />}
+                            {saving ? "Oluşturuluyor..." : "Yeni Görev Oluştur"}
+                        </Button>
                     </form>
-                </div>
+                </Card>
             )}
 
             {/* Bekleyen Görev Davetleri */}
@@ -730,68 +685,64 @@ export default function Tasks() {
                 </div>
             )}
 
-            {/* Görevler Tablosu */}
-            <div style={{ background: isDark ? "#1e293b" : "white", borderRadius: "1rem", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", border: isDark ? "1px solid #334155" : "1px solid #e2e8f0", overflow: "hidden" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.5rem 1.75rem", borderBottom: isDark ? "1px solid #334155" : "1px solid #f1f5f9" }}>
-                    <h3 style={{ fontSize: "1.25rem", fontWeight: 900, fontFamily: "'Outfit', sans-serif", color: isDark ? "#f1f5f9" : "#0f172a", letterSpacing: "-0.02em" }}>Görev Listesi</h3>
-                    <div style={{ position: "relative" }}>
-                        <Search style={{ position: "absolute", left: "1rem", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", opacity: 0.6 }} size={16} />
+            {/* Görev Listesi */}
+            <Card className="overflow-hidden border border-border shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:p-6 border-b border-border bg-muted/20">
+                    <h3 className="text-xl font-black font-outfit text-slate-900 dark:text-slate-100 tracking-tight">Aktif Görev Listesi</h3>
+                    <div className="relative w-full md:w-[320px]">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <input
                             placeholder="Dosya no veya görev adı ile ara..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            style={{ ...inputStyle, paddingLeft: "2.75rem", width: "280px", height: "42px", fontSize: "12px", fontWeight: 600 }}
+                            className="w-full h-11 pl-10 pr-4 rounded-xl border border-border bg-card text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all"
                         />
                     </div>
                 </div>
 
-                <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                        <thead>
-                            <tr style={{ background: "#f8fafc/50" }}>
-                                {["Rapor No", "Görev Adı", "Tür", "Kalan", "Durum", "İşlemler"].map(col => (
-                                    <th key={col} style={{ padding: "1.2rem 1rem", textAlign: "left", fontSize: "0.68rem", fontWeight: 900, color: isDark ? "#94a3b8" : "#64748b", letterSpacing: "0.15em", borderBottom: isDark ? "1px solid #334155" : "1px solid #e2e8f0", textTransform: "uppercase", fontFamily: "'Outfit', sans-serif" }}>
-                                        {col}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={6} style={{ textAlign: "center", padding: "3rem" }}>
-                                        <Loader2 size={32} className="animate-spin" style={{ margin: "0 auto", color: "#0f172a" }} />
-                                    </td>
-                                </tr>
-                            ) : filtered.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} style={{ textAlign: "center", padding: "3rem", color: "#94a3b8" }}>Kayıt bulunamadı.</td>
-                                </tr>
-                            ) : (
-                                filtered.map(task => {
-                                    const isExpanded = expandedRow === task.id;
-                                    const sureInfo = getSureInfo(task);
-                                    return (
-                                        <React.Fragment key={task.id}>
-                                            <tr style={{ borderBottom: isDark ? "1px solid #334155" : "1px solid #f1f5f9", background: isExpanded ? (isDark ? "#334155" : "#f8fafc") : "transparent" }} className="hover:bg-muted dark:hover:bg-slate-800/50 transition-colors">
-                                                <td style={tdStyle}><span style={{ fontWeight: 900, color: isDark ? "#60a5fa" : "#3b82f6", fontSize: "11px", letterSpacing: "0.02em", fontFamily: "'Outfit', sans-serif" }}>{task.rapor_kodu}</span></td>
-                                                <td style={tdStyle}><span style={{ fontWeight: 700, color: isDark ? "#f1f5f9" : "#1e293b", fontSize: "13px", fontFamily: "'Inter', sans-serif" }}>{task.rapor_adi}</span></td>
-                                                <td style={tdStyle}><span style={{ fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", fontSize: "11px", fontFamily: "'Inter', sans-serif" }}>{task.rapor_turu}</span></td>
-                                                <td style={tdStyle}>
-                                                    {sureInfo ? (
-                                                        <span style={{ 
-                                                            fontSize: "0.75rem", 
-                                                            padding: "0.25rem 0.5rem", 
-                                                            borderRadius: "0.5rem", 
-                                                            backgroundColor: getKalanColor(sureInfo.diff, sureInfo.total) + "15", 
-                                                            color: getKalanColor(sureInfo.diff, sureInfo.total), 
-                                                            fontWeight: 700 
-                                                        }}>
-                                                            {sureInfo.diff} Gün
-                                                        </span>
-                                                    ) : "—"}
-                                                </td>
-                                                <td style={tdStyle}>
+                <div className="overflow-x-auto">
+                    {/* Mobile Task List (Cards) */}
+                    <div className="md:hidden divide-y divide-border">
+                        {loading ? (
+                            <div className="p-12 flex flex-col items-center justify-center space-y-4">
+                                <Loader2 size={32} className="animate-spin text-primary" />
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Görevler Yükleniyor...</p>
+                            </div>
+                        ) : filtered.length === 0 ? (
+                            <div className="p-12 text-center text-slate-400 font-bold text-sm">Kayıt bulunamadı.</div>
+                        ) : (
+                            filtered.map(task => {
+                                const sureInfo = getSureInfo(task);
+                                const statusColor = getDurumColor(task.rapor_durumu);
+                                const timeColor = sureInfo ? getKalanColor(sureInfo.diff, sureInfo.total) : '#94a3b8';
+                                
+                                return (
+                                    <div key={task.id} className="p-4 space-y-4">
+                                        <div className="flex justify-between items-start">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-black text-primary tracking-widest">{task.rapor_kodu}</span>
+                                                    <span className="text-[9px] font-bold text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded uppercase">{task.rapor_turu}</span>
+                                                </div>
+                                                <h4 className="font-bold text-slate-900 dark:text-slate-100 leading-tight">{task.rapor_adi}</h4>
+                                            </div>
+                                            <button 
+                                                onClick={() => setExpandedRow(expandedRow === task.id ? null : task.id)}
+                                                className="p-2 rounded-lg bg-slate-100 text-slate-400"
+                                            >
+                                                <ChevronRight size={16} className={cn("transition-transform", expandedRow === task.id ? "rotate-90" : "")} />
+                                            </button>
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Kalan Süre</span>
+                                                    <span className="text-xs font-black" style={{ color: timeColor }}>{sureInfo ? `${sureInfo.diff} Gün` : '—'}</span>
+                                                </div>
+                                                <div className="w-px h-6 bg-slate-200" />
+                                                <div className="flex flex-col">
+                                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Durum</span>
                                                     <select
                                                         value={task.rapor_durumu}
                                                         onChange={async (e) => {
@@ -799,71 +750,173 @@ export default function Tasks() {
                                                             try {
                                                                 await updateTask(task.id, { rapor_durumu: newStatus });
                                                                 setTasks(prev => prev.map(t => t.id === task.id ? { ...t, rapor_durumu: newStatus } : t));
-                                                                toast.success("Durum güncellendi");
-                                                            } catch {
-                                                                toast.error("Güncellenemedi");
-                                                            }
+                                                                toast.success("Durum güncellendi.");
+                                                            } catch { toast.error("Hata oluştu."); }
                                                         }}
-                                                        style={{
-                                                            fontSize: "0.68rem",
-                                                            padding: "0.3rem 0.8rem",
-                                                            borderRadius: "0.5rem",
-                                                            backgroundColor: getDurumColor(task.rapor_durumu) + "15",
-                                                            color: getDurumColor(task.rapor_durumu),
-                                                            fontWeight: 900,
-                                                            border: `1px solid ${getDurumColor(task.rapor_durumu)}30`,
-                                                            outline: "none",
-                                                            cursor: "pointer",
-                                                            letterSpacing: "0.02em",
-                                                            appearance: "none",
-                                                            textAlign: "center",
-                                                            minWidth: "130px"
-                                                        }}
+                                                        className="text-[10px] font-black uppercase tracking-tight bg-transparent border-none p-0 outline-none cursor-pointer"
+                                                        style={{ color: statusColor }}
                                                     >
-                                                        {RAPOR_DURUMLARI.map(s => <option key={s} value={s} style={{ color: isDark ? "#f1f5f9" : "#0f172a", background: isDark ? "#1e293b" : "white" }}>{s}</option>)}
+                                                        {RAPOR_DURUMLARI.map(d => <option key={d} value={d} className="text-slate-900">{d}</option>)}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                                <ActionBtn title="İş Adımları" color="#3b82f6" onClick={() => setExpandedRow(expandedRow === task.id ? null : task.id)}>
+                                                    <ClipboardList size={14} />
+                                                </ActionBtn>
+                                                <ActionBtn title="Rapor Başlat" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
+                                                    <FileText size={14} />
+                                                </ActionBtn>
+                                                <ActionBtn title="Düzenle" color="#f59e0b" onClick={() => setEditingTask(task)}>
+                                                    <Edit3 size={14} />
+                                                </ActionBtn>
+                                                <ActionBtn title="Paylaş" color="#8b5cf6" onClick={() => setShareTask(task)}>
+                                                    <UserPlus size={14} />
+                                                </ActionBtn>
+                                                <ActionBtn title="Sil" color="#ef4444" onClick={() => handleDelete(task.id)}>
+                                                    <Trash2 size={14} />
+                                                </ActionBtn>
+                                            </div>
+                                        </div>
+
+                                        {expandedRow === task.id && (
+                                            <div className="mt-4 pt-4 border-t border-border space-y-4 animate-in slide-in-from-top-2 duration-200">
+                                                <div className="space-y-3">
+                                                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alt Görevler / Adımlar</h5>
+                                                    <div className="space-y-2">
+                                                        {(task.steps || []).map((step, idx) => (
+                                                            <div key={idx} className="flex items-center justify-between gap-3 p-2 bg-muted/50 rounded-lg">
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    <input type="checkbox" checked={step.done} onChange={() => handleToggleStep(task, idx)} className="w-4 h-4 rounded border-border" />
+                                                                    <span className={cn("text-xs font-medium truncate", step.done ? "line-through text-slate-400" : "text-slate-700")}>{step.text}</span>
+                                                                </div>
+                                                                <button onClick={() => handleDeleteStep(task, idx)} className="text-rose-400 p-1"><X size={14} /></button>
+                                                            </div>
+                                                        ))}
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                placeholder="Yeni adım ekle..."
+                                                                value={newStepText[task.id] || ""}
+                                                                onChange={e => setNewStepText({ ...newStepText, [task.id]: e.target.value })}
+                                                                onKeyDown={e => e.key === 'Enter' && handleAddStep(task)}
+                                                                className="flex-1 h-9 px-3 rounded-lg border border-border bg-card text-xs font-medium outline-none"
+                                                            />
+                                                            <Button onClick={() => handleAddStep(task)} size="sm" className="h-9 px-3 text-[10px] font-black uppercase">EKLE</Button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+
+                    {/* Desktop Task Table */}
+                    <table className="hidden md:table w-full border-collapse">
+                        <thead>
+                            <tr className="bg-muted/30">
+                                {["Rapor No", "Görev Adı", "Tür", "Kalan", "Durum", "İşlemler"].map(col => (
+                                    <th key={col} className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                        {col}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={6} className="py-20 text-center">
+                                        <Loader2 size={32} className="animate-spin mx-auto text-primary" />
+                                    </td>
+                                </tr>
+                            ) : filtered.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6} className="py-20 text-center text-slate-400 font-bold">Kayıt bulunamadı.</td>
+                                </tr>
+                            ) : (
+                                filtered.map(task => {
+                                    const isExpanded = expandedRow === task.id;
+                                    const sureInfo = getSureInfo(task);
+                                    return (
+                                        <React.Fragment key={task.id}>
+                                            <tr className={cn("hover:bg-muted/50 transition-colors", isExpanded ? "bg-muted/50" : "bg-transparent")}>
+                                                <td className="px-6 py-4"><span className="font-black text-primary text-[11px] tracking-widest font-outfit">{task.rapor_kodu}</span></td>
+                                                <td className="px-6 py-4"><span className="font-bold text-slate-900 dark:text-slate-100 text-sm">{task.rapor_adi}</span></td>
+                                                <td className="px-6 py-4"><span className="font-bold text-slate-400 text-[11px] uppercase">{task.rapor_turu}</span></td>
+                                                <td className="px-6 py-4">
+                                                    {sureInfo ? (
+                                                        <span 
+                                                            className="text-[11px] font-black px-2 py-1 rounded-lg"
+                                                            style={{ backgroundColor: getKalanColor(sureInfo.diff, sureInfo.total) + "15", color: getKalanColor(sureInfo.diff, sureInfo.total) }}
+                                                        >
+                                                            {sureInfo.diff} Gün
+                                                        </span>
+                                                    ) : "—"}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <select
+                                                        value={task.rapor_durumu}
+                                                        onChange={async (e) => {
+                                                            const newStatus = e.target.value;
+                                                            try {
+                                                                await updateTask(task.id, { rapor_durumu: newStatus });
+                                                                setTasks(prev => prev.map(t => t.id === task.id ? { ...t, rapor_durumu: newStatus } : t));
+                                                                toast.success("Durum güncellendi.");
+                                                            } catch { toast.error("Hata oluştu."); }
+                                                        }}
+                                                        className="bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer p-1 rounded-lg hover:bg-slate-100"
+                                                        style={{ color: getDurumColor(task.rapor_durumu) }}
+                                                    >
+                                                        {RAPOR_DURUMLARI.map(d => <option key={d} value={d} className="text-slate-900">{d}</option>)}
                                                     </select>
                                                 </td>
-                                                <td style={tdStyle}>
-                                                    <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-                                                        <ActionBtn title="Raporu Yaz" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
-                                                            <FileText size={14} />
-                                                        </ActionBtn>
-                                                        <ActionBtn title="Paylaş" color="#a855f7" onClick={() => setShareTask(task)}>
-                                                            <UserPlus size={14} />
-                                                        </ActionBtn>
-                                                        <ActionBtn title="İş Adımları" color="#3b82f6" onClick={() => setExpandedRow(isExpanded ? null : task.id)}>
-                                                            <ClipboardList size={14} />
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <ActionBtn title="Rapor Başlat" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
+                                                            <FileText size={16} />
                                                         </ActionBtn>
                                                         <ActionBtn title="Görevi Düzenle" color="#f59e0b" onClick={() => setEditingTask(task)}>
-                                                            <Edit3 size={14} />
+                                                            <Edit3 size={16} />
+                                                        </ActionBtn>
+                                                        <ActionBtn title="Paylaş" color="#8b5cf6" onClick={() => setShareTask(task)}>
+                                                            <UserPlus size={16} />
+                                                        </ActionBtn>
+                                                        <ActionBtn title="İş Adımları" color="#3b82f6" onClick={() => setExpandedRow(isExpanded ? null : task.id)}>
+                                                            <ClipboardList size={16} />
                                                         </ActionBtn>
                                                         <ActionBtn title="Sil" color="#ef4444" onClick={() => handleDelete(task.id)}>
-                                                            <Trash2 size={14} />
+                                                            <Trash2 size={16} />
                                                         </ActionBtn>
                                                     </div>
                                                 </td>
                                             </tr>
                                             {isExpanded && (
-                                                <tr style={{ backgroundColor: isDark ? "#0f172a" : "#f8fafc" }}>
-                                                    <td colSpan={6} style={{ padding: "1rem 1.5rem" }}>
-                                                        <div style={{ backgroundColor: isDark ? "#1e293b" : "white", padding: "1.25rem", borderRadius: "1rem", border: isDark ? "1px solid #334155" : "1px solid #e2e8f0" }}>
-                                                            <p style={{ fontSize: "0.8rem", fontWeight: 700, marginBottom: "0.5rem" }}>İŞ ADIMLARI</p>
-                                                            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                                                <tr className="bg-muted/30">
+                                                    <td colSpan={6} className="px-12 py-6">
+                                                        <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
+                                                            <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">ALT GÖREVLER / ADIMLAR</h5>
+                                                            <div className="space-y-2">
                                                                 {(task.steps || []).map((step, idx) => (
-                                                                    <div key={idx} style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                                                                        <input type="checkbox" checked={step.done} onChange={() => handleToggleStep(task, idx)} />
-                                                                        <span style={{ flex: 1, fontSize: "0.85rem", textDecoration: step.done ? "line-through" : "none" }}>{step.text}</span>
-                                                                        <X size={14} style={{ cursor: "pointer", color: "#94a3b8" }} onClick={() => handleDeleteStep(task, idx)} />
+                                                                    <div key={idx} className="flex items-center justify-between gap-3 p-3 bg-muted/50 rounded-xl">
+                                                                        <div className="flex items-center gap-3">
+                                                                            <input type="checkbox" checked={step.done} onChange={() => handleToggleStep(task, idx)} className="w-5 h-5 rounded border-border" />
+                                                                            <span className={cn("text-sm font-medium", step.done ? "line-through text-slate-400" : "text-slate-700")}>{step.text}</span>
+                                                                        </div>
+                                                                        <button onClick={() => handleDeleteStep(task, idx)} className="text-rose-400 p-1.5 hover:bg-rose-50 rounded-lg transition-colors"><X size={16} /></button>
                                                                     </div>
                                                                 ))}
-                                                                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-                                                                    <input 
-                                                                        placeholder="Yeni adım..." 
+                                                                <div className="flex gap-3 mt-4">
+                                                                    <input
+                                                                        placeholder="Yeni adım ekle..."
                                                                         value={newStepText[task.id] || ""}
-                                                                        onChange={e => setNewStepText({...newStepText, [task.id]: e.target.value})}
-                                                                        style={{...inputStyle, padding: "0.4rem"}} 
+                                                                        onChange={e => setNewStepText({ ...newStepText, [task.id]: e.target.value })}
+                                                                        onKeyDown={e => e.key === 'Enter' && handleAddStep(task)}
+                                                                        className="flex-1 h-11 px-4 rounded-xl border border-border bg-card text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all"
                                                                     />
-                                                                    <button onClick={() => handleAddStep(task)} style={{ padding: "0.4rem 1rem", backgroundColor: isDark ? "#3b82f6" : "#0f172a", color: "white", borderRadius: "0.5rem", fontSize: "0.8rem", fontWeight: 700 }}>Ekle</button>
+                                                                    <Button onClick={() => handleAddStep(task)} className="h-11 px-6 text-[10px] font-black uppercase tracking-widest">EKLE</Button>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -877,7 +930,7 @@ export default function Tasks() {
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </Card>
 
             {/* Report Selector Modal */}
             {showReportSelector && (

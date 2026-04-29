@@ -34,15 +34,15 @@ export function Modal({ isOpen, onClose, title, children, size = 'medium' }: Mod
 
     const modalContent = (
         <div 
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" 
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm" 
             onClick={onClose}
         >
             <div 
-                className={`bg-card rounded-2xl shadow-2xl w-full overflow-hidden ${sizes[size]} border border-border`}
+                className={`bg-card rounded-2xl shadow-2xl w-full flex flex-col max-h-[90vh] ${sizes[size]} border border-border overflow-hidden`}
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-muted/50">
-                    <h3 className="text-xl font-black text-primary font-outfit tracking-tight">{title}</h3>
+                <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-muted/50 shrink-0">
+                    <h3 className="text-lg md:text-xl font-black text-primary font-outfit tracking-tight">{title}</h3>
                     <button 
                         onClick={onClose}
                         className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors"
@@ -50,7 +50,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'medium' }: Mod
                         <X size={20} />
                     </button>
                 </div>
-                <div className="p-6">
+                <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar">
                     {children}
                 </div>
             </div>

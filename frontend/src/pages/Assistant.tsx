@@ -233,9 +233,9 @@ export default function Assistant() {
     const showSuggestions = messages.length <= 1;
 
     return (
-        <div className="h-[calc(100vh-160px)] flex flex-col gap-6 animate-in fade-in duration-500">
+        <div className="flex-1 flex flex-col min-h-0 gap-4 md:gap-6 animate-in fade-in duration-500">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
                 <div>
                     <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
                         <Shield size={10} className="text-primary/60" />
@@ -243,16 +243,16 @@ export default function Assistant() {
                         <ChevronRight size={10} />
                         <span className="text-primary opacity-80 uppercase tracking-widest">Dijital Asistan</span>
                     </div>
-                    <h1 className="text-3xl font-black text-foreground tracking-tight">
+                    <h1 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">
                         Dijital Müfettiş Asistanı
                     </h1>
                     <p className="text-muted-foreground text-sm font-medium mt-1">Mevzuat ve denetim süreçlerinizde AI desteği alın.</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <Button variant="outline" size="sm" onClick={handleClearHistory} className="rounded-xl border-border text-muted-foreground hover:bg-muted font-bold text-[11px] h-11 px-4">
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                    <Button variant="outline" size="sm" onClick={handleClearHistory} className="flex-1 md:flex-none rounded-xl border-border text-muted-foreground hover:bg-muted font-bold text-[11px] h-11 px-4">
                         <Trash2 size={16} className="mr-2" /> TEMİZLE
                     </Button>
-                    <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-600 px-4 py-2 rounded-xl text-[10px] font-black border border-emerald-100 shadow-sm uppercase tracking-widest h-11">
+                    <div className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-emerald-500/10 text-emerald-600 px-4 py-2 rounded-xl text-[10px] font-black border border-emerald-100 shadow-sm uppercase tracking-widest h-11">
                         <Bot size={14} /> Gemini Online
                     </div>
                 </div>
@@ -265,15 +265,15 @@ export default function Assistant() {
                         <div
                             key={idx}
                             className={cn(
-                                "flex gap-4 max-w-[85%] animate-in slide-in-from-bottom-2 duration-300 group/msg",
+                                "flex gap-3 md:gap-4 max-w-[95%] md:max-w-[85%] animate-in slide-in-from-bottom-2 duration-300 group/msg",
                                 m.role === 'user' ? "ml-auto flex-row-reverse" : ""
                             )}
                         >
                             <div className={cn(
-                                "w-10 h-10 rounded-2xl flex-shrink-0 flex items-center justify-center shadow-lg transition-transform hover:scale-110",
+                                "w-8 h-8 md:w-10 md:h-10 rounded-xl md:rounded-2xl flex-shrink-0 flex items-center justify-center shadow-lg transition-transform hover:scale-110",
                                 m.role === 'assistant' ? "bg-primary text-white" : "bg-card border border-border text-primary"
                             )}>
-                                {m.role === 'assistant' ? <Bot size={20} /> : <User size={20} />}
+                                {m.role === 'assistant' ? <Bot size={16} className="md:size-[20px]" /> : <User size={16} className="md:size-[20px]" />}
                             </div>
                             <div className="space-y-1 flex-1 min-w-0">
                                 <div className={cn(
@@ -366,24 +366,26 @@ export default function Assistant() {
                 </div>
 
                 {/* Input Area */}
-                <div className="p-6 bg-card/80 border-t border-border/50 backdrop-blur-md">
-                    <form onSubmit={onSubmit} className="relative max-w-4xl mx-auto group">
-                        <input
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            placeholder="Mevzuat maddesi, personel bilgisi veya denetim durumu sorun..."
-                            className="w-full h-14 pl-6 pr-20 rounded-2xl border border-border/60 outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all text-[15px] font-medium shadow-inner bg-card/50"
-                            disabled={isTyping}
-                        />
-                        <button
+                <div className="p-4 md:p-6 bg-card/80 border-t border-border/50 backdrop-blur-md">
+                    <form onSubmit={onSubmit} className="relative max-w-4xl mx-auto group flex items-center gap-2">
+                        <div className="relative flex-1 min-w-0">
+                            <input
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                placeholder="Bir şeyler sorun..."
+                                className="w-full h-12 md:h-14 pl-5 md:pl-6 pr-4 rounded-2xl border border-border/60 outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all text-[14px] md:text-[15px] font-medium shadow-inner bg-card/50"
+                                disabled={isTyping}
+                            />
+                        </div>
+                        <Button
                             type="submit"
                             disabled={isTyping || !input.trim()}
-                            className="absolute right-2 top-2 h-10 px-5 rounded-xl bg-primary text-white shadow-lg shadow-primary/30 disabled:opacity-50 disabled:shadow-none hover:bg-primary-light transition-all active:scale-95 flex items-center gap-2"
+                            className="h-12 md:h-14 px-4 md:px-8 rounded-2xl bg-primary text-white shadow-lg shadow-primary/30 disabled:opacity-50 disabled:shadow-none hover:bg-primary/90 transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0 border-none"
                         >
-                            <span className="text-sm font-bold">Sor</span>
-                            <Send size={16} />
-                        </button>
+                            <span className="hidden sm:inline text-sm font-bold">Sor</span>
+                            <Send size={18} />
+                        </Button>
                     </form>
                     <div className="flex justify-center gap-6 mt-3 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                         <span className="flex items-center gap-1"><History size={12} /> Gerçek Zamanlı Analiz</span>

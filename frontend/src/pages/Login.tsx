@@ -54,9 +54,28 @@ export default function Login() {
             let result;
             if (isRegister) {
                 if (!fullName.trim()) throw new Error("Lütfen adınızı ve soyadınızı girin.");
+                
                 result = await signUp(email, password, fullName);
+                
+                // Kayıt başarılıysa ama mail doğrulaması bekleniyorsa mesaj göster
+                setError("Kayıt başarılı! Lütfen e-postanıza gönderilen doğrulama linkine tıklayarak hesabınızı aktif edin.");
+                setLoading(false);
+                return;
             } else {
                 result = await signIn(email, password);
+                
+                // E-POSTA DOĞRULAMA KONTROLÜ (Gerçek Firebase User ise kontrol et)
+                const fbUser = result.user as any;
+                // mufettis bypass hariç herkesi kontrol et
+                if (fbUser && fbUser.uid !== "mufettis-gsb-unique-id" && fbUser.uid !== "demo-user-123") {
+                    if (fbUser.emailVerified === false) {
+                        // Firebase session'ı kapat ki giriş yapmış sayılmasın
+                        import("firebase/auth").then(({ getAuth, signOut }) => {
+                            signOut(getAuth());
+                        });
+                        throw new Error("Hesabınız henüz aktif edilmemiş. Lütfen e-postanıza gönderilen doğrulama linkine tıklayın.");
+                    }
+                }
             }
             
             // "Beni Hatırla" mantığı
@@ -117,16 +136,16 @@ export default function Login() {
 
 
     return (
-        <div className="h-screen flex items-center justify-center bg-[#0f172a] font-sans selection:bg-blue-500/30 overflow-hidden sm:p-0">
+        <div className="min-h-screen lg:h-screen flex items-center justify-center bg-[#0f172a] font-sans selection:bg-blue-500/30 overflow-x-hidden sm:p-0">
             <div className="absolute inset-0 opacity-5 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
 
-            <div className="relative z-10 w-full max-w-[1050px] flex bg-white dark:bg-slate-900 rounded-[40px] md:rounded-[50px] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.6)] border border-white/10 dark:border-slate-800/50 mx-4 sm:mx-6 animate-in fade-in zoom-in duration-700 h-[92vh] max-h-[850px]">
+            <div className="relative z-10 w-full lg:max-w-[1050px] flex bg-white dark:bg-slate-900 rounded-none lg:rounded-[50px] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.6)] border-none lg:border lg:border-white/10 dark:lg:border-slate-800/50 min-h-screen lg:h-[92vh] lg:max-h-[850px]">
 
                 {/* Sol Taraf: Kurumsal Alan */}
                 <div className="hidden md:flex w-[40%] bg-slate-50 dark:bg-slate-950/50 p-12 flex-col relative overflow-hidden border-r border-slate-100 dark:border-slate-800">
                     <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center gap-10">
                         <div className="flex flex-col items-center gap-6 lg:gap-8">
-                            <div className="w-40 h-40 lg:w-60 lg:h-60 flex items-center justify-center animate-in zoom-in duration-1000">
+                            <div className="w-32 h-32 lg:w-60 lg:h-60 flex items-center justify-center animate-in zoom-in duration-1000">
                                 <img src="./logo-login.png" alt="Müf Yard Logo" className="w-full h-full object-contain" />
                             </div>
                             <div className="animate-in slide-in-from-bottom-4 duration-700 delay-200">
@@ -159,7 +178,10 @@ export default function Login() {
                 </div>
 
                 {/* Sağ Taraf: Giriş/Kayıt Formu */}
-                <div className="flex-1 p-8 md:p-14 flex flex-col justify-center bg-white dark:bg-slate-900 overflow-y-auto custom-scrollbar">
+                <div className="flex-1 p-6 md:p-14 flex flex-col justify-center bg-white dark:bg-slate-900 overflow-y-auto custom-scrollbar">
+                    <div className="mb-6 lg:hidden flex justify-center">
+                         <img src="./logo-login.png" alt="Müf Yard Logo" className="w-20 h-20 object-contain" />
+                    </div>
                     <div className="mb-6">
                         <h3 className="text-2xl font-black text-[#0f172a] dark:text-white mb-2 font-outfit tracking-tight">
                             {isRegister ? "Yeni Hesap Oluştur" : "Hoş Geldiniz"}
