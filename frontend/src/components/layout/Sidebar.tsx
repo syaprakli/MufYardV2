@@ -12,6 +12,7 @@ import {
     Bot,
     HelpCircle,
     Sparkles,
+    Star,
     MessageSquare,
     X
 } from "lucide-react";
@@ -36,6 +37,7 @@ const navItems = [
     { icon: StickyNote, label: "Hızlı Notlar", href: "/notes" },
     { icon: BookOpen, label: "Mevzuat", href: "/legislation" },
     { icon: Bot, label: "Dijital Müfettiş", href: "/assistant" },
+    { icon: Star, label: "Bize Puan Verin", href: "/feedback" },
 ];
 
 const comingSoonItems = [
@@ -43,7 +45,6 @@ const comingSoonItems = [
 ];
 
 const bottomNavItems = [
-    { icon: Sparkles, label: "Bize Puan Verin", href: "/feedback" },
     { icon: HelpCircle, label: "Hakkında", href: "/about" },
     { icon: Settings, label: "Ayarlar", href: "/settings" },
 ];

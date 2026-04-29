@@ -109,7 +109,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
 
             <div className="flex items-center gap-4 lg:gap-6">
                 {/* Online Users Indicator */}
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30">
+                <div className="flex items-center gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30">
                     <div className="relative">
                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                         <div className="absolute top-0 left-0 w-2 h-2 rounded-full bg-emerald-500 animate-ping opacity-75" />
