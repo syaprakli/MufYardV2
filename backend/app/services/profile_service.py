@@ -111,6 +111,10 @@ class ProfileService:
                     "role": "admin" if email in ["mufettis@gsb.gov.tr", "sefayaprakli@hotmail.com"] else "user"
                 })
             
+            # Admin role enforcement
+            if email in ["mufettis@gsb.gov.tr", "sefayaprakli@hotmail.com"]:
+                new_data["role"] = "admin"
+
             await asyncio.to_thread(lambda: doc_ref.set(new_data, merge=True))
             
             # Welcome Notification

@@ -5,7 +5,7 @@ from app.lib.firebase_admin import db
 from datetime import datetime
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/feedback", tags=["feedback"])
+router = APIRouter(prefix="", tags=["feedback"])
 
 class FeedbackCreate(BaseModel):
     rating: int
