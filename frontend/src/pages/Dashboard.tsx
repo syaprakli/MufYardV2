@@ -17,6 +17,7 @@ import {
 } from 'recharts';
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { IdentitySelectionModal } from "../components/IdentitySelectionModal";
 
 // Premium Color Palette with Dark Mode support
 const COLORS = {
@@ -60,6 +61,7 @@ export default function Dashboard() {
     const [profile, setProfile] = useState<any>(null);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
+    const [showIdentityModal, setShowIdentityModal] = useState(false);
 
     // ─── Filtre State ───
     const [showFilters, setShowFilters] = useState(false);
@@ -120,6 +122,14 @@ export default function Dashboard() {
                 setData(stats);
                 setTasks(myTasks);
                 setProfile(profileData);
+
+                // Determine if identity selection is needed
+                const isGeneric = profileData && 
+                                 ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz", "Müfettiş"].includes(profileData.full_name);
+                
+                if (isGeneric && !localStorage.getItem(`id_skip_${effectiveUid}`)) {
+                    setShowIdentityModal(true);
+                }
             } catch (err) {
                 console.error("Dashboard yüklenirken hata:", err);
             } finally {
@@ -334,6 +344,16 @@ Lütfen şunları analiz et:
 
     return (
         <div className="max-w-[1600px] mx-auto space-y-4 lg:space-y-8 animate-in fade-in duration-500 pb-12 pr-2 lg:pr-4 pl-2 lg:pl-2">
+            {showIdentityModal && effectiveUid && (
+                <IdentitySelectionModal 
+                    uid={effectiveUid} 
+                    onComplete={(name) => {
+                        setProfile((p: any) => ({ ...p, full_name: name }));
+                        setShowIdentityModal(false);
+                    }} 
+                />
+            )}
+
             {/* Standardized Page Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="space-y-1">

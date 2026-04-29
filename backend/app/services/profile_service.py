@@ -89,6 +89,24 @@ class ProfileService:
             if results:
                 inspector_match = results[0].to_dict()
 
+        if not inspector_match and profile_data and profile_data.get('full_name'):
+            # Try search by full_name in inspectors (Fuzzy match)
+            # This handles cases like sefayaprakli@hotmail.com -> Sefa Yapraklı
+            name_to_search = profile_data.get('full_name')
+            if name_to_search not in ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz"]:
+                inspectors_ref = db.collection('inspectors')
+                # Try exact name match
+                query = inspectors_ref.where('name', '==', name_to_search).limit(1)
+                results = await asyncio.to_thread(lambda: list(query.stream()))
+                if results:
+                    inspector_match = results[0].to_dict()
+                else:
+                    # Try uppercase/lowercase variants
+                    query = inspectors_ref.where('name', '==', name_to_search.upper()).limit(1)
+                    results = await asyncio.to_thread(lambda: list(query.stream()))
+                    if results:
+                        inspector_match = results[0].to_dict()
+
         if inspector_match:
             new_data = {
                 "uid": uid,
