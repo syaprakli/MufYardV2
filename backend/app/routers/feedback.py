@@ -29,7 +29,8 @@ async def submit_feedback(fb: FeedbackCreate):
 async def get_feedbacks():
     # Only for admins (logic checked in frontend for now, or add dependency here)
     import asyncio
-    docs = await asyncio.to_thread(lambda: db.collection('feedbacks').order_by('created_at', direction='DESCENDING').stream())
+    docs = await asyncio.to_thread(lambda: list(db.collection('feedbacks').order_by('created_at', direction='DESCENDING').stream()))
+    feedbacks = []
     for doc in docs:
         d = doc.to_dict()
         d['id'] = doc.id

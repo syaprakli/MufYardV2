@@ -101,7 +101,6 @@ export default function Messages() {
     e.stopPropagation();
     
     const isRegistered = !!contact.uid;
-    const inDirectory = !!contact.directoryId;
 
     const confirmed = await confirm({
       title: "Kullanıcıyı Sil",
