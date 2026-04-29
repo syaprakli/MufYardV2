@@ -20,6 +20,7 @@ interface UnifiedContact {
   isRegistered: boolean;
   isMe: boolean;
   isOnline?: boolean;
+  directoryId?: string | null;
 }
 
 export default function Messages() {
@@ -79,7 +80,8 @@ export default function Messages() {
           email: ins.email || '',
           avatar_url: profile?.avatar_url || null,
           isRegistered: !!profile?.uid || isMe,
-          isMe: isMe
+          isMe: isMe,
+          directoryId: ins.id || null
         });
       });
 
@@ -97,23 +99,39 @@ export default function Messages() {
 
   const handleDeleteProfile = async (e: React.MouseEvent, contact: UnifiedContact) => {
     e.stopPropagation();
-    if (!contact.uid) return;
     
+    const isRegistered = !!contact.uid;
+    const inDirectory = !!contact.directoryId;
+
     const confirmed = await confirm({
-      title: "Profili Sil",
-      message: `${contact.full_name} kullanıcısının sistem profilini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`,
+      title: "Kullanıcıyı Sil",
+      message: `${contact.full_name} kullanıcısını ${isRegistered ? "sistemden ve " : ""}rehberden tamamen silmek istediğinize emin misiniz?`,
       confirmText: "Sil",
       variant: "danger"
     });
     
     if (confirmed) {
       try {
-        const success = await apiDeleteProfile(contact.uid);
-        if (success) {
-          toast.success("Profil başarıyla silindi.");
+        let successCount = 0;
+        
+        // 1. Profil sil (Kayıtlı ise)
+        if (contact.uid) {
+          const res = await apiDeleteProfile(contact.uid);
+          if (res) successCount++;
+        }
+
+        // 2. Rehberden sil (Directory ID varsa)
+        if (contact.directoryId) {
+          const { deleteInspector } = await import('../lib/api/inspectors');
+          await deleteInspector(contact.directoryId);
+          successCount++;
+        }
+
+        if (successCount > 0) {
+          toast.success("Kullanıcı başarıyla silindi.");
           fetchUsers();
         } else {
-          toast.error("Profil silinemedi.");
+          toast.error("Silme işlemi başarısız.");
         }
       } catch (err) {
         toast.error("Hata oluştu.");
@@ -279,9 +297,9 @@ export default function Messages() {
                         </div>
                         
                         <div className="flex items-center gap-2">
-                          {contact.isRegistered && userRole === 'admin' && (
+                          {userRole === 'admin' && (contact.isRegistered || contact.directoryId) && (
                             <button 
-                              onClick={(e) => handleDeleteProfile(e, contact)}
+                              onClick={(e) => handleDeleteProfile(e, contact as any)}
                               className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                               title="Profili Sil"
                             >

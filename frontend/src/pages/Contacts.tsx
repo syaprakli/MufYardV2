@@ -189,7 +189,14 @@ export default function Contacts() {
                         // Kurumsal Rehber için Gruplandırılmış Görünüm
                         Object.entries(
                             sortedContacts.reduce((acc: any, contact) => {
-                                const group = contact.unit || "Diğer";
+                                // Öncelik: Birim (unit) -> Ünvan (title) -> Diğer
+                                let group = contact.unit || contact.title || "Diğer";
+                                
+                                // Özel kural: Eğer ünvan "Başkan" içeriyorsa "Başkanlık" grubuna koy
+                                if (group.toLowerCase().includes("başkan") && !group.toLowerCase().includes("başmüfettiş")) {
+                                    group = "Başkanlık";
+                                }
+                                
                                 if (!acc[group]) acc[group] = [];
                                 acc[group].push(contact);
                                 return acc;

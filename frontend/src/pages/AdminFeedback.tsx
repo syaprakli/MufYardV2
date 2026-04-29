@@ -3,7 +3,6 @@ import { Star, Clock, User, Mail, MessageSquare, Loader2 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { API_URL } from '../lib/config';
 import { fetchWithTimeout } from '../lib/api/utils';
-import { useAuth } from '../lib/hooks/useAuth';
 import toast from 'react-hot-toast';
 
 interface Feedback {
@@ -16,7 +15,6 @@ interface Feedback {
 }
 
 export default function AdminFeedback() {
-    const { user } = useAuth();
     const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
     const [loading, setLoading] = useState(true);
 
