@@ -3,11 +3,14 @@ import { Search, MessageSquare, Shield, ChevronRight, ChevronLeft, User } from '
 
 import { useAuth } from '../lib/hooks/useAuth';
 import { useChat } from '../lib/context/ChatContext';
+import { usePresence } from '../lib/context/PresenceContext';
 import { toast } from 'react-hot-toast';
 import { cn } from '../lib/utils';
 import { API_URL } from '../lib/config';
-import { fetchAllProfiles } from '../lib/api/profiles';
+import { fetchAllProfiles, deleteProfile as apiDeleteProfile } from '../lib/api/profiles';
 import { fetchInspectors } from '../lib/api/inspectors';
+import { useConfirm } from '../lib/context/ConfirmContext';
+import { Trash2 } from 'lucide-react';
 
 interface UnifiedContact {
   uid: string | null;
@@ -23,34 +26,21 @@ interface UnifiedContact {
 export default function Messages() {
   const { user } = useAuth();
   const { openChat } = useChat();
+  const { onlineUsers } = usePresence();
+  const confirm = useConfirm();
   const [contacts, setContacts] = useState<UnifiedContact[]>([]);
+  const [userRole, setUserRole] = useState('user');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'online' | 'offline'>('all');
-  const [onlineUids, setOnlineUids] = useState<string[]>([]);
   const itemsPerPage = 8;
 
   useEffect(() => {
     fetchUsers();
-    fetchOnlineUsers();
-    
-    // Her 30 saniyede bir online kullanıcıları güncelle
-    const interval = setInterval(fetchOnlineUsers, 30000);
-    return () => clearInterval(interval);
   }, [user]);
 
-  const fetchOnlineUsers = async () => {
-    try {
-      const response = await fetch(`${API_URL}/collaboration/online-users`);
-      if (response.ok) {
-        const uids = await response.json();
-        setOnlineUids(uids);
-      }
-    } catch (error) {
-      console.error("Online kullanıcılar alınamadı:", error);
-    }
-  };
+  const onlineUids = onlineUsers.map(u => u.uid);
 
   // Arama veya filtre değiştiğinde sayfa 1'e dön
   useEffect(() => {
@@ -64,6 +54,12 @@ export default function Messages() {
         fetchAllProfiles(),
         fetchInspectors()
       ]);
+      
+      // Set current user role
+      if (user) {
+        const myProfile = profiles.find(p => p.uid === user.uid);
+        if (myProfile?.role) setUserRole(myProfile.role);
+      }
       
       const unified: UnifiedContact[] = [];
 
@@ -97,6 +93,32 @@ export default function Messages() {
       toast.error("Kullanıcı listesi alınamadı.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteProfile = async (e: React.MouseEvent, contact: UnifiedContact) => {
+    e.stopPropagation();
+    if (!contact.uid) return;
+    
+    const confirmed = await confirm({
+      title: "Profili Sil",
+      message: `${contact.full_name} kullanıcısının sistem profilini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`,
+      confirmText: "Sil",
+      variant: "danger"
+    });
+    
+    if (confirmed) {
+      try {
+        const success = await apiDeleteProfile(contact.uid);
+        if (success) {
+          toast.success("Profil başarıyla silindi.");
+          fetchUsers();
+        } else {
+          toast.error("Profil silinemedi.");
+        }
+      } catch (err) {
+        toast.error("Hata oluştu.");
+      }
     }
   };
 
@@ -256,7 +278,19 @@ export default function Messages() {
                           </div>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">{contact.title}</p>
                         </div>
-                        <ChevronRight size={16} className="text-slate-300 group-hover:text-primary transition-colors translate-x-0 group-hover:translate-x-1" />
+                        
+                        <div className="flex items-center gap-2">
+                          {contact.isRegistered && userRole === 'admin' && (
+                            <button 
+                              onClick={(e) => handleDeleteProfile(e, contact)}
+                              className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                              title="Profili Sil"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                          <ChevronRight size={16} className="text-slate-300 group-hover:text-primary transition-colors translate-x-0 group-hover:translate-x-1" />
+                        </div>
                       </button>
                     ))}
                   </div>

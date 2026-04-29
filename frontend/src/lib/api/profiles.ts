@@ -70,3 +70,10 @@ export async function uploadAvatar(uid: string, file: File): Promise<{avatar_url
 
     return response.json();
 }
+
+export async function deleteProfile(uid: string): Promise<boolean> {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/profiles/${uid}`, {
+        method: "DELETE",
+    });
+    return response.ok;
+}

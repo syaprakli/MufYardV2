@@ -59,8 +59,9 @@ export default function Tasks() {
 
     const [tasks, setTasks] = useState<Task[]>([]);
     const { user } = useAuth();
-    const currentUser = user || JSON.parse(localStorage.getItem('demo_user') || '{"email": "mufettis@gsb.gov.tr", "uid": "mufettis@gsb.gov.tr"}');
-    const effectiveUid = currentUser.uid;
+    
+    const currentUser = user;
+    const effectiveUid = currentUser?.uid;
 
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -154,6 +155,14 @@ export default function Tasks() {
         }
     }, [autoKodu, form.rapor_kodu]);
 
+    if (!user) {
+        return (
+            <div className="min-h-[400px] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+            </div>
+        );
+    }
+
     const loadTasks = async () => {
         if (!effectiveUid) return;
         try {
@@ -192,8 +201,8 @@ export default function Tasks() {
                 rapor_durumu: "Başlanmadı", 
                 steps: [],
                 is_public: activeTab === 'ortak',
-                owner_id: currentUser.uid,
-                assigned_to: form.assigned_to.length > 0 ? form.assigned_to : [currentUser.uid]
+                owner_id: currentUser?.uid || "",
+                assigned_to: form.assigned_to.length > 0 ? form.assigned_to : [currentUser?.uid || ""]
             });
             setForm({ 
                 rapor_kodu: "", 
@@ -221,7 +230,7 @@ export default function Tasks() {
     const handleAcceptInvitation = async (taskId: string) => {
         try {
             setSaving(true);
-            await acceptTask(taskId, effectiveUid);
+            await acceptTask(taskId, effectiveUid || "");
             toast.success("Görev kabul edildi ve listenize eklendi.");
             await loadTasks();
         } catch (error) {
@@ -289,7 +298,7 @@ export default function Tasks() {
         try {
             setLoading(true);
             // Hem UID hem Email ile sorgulayarak yetki kapsamını genişletiyoruz
-            const allAudits = await fetchAudits(effectiveUid, currentUser.email);
+            const allAudits = await fetchAudits(effectiveUid || "", currentUser?.email || undefined);
             const associated = allAudits.filter(a => String(a.task_id).trim() === String(task.id).trim());
             setTaskAudits(associated);
             
@@ -373,7 +382,7 @@ export default function Tasks() {
             if (!task) return;
 
             // 1. Get existing audits to determine next sequence number
-            const existingAudits = await fetchAudits(effectiveUid, currentUser.email);
+            const existingAudits = await fetchAudits(effectiveUid || "", currentUser?.email || undefined);
             const taskAudits = existingAudits.filter(a => String(a.task_id).trim() === String(taskId).trim());
             const nextSeq = Math.max(0, ...taskAudits.map(a => a.report_seq || 0)) + 1;
 
@@ -383,7 +392,7 @@ export default function Tasks() {
                 location: "Merkez / Yerinde",
                 date: new Date().toLocaleDateString("tr-TR"),
                 status: "Rapor Yazılıyor",
-                inspector: currentUser.email?.split('@')[0] || "Müfettiş",
+                inspector: currentUser?.email?.split('@')[0] || "Müfettiş",
                 owner_id: effectiveUid,
                 report_content: RAPOR_SABLONLARI[sablonName] || "",
                 assigned_to: Array.from(new Set([...(task.assigned_to || []), effectiveUid])),

@@ -181,6 +181,7 @@ app.include_router(ai_knowledge.router, prefix="/api/ai-knowledge", tags=["AI Kn
 app.include_router(backup.router, prefix="/api/backup", tags=["Backup"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])
+app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 
 @app.get("/")
 async def root():

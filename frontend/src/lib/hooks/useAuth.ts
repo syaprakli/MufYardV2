@@ -11,24 +11,9 @@ export function useAuth() {
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
             if (firebaseUser) {
                 setUser(firebaseUser);
-                // Demo persistence check (Optional but kept for safety)
-                if (firebaseUser.uid === "demo-user-123") {
-                    localStorage.setItem("demo_user", JSON.stringify(firebaseUser));
-                }
                 setLoading(false);
             } else {
-                // If NO Firebase user, check for Demo User in localStorage
-                const demoUser = localStorage.getItem("demo_user");
-                if (demoUser) {
-                    try {
-                        setUser(JSON.parse(demoUser));
-                    } catch (e) {
-                        setUser(null);
-                        localStorage.removeItem("demo_user");
-                    }
-                } else {
-                    setUser(null);
-                }
+                setUser(null);
                 setLoading(false);
             }
         });

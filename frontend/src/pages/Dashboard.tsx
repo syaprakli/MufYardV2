@@ -74,8 +74,8 @@ export default function Dashboard() {
     const [analysisLoading, setAnalysisLoading] = useState(false);
     
     // Get identity once from useAuth or fallback (same as Tasks.tsx)
-    const currentUser = user || JSON.parse(localStorage.getItem('demo_user') || '{"email": "mufettis@gsb.gov.tr", "uid": "mufettis@gsb.gov.tr"}');
-    const effectiveUid = currentUser.uid;
+    const currentUser = user;
+    const effectiveUid = currentUser?.uid;
 
     // Filtre dışı tıklama
     useEffect(() => {
@@ -330,6 +330,8 @@ Lütfen şunları analiz et:
         color: Object.values(COLORS)[idx % 6].chart
     }));
 
+    if (!user) return null;
+
     return (
         <div className="max-w-[1600px] mx-auto space-y-4 lg:space-y-8 animate-in fade-in duration-500 pb-12 pr-2 lg:pr-4 pl-2 lg:pl-2">
             {/* Standardized Page Header */}
@@ -342,7 +344,7 @@ Lütfen şunları analiz et:
                         <span className="text-primary opacity-80 uppercase tracking-widest">Genel Bakış</span>
                     </div>
                     <h1 className="text-2xl lg:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-                        Hoş Geldiniz, <span className="text-primary">{profile?.full_name?.split(' ')[0] || user?.displayName?.split(' ')[0] || "Müfettiş"}</span>
+                        Hoş Geldiniz, <span className="text-primary">{(profile?.full_name && profile.full_name !== "Kullanıcı" ? profile.full_name : (user?.displayName || "Müfettiş")).split(' ')[0]}</span>
                     </h1>
                     <div className="flex flex-wrap items-center gap-2 lg:gap-3 mt-1">
                          <span className="flex items-center gap-1.5 text-[10px] lg:text-xs font-bold text-slate-400 uppercase tracking-tighter">

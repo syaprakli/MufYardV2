@@ -43,6 +43,7 @@ const comingSoonItems = [
 ];
 
 const bottomNavItems = [
+    { icon: Sparkles, label: "Bize Puan Verin", href: "/feedback" },
     { icon: HelpCircle, label: "Hakkında", href: "/about" },
     { icon: Settings, label: "Ayarlar", href: "/settings" },
 ];
@@ -55,10 +56,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             isOpen ? "translate-x-0" : "-translate-x-full" // Toggle on mobile
         )}>
             <div className="p-6 border-b border-primary-light flex items-center justify-between">
-                <div>
+                <NavLink 
+                    to="/" 
+                    onClick={() => {
+                        if (window.innerWidth < 1024) onClose();
+                    }}
+                    className="hover:opacity-80 transition-opacity"
+                >
                     <h1 className="text-2xl font-black font-outfit tracking-tight text-white">MüfYard</h1>
-                    <p className="text-[10px] font-bold text-white/60 tracking-widest mt-1">DİJİTAL MÜFETTİŞ YARDIMCISI</p>
-                </div>
+                    <p className="text-[10px] font-bold text-white/60 tracking-widest mt-1 uppercase">Dijital Müfettiş Yardımcısı</p>
+                </NavLink>
                 {/* Close button for mobile */}
                 <button 
                     onClick={onClose}

@@ -4,10 +4,12 @@ import { ChatProvider } from "./lib/context/ChatContext";
 import { ConfirmProvider } from "./lib/context/ConfirmContext";
 import { NotificationProvider } from "./lib/context/NotificationContext";
 import { ThemeProvider } from "./lib/context/ThemeContext";
+import { PresenceProvider } from "./lib/context/PresenceContext";
 
 import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth";
 import { auth, isElectron } from "./lib/firebase";
 import { Toaster } from "react-hot-toast";
+import { Loader2 } from "lucide-react";
 
 import { MainLayout } from "./components/layout/MainLayout";
 import Dashboard from "./pages/Dashboard";
@@ -27,6 +29,7 @@ import PublicSpace from "./pages/PublicSpace";
 import About from "./pages/About";
 import Notifications from "./pages/Notifications";
 import Messages from "./pages/Messages";
+import Feedback from "./pages/Feedback";
 
 import { useVersionCheck } from "./lib/hooks/useVersionCheck";
 import { UpdateModal } from "./components/ui/UpdateModal";
@@ -44,20 +47,39 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-      } else {
-        const localUserRaw = localStorage.getItem('demo_user');
-        const localUser = localUserRaw ? JSON.parse(localUserRaw) : null;
-        if (localUser && localUser.uid === "mufettis-gsb-unique-id") {
-           setUser(localUser as FirebaseUser);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      try {
+        if (firebaseUser) {
+          // E-Posta doğrulama kalkanı
+          // Sadece gerçek Firebase kullanıcıları için (demo/bypass hariç)
+          const isBypass = firebaseUser.uid === "mufettis-gsb-unique-id" || firebaseUser.uid === "demo-user-123";
+          
+          if (!isBypass && !firebaseUser.emailVerified) {
+              console.log("🔒 Onaysız e-posta tespit edildi, oturum kapatılıyor.");
+              await auth.signOut();
+              setUser(null);
+              localStorage.removeItem('demo_user');
+          } else {
+              setUser(firebaseUser);
+          }
         } else {
-           setUser(null);
-           localStorage.removeItem('demo_user');
+          // Firebase'de kullanıcı yoksa localStorage'daki bypass'ı kontrol et
+          const localUserRaw = localStorage.getItem('demo_user');
+          const localUser = localUserRaw ? JSON.parse(localUserRaw) : null;
+          
+          if (localUser && localUser.uid === "mufettis-gsb-unique-id") {
+             setUser(localUser as FirebaseUser);
+          } else {
+             setUser(null);
+             localStorage.removeItem('demo_user');
+          }
         }
+      } catch (error) {
+        console.error("Auth error:", error);
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -65,8 +87,11 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#020617] flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-[#0f172a]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+          <p className="text-blue-200/50 font-medium animate-pulse">Oturum kontrol ediliyor...</p>
+        </div>
       </div>
     );
   }
@@ -76,52 +101,44 @@ function App() {
       <ChatProvider>
         <ConfirmProvider>
           <NotificationProvider>
-            <Toaster 
-              position="top-center" 
-              toastOptions={{ 
-                className: 'dark:bg-slate-950 dark:text-white dark:border dark:border-slate-800',
-                style: { 
-                  borderRadius: '16px', 
-                  padding: '12px 24px',
-                  fontWeight: 'bold',
-                  fontSize: '14px'
-                }
-              }} 
-            />
-            {updateAvailable && isElectron && (
-              <UpdateModal 
-                isOpen={showUpdateModal} 
-                onClose={() => setShowUpdateModal(false)}
-                latestVersion={updateAvailable}
-                currentVersion={currentVersion}
-              />
-            )}
-            <Router>
-              <Routes>
-                <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
+            <PresenceProvider>
+              <Toaster position="top-right" />
+              {showUpdateModal && (
+                <UpdateModal 
+                  isOpen={showUpdateModal}
+                  onClose={() => setShowUpdateModal(false)}
+                  latestVersion={updateAvailable || ""}
+                  currentVersion={currentVersion}
+                />
+              )}
+              <Router>
+                <Routes>
+                  <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
 
-                <Route element={user ? <MainLayout /> : <Navigate to="/login" />}>
-                  <Route index element={<Dashboard />} />
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="audit" element={<Audit />} />
-                  <Route path="tasks" element={<Tasks />} />
-                  <Route path="contacts" element={<Contacts />} />
-                  <Route path="assistant" element={<Assistant />} />
-                  <Route path="ai-knowledge" element={<AIKnowledge />} />
-                  <Route path="legislation" element={<Legislation />} />
-                  <Route path="notes" element={<Notes />} />
-                  <Route path="files" element={<Files />} />
-                  <Route path="settings" element={<Settings />} />
-                  <Route path="calendar" element={<Calendar />} />
-                  <Route path="audit/:id/report" element={<ReportEditor />} />
-                  <Route path="public-space" element={<PublicSpace />} />
-                  <Route path="about" element={<About />} />
-                  <Route path="notifications" element={<Notifications />} />
-                  <Route path="messages" element={<Messages />} />
-                </Route>
-                <Route path="*" element={<Navigate to="/" />} />
-              </Routes>
-            </Router>
+                  <Route element={user ? <MainLayout /> : <Navigate to="/login" />}>
+                    <Route index element={<Dashboard />} />
+                    <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="audit" element={<Audit />} />
+                    <Route path="tasks" element={<Tasks />} />
+                    <Route path="contacts" element={<Contacts />} />
+                    <Route path="assistant" element={<Assistant />} />
+                    <Route path="ai-knowledge" element={<AIKnowledge />} />
+                    <Route path="legislation" element={<Legislation />} />
+                    <Route path="notes" element={<Notes />} />
+                    <Route path="files" element={<Files />} />
+                    <Route path="settings" element={<Settings />} />
+                    <Route path="calendar" element={<Calendar />} />
+                    <Route path="audit/:id/report" element={<ReportEditor />} />
+                    <Route path="public-space" element={<PublicSpace />} />
+                    <Route path="about" element={<About />} />
+                    <Route path="notifications" element={<Notifications />} />
+                    <Route path="messages" element={<Messages />} />
+                    <Route path="feedback" element={<Feedback />} />
+                  </Route>
+                  <Route path="*" element={<Navigate to="/" />} />
+                </Routes>
+              </Router>
+            </PresenceProvider>
           </NotificationProvider>
         </ConfirmProvider>
       </ChatProvider>

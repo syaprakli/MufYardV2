@@ -87,29 +87,29 @@ export default function Notifications() {
     return (
         <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
             {/* Header Section */}
-            <div className="flex items-end justify-between mb-10">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-10">
                 <div>
-                    <h1 className="text-4xl font-black text-slate-800 dark:text-slate-100 tracking-tight">
+                    <h1 className="text-3xl sm:text-4xl font-black text-slate-800 dark:text-slate-100 tracking-tight">
                         Bildirim Geçmişi
                     </h1>
                     <p className="text-slate-400 dark:text-slate-500 font-bold mt-2 uppercase tracking-[0.2em] text-[10px]">
                         Tüm aktiviteleriniz ve sistem güncellemeleri
                     </p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                     <button 
                         onClick={() => markAllAsRead()}
-                        className="flex items-center gap-2 px-5 py-3 bg-card border border-slate-200 dark:border-slate-700 rounded-2xl text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm"
+                        className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-5 py-3 bg-card border border-slate-200 dark:border-slate-700 rounded-2xl text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm"
                     >
                         <CheckCheck size={16} />
-                        Tümünü Okundu İşaretle
+                        Okundu İşaretle
                     </button>
                     <button 
                         onClick={() => clearAll()}
-                        className="flex items-center gap-2 px-5 py-3 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 rounded-2xl text-[11px] font-black uppercase tracking-widest text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all"
+                        className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-5 py-3 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 rounded-2xl text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all"
                     >
                         <Trash2 size={16} />
-                        Tüm Geçmişi Sil
+                        Geçmişi Sil
                     </button>
                 </div>
             </div>
@@ -117,8 +117,8 @@ export default function Notifications() {
             <div className="grid grid-cols-12 gap-8">
                 {/* Sidebar Filter */}
                 <div className="col-span-12 lg:col-span-3">
-                    <div className="bg-card rounded-3xl border border-slate-100 dark:border-slate-800 p-4 sticky top-24 shadow-sm">
-                        <div className="relative mb-6">
+                    <div className="bg-card rounded-3xl border border-slate-100 dark:border-slate-800 p-4 lg:sticky lg:top-24 shadow-sm overflow-x-auto no-scrollbar">
+                        <div className="relative mb-4 lg:mb-6">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
                             <input 
                                 type="text" 
@@ -129,12 +129,12 @@ export default function Notifications() {
                             />
                         </div>
 
-                        <div className="space-y-1">
+                        <div className="flex lg:flex-col gap-2 min-w-max lg:min-w-0">
                             {categories.map((cat) => (
                                 <button
                                     key={cat.id}
                                     onClick={() => setFilterType(cat.id)}
-                                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${
+                                    className={`flex items-center gap-3 px-4 py-2.5 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
                                         filterType === cat.id 
                                         ? 'bg-primary text-white shadow-lg shadow-primary/20' 
                                         : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
@@ -158,20 +158,20 @@ export default function Notifications() {
                             return (
                                 <div 
                                     key={notif.id}
-                                    className={`group bg-card rounded-3xl border transition-all p-6 flex gap-6 items-start relative overflow-hidden ${
+                                    className={`group bg-card rounded-3xl border transition-all p-4 sm:p-6 flex flex-col sm:flex-row gap-4 sm:gap-6 items-start relative overflow-hidden ${
                                         isNew ? 'border-primary/20 bg-primary/[0.01] dark:bg-primary/[0.03]' : 'border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 shadow-sm'
                                     }`}
                                 >
-                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-all group-hover:scale-110 ${
+                                    <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-all group-hover:scale-110 ${
                                         isNew ? 'bg-card' : 'bg-muted/50'
                                     }`}>
                                         {getIcon(notif.type)}
                                     </div>
 
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between mb-1">
+                                    <div className="flex-1 min-w-0 w-full">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
                                             <div className="flex items-center gap-3">
-                                                <h3 className={`text-lg tracking-tight ${
+                                                <h3 className={`text-base sm:text-lg tracking-tight ${
                                                     isNew ? 'font-black text-slate-800 dark:text-slate-100' : 'font-bold text-slate-600 dark:text-slate-400'
                                                 }`}>
                                                     {notif.title}
@@ -182,8 +182,8 @@ export default function Notifications() {
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="text-right">
+                                            <div className="flex items-center justify-between sm:justify-end gap-4">
+                                                <div className="text-left sm:text-right">
                                                     <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                                                         {dateObj.toLocaleDateString('tr-TR')}
                                                     </p>
@@ -193,7 +193,7 @@ export default function Notifications() {
                                                 </div>
                                                 <button 
                                                     onClick={() => deleteNotification(notif.id)}
-                                                    className="p-2 text-slate-300 dark:text-slate-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                                                    className="p-2 text-slate-300 dark:text-slate-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all sm:opacity-0 group-hover:opacity-100"
                                                 >
                                                     <Trash2 size={16} />
                                                 </button>

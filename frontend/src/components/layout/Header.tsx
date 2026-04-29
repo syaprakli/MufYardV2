@@ -4,7 +4,8 @@ import { NotificationDropdown } from "./NotificationDropdown";
 import { useAuth } from "../../lib/hooks/useAuth";
 import { useConfirm } from "../../lib/context/ConfirmContext";
 import { useNotifications } from "../../lib/context/NotificationContext";
-import { Search, Bell, ChevronDown, User, LogOut, Menu } from "lucide-react";
+import { usePresence } from "../../lib/context/PresenceContext";
+import { Search, Bell, ChevronDown, User, LogOut, Menu, Users } from "lucide-react";
 import { fetchProfile } from "../../lib/api/profiles";
 import { cn } from "../../lib/utils";
 
@@ -17,6 +18,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
     const navigate = useNavigate();
     const confirm = useConfirm();
     const { unreadCount } = useNotifications();
+    const { onlineUsers } = usePresence();
     const [showNotifications, setShowNotifications] = useState(false);
 
 
@@ -37,7 +39,10 @@ export function Header({ toggleSidebar }: HeaderProps) {
 
     
     // Build initials from first and last words (e.g. "Selin Yilmaz" -> "SY").
-    const displayName = profile?.full_name || user?.displayName || user?.email?.split('@')[0] || "Müfettiş";
+    const displayName = (profile?.full_name && profile.full_name !== "Kullanıcı") 
+        ? profile.full_name 
+        : (user?.displayName || user?.email?.split('@')[0] || "Müfettiş");
+
     const nameParts = displayName
         .replace(/[._-]+/g, " ")
         .trim()
@@ -102,7 +107,19 @@ export function Header({ toggleSidebar }: HeaderProps) {
                 </div>
             </div>
 
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4 lg:gap-6">
+                {/* Online Users Indicator */}
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30">
+                    <div className="relative">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <div className="absolute top-0 left-0 w-2 h-2 rounded-full bg-emerald-500 animate-ping opacity-75" />
+                    </div>
+                    <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <Users size={12} />
+                        {onlineUsers.length} AKTİF
+                    </span>
+                </div>
+
                 <div className="relative" ref={notificationRef}>
                     <button 
                         onClick={() => setShowNotifications(!showNotifications)}

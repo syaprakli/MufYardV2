@@ -108,7 +108,7 @@ class ProfileService:
                     "ai_model": "Gemini 2.0 Flash",
                     "ai_temperature": 0.7,
                     "notifications_enabled": True,
-                    "role": "user"
+                    "role": "admin" if email in ["mufettis@gsb.gov.tr", "sefayaprakli@hotmail.com"] else "user"
                 })
             
             await asyncio.to_thread(lambda: doc_ref.set(new_data, merge=True))
@@ -184,6 +184,15 @@ class ProfileService:
             p['uid'] = doc.id
             profiles.append(p)
         return profiles
+
+    @staticmethod
+    async def delete_profile(uid: str) -> bool:
+        doc_ref = db.collection('profiles').document(uid)
+        exists = await asyncio.to_thread(lambda: doc_ref.get().exists)
+        if not exists:
+            return False
+        await asyncio.to_thread(doc_ref.delete)
+        return True
 
     @staticmethod
     async def send_notification(token: str, title: str, body: str) -> bool:

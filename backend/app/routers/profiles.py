@@ -24,6 +24,13 @@ async def update_profile(uid: str, profile_update: ProfileUpdate):
         raise HTTPException(status_code=404, detail="Profil güncellenemedi.")
     return updated
 
+@router.delete("/{uid}")
+async def delete_profile(uid: str):
+    success = await ProfileService.delete_profile(uid)
+    if not success:
+        raise HTTPException(status_code=404, detail="Profil bulunamadı.")
+    return {"status": "success"}
+
 @router.post("/{uid}/avatar")
 async def upload_avatar(uid: str, file: UploadFile = File(...)):
     try:

@@ -110,7 +110,8 @@ export default function Audit() {
             return;
         }
         try {
-            const currentUser = user || JSON.parse(localStorage.getItem('demo_user') || '{"email": "mufettis@gsb.gov.tr", "uid": "mufettis@gsb.gov.tr"}');
+            if (!user) return;
+            const currentUser = user;
             const selectedTask = tasks.find(t => t.id === newAudit.task_id);
             const taskAssigned = selectedTask?.assigned_to || [];
             const taskShared = selectedTask?.shared_with || [];

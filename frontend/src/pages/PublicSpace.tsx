@@ -7,10 +7,11 @@ import {
     Plus, Eye, Edit3,
     ArrowLeft, Image as ImageIcon, Paperclip, 
     Shield, Bell, HelpCircle, Check, X, Lock as LockIcon,
-    ChevronLeft, ChevronRight, FolderTree, Reply, Smile
+    ChevronLeft, ChevronRight, FolderTree, Reply, Smile, Trash
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
+import { usePresence } from "../lib/context/PresenceContext";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { API_URL, WS_URL } from "../lib/config";
@@ -97,7 +98,7 @@ export default function PublicSpace() {
     const [userRole, setUserRole] = useState('user');
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [isChatCollapsed, setIsChatCollapsed] = useState(window.innerWidth < 1024);
-    const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
+    const { onlineUsers } = usePresence();
     const [selectedCategory, setSelectedCategory] = useState("Hepsi");
     const [loading, setLoading] = useState(true);
     const [newMessage, setNewMessage] = useState("");
@@ -249,7 +250,8 @@ export default function PublicSpace() {
                     try {
                         const data = JSON.parse(event.data);
                         if (data.type === 'presence') {
-                            setOnlineUsers(Array.isArray(data.users) ? data.users : []);
+                            // Already handled by global PresenceContext
+                            return;
                         } else if (data.text && data.author_id !== user?.uid) {
                             setMessages(prev => [...prev, {
                                 id: data.id || Date.now().toString(),
@@ -280,6 +282,28 @@ export default function PublicSpace() {
             if (retryTimer.current) clearTimeout(retryTimer.current);
         };
     }, [user]);
+
+    const handleDeleteMessage = async (messageId: string) => {
+        const confirmed = await confirm({
+            title: "Mesajı Sil",
+            message: "Bu mesajı kalıcı olarak silmek istediğinize emin misiniz?",
+            confirmText: "Sil",
+            variant: "danger"
+        });
+        if (confirmed) {
+            try {
+                const res = await fetchWithTimeout(`${API_URL}/collaboration/messages/${messageId}`, {
+                    method: 'DELETE'
+                });
+                if (res.ok) {
+                    setMessages(prev => prev.filter(m => m.id !== messageId));
+                    toast.success("Mesaj silindi.");
+                }
+            } catch (err) {
+                toast.error("Hata oluştu.");
+            }
+        }
+    };
 
     const handleSendChat = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -782,8 +806,8 @@ export default function PublicSpace() {
 
             <div 
                 className={cn(
-                    "fixed inset-y-0 right-0 z-[100] transition-transform duration-300 transform lg:relative lg:translate-x-0 lg:z-10",
-                    isChatCollapsed ? "translate-x-full lg:translate-x-0" : "translate-x-0",
+                    "fixed inset-y-0 right-0 z-[100] transition-all duration-300 transform lg:relative lg:z-10 flex",
+                    isChatCollapsed ? "translate-x-full lg:translate-x-0 lg:w-0" : "translate-x-0 lg:w-[384px]",
                     (isChatCollapsed || viewMode !== 'Sohbet') && "lg:block hidden"
                 )}
             >
@@ -798,12 +822,12 @@ export default function PublicSpace() {
                         onClick={() => setIsChatCollapsed(!isChatCollapsed)}
                         className={cn(
                             "absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-20 bg-[#002B4B] text-white flex items-center justify-center rounded-l-2xl shadow-xl z-50 border-r border-white/10 hover:w-10 transition-all",
-                            !isChatCollapsed && "lg:flex hidden"
+                            "lg:flex" // Always show on desktop
                         )}
                     >
                         {isChatCollapsed ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
                     </button>
-                    <div className="w-screen sm:w-[384px] h-full border-l border-border/50 bg-card flex flex-col shadow-2xl overflow-hidden">
+                    <div className="w-full sm:w-[384px] lg:w-full h-full border-l border-border/50 bg-card flex flex-col shadow-2xl overflow-hidden">
                         <div className="p-6 border-b border-white/10 bg-[#002B4B] text-white flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <button 
@@ -840,7 +864,18 @@ export default function PublicSpace() {
                                             </div>
                                         )}
                                     </div>
-                                    <span className="text-[10px] font-bold text-slate-400 mt-1 px-2">{msg.author_name} • {new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                    <div className="flex items-center gap-2 mt-1 px-2 group">
+                                        <span className="text-[10px] font-bold text-slate-400">{msg.author_name} • {new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                        {(msg.author_id === user?.uid || userRole === 'admin') && (
+                                            <button 
+                                                onClick={() => handleDeleteMessage(msg.id)}
+                                                className="p-1 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                                                title="Sil"
+                                            >
+                                                <Trash size={10} />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                             <div ref={chatEndRef} />

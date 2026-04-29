@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { User, Lock, ArrowRight, AlertCircle, LogIn } from "lucide-react";
+import { User, Lock, ArrowRight, AlertCircle, LogIn, CheckCircle2 } from "lucide-react";
+import { cn } from "../lib/utils";
 import { signIn, signUp } from "../lib/firebase";
 import { toast } from "react-hot-toast";
 
@@ -53,7 +54,7 @@ export default function Login() {
                 result = await signUp(email, password, fullName);
                 
                 // Kayıt başarılıysa ama mail doğrulaması bekleniyorsa mesaj göster
-                setError("Kayıt başarılı! Lütfen e-postanıza gönderilen doğrulama linkine tıklayarak hesabınızı aktif edin.");
+                setError("Kayıt başarılı! Lütfen e-postanıza gönderilen doğrulama linkine tıklayarak hesabınızı aktif edin. !!! ÖNEMLİ: Doğrulama e-postası GEREKSİZ (SPAM) klasörüne düşmüş olabilir, lütfen orayı da kontrol edin !!!");
                 setLoading(false);
                 return;
             } else {
@@ -262,8 +263,13 @@ export default function Login() {
                         )}
 
                         {error && (
-                            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-[10px] font-bold border border-red-100 dark:border-red-900/30 flex items-center gap-3 animate-shake">
-                                <AlertCircle size={14} className="shrink-0" />
+                            <div className={cn(
+                                "p-3 rounded-xl text-[10px] font-black border flex items-center gap-3 animate-shake",
+                                error.includes("başarılı")
+                                    ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30"
+                                    : "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900/30"
+                            )}>
+                                {error.includes("başarılı") ? <CheckCircle2 size={14} className="shrink-0" /> : <AlertCircle size={14} className="shrink-0" />}
                                 <span>{error}</span>
                             </div>
                         )}
