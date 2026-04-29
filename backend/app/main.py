@@ -183,6 +183,59 @@ app.include_router(notifications.router, prefix="/api/notifications", tags=["Not
 app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 
+# --- WEBSOCKET CHAT ENDPOINT ---
+# Moved here to avoid 404 issues with router prefixes in production
+from fastapi import WebSocket, WebSocketDisconnect, Query
+from app.routers.collaboration import chat_manager, CollaborationService, DirectMessageCreate, NotificationService, NotificationCreate
+
+@app.websocket("/api/collaboration/chat")
+async def websocket_chat_endpoint(websocket: WebSocket):
+    uid = websocket.query_params.get("uid", "guest")
+    name = websocket.query_params.get("name", "Müfettiş")
+    room_id = websocket.query_params.get("room_id", "global")
+    
+    await chat_manager.connect(websocket, room_id, uid, name)
+    try:
+        while True:
+            raw_data = await websocket.receive_text()
+            data = json.loads(raw_data)
+            
+            # Eğer DM odasıysa ve mesaj geliyorsa, veri tabanına kaydet
+            if room_id.startswith("dm_") and data.get("type", "message") == "message":
+                # Alıcıyı room_id'den bul (dm_uid1_uid2)
+                parts = room_id.split("_")
+                recipient_id = parts[1] if parts[2] == uid else parts[2]
+                
+                # Servis üzerinden kaydet (persistent)
+                dm_create = DirectMessageCreate(
+                    recipient_id=recipient_id,
+                    content=data.get("content", ""),
+                    attachment=data.get("attachment")
+                )
+                new_db_msg = await CollaborationService.save_private_message(uid, name, dm_create)
+                
+                # Bildirim gönder (async)
+                notif = NotificationCreate(
+                    user_id=recipient_id,
+                    title=f"Yeni Mesaj: {name}",
+                    message=data.get("content", "")[:100],
+                    type="collaboration",
+                    chat_room_id=room_id
+                )
+                asyncio.create_task(NotificationService.create_notification(notif))
+                
+                # Mesajın ID'sini geri dönen dataya ekle
+                data["id"] = new_db_msg["id"]
+                data["timestamp"] = new_db_msg["timestamp"]
+                raw_data = json.dumps(data)
+
+            await chat_manager.broadcast(room_id, raw_data)
+    except WebSocketDisconnect:
+        await chat_manager.disconnect(websocket, room_id)
+    except Exception as e:
+        logger.error(f"Chat WS Error: {e}")
+        await chat_manager.disconnect(websocket, room_id)
+
 @app.get("/")
 async def root():
     return {"message": "MufYARD API is running"}

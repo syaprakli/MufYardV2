@@ -213,53 +213,7 @@ chat_manager = ChatConnectionManager()
 async def get_online_users():
     return chat_manager.get_online_uids()
 
-@router.websocket("/chat")
-async def chat_endpoint(websocket: WebSocket):
-    uid = websocket.query_params.get("uid", "guest")
-    name = websocket.query_params.get("name", "Müfettiş")
-    room_id = websocket.query_params.get("room_id", "global")
-    
-    await chat_manager.connect(websocket, room_id, uid, name)
-    try:
-        while True:
-            raw_data = await websocket.receive_text()
-            data = json.loads(raw_data)
-            
-            # Eğer DM odasıysa ve mesaj geliyorsa, veri tabanına kaydet
-            if room_id.startswith("dm_") and data.get("type", "message") == "message":
-                # Alıcıyı room_id'den bul (dm_uid1_uid2)
-                parts = room_id.split("_")
-                recipient_id = parts[1] if parts[2] == uid else parts[2]
-                
-                # Servis üzerinden kaydet (persistent)
-                dm_create = DirectMessageCreate(
-                    recipient_id=recipient_id,
-                    content=data.get("content", ""),
-                    attachment=data.get("attachment")
-                )
-                new_db_msg = await CollaborationService.save_private_message(uid, name, dm_create)
-                
-                # Bildirim gönder (async)
-                notif = NotificationCreate(
-                    user_id=recipient_id,
-                    title=f"Yeni Mesaj: {name}",
-                    message=data.get("content", "")[:100],
-                    type="collaboration",
-                    chat_room_id=room_id
-                )
-                asyncio.create_task(NotificationService.create_notification(notif))
-                
-                # Mesajın ID'sini geri dönen dataya ekle
-                data["id"] = new_db_msg["id"]
-                data["timestamp"] = new_db_msg["timestamp"]
-                raw_data = json.dumps(data)
-
-            await chat_manager.broadcast(room_id, raw_data)
-    except WebSocketDisconnect:
-        await chat_manager.disconnect(websocket, room_id)
-    except Exception as e:
-        print(f"Chat WS Error: {e}")
-        await chat_manager.disconnect(websocket, room_id)
+# --- WEBSOCKET HANDLER MOVED TO main.py FOR STABILITY ---
 
 
 # --- REPORT COLLABORATION ---

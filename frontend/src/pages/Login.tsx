@@ -53,6 +53,21 @@ export default function Login() {
                 
                 result = await signUp(email, password, fullName);
                 
+                // Profile sync for registration
+                try {
+                    const { updateProfile: apiUpdateProfile } = await import("../lib/api/profiles");
+                    if (result.user?.uid) {
+                        await apiUpdateProfile(result.user.uid, {
+                            full_name: fullName,
+                            email: email,
+                            institution: "Gençlik ve Spor Bakanlığı",
+                            title: "Müfettiş Yardımcısı"
+                        });
+                    }
+                } catch (profileErr) {
+                    console.error("Profile creation failed:", profileErr);
+                }
+
                 // Kayıt başarılıysa ama mail doğrulaması bekleniyorsa mesaj göster
                 setError("Kayıt başarılı! Lütfen e-postanıza gönderilen doğrulama linkine tıklayarak hesabınızı aktif edin. !!! ÖNEMLİ: Doğrulama e-postası GEREKSİZ (SPAM) klasörüne düşmüş olabilir, lütfen orayı da kontrol edin !!!");
                 setLoading(false);
