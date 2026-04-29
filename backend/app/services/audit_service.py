@@ -32,14 +32,14 @@ class AuditService:
                       'assigned_to', 'shared_with', 'task_id', 'report_seq', 'is_public', 'created_at']
             return await asyncio.to_thread(lambda: list(q.select(fields).stream()))
 
-            queries = [
-                audits_ref.where('owner_id', '==', user_id) if user_id else None,
-                audits_ref.where('owner_id', '==', user_email) if user_email else None,
-                audits_ref.where('assigned_to', 'array_contains', user_id) if user_id else None,
-                audits_ref.where('assigned_to', 'array_contains', user_email) if user_email else None,
-                audits_ref.where('shared_with', 'array_contains', user_id) if user_id else None,
-                audits_ref.where('shared_with', 'array_contains', user_email) if user_email else None
-            ]
+        queries = [
+            audits_ref.where('owner_id', '==', user_id) if user_id else None,
+            audits_ref.where('owner_id', '==', user_email) if user_email else None,
+            audits_ref.where('assigned_to', 'array_contains', user_id) if user_id else None,
+            audits_ref.where('assigned_to', 'array_contains', user_email) if user_email else None,
+            audits_ref.where('shared_with', 'array_contains', user_id) if user_id else None,
+            audits_ref.where('shared_with', 'array_contains', user_email) if user_email else None
+        ]
         
         results = await asyncio.gather(*(run_query(q) for q in queries))
         

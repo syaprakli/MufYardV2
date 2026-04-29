@@ -190,7 +190,7 @@ class TaskService:
     @staticmethod
     async def delete_task(task_id: str) -> bool:
         try:
-            await asyncio.to_thread(db.collection('tasks').document(task_id).delete)
+            await asyncio.to_thread(lambda: db.collection('tasks').document(task_id).delete())
             return True
         except Exception:
             return False
