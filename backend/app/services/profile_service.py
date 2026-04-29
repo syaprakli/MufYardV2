@@ -93,19 +93,22 @@ class ProfileService:
             # Try search by full_name in inspectors (Fuzzy match)
             # This handles cases like sefayaprakli@hotmail.com -> Sefa Yapraklı
             name_to_search = profile_data.get('full_name')
-            if name_to_search not in ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz"]:
+            if (name_to_search not in ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz", "Müfettiş"]):
                 inspectors_ref = db.collection('inspectors')
-                # Try exact name match
-                query = inspectors_ref.where('name', '==', name_to_search).limit(1)
-                results = await asyncio.to_thread(lambda: list(query.stream()))
-                if results:
-                    inspector_match = results[0].to_dict()
-                else:
-                    # Try uppercase/lowercase variants
-                    query = inspectors_ref.where('name', '==', name_to_search.upper()).limit(1)
-                    results = await asyncio.to_thread(lambda: list(query.stream()))
-                    if results:
-                        inspector_match = results[0].to_dict()
+                
+                # More robust normalization: Uppercase and strip dots/dashes
+                def clean_name(n):
+                    return n.upper().replace(".", " ").replace("-", " ").strip()
+
+                cleaned_search = clean_name(name_to_search)
+                
+                # Query all inspectors to perform case-insensitive fuzzy check in memory
+                # (Firestore query limitations on partial match)
+                all_inspectors = await asyncio.to_thread(lambda: [doc.to_dict() for doc in inspectors_ref.stream()])
+                for insp in all_inspectors:
+                    if clean_name(insp.get('name', '')) == cleaned_search:
+                        inspector_match = insp
+                        break
 
         if inspector_match:
             new_data = {

@@ -31,14 +31,28 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const [messages, setMessages] = useState<Message[]>([]);
     const wsRef = useRef<WebSocket | null>(null);
     const retryTimer = useRef<any>(null);
+    const [profileName, setProfileName] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (user?.uid) {
+            import('../api/profiles').then(api => {
+                api.fetchProfile(user.uid, user.email || undefined).then(p => {
+                    if (p.full_name && p.full_name !== "Kullanıcı") {
+                        setProfileName(p.full_name);
+                    }
+                });
+            });
+        }
+    }, [user]);
 
     useEffect(() => {
         const connect = () => {
             if (!user?.uid) return;
 
             try {
+                const activeName = profileName || user.displayName || 'Müfettiş';
                 const baseWsUrl = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
-                const wsUrl = `${baseWsUrl}/ws/chat?uid=${user.uid}&name=${encodeURIComponent(user.displayName || 'Müfettiş')}&room_id=global`;
+                const wsUrl = `${baseWsUrl}/ws/chat?uid=${user.uid}&name=${encodeURIComponent(activeName)}&room_id=global`;
                 
                 console.log("Presence: Connecting to", wsUrl);
                 const ws = new WebSocket(wsUrl);
