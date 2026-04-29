@@ -14,7 +14,7 @@ import { useAuth } from "../lib/hooks/useAuth";
 import { usePresence } from "../lib/context/PresenceContext";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { API_URL, WS_URL } from "../lib/config";
+import { API_URL } from "../lib/config";
 import { fetchWithTimeout } from "../lib/api/utils";
 import toast from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
@@ -860,7 +860,7 @@ export default function PublicSpace() {
                                             {(gifSearchQuery.trim() && isOnline ? onlineGifs : offlineGifs).map((gif, i) => <img key={i} src={gif} onClick={() => { 
                                                 const msgObj = { id: Date.now().toString(), text: "GIF", author_id: user?.uid, author_name: user?.displayName || "Müfettiş", timestamp: new Date().toISOString(), attachments: [{ url: gif, type: 'image', name: 'gif' }] };
                                                 setMessages((prev: any) => [...prev, { ...msgObj, isMine: true } as Message]);
-                                                wsRef.current?.send(JSON.stringify(msgObj));
+                                                sendGlobalMessage("GIF", [{ url: gif, type: 'image', name: 'gif' }]);
                                                 setShowGifPicker(null); 
                                                 setGifSearchQuery("");
                                             }} className="w-full aspect-square object-cover rounded-xl cursor-pointer hover:scale-105 transition-transform" />)}

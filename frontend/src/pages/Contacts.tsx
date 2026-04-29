@@ -184,10 +184,37 @@ export default function Contacts() {
             {loading ? (
                 <div className="flex flex-col items-center justify-center py-20"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {sortedContacts.map(contact => (
-                        <ContactCard key={contact.id} contact={contact} isOwner={contact.owner_id === user?.uid} onEdit={() => { setEditingContact(contact); setNewContact({ ...contact, tagsString: contact.tags?.join(', ') || "" }); setIsModalOpen(true); }} onShare={() => handleShare(contact.id)} onDelete={() => handleDelete(contact.id)} onChat={() => openChat(["dm", ...[user!.uid, contact.id].sort()].join("_"), contact.name, "dm")} />
-                    ))}
+                <div className="space-y-12">
+                    {activeTab === "corporate" ? (
+                        // Kurumsal Rehber için Gruplandırılmış Görünüm
+                        Object.entries(
+                            sortedContacts.reduce((acc: any, contact) => {
+                                const group = contact.unit || "Diğer";
+                                if (!acc[group]) acc[group] = [];
+                                acc[group].push(contact);
+                                return acc;
+                            }, {})
+                        ).sort(([a], [b]) => a.localeCompare(b, 'tr')).map(([unit, unitContacts]: any) => (
+                            <div key={unit} className="space-y-6">
+                                <div className="flex items-center gap-4">
+                                    <h2 className="text-sm font-black uppercase tracking-[0.3em] text-slate-400 whitespace-nowrap">{unit}</h2>
+                                    <div className="h-[1px] w-full bg-slate-100 dark:bg-slate-800" />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                    {unitContacts.map((contact: any) => (
+                                        <ContactCard key={contact.id} contact={contact} isOwner={contact.owner_id === user?.uid} onEdit={() => { setEditingContact(contact); setNewContact({ ...contact, tagsString: contact.tags?.join(', ') || "" }); setIsModalOpen(true); }} onShare={() => handleShare(contact.id)} onDelete={() => handleDelete(contact.id)} onChat={() => openChat(["dm", ...[user!.uid, contact.id].sort()].join("_"), contact.name, "dm")} />
+                                    ))}
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        // Kişisel Rehber için Düz Görünüm
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                            {sortedContacts.map(contact => (
+                                <ContactCard key={contact.id} contact={contact} isOwner={contact.owner_id === user?.uid} onEdit={() => { setEditingContact(contact); setNewContact({ ...contact, tagsString: contact.tags?.join(', ') || "" }); setIsModalOpen(true); }} onShare={() => handleShare(contact.id)} onDelete={() => handleDelete(contact.id)} onChat={() => openChat(["dm", ...[user!.uid, contact.id].sort()].join("_"), contact.name, "dm")} />
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
