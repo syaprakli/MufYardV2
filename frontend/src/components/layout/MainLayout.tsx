@@ -3,10 +3,9 @@ import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { cn } from "../../lib/utils";
-import { usePresence } from "../../lib/hooks/usePresence";
 
 export function MainLayout() {
-    usePresence();
+
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
