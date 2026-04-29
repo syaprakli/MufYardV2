@@ -45,7 +45,18 @@ function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
+      if (firebaseUser) {
+        setUser(firebaseUser);
+      } else {
+        const localUserRaw = localStorage.getItem('demo_user');
+        const localUser = localUserRaw ? JSON.parse(localUserRaw) : null;
+        if (localUser && localUser.uid === "mufettis-gsb-unique-id") {
+           setUser(localUser as FirebaseUser);
+        } else {
+           setUser(null);
+           localStorage.removeItem('demo_user');
+        }
+      }
       setLoading(false);
     });
 

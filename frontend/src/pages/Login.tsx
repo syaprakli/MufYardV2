@@ -25,12 +25,7 @@ export default function Login() {
             setEmail(savedEmail);
             setRememberMe(true);
         }
-
-        const demoUser = localStorage.getItem("demo_user");
-        if (demoUser) {
-            navigate("/dashboard");
-        }
-    }, [navigate]);
+    }, []);
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
