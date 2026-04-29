@@ -53,7 +53,6 @@ const getIcon = (type: string) => {
 
 
     return (
-    return (
         <div className="absolute top-full right-[-8px] sm:right-0 mt-4 w-[calc(100vw-24px)] sm:w-[400px] bg-white/90 backdrop-blur-xl border border-slate-200 rounded-3xl shadow-2xl shadow-slate-200/50 overflow-hidden z-[60] animate-in fade-in slide-in-from-top-2 duration-200">
             {/* Header */}
             <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-white/50">
