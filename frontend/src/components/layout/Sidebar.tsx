@@ -76,7 +76,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
 
             <nav className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-0.5">
-                {navItems.filter(item => isElectron || item.href !== "/files").map((item) => (
+                {navItems.filter(item => {
+                    // Dosyalar sayfası sadece Electron (Masaüstü Paket) sürümünde görünsün
+                    if (item.href === "/files") return isElectron;
+                    return true;
+                }).map((item) => (
                     <NavLink
                         key={item.href}
                         to={item.href}
