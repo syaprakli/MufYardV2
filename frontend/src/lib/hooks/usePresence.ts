@@ -10,6 +10,7 @@ export function usePresence() {
 
     let ws: WebSocket | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout>;
+    let isMounted = true;
 
     const connect = () => {
       // Use the existing chat websocket endpoint but with a 'global' room
@@ -18,24 +19,27 @@ export function usePresence() {
       ws = new WebSocket(`${wsUrl}/collaboration/chat?uid=${user.uid}&name=${encodeURIComponent(user.displayName || user.email || 'User')}&room_id=global`);
 
       ws.onopen = () => {
-        console.log("Presence: Connected");
+        if (isMounted) console.log("Presence: Connected");
       };
 
       ws.onclose = () => {
+        if (!isMounted) return;
         console.log("Presence: Disconnected, reconnecting...");
         reconnectTimer = setTimeout(connect, 5000);
       };
 
       ws.onerror = (err) => {
-        console.error("Presence WS error:", err);
+        if (isMounted) console.error("Presence WS error:", err);
       };
     };
 
     connect();
 
     return () => {
+      isMounted = false;
       clearTimeout(reconnectTimer);
       if (ws) {
+        ws.onclose = null; // Önemi büyük: unmount olurken close eventini iptal et
         ws.close();
       }
     };

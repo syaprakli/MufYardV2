@@ -74,6 +74,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         };
 
         return () => {
+            socket.onerror = null;
+            socket.onmessage = null;
             socket.close();
         };
     }, [user?.uid]);
