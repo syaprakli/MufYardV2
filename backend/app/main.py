@@ -38,7 +38,7 @@ from app.routers import (
     dashboard, audit, tasks, contacts, 
     inspectors, profiles, legislation, 
     notes, ai_knowledge, backup, files,
-    ai, collaboration, notifications, calendar
+    calendar, auth, notifications, ai, collaboration, feedback
 )
 
 from app.services.contact_service import ContactService
