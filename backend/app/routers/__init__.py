@@ -3,7 +3,7 @@ from . import (
     inspectors, profiles, legislation, 
     notes, ai_knowledge, backup, files,
     ai, collaboration, notifications, 
-    calendar, auth, feedback
+    calendar, feedback
 )
 
 __all__ = [
@@ -11,5 +11,5 @@ __all__ = [
     "inspectors", "profiles", "legislation", 
     "notes", "ai_knowledge", "backup", "files",
     "ai", "collaboration", "notifications",
-    "calendar", "auth", "feedback"
+    "calendar", "feedback"
 ]
