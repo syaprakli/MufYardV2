@@ -5,6 +5,7 @@ from app.schemas.messaging import MessageCreate, MessageResponse, DirectMessageC
 from app.schemas.post import PostCreate, PostResponse, PostUpdate, CommentUpdate
 from app.services.notification_service import NotificationService
 from app.schemas.notification import NotificationCreate
+import json
 
 router = APIRouter(prefix="", tags=["collaboration"])
 
@@ -56,7 +57,6 @@ async def delete_dm(room_id: str, message_id: str, uid: str):
     success = await CollaborationService.delete_private_message(room_id, message_id, uid)
     if success:
         # WebSocket üzerinden diğer tarafa bildir
-        import json
         delete_event = json.dumps({
             "type": "delete_message",
             "message_id": message_id,
@@ -187,7 +187,6 @@ class ChatConnectionManager:
                 users.append({"uid": info["uid"], "name": info["name"]})
                 seen_uids.add(info["uid"])
         
-        import json
         presence_msg = json.dumps({"type": "presence", "users": users})
         for connection in self.rooms[room_id].keys():
             try:
