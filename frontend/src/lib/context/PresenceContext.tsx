@@ -52,7 +52,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             try {
                 const activeName = profileName || user.displayName || 'Müfettiş';
                 const baseWsUrl = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
-                const wsUrl = `${baseWsUrl}/ws/chat?uid=${user.uid}&name=${encodeURIComponent(activeName)}&room_id=global`;
+                const wsUrl = `${baseWsUrl}/ws?uid=${user.uid}&name=${encodeURIComponent(activeName)}&room_id=global`;
                 
                 console.log("Presence: Connecting to", wsUrl);
                 const ws = new WebSocket(wsUrl);

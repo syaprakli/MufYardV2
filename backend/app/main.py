@@ -188,7 +188,7 @@ app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 from fastapi import WebSocket, WebSocketDisconnect, Query
 from app.routers.collaboration import chat_manager, CollaborationService, DirectMessageCreate, NotificationService, NotificationCreate
 
-@app.websocket("/ws/chat")
+@app.websocket("/ws")
 async def websocket_chat_endpoint(websocket: WebSocket):
     uid = websocket.query_params.get("uid", "guest")
     name = websocket.query_params.get("name", "Müfettiş")

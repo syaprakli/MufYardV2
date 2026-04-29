@@ -124,16 +124,14 @@ export default function Dashboard() {
                 setProfile(profileData);
 
                 // Determine if identity selection is needed
-                const isGeneric = profileData && (
-                    ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz", "Müfettiş"].includes(profileData.full_name) ||
-                    !profileData.title || 
-                    profileData.institution === "Gençlik ve Spor Bakanlığı" // This is the default, might need more specific check
-                );
+                // 1. If name is generic
+                const isGeneric = profileData && 
+                                 ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz", "Müfettiş"].includes(profileData.full_name);
                 
-                // More aggressive check: if they don't have a GSB email in profile but have a generic title
-                const needsIdentification = isGeneric || (profileData && profileData.title === "Müfettiş" && !profileData.email?.includes("@gsb.gov.tr"));
-
-                if (needsIdentification && !localStorage.getItem(`id_skip_${effectiveUid}`)) {
+                // 2. If title is generic and not verified
+                const notVerified = profileData && (profileData.title === "Müfettiş" || !profileData.institution);
+                
+                if ((isGeneric || notVerified) && !localStorage.getItem(`id_skip_${effectiveUid}`)) {
                     setShowIdentityModal(true);
                 }
             } catch (err) {

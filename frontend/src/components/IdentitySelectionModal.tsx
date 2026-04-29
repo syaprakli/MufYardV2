@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Modal } from "./ui/Modal";
-import { Button } from "./ui/Button";
 import { Search, UserCheck, Loader2 } from "lucide-react";
 import { fetchContacts } from "../lib/api/contacts";
 import { updateProfile } from "../lib/api/profiles";
