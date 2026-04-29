@@ -1,5 +1,3 @@
-import { isElectron } from "./firebase";
-
 const PUBLIC_BACKEND_URL = "https://mufyardv2.up.railway.app"; 
 
 // Tüm ortamlarda (Local, Web APK, Bulut) ortak veritabanını kullanmak için Railway adresini sabitliyoruz.

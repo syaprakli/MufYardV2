@@ -6,7 +6,6 @@ import { useChat } from '../lib/context/ChatContext';
 import { usePresence } from '../lib/context/PresenceContext';
 import { toast } from 'react-hot-toast';
 import { cn } from '../lib/utils';
-import { API_URL } from '../lib/config';
 import { fetchAllProfiles, deleteProfile as apiDeleteProfile } from '../lib/api/profiles';
 import { fetchInspectors } from '../lib/api/inspectors';
 import { useConfirm } from '../lib/context/ConfirmContext';

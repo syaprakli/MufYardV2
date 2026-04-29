@@ -91,6 +91,7 @@ export default function PublicSpace() {
     const confirm = useConfirm();
 
     const location = useLocation();
+    const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage } = usePresence();
     const [posts, setPosts] = useState<Post[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
     const [categories, setCategories] = useState<string[]>([]);
@@ -98,7 +99,6 @@ export default function PublicSpace() {
     const [userRole, setUserRole] = useState('user');
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [isChatCollapsed, setIsChatCollapsed] = useState(window.innerWidth < 1024);
-    const { onlineUsers } = usePresence();
     const [selectedCategory, setSelectedCategory] = useState("Hepsi");
     const [loading, setLoading] = useState(true);
     const [newMessage, setNewMessage] = useState("");
@@ -163,21 +163,21 @@ export default function PublicSpace() {
     ];
 
     const chatEndRef = useRef<HTMLDivElement>(null);
-    const wsRef = useRef<WebSocket | null>(null);
-    const retryTimer = useRef<any>(null);
 
     useEffect(() => {
         const loadInitialData = async () => {
             if (!user?.uid) return;
             try {
-                const [prof, cats, insps] = await Promise.all([
+                const [prof, cats, insps, messagesRes] = await Promise.all([
                     fetchWithTimeout(`${API_URL}/profiles/${user.uid}`).then(r => r.json()),
                     fetchWithTimeout(`${API_URL}/collaboration/categories`).then(r => r.json()),
-                    fetchWithTimeout(`${API_URL}/profiles/`).then(r => r.json())
+                    fetchWithTimeout(`${API_URL}/profiles/`).then(r => r.json()),
+                    fetchWithTimeout(`${API_URL}/collaboration/messages`).then(r => r.json())
                 ]);
                 setUserRole(prof.role || 'user');
                 setCategories(cats);
                 setAllInspectors(insps.filter((i: any) => i.uid !== user?.uid));
+                setMessages(messagesRes.map((m: any) => ({ ...m, isMine: m.author_id === user?.uid })));
             } catch (err: any) {
                 console.error("Initial load error", err);
                 setLoading(false);
@@ -187,6 +187,16 @@ export default function PublicSpace() {
     }, [user]);
 
     useEffect(() => {
+        if (globalMessages.length > 0) {
+            setMessages(prev => {
+                const newMsgs = globalMessages.filter(gm => !prev.some(pm => pm.id === gm.id));
+                if (newMsgs.length === 0) return prev;
+                return [...prev, ...newMsgs.map(m => ({ ...m, isMine: m.author_id === user?.uid }))];
+            });
+        }
+    }, [globalMessages, user?.uid]);
+
+    useEffect(() => {
         const loadPosts = async () => {
             setLoading(true);
             try {
@@ -194,18 +204,10 @@ export default function PublicSpace() {
                 if (selectedCategory !== 'Hepsi') url.searchParams.append('category', selectedCategory);
                 if (user?.uid) url.searchParams.append('user_id', user.uid);
                 
-                const [postsRes, msgsRes] = await Promise.all([
-                    fetchWithTimeout(url.toString()),
-                    fetchWithTimeout(`${API_URL}/collaboration/messages`)
-                ]);
+                const postsRes = await fetchWithTimeout(url.toString());
                 const postsData = await postsRes.json();
-                const msgsData = await msgsRes.json();
                 
                 setPosts(Array.isArray(postsData) ? postsData : []);
-                setMessages(Array.isArray(msgsData) ? msgsData.map((m: any) => ({
-                    ...m,
-                    isMine: m.author_id === user?.uid
-                })) : []);
             } catch (err: any) {
                 console.error("Data load error", err);
             } finally {
@@ -237,51 +239,6 @@ export default function PublicSpace() {
         }
     }, [location.state, posts]);
 
-    useEffect(() => {
-        let ws: WebSocket;
-        const connectWS = () => {
-            if (!user) return;
-            try {
-                const baseWsUrl = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
-                const wsUrl = `${baseWsUrl}/api/collaboration/chat?uid=${user.uid}&name=${encodeURIComponent(user.displayName || 'Müfettiş')}`;
-                ws = new WebSocket(wsUrl);
-                ws.onopen = () => console.log("WebSocket connected");
-                ws.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        if (data.type === 'presence') {
-                            // Already handled by global PresenceContext
-                            return;
-                        } else if (data.text && data.author_id !== user?.uid) {
-                            setMessages(prev => [...prev, {
-                                id: data.id || Date.now().toString(),
-                                text: data.text,
-                                author_id: data.author_id,
-                                author_name: data.author_name || "Müfettiş",
-                                timestamp: data.timestamp || new Date().toISOString(),
-                                isMine: false,
-                                attachments: data.attachments || []
-                            }]);
-                        }
-                    } catch {}
-                };
-                ws.onclose = () => {
-                    retryTimer.current = setTimeout(connectWS, 5000);
-                };
-                ws.onerror = () => {
-                    ws.close();
-                };
-                wsRef.current = ws;
-            } catch {
-                retryTimer.current = setTimeout(connectWS, 10000);
-            }
-        };
-        if (user) connectWS();
-        return () => {
-            ws?.close();
-            if (retryTimer.current) clearTimeout(retryTimer.current);
-        };
-    }, [user]);
 
     const handleDeleteMessage = async (messageId: string) => {
         const confirmed = await confirm({
@@ -315,7 +272,7 @@ export default function PublicSpace() {
             author_name: user.displayName || "Müfettiş",
             timestamp: new Date().toISOString()
         };
-        setMessages(prev => [...prev, { ...msgObj, isMine: true }]);
+        sendGlobalMessage(newMessage);
         setIsSendingMsg(true);
         setNewMessage("");
         try {
@@ -324,7 +281,6 @@ export default function PublicSpace() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(msgObj)
             });
-            wsRef.current?.send(JSON.stringify(msgObj));
         } catch {
             toast.error("Mesaj gönderilemedi");
         } finally {
@@ -806,9 +762,9 @@ export default function PublicSpace() {
 
             <div 
                 className={cn(
-                    "fixed inset-y-0 right-0 z-[100] transition-all duration-300 transform lg:relative lg:z-10 flex",
-                    isChatCollapsed ? "translate-x-full lg:translate-x-0 lg:w-0" : "translate-x-0 lg:w-[384px]",
-                    (isChatCollapsed || viewMode !== 'Sohbet') && "lg:block hidden"
+                    "fixed inset-y-0 right-0 z-[100] transition-all duration-300 lg:relative lg:z-10 flex",
+                    isChatCollapsed ? "translate-x-[calc(100%-32px)] lg:translate-x-0 lg:w-0" : "translate-x-0 lg:w-[384px]",
+                    viewMode !== 'Sohbet' && "lg:block" 
                 )}
             >
                 {!isChatCollapsed && (

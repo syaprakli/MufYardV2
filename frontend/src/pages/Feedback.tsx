@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Star, Send, Shield, MessageSquare, CheckCircle2, User } from 'lucide-react';
+import { Star, Send, Shield, CheckCircle2, User } from 'lucide-react';
 import { useAuth } from '../lib/hooks/useAuth';
 import { fetchWithTimeout } from '../lib/api/utils';
 import { API_URL } from '../lib/config';
