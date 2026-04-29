@@ -16,6 +16,7 @@ import {
     X
 } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { isElectron } from "../../lib/firebase";
 
 interface SidebarProps {
     isOpen: boolean;
@@ -68,7 +69,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
 
             <nav className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-0.5">
-                {navItems.map((item) => (
+                {navItems.filter(item => isElectron || item.href !== "/files").map((item) => (
                     <NavLink
                         key={item.href}
                         to={item.href}
