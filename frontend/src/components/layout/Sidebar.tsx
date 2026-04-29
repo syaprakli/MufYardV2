@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { isElectron } from "../../lib/firebase";
+import { useAuth } from "../../lib/hooks/useAuth";
 
 interface SidebarProps {
     isOpen: boolean;
@@ -50,6 +51,9 @@ const bottomNavItems = [
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
+    const { user } = useAuth();
+    const isAdmin = user?.email === "sefayaprakli@hotmail.com" || user?.email === "mufettis@gsb.gov.tr";
+
     return (
         <aside className={cn(
             "w-64 bg-slate-950 text-white h-screen flex flex-col fixed left-0 top-0 z-50 border-r border-slate-900/50 transition-all duration-300 ease-in-out",
@@ -114,6 +118,24 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         </span>
                     </div>
                 ))}
+
+                {isAdmin && (
+                    <NavLink
+                        to="/admin/feedback"
+                        onClick={() => {
+                            if (window.innerWidth < 1024) onClose();
+                        }}
+                        className={({ isActive }) => cn(
+                            "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 border border-amber-500/20 bg-amber-500/5",
+                            isActive
+                                ? "bg-amber-500 text-white shadow-md"
+                                : "text-amber-500 hover:bg-amber-500/10"
+                        )}
+                    >
+                        <Star size={18} className="fill-current" />
+                        <span className="font-bold text-sm">Değerlendirmeleri Gör</span>
+                    </NavLink>
+                )}
             </nav>
 
             <div className="p-4 border-t border-primary-light space-y-1">

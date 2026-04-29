@@ -8,6 +8,7 @@ import { PresenceProvider } from "./lib/context/PresenceContext";
 
 import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth";
 import { auth, isElectron } from "./lib/firebase";
+import AdminFeedback from "./pages/AdminFeedback";
 import { Toaster } from "react-hot-toast";
 import { Loader2 } from "lucide-react";
 
@@ -134,6 +135,7 @@ function App() {
                     <Route path="notifications" element={<Notifications />} />
                     <Route path="messages" element={<Messages />} />
                     <Route path="feedback" element={<Feedback />} />
+                    <Route path="admin/feedback" element={<AdminFeedback />} />
                   </Route>
                   <Route path="*" element={<Navigate to="/" />} />
                 </Routes>
