@@ -119,7 +119,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                 clearTimeout(retryTimer.current);
             }
         };
-    }, [user?.uid, user?.displayName]);
+    }, [user?.uid, user?.displayName, profileName]);
 
     const isUserOnline = (uid: string) => {
         return onlineUsers.some(u => u.uid === uid);

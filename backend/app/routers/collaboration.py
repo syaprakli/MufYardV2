@@ -156,6 +156,18 @@ class ChatConnectionManager:
         await websocket.accept()
         if room_id not in self.rooms:
             self.rooms[room_id] = {}
+
+        # Aynı uid'den eski bağlantı varsa kapat (yeniden bağlanma / sekme yenileme)
+        stale = [ws for ws, info in self.rooms[room_id].items() if info["uid"] == user_id]
+        for old_ws in stale:
+            del self.rooms[room_id][old_ws]
+            if user_id in self.global_online_users:
+                self.global_online_users[user_id].discard(old_ws)
+            try:
+                await old_ws.close()
+            except Exception:
+                pass
+
         self.rooms[room_id][websocket] = {"uid": user_id, "name": user_name}
 
         # Update global presence

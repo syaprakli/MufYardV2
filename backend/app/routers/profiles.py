@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
-from typing import List
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
+from typing import Any, Dict, List
 from app.services.profile_service import ProfileService
 from app.schemas.profile import ProfileUpdate, ProfileResponse
 from app.services.email_service import EmailService
+from app.lib.auth import get_current_user, require_roles
 
 router = APIRouter(tags=["profiles"])
 
@@ -18,7 +19,16 @@ async def get_profile(uid: str, email: str = None):
     return profile
 
 @router.patch("/{uid}", response_model=ProfileResponse)
-async def update_profile(uid: str, profile_update: ProfileUpdate):
+async def update_profile(
+    uid: str,
+    profile_update: ProfileUpdate,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    # Rol değiştirme sadece admin yetkisi gerektirir
+    if profile_update.role is not None:
+        caller_role = (current_user.get("role") or "user").strip().lower()
+        if caller_role != "admin":
+            raise HTTPException(status_code=403, detail="Rol değiştirme yetkisi yalnızca yöneticilere aittir.")
     updated = await ProfileService.update_profile(uid, profile_update)
     if not updated:
         raise HTTPException(status_code=404, detail="Profil güncellenemedi.")
