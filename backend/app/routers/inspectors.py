@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, File, UploadFile
 from typing import List, Dict, Any
+from pydantic import BaseModel
 from app.services.inspector_service import InspectorService
 from app.schemas.inspector import InspectorCreate, InspectorResponse
 from app.config import BASE_DIR
@@ -76,3 +77,27 @@ async def update_inspector(inspector_id: str, inspector: InspectorCreate):
 async def add_inspectors_bulk(inspectors: List[InspectorCreate]):
     count = await InspectorService.add_inspectors_bulk(inspectors)
     return {"status": "success", "count": count}
+
+class LinkProfileRequest(BaseModel):
+    profile_uid: str
+
+@router.patch("/{inspector_id}/link")
+async def link_inspector_to_profile(inspector_id: str, body: LinkProfileRequest):
+    """Admin tarafından bir müfettişi sisteme kayıtlı kullanıcıyla manuel eşleştirir."""
+    import asyncio
+    from app.lib.firebase_admin import db
+    try:
+        await asyncio.to_thread(
+            db.collection('inspectors').document(inspector_id).update,
+            {"uid": body.profile_uid}
+        )
+        doc = await asyncio.to_thread(db.collection('inspectors').document(inspector_id).get)
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Müfettiş bulunamadı.")
+        d = doc.to_dict()
+        d['id'] = doc.id
+        return d
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

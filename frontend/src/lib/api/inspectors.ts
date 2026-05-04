@@ -97,3 +97,13 @@ export async function syncInspectorsFromContacts(): Promise<{ status: string, me
 
     return response.json();
 }
+
+export async function linkInspectorToProfile(inspectorId: string, profileUid: string): Promise<Inspector> {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/inspectors/${inspectorId}/link`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile_uid: profileUid }),
+    });
+    if (!response.ok) throw new Error("Eşleştirme başarısız.");
+    return response.json();
+}
