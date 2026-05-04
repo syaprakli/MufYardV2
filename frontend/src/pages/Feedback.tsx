@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Star, Send, Shield, CheckCircle2, User } from 'lucide-react';
+import { useState } from 'react';
+import { Star, Send, Shield, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../lib/hooks/useAuth';
 import { fetchWithTimeout } from '../lib/api/utils';
 import { API_URL } from '../lib/config';
@@ -7,7 +7,6 @@ import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { fetchProfile } from '../lib/api/profiles';
 
 export default function Feedback() {
     const { user } = useAuth();
@@ -16,34 +15,6 @@ export default function Feedback() {
     const [comment, setComment] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
-    const [isAdmin, setIsAdmin] = useState(false);
-    const [feedbacks, setFeedbacks] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        if (user) {
-            fetchProfile(user.uid, user.email || undefined).then(p => {
-                if (p.role === 'admin') {
-                    setIsAdmin(true);
-                    loadFeedbacks();
-                } else {
-                    setLoading(false);
-                }
-            });
-        }
-    }, [user]);
-
-    const loadFeedbacks = async () => {
-        try {
-            const res = await fetchWithTimeout(`${API_URL}/feedback/`);
-            const data = await res.json();
-            setFeedbacks(data);
-        } catch (err) {
-            console.error("Feedback list load error", err);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -83,10 +54,6 @@ export default function Feedback() {
         }
     };
 
-    if (loading) {
-        return <div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
-    }
-
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
             <div className="text-center space-y-4">
@@ -100,38 +67,6 @@ export default function Feedback() {
                     MufYard deneyiminizi iyileştirmemize yardımcı olun. Görüşleriniz bizim için çok değerlidir.
                 </p>
             </div>
-
-            {isAdmin && feedbacks.length > 0 && (
-                <div className="space-y-6">
-                    <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-4">
-                        <Shield className="text-primary" size={20} />
-                        <h2 className="text-xl font-black text-slate-800 dark:text-slate-100">Gelen Değerlendirmeler (Yönetici Paneli)</h2>
-                    </div>
-                    <div className="grid grid-cols-1 gap-4">
-                        {feedbacks.map((fb) => (
-                            <Card key={fb.id} className="p-6 border-slate-100 dark:border-slate-800 hover:shadow-lg transition-all">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="flex gap-1">
-                                        {[1, 2, 3, 4, 5].map((s) => (
-                                            <Star key={s} size={16} className={s <= fb.rating ? "fill-amber-400 text-amber-400" : "text-slate-200"} />
-                                        ))}
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-widest">
-                                            <User size={12} /> {fb.user_name}
-                                        </div>
-                                        <div className="text-[10px] text-slate-400 font-bold">{fb.user_email}</div>
-                                        <div className="text-[9px] text-slate-300 font-medium">{new Date(fb.created_at).toLocaleString('tr-TR')}</div>
-                                    </div>
-                                </div>
-                                <p className="text-slate-600 dark:text-slate-400 text-sm font-medium leading-relaxed italic">
-                                    "{fb.comment}"
-                                </p>
-                            </Card>
-                        ))}
-                    </div>
-                </div>
-            )}
 
             <Card className="p-8 sm:p-12 border-slate-100 dark:border-slate-800 relative overflow-hidden bg-card/50 backdrop-blur-sm">
                 {!submitted ? (
