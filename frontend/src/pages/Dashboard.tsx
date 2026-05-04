@@ -8,7 +8,6 @@ import { fetchTasks, type Task } from "../lib/api/tasks";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
-import { fetchOnlineUsers } from "../lib/api/online";
 import { useTheme } from "../lib/context/ThemeContext";
 import { fetchProfile, updateProfile } from "../lib/api/profiles";
 import { fetchInspectors } from "../lib/api/inspectors";
@@ -61,7 +60,6 @@ export default function Dashboard() {
     const { theme } = useTheme();
     const [data, setData] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
-    const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [showIdentityModal, setShowIdentityModal] = useState(false);
@@ -97,11 +95,10 @@ export default function Dashboard() {
         const loadData = async () => {
             if (!effectiveUid) return;
             try {
-                const [statsResult, tasksResult, profileResult, onlineResult] = await Promise.allSettled([
+                const [statsResult, tasksResult, profileResult] = await Promise.allSettled([
                     fetchStats(),
                     fetchTasks(effectiveUid),
-                    fetchProfile(effectiveUid, currentUser.email || undefined, currentUser.displayName || undefined),
-                    fetchOnlineUsers()
+                    fetchProfile(effectiveUid, currentUser.email || undefined, currentUser.displayName || undefined)
                 ]);
 
                 const stats =
@@ -178,9 +175,6 @@ export default function Dashboard() {
                         setShowIdentityModal(true);
                     }
                 }
-
-                const onlineList = onlineResult.status === "fulfilled" ? onlineResult.value : [];
-                setOnlineUsers(onlineList);
 
                 setData(stats);
                 setTasks(myTasks);
@@ -399,16 +393,6 @@ Lütfen şunları analiz et:
 
     return (
         <div className="max-w-[1600px] mx-auto space-y-4 lg:space-y-8 animate-in fade-in duration-500 pb-12 pr-2 lg:pr-4 pl-2 lg:pl-2">
-            {/* Online kullanıcılar göstergesi */}
-            <div className="flex items-center gap-2 text-xs text-emerald-600 font-bold mb-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>{onlineUsers.length} kişi şu an online</span>
-                {onlineUsers.length > 0 && (
-                    <span className="text-slate-400 font-normal">(
-                        {onlineUsers.map(u => u.name || u.uid).join(", ")}
-                    )</span>
-                )}
-            </div>
             {showIdentityModal && effectiveUid && (
                 <IdentitySelectionModal 
                     uid={effectiveUid} 

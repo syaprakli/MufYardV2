@@ -130,13 +130,13 @@ const getIcon = (type: string) => {
                                 {getIcon(notif.type)}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-0.5">
-                                    <h4 className={`text-sm tracking-tight truncate pr-4 ${
+                                <div className="flex items-center gap-2 mb-0.5 pr-4">
+                                    <h4 className={`text-sm tracking-tight truncate ${
                                         !notif.read ? 'font-black text-slate-800' : 'font-bold text-slate-500'
                                     }`}>
                                         {notif.title}
                                     </h4>
-                                    <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">
+                                    <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap shrink-0">
                                         {getDisplayTime(notif.created_at)}
                                     </span>
                                 </div>

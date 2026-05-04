@@ -2,38 +2,45 @@ import { useState, useEffect } from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut, sendPasswordResetEmail } from "firebase/auth";
 import type { User } from "firebase/auth";
 import { auth } from "../firebase";
-import { setOnline, removeOnline } from "../api/online";
+import { setOnline, removeOnline, removeOnlineBeacon } from "../api/online";
 
 export function useAuth() {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-            if (firebaseUser) {
-                setUser(firebaseUser);
-                setLoading(false);
-                // Online olarak işaretle
-                try {
-                    await setOnline(firebaseUser.uid, firebaseUser.displayName || firebaseUser.email || "Kullanıcı");
-                } catch (e) {
-                    // Sessiz hata
-                }
-            } else {
-                // Çıkışta online'dan kaldır
-                if (user) {
-                    try {
-                        await removeOnline(user.uid);
-                    } catch (e) {}
-                }
-                setUser(null);
-                setLoading(false);
-            }
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+            setUser(firebaseUser);
+            setLoading(false);
         });
         return () => unsubscribe();
-        // user dependency ile çıkışta da removeOnline çağrılır
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    useEffect(() => {
+        if (!user?.uid) return;
+
+        const name = user.displayName || user.email || "Kullanıcı";
+
+        // İlk girişte online yaz
+        setOnline(user.uid, name).catch(() => undefined);
+
+        // Periyodik heartbeat: stale kayıt birikmesini engeller
+        const heartbeat = setInterval(() => {
+            setOnline(user.uid, name).catch(() => undefined);
+        }, 30000);
+
+        // Sekme kapanmasında mümkünse beacon ile sil
+        const handleBeforeUnload = () => {
+            removeOnlineBeacon(user.uid);
+        };
+        window.addEventListener("beforeunload", handleBeforeUnload);
+
+        return () => {
+            clearInterval(heartbeat);
+            window.removeEventListener("beforeunload", handleBeforeUnload);
+            removeOnline(user.uid).catch(() => undefined);
+        };
+    }, [user?.uid, user?.displayName, user?.email]);
 
     const logout = async () => {
         try {

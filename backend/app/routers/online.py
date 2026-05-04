@@ -38,7 +38,28 @@ async def remove_online(body: RemoveOnlineRequest):
 async def list_online() -> List[dict]:
     try:
         docs = db.collection("online_users").stream()
-        users = [doc.to_dict() for doc in docs]
-        return users
+        now = datetime.now(timezone.utc)
+        fresh_users: List[dict] = []
+
+        for doc in docs:
+            data = doc.to_dict() or {}
+            last_active_raw = data.get("last_active")
+            is_fresh = False
+
+            if isinstance(last_active_raw, str):
+                try:
+                    last_active = datetime.fromisoformat(last_active_raw.replace("Z", "+00:00"))
+                    age_seconds = (now - last_active).total_seconds()
+                    is_fresh = age_seconds <= 90
+                except Exception:
+                    is_fresh = False
+
+            if is_fresh:
+                fresh_users.append(data)
+            else:
+                # Sessizce stale kayıt temizliği
+                db.collection("online_users").document(doc.id).delete()
+
+        return fresh_users
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

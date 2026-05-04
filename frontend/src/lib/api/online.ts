@@ -18,6 +18,16 @@ export async function removeOnline(uid: string) {
   });
 }
 
+export function removeOnlineBeacon(uid: string) {
+  try {
+    if (typeof navigator === "undefined" || !navigator.sendBeacon) return;
+    const blob = new Blob([JSON.stringify({ uid })], { type: "application/json" });
+    navigator.sendBeacon(`${API_URL}/online/remove`, blob);
+  } catch {
+    // no-op
+  }
+}
+
 export async function fetchOnlineUsers() {
   const res = await fetch(`${API_URL}/online/list`);
   if (!res.ok) throw new Error("Online kullanıcılar alınamadı");
