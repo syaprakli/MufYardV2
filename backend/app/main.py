@@ -200,7 +200,12 @@ async def websocket_chat_endpoint(websocket: WebSocket):
         while True:
             raw_data = await websocket.receive_text()
             data = json.loads(raw_data)
-            
+
+            # Ping/pong heartbeat - Railway WS timeout'unu önler
+            if data.get("type") == "ping":
+                await websocket.send_text(json.dumps({"type": "pong"}))
+                continue
+
             # Eğer DM odasıysa ve mesaj geliyorsa, veri tabanına kaydet
             if room_id.startswith("dm_") and data.get("type", "message") == "message":
                 # Alıcıyı room_id'den bul (dm_uid1_uid2)

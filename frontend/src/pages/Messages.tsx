@@ -59,10 +59,15 @@ export default function Messages() {
       try {
         profiles = await fetchAllProfiles();
       } catch (err) {
-        console.error("Profiller yüklenemedi:", err);
-        toast.error("Kullanıcı listesi alınamadı.");
-        setLoading(false);
-        return;
+        console.warn("Profiller yüklenemedi, tekrar deneniyor...", err);
+        // Kısa gecikme sonrası bir kez daha dene (Railway cold start için)
+        await new Promise(r => setTimeout(r, 3000));
+        try {
+          profiles = await fetchAllProfiles();
+        } catch (err2) {
+          console.error("Profiller yine yüklenemedi:", err2);
+          toast.error("Kullanıcı listesi alınamadı.");
+        }
       }
 
       try {

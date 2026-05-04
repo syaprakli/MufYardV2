@@ -21,7 +21,7 @@ interface PresenceContextType {
     sessionCount: number;
     isUserOnline: (uid: string) => boolean;
     messages: Message[];
-    sendMessage: (text: string, attachments?: any[]) => void;
+    sendMessage: (text: string, attachments?: any[]) => string;
 }
 
 const PresenceContext = createContext<PresenceContextType | undefined>(undefined);
@@ -33,6 +33,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const [messages, setMessages] = useState<Message[]>([]);
     const wsRef = useRef<WebSocket | null>(null);
     const retryTimer = useRef<any>(null);
+    const pingTimer = useRef<any>(null);
     const retryCountRef = useRef(0);
     const [profileName, setProfileName] = useState<string | null>(null);
 
@@ -63,12 +64,20 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 
                 ws.onopen = () => {
                     console.log("Global Presence & Chat: Connected");
-                    retryCountRef.current = 0; // Reset retry count on success
+                    retryCountRef.current = 0;
+                    // Railway WS timeout'unu önlemek için her 20sn'de ping gönder
+                    clearInterval(pingTimer.current);
+                    pingTimer.current = setInterval(() => {
+                        if (ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({ type: 'ping' }));
+                        }
+                    }, 20000);
                 };
 
                 ws.onmessage = (event) => {
                     try {
                         const data = JSON.parse(event.data);
+                        if (data.type === 'pong') return; // heartbeat yanıtı, işlem yok
                         if (data.type === 'presence' && Array.isArray(data.users)) {
                             setOnlineUsers(data.users);
                             setSessionCount(typeof data.connections === 'number' ? data.connections : data.users.length);
@@ -93,6 +102,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                 };
 
                 ws.onclose = () => {
+                    clearInterval(pingTimer.current);
                     const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 30000);
                     console.log(`Global Presence: Disconnected, retrying in ${delay/1000}s...`);
                     retryTimer.current = setTimeout(connect, delay);
@@ -121,6 +131,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             if (retryTimer.current) {
                 clearTimeout(retryTimer.current);
             }
+            clearInterval(pingTimer.current);
         };
     }, [user?.uid, user?.displayName, profileName]);
 
@@ -128,10 +139,12 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         return onlineUsers.some(u => u.uid === uid);
     };
 
-    const sendMessage = (text: string, attachments: any[] = []) => {
+    const sendMessage = (text: string, attachments: any[] = []): string => {
+        const msgId = `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({
                 type: 'message',
+                id: msgId,
                 text,
                 attachments,
                 author_id: user?.uid,
@@ -141,6 +154,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         } else {
             console.warn("WS not open, cannot send message");
         }
+        return msgId;
     };
 
     return (

@@ -266,16 +266,18 @@ export default function PublicSpace() {
     const handleSendChat = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newMessage.trim() || !user) return;
+        const tempId = sendGlobalMessage(newMessage); // WS üzerinden gönder, ID al
         const msgObj = {
-            id: Date.now().toString(),
+            id: tempId,
             text: newMessage,
             author_id: user.uid,
             author_name: user.displayName || "Müfettiş",
             timestamp: new Date().toISOString()
         };
-        sendGlobalMessage(newMessage);
-        setIsSendingMsg(true);
+        // Anlık göster (WS echo beklemeden)
+        setMessages(prev => prev.some(m => m.id === tempId) ? prev : [...prev, { ...msgObj, isMine: true }]);
         setNewMessage("");
+        setIsSendingMsg(true);
         try {
             await fetchWithTimeout(`${API_URL}/collaboration/messages`, {
                 method: 'POST',
