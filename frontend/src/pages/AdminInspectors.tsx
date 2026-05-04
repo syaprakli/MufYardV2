@@ -44,6 +44,7 @@ export default function AdminInspectors() {
     const registeredEmails = new Set(profiles.map(p => (p.email || "").toLowerCase().trim()));
 
     const isRegistered = (ins: Inspector) => {
+        if (ins.force_unlinked) return false;
         const uidMatch = !!ins.uid && profiles.some(p => p.uid === ins.uid);
         const emailMatch = !!ins.email && registeredEmails.has(ins.email.toLowerCase().trim());
         return uidMatch || emailMatch;

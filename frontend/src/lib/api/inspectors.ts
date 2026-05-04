@@ -10,6 +10,7 @@ export interface Inspector {
     phone?: string;
     room?: string;
     uid?: string;
+    force_unlinked?: boolean;
     created_at: string;
 }
 

@@ -87,9 +87,10 @@ async def link_inspector_to_profile(inspector_id: str, body: LinkProfileRequest)
     import asyncio
     from app.lib.firebase_admin import db
     try:
+        update_data = {"uid": body.profile_uid, "force_unlinked": not body.profile_uid}
         await asyncio.to_thread(
             db.collection('inspectors').document(inspector_id).update,
-            {"uid": body.profile_uid}
+            update_data
         )
         doc = await asyncio.to_thread(db.collection('inspectors').document(inspector_id).get)
         if not doc.exists:
