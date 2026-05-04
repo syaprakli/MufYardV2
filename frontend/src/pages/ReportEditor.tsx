@@ -239,7 +239,7 @@ export default function ReportEditor() {
 
         try {
             setProcessingAI(true);
-            const aiUrl = (WS_URL.startsWith('ws') ? WS_URL.replace('ws', 'http') : WS_URL).replace(/\/$/, '') + '/api/ai/chat';
+            const aiUrl = `${API_URL}/ai/chat`;
             const headers = await getAuthHeaders({ "Content-Type": "application/json" });
             const response = await fetchWithTimeout(aiUrl, {
                 method: "POST",

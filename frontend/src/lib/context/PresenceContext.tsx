@@ -31,6 +31,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const [messages, setMessages] = useState<Message[]>([]);
     const wsRef = useRef<WebSocket | null>(null);
     const retryTimer = useRef<any>(null);
+    const retryCountRef = useRef(0);
     const [profileName, setProfileName] = useState<string | null>(null);
 
     useEffect(() => {
@@ -60,6 +61,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 
                 ws.onopen = () => {
                     console.log("Global Presence & Chat: Connected");
+                    retryCountRef.current = 0; // Reset retry count on success
                 };
 
                 ws.onmessage = (event) => {
@@ -88,8 +90,10 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                 };
 
                 ws.onclose = () => {
-                    console.log("Global Presence: Disconnected, retrying...");
-                    retryTimer.current = setTimeout(connect, 5000);
+                    const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 30000);
+                    console.log(`Global Presence: Disconnected, retrying in ${delay/1000}s...`);
+                    retryTimer.current = setTimeout(connect, delay);
+                    retryCountRef.current += 1;
                 };
 
                 ws.onerror = (err) => {

@@ -44,8 +44,10 @@ export function IdentitySelectionModal({ uid, onComplete }: IdentitySelectionMod
                 full_name: inspector.name,
                 title: inspector.title,
                 institution: inspector.unit || "Gençlik ve Spor Bakanlığı",
-                email: inspector.email // Opsiyonel: Kendi maili kalsın mı yoksa listedeki mi? Kullanıcı isteğine göre listedekini de kaydedebiliriz.
+                email: inspector.email,
+                verified: true
             });
+            localStorage.setItem(`id_skip_${uid}`, "true");
             toast.success(`Kimlik doğrulandı: ${inspector.name}`);
             setIsOpen(false);
             onComplete(inspector.name);
@@ -60,9 +62,21 @@ export function IdentitySelectionModal({ uid, onComplete }: IdentitySelectionMod
     return (
         <Modal 
             isOpen={isOpen} 
-            onClose={() => {}} // Kapatılamaz, kimlik seçilmeli
+            onClose={() => {
+                localStorage.setItem(`id_skip_${uid}`, "true");
+                setIsOpen(false);
+            }} 
             title="Sizi Tanıyalım 🤝"
         >
+            <button 
+                onClick={() => {
+                    localStorage.setItem(`id_skip_${uid}`, "true");
+                    setIsOpen(false);
+                }}
+                className="absolute top-4 right-12 p-2 text-slate-400 hover:text-slate-600 transition-colors text-[10px] font-black uppercase tracking-widest"
+            >
+                Kapat [×]
+            </button>
             <div className="space-y-6 py-4 font-outfit">
                 <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10">
                     <p className="text-sm text-slate-600 leading-relaxed font-medium">

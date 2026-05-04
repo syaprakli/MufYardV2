@@ -1,11 +1,8 @@
 from datetime import datetime
 import asyncio
-import logging
 from typing import List, Optional, Dict, Any
 from app.lib.firebase_admin import db
 from app.schemas.contact import ContactCreate, ContactUpdate
-
-logger = logging.getLogger(__name__)
 
 class ContactService:
     @staticmethod
@@ -132,17 +129,19 @@ class ContactService:
     async def sync_from_rdb_rehber_v6(file_path: str = None) -> Dict[str, Any]:
         """
         rehber.xlsx dosyasını 'Kurumsal Rehber' koleksiyonuna aktarır.
+        Excel yapısı: Sıra No(0), İsim(1), Ünvan(2), Cep(3), Dahili(4), Oda(5), Kat(6).
+        Bölüm başlıklarını korur ve eski sistem aktarımlarını temizleyerek yinelenen/hatalı kayıt birikimini önler.
         """
         import os
         import pandas as pd
         import hashlib
-        from app.config import BASE_DIR
         
         if file_path is None:
-            # Önce rehber.xlsx, yoksa Rdb_rehber.xlsx bak
-            file_path = os.path.join(BASE_DIR, "rehber.xlsx")
-            if not os.path.exists(file_path):
-                file_path = os.path.join(BASE_DIR, "Rdb_rehber.xlsx")
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            file_path = os.path.join(base_dir, "Rdb_rehber.xlsx")
+            
+        if not os.path.exists(file_path):
+            file_path = os.path.join(os.path.dirname(file_path), "rehber.xlsx")
             
         if not os.path.exists(file_path):
             return {"status": "error", "message": "Excel dosyası bulunamadı."}
@@ -344,12 +343,10 @@ class ContactService:
             if sync_count % 400 != 0:
                 await asyncio.to_thread(batch.commit)
             
-            logger.info(f"Rehber senkronizasyonu tamamlandı. {sync_count} kayıt aktarıldı.")
             return {
                 "status": "success", "processed": sync_count,
                 "message": f"{sync_count} personel rehbere aktarıldı/güncellendi. Mailler otomatik eşitlendi."
             }
-        
+            
         except Exception as e:
-            logger.error(f"Rehber senkronizasyon hatası: {str(e)}")
             return {"status": "error", "message": f"V6 senkronizasyon hatası: {str(e)}"}

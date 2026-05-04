@@ -538,13 +538,7 @@ export default function PublicSpace() {
                             Duyurular
                             {viewMode === 'Duyurular' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-full" />}
                         </button>
-                        <button 
-                            onClick={() => { setViewMode('Sohbet'); setIsChatCollapsed(false); }}
-                            className={cn("md:hidden pb-3 text-xs font-black tracking-widest transition-all relative whitespace-nowrap", viewMode === 'Sohbet' ? "text-primary" : "text-slate-400 hover:text-slate-600")}
-                        >
-                            Canlı Sohbet
-                            {viewMode === 'Sohbet' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-full" />}
-                        </button>
+
                     </div>
                 </div>
 
@@ -764,21 +758,15 @@ export default function PublicSpace() {
                 className={cn(
                     "fixed inset-y-0 right-0 z-[100] transition-all duration-300 lg:relative lg:z-10 flex",
                     isChatCollapsed ? "translate-x-[calc(100%-32px)] lg:translate-x-0 lg:w-0" : "translate-x-0 lg:w-[384px]",
-                    viewMode !== 'Sohbet' && "lg:block" 
+                    "hidden lg:flex" // Mobile'da tamamen gizle, sadece desktop'ta göster
                 )}
             >
-                {!isChatCollapsed && (
-                    <div 
-                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm lg:hidden z-[-1]"
-                        onClick={() => { setIsChatCollapsed(true); if (viewMode === 'Sohbet') setViewMode('Forum'); }}
-                    />
-                )}
                 <div className="flex h-full relative">
                     <button 
                         onClick={() => setIsChatCollapsed(!isChatCollapsed)}
                         className={cn(
                             "absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-20 bg-[#002B4B] text-white flex items-center justify-center rounded-l-2xl shadow-xl z-50 border-r border-white/10 hover:w-10 transition-all",
-                            "lg:flex" // Always show on desktop
+                            "hidden lg:flex" // Sadece desktop'ta göster
                         )}
                     >
                         {isChatCollapsed ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
@@ -1266,11 +1254,28 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                                     ))}
                                 </div>
                             )}
-                            <div className="flex items-center gap-2">
-                                <button onClick={onAttach} className="p-3 text-slate-400 hover:text-primary transition-all"><Paperclip size={20} /></button>
-                                <input value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Cevap yaz..." className="flex-1 bg-muted border-none rounded-xl px-4 h-12 text-sm font-bold outline-none" />
-                                <button disabled={isCommenting || (!commentText.trim() && attachments.length === 0)} onClick={onComment} className="bg-primary text-white h-12 px-6 rounded-xl font-black text-xs shadow-lg transition-all disabled:opacity-50">
-                                    {isCommenting ? <Loader2 className="animate-spin" /> : "Gönder"}
+                            <div className="flex flex-col sm:flex-row items-center gap-2">
+                                <div className="flex-1 w-full flex items-center gap-2">
+                                    <button onClick={onAttach} className="p-3 text-slate-400 hover:text-primary transition-all shrink-0"><Paperclip size={20} /></button>
+                                    <input 
+                                        value={commentText} 
+                                        onChange={e => setCommentText(e.target.value)} 
+                                        placeholder="Cevap yaz..." 
+                                        className="flex-1 bg-muted border-none rounded-xl px-4 h-12 text-sm font-bold outline-none" 
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                onComment();
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                <button 
+                                    disabled={isCommenting || (!commentText.trim() && attachments.length === 0)} 
+                                    onClick={onComment} 
+                                    className="w-full sm:w-auto bg-primary text-white h-12 px-8 rounded-xl font-black text-xs shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
+                                >
+                                    {isCommenting ? <Loader2 className="animate-spin mx-auto" /> : "GÖNDER"}
                                 </button>
                             </div>
                         </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Minus, MessageSquare, Send, Paperclip, Smile, Image as ImageIcon, Search, FileText, Trash2 } from 'lucide-react';
-import { WS_URL } from '../lib/config';
+import { WS_URL, API_URL } from '../lib/config';
 import { useAuth } from '../lib/hooks/useAuth';
 import { useTheme } from "../lib/context/ThemeContext";
 import EmojiPicker, { type EmojiClickData, Theme as EmojiTheme } from 'emoji-picker-react';
@@ -95,7 +95,7 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm' }: Fl
           // room_id: dm_uid1_uid2 formatında
           const parts = roomId.split('_');
           const otherUid = parts[1] === user.uid ? parts[2] : parts[1];
-          const res = await fetch(`http://localhost:8000/api/collaboration/dm/history?uid1=${user.uid}&uid2=${otherUid}`);
+          const res = await fetch(`${API_URL}/collaboration/dm/history?uid1=${user.uid}&uid2=${otherUid}`);
           if (res.ok) {
             const data = await res.json();
             setMessages(data.map((m: any) => ({
@@ -118,32 +118,72 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm' }: Fl
   // ── websocket ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    const baseWs = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
-    const socketUrl = `${baseWs}/api/collaboration/chat?uid=${user.uid}&name=${encodeURIComponent(user.displayName || user.email || 'Müfettiş')}&room_id=${roomId}`;
-    ws.current = new WebSocket(socketUrl);
-    ws.current.onopen = () => setIsConnected(true);
-    ws.current.onclose = () => setIsConnected(false);
-    ws.current.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'presence') return;
-      
-      if (data.type === 'delete_message') {
-        setMessages(prev => prev.filter(m => m.id !== data.message_id));
-        return;
-      }
+    
+    let retryCount = 0;
+    let retryTimer: any = null;
 
-      if (data.sender_id === user?.uid) return; // skip own echo
-      setMessages(prev => [...prev, {
-        id: data.id || Math.random().toString(36).substr(2, 9),
-        sender_id: data.sender_id,
-        sender_name: data.sender_name,
-        content: data.content || '',
-        timestamp: data.timestamp || new Date().toISOString(),
-        attachment: data.attachment,
-      }]);
-      audioRef.current?.play().catch(() => {});
+    const connect = () => {
+      if (!user) return;
+      const baseWs = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
+      const socketUrl = `${baseWs}/ws?uid=${user.uid}&name=${encodeURIComponent(user.displayName || user.email || 'Müfettiş')}&room_id=${roomId}`;
+      
+      ws.current = new WebSocket(socketUrl);
+
+      ws.current.onopen = () => {
+        setIsConnected(true);
+        retryCount = 0;
+      };
+
+      ws.current.onclose = () => {
+        setIsConnected(false);
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+        console.log(`Chat WS [${roomId}]: Disconnected, retrying in ${delay/1000}s...`);
+        retryTimer = setTimeout(connect, delay);
+        retryCount += 1;
+      };
+
+      ws.current.onerror = (err) => {
+        console.error(`Chat WS [${roomId}] error:`, err);
+        ws.current?.close();
+      };
+
+      ws.current.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'presence') return;
+          
+          if (data.type === 'delete_message') {
+            setMessages(prev => prev.filter(m => m.id !== data.message_id));
+            return;
+          }
+
+          if (data.sender_id === user?.uid) return; // skip own echo
+          setMessages(prev => [...prev, {
+            id: data.id || Math.random().toString(36).substr(2, 9),
+            sender_id: data.sender_id,
+            sender_name: data.sender_name,
+            content: data.content || '',
+            timestamp: data.timestamp || new Date().toISOString(),
+            attachment: data.attachment,
+          }]);
+          audioRef.current?.play().catch(() => {});
+        } catch (e) {
+          console.error("Chat WS message error:", e);
+        }
+      };
     };
-    return () => { ws.current?.close(); };
+
+    connect();
+
+    return () => { 
+      if (ws.current) {
+        ws.current.onclose = null;
+        ws.current.onerror = null;
+        ws.current.onmessage = null;
+        ws.current.close();
+      }
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [roomId, user]);
 
   // ── auto-scroll ────────────────────────────────────────────────────────
@@ -231,7 +271,7 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm' }: Fl
   const deleteMessage = async (messageId: string) => {
     if (!user) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/collaboration/dm/${roomId}/${messageId}?uid=${user.uid}`, {
+      const res = await fetch(`${API_URL}/collaboration/dm/${roomId}/${messageId}?uid=${user.uid}`, {
         method: 'DELETE'
       });
       if (res.ok) {

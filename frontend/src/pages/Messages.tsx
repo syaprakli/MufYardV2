@@ -6,7 +6,7 @@ import { useChat } from '../lib/context/ChatContext';
 import { usePresence } from '../lib/context/PresenceContext';
 import { toast } from 'react-hot-toast';
 import { cn } from '../lib/utils';
-import { fetchAllProfiles, deleteProfile as apiDeleteProfile } from '../lib/api/profiles';
+import { fetchAllProfiles, deleteProfile as apiDeleteProfile, type Profile } from '../lib/api/profiles';
 import { fetchInspectors } from '../lib/api/inspectors';
 import { useConfirm } from '../lib/context/ConfirmContext';
 import { Trash2 } from 'lucide-react';
@@ -50,10 +50,24 @@ export default function Messages() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const [profiles, inspectors] = await Promise.all([
-        fetchAllProfiles(),
-        fetchInspectors()
-      ]);
+      
+      let profiles: Profile[] = [];
+      let directory: any[] = [];
+
+      try {
+        profiles = await fetchAllProfiles();
+      } catch (err) {
+        console.error("Profiller yüklenemedi:", err);
+        toast.error("Kullanıcı listesi alınamadı.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        directory = await fetchInspectors();
+      } catch (err) {
+        console.warn("Rehber verisi alınamadı, sadece kayıtlı kullanıcılar gösteriliyor.");
+      }
       
       // Set current user role
       if (user) {
@@ -63,35 +77,29 @@ export default function Messages() {
       
       const unified: UnifiedContact[] = [];
 
-      // 1. Her bir müfettişi listeye ekle
-      inspectors.forEach(ins => {
-        const insEmail = ins.email?.trim().toLowerCase();
-        const userEmail = user?.email?.trim().toLowerCase();
-
-        // Bu müfettiş için kayıtlı bir profil var mı? (email üzerinden)
-        const profile = profiles.find(p => p.email?.trim().toLowerCase() === insEmail);
+      // Sadece kayıtlı profilleri ekle ve rehber bilgisiyle zenginleştir
+      profiles.forEach(profile => {
+        const isMe = profile.uid === user?.uid;
+        const dirEntry = directory.find(d => d.email?.toLowerCase() === profile.email?.toLowerCase());
         
-        const isMe = !!((profile?.uid === user?.uid) || (insEmail && userEmail && insEmail === userEmail));
-
         unified.push({
-          uid: profile?.uid || (isMe ? user?.uid : null) || null,
-          full_name: ins.name + (isMe ? " (Siz)" : ""), 
-          title: ins.title || 'Müfettiş',
-          email: ins.email || '',
-          avatar_url: profile?.avatar_url || null,
-          isRegistered: !!profile?.uid || isMe,
+          uid: profile.uid,
+          full_name: profile.full_name + (isMe ? " (Siz)" : ""),
+          title: profile.title || dirEntry?.title || 'Müfettiş',
+          email: profile.email || '',
+          avatar_url: profile.avatar_url || null,
+          isRegistered: true,
           isMe: isMe,
-          directoryId: ins.id || null
+          directoryId: dirEntry?.id || null
         });
       });
 
-      // 2. Listeyi alfabetik sırala
+      // Listeyi alfabetik sırala
       unified.sort((a, b) => a.full_name.localeCompare(b.full_name));
 
       setContacts(unified);
     } catch (error) {
       console.error("Kullanıcılar yüklenemedi:", error);
-      toast.error("Kullanıcı listesi alınamadı.");
     } finally {
       setLoading(false);
     }

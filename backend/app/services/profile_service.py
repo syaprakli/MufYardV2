@@ -53,12 +53,14 @@ class ProfileService:
         is_generic = False
         if doc.exists:
             profile_data = doc.to_dict()
-            # If profile is "generic", try to enrich it
-            if profile_data.get('full_name') in ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz"]:
-                is_generic = True
-            else:
-                profile_data['uid'] = doc.id
+            profile_data['uid'] = doc.id
+            
+            # Eğer profil zaten doğrulanmışsa ve ismi genel değilse direkt döndür
+            is_generic = profile_data.get('full_name') in ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz"]
+            if profile_data.get('verified') == True and not is_generic:
                 return profile_data
+            
+            # Doğrulanmamışsa veya ismi genel ise aşağıda 'Discovery' mantığına devam et
 
         # Discovery logic
         search_email = (email or (uid if "@" in uid else None))
@@ -118,6 +120,7 @@ class ProfileService:
                 "email": inspector_match.get('email', search_email or (profile_data.get('email') if profile_data else "")),
                 "phone": inspector_match.get('phone', (profile_data.get('phone') if profile_data else "")),
                 "institution": "Gençlik ve Spor Bakanlığı",
+                "verified": True,
                 "updated_at": datetime.utcnow()
             }
             
@@ -168,6 +171,7 @@ class ProfileService:
             "ai_temperature": 0.7,
             "notifications_enabled": True,
             "role": "user",
+            "verified": False,
             "updated_at": datetime.utcnow()
         }
         await asyncio.to_thread(lambda: doc_ref.set(default_profile))
@@ -202,13 +206,27 @@ class ProfileService:
         return updated_doc
     @staticmethod
     async def get_all_profiles() -> List[Dict[str, Any]]:
-        docs = await asyncio.to_thread(db.collection('profiles').stream)
-        profiles = []
-        for doc in docs:
-            p = doc.to_dict()
-            p['uid'] = doc.id
-            profiles.append(p)
-        return profiles
+        try:
+            docs = await asyncio.to_thread(db.collection('profiles').stream)
+            profiles = []
+            now = datetime.utcnow()
+            for doc in docs:
+                p = doc.to_dict()
+                if not p: continue
+                
+                p['uid'] = doc.id
+                
+                # Validation for schema
+                if 'full_name' not in p: p['full_name'] = "İsimsiz Kullanıcı"
+                if 'email' not in p: p['email'] = ""
+                if 'role' not in p: p['role'] = "user"
+                if 'updated_at' not in p: p['updated_at'] = now
+                
+                profiles.append(p)
+            return profiles
+        except Exception as e:
+            logger.error(f"Error getting all profiles: {e}")
+            return []
 
     @staticmethod
     async def delete_profile(uid: str) -> bool:

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useAuth } from './useAuth';
-import { API_URL } from '../config';
+import { WS_URL } from '../config';
 
 export function usePresence() {
   const { user } = useAuth();
@@ -12,24 +12,31 @@ export function usePresence() {
     let reconnectTimer: ReturnType<typeof setTimeout>;
     let isMounted = true;
 
+    let retryCount = 0;
+
     const connect = () => {
-      // Use the existing chat websocket endpoint but with a 'global' room
-      // This registers the user in the backend's global_online_users
-      const wsUrl = API_URL.replace('http', 'ws');
-      ws = new WebSocket(`${wsUrl}/collaboration/chat?uid=${user.uid}&name=${encodeURIComponent(user.displayName || user.email || 'User')}&room_id=global`);
+      // Use the correct websocket endpoint from backend
+      const wsUrl = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
+      ws = new WebSocket(`${wsUrl}/ws?uid=${user.uid}&name=${encodeURIComponent(user.displayName || user.email || 'User')}&room_id=global`);
 
       ws.onopen = () => {
-        if (isMounted) console.log("Presence: Connected");
+        if (isMounted) {
+          console.log("Presence Hook: Connected");
+          retryCount = 0;
+        }
       };
 
       ws.onclose = () => {
         if (!isMounted) return;
-        console.log("Presence: Disconnected, reconnecting...");
-        reconnectTimer = setTimeout(connect, 5000);
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+        console.log(`Presence Hook: Disconnected, retrying in ${delay/1000}s...`);
+        reconnectTimer = setTimeout(connect, delay);
+        retryCount += 1;
       };
 
       ws.onerror = (err) => {
-        if (isMounted) console.error("Presence WS error:", err);
+        if (isMounted) console.error("Presence Hook WS error:", err);
+        ws?.close();
       };
     };
 

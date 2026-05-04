@@ -8,8 +8,10 @@ import { fetchTasks, type Task } from "../lib/api/tasks";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
+import { fetchOnlineUsers } from "../lib/api/online";
 import { useTheme } from "../lib/context/ThemeContext";
-import { fetchProfile } from "../lib/api/profiles";
+import { fetchProfile, updateProfile } from "../lib/api/profiles";
+import { fetchContacts } from "../lib/api/contacts";
 import { toast } from "react-hot-toast";
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -59,6 +61,7 @@ export default function Dashboard() {
     const { theme } = useTheme();
     const [data, setData] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
+    const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [showIdentityModal, setShowIdentityModal] = useState(false);
@@ -94,10 +97,11 @@ export default function Dashboard() {
         const loadData = async () => {
             if (!effectiveUid) return;
             try {
-                const [statsResult, tasksResult, profileResult] = await Promise.allSettled([
+                const [statsResult, tasksResult, profileResult, onlineResult] = await Promise.allSettled([
                     fetchStats(),
                     fetchTasks(effectiveUid),
-                    fetchProfile(effectiveUid, currentUser.email || undefined)
+                    fetchProfile(effectiveUid, currentUser.email || undefined),
+                    fetchOnlineUsers()
                 ]);
 
                 const stats =
@@ -114,26 +118,53 @@ export default function Dashboard() {
                     t.accepted_collaborators?.includes(effectiveUid)
                 );
 
-                const profileData = 
+                let profileData = 
                     profileResult.status === "fulfilled"
                         ? profileResult.value
                         : null;
 
+                // Otomatik kurumsal eşleştirme (eğer verified değilse ve generic ise)
+                const isVerified = profileData?.verified === true;
+                const isGeneric = !profileData?.full_name || 
+                                 ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz"].includes(profileData.full_name);
+                const isSpecialUser = currentUser?.email === "sefayaprakli@hotmail.com" || 
+                                    currentUser?.email === "mufettis@gsb.gov.tr" ||
+                                    effectiveUid === "mufettis-gsb-unique-id";
+
+                if (!isSpecialUser && !isVerified && isGeneric && !localStorage.getItem(`id_skip_${effectiveUid}`)) {
+                    try {
+                        const contacts = await fetchContacts("corporate");
+                        // Önce email ile tam eşleşme
+                        let match = contacts.find(c => c.email?.trim().toLowerCase() === (currentUser.email || "").trim().toLowerCase());
+                        // Yoksa ad-soyad ile (case-insensitive, boşlukları ignore)
+                        if (!match && profileData?.full_name) {
+                            const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+                            match = contacts.find(c => norm(c.name) === norm(profileData!.full_name));
+                        }
+                        if (match) {
+                            await updateProfile(effectiveUid, {
+                                full_name: match.name,
+                                title: match.title,
+                                institution: match.unit || "Gençlik ve Spor Bakanlığı",
+                                email: match.email,
+                                verified: true
+                            });
+                            localStorage.setItem(`id_skip_${effectiveUid}`, "true");
+                            profileData = { ...profileData, ...match, verified: true, uid: effectiveUid } as any;
+                        } else {
+                            setShowIdentityModal(true);
+                        }
+                    } catch (e) {
+                        setShowIdentityModal(true);
+                    }
+                }
+
+                const onlineList = onlineResult.status === "fulfilled" ? onlineResult.value : [];
+                setOnlineUsers(onlineList);
+
                 setData(stats);
                 setTasks(myTasks);
                 setProfile(profileData);
-
-                // Determine if identity selection is needed
-                // 1. If name is generic
-                const isGeneric = profileData && 
-                                 ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz", "Müfettiş"].includes(profileData.full_name);
-                
-                // 2. If title is generic and not verified
-                const notVerified = profileData && (profileData.title === "Müfettiş" || !profileData.institution);
-                
-                if ((isGeneric || notVerified) && !localStorage.getItem(`id_skip_${effectiveUid}`)) {
-                    setShowIdentityModal(true);
-                }
             } catch (err) {
                 console.error("Dashboard yüklenirken hata:", err);
             } finally {
@@ -348,6 +379,16 @@ Lütfen şunları analiz et:
 
     return (
         <div className="max-w-[1600px] mx-auto space-y-4 lg:space-y-8 animate-in fade-in duration-500 pb-12 pr-2 lg:pr-4 pl-2 lg:pl-2">
+            {/* Online kullanıcılar göstergesi */}
+            <div className="flex items-center gap-2 text-xs text-emerald-600 font-bold mb-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>{onlineUsers.length} kişi şu an online</span>
+                {onlineUsers.length > 0 && (
+                    <span className="text-slate-400 font-normal">(
+                        {onlineUsers.map(u => u.name || u.uid).join(", ")}
+                    )</span>
+                )}
+            </div>
             {showIdentityModal && effectiveUid && (
                 <IdentitySelectionModal 
                     uid={effectiveUid} 

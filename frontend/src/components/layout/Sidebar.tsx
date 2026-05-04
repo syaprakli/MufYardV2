@@ -120,21 +120,43 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 ))}
 
                 {isAdmin && (
-                    <NavLink
-                        to="/admin/feedback"
-                        onClick={() => {
-                            if (window.innerWidth < 1024) onClose();
-                        }}
-                        className={({ isActive }) => cn(
-                            "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 border border-amber-500/20 bg-amber-500/5",
-                            isActive
-                                ? "bg-amber-500 text-white shadow-md"
-                                : "text-amber-500 hover:bg-amber-500/10"
-                        )}
-                    >
-                        <Star size={18} className="fill-current" />
-                        <span className="font-bold text-sm">Değerlendirmeleri Gör</span>
-                    </NavLink>
+                    <div className="pt-2">
+                        <div className="flex items-center gap-1.5 px-4 pb-1.5">
+                            <div className="h-px flex-1 bg-amber-500/20" />
+                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-500/70">Kurucu Paneli</span>
+                            <div className="h-px flex-1 bg-amber-500/20" />
+                        </div>
+                        <NavLink
+                            to="/admin/feedback"
+                            onClick={() => {
+                                if (window.innerWidth < 1024) onClose();
+                            }}
+                            className={({ isActive }) => cn(
+                                "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 border border-amber-500/20 bg-amber-500/5",
+                                isActive
+                                    ? "bg-amber-500 text-white shadow-md"
+                                    : "text-amber-500 hover:bg-amber-500/10"
+                            )}
+                        >
+                            <Star size={18} className="fill-current" />
+                            <span className="font-bold text-sm">Değerlendirmeleri Gör</span>
+                        </NavLink>
+                        <NavLink
+                            to="/admin/inspectors"
+                            onClick={() => {
+                                if (window.innerWidth < 1024) onClose();
+                            }}
+                            className={({ isActive }) => cn(
+                                "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 border border-amber-500/20 bg-amber-500/5 mt-1",
+                                isActive
+                                    ? "bg-amber-500 text-white shadow-md"
+                                    : "text-amber-500 hover:bg-amber-500/10"
+                            )}
+                        >
+                            <Users size={18} />
+                            <span className="font-bold text-sm">Müfettiş Listesi</span>
+                        </NavLink>
+                    </div>
                 )}
             </nav>
 

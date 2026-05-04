@@ -1,12 +1,12 @@
-import { User, Bell, Shield, Wand2, Database, LogOut, Loader2, Save, FileText, CheckCircle2, Upload, Users, X, Camera, AlertTriangle, Key, Download, HardDrive, Globe, ShieldAlert, Plus, Search, MoreVertical, Edit2, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { User, Bell, Shield, Wand2, Database, LogOut, Loader2, Save, FileText, CheckCircle2, Upload, Users, Camera, AlertTriangle, Key, Download, HardDrive, Globe, ShieldAlert, Search, MoreVertical, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useConfirm } from "../lib/context/ConfirmContext";
-import { fetchProfile, updateProfile, uploadAvatar as uploadAvatarApi, type Profile } from "../lib/api/profiles";
-import { fetchInspectors, addInspector, deleteInspector, updateInspector, uploadAndSyncInspectors, syncInspectorsFromContacts, type Inspector } from "../lib/api/inspectors";
+import { fetchProfile, updateProfile, fetchAllProfiles, deleteProfile as apiDeleteProfile, uploadAvatar as uploadAvatarApi, type Profile } from "../lib/api/profiles";
+import { fetchInspectors, type Inspector } from "../lib/api/inspectors";
 import { cn } from "../lib/utils";
 import { exportSystemData, backupToDrive, importSystemData } from "../lib/api/backup";
 import { isElectron } from "../lib/firebase";
@@ -207,21 +207,17 @@ export default function Settings() {
     const [activeTab, setActiveTab] = useState("Profil");
     const [raporOnek, setRaporOnek] = useState(() => localStorage.getItem('raporKoduOnek') || 'S.Y.64');
     const [inspectors, setInspectors] = useState<Inspector[]>([]);
-    const [newInspector, setNewInspector] = useState({ name: "", email: "", title: "Müfettiş", extension: "", phone: "", room: "" });
-    const [editingInspector, setEditingInspector] = useState<Inspector | null>(null);
     const [inspectorsLoading, setInspectorsLoading] = useState(false);
     const [openRoleMenu, setOpenRoleMenu] = useState<string | null>(null);
     const [backupLoading, setBackupLoading] = useState(false);
     const [driveBackupLoading, setDriveBackupLoading] = useState(false);
     const [importLoading, setImportLoading] = useState(false);
-    const [excelLoading, setExcelLoading] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
     const avatarInputRef = useRef<HTMLInputElement>(null);
-    const excelInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (user?.uid) {
@@ -314,83 +310,52 @@ export default function Settings() {
     const loadInspectors = async () => {
         try {
             setInspectorsLoading(true);
+            
+            // Profiller kritiktir, Rehber (directory) opsiyoneldir
+            let profiles: Profile[] = [];
+            let directory: Inspector[] = [];
+            
             try {
-                await syncInspectorsFromContacts();
-            } catch (syncError) {
-                console.warn("Rehberden otomatik müfettiş senkronu atlandı:", syncError);
+                const profilesData = await fetchAllProfiles();
+                profiles = profilesData;
+            } catch (err) {
+                console.error("Profiller yüklenemedi:", err);
+                toast.error("Kullanıcı listesi alınamadı.");
+                setInspectorsLoading(false);
+                return;
             }
-            const data = await fetchInspectors();
-            setInspectors(data);
+            
+            try {
+                const directoryData = await fetchInspectors();
+                directory = directoryData;
+            } catch (err) {
+                console.warn("Rehber verisi alınamadı, sadece kayıtlı kullanıcılar gösteriliyor.");
+                // Directory hatası kritik değil, devam ediyoruz
+            }
+            
+            // Map profiles to inspector structure and enrich with directory data
+            const mapped: Inspector[] = profiles.map(p => {
+                const dirEntry = directory.find(d => d.email?.toLowerCase() === p.email?.toLowerCase());
+                return {
+                    id: p.uid,
+                    name: p.full_name,
+                    email: p.email,
+                    title: p.title || dirEntry?.title || 'Müfettiş',
+                    phone: (p as any).phone || dirEntry?.phone || '',
+                    extension: (p as any).extension || dirEntry?.extension || '',
+                    room: (p as any).room || dirEntry?.room || '',
+                    created_at: new Date().toISOString()
+                };
+            });
+            
+            setInspectors(mapped);
         } catch (error) {
-            console.error("Müfettişler yüklenemedi:", error);
-            toast.error("Müfettiş listesi alınamadı.");
+            console.error("Genel yükleme hatası:", error);
         } finally {
             setInspectorsLoading(false);
         }
     };
 
-    const handleAddInspector = async () => {
-        if (!newInspector.name || !newInspector.email) {
-            toast.error("Lütfen ad ve e-posta alanlarını doldurun.");
-            return;
-        }
-        try {
-            const added = await addInspector(newInspector);
-            setInspectors(prev => [...prev, added]);
-            setNewInspector({ name: "", email: "", title: "Müfettiş", extension: "", phone: "", room: "" });
-            toast.success("Müfettiş listeye eklendi.");
-        } catch (error) {
-            toast.error("Müfettiş eklenemedi.");
-        }
-    };
-
-    const handleUpdateInspector = async () => {
-        if (!editingInspector) return;
-        try {
-            const updated = await updateInspector(editingInspector.id, editingInspector);
-            setInspectors(prev => prev.map(ins => ins.id === updated.id ? updated : ins));
-            setEditingInspector(null);
-            toast.success("Müfettiş bilgileri güncellendi.");
-        } catch (error) {
-            toast.error("Müfettiş güncellenemedi.");
-        }
-    };
-
-    const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        try {
-            setExcelLoading(true);
-            const result = await uploadAndSyncInspectors(file);
-            toast.success(result.message || "Müfettiş listesi başarıyla güncellendi.");
-            loadInspectors();
-        } catch (error: any) {
-            console.error("Müfettiş yükleme hatası:", error);
-            toast.error(error.message || "Excel yüklenirken bir hata oluştu.");
-        } finally {
-            setExcelLoading(false);
-            e.target.value = '';
-        }
-    };
-
-    const handleDeleteInspector = async (id: string) => {
-        const confirmed = await confirm({
-            title: "Müfettişi Sil",
-            message: "Bu müfettişi listeden silmek istediğinize emin misiniz?",
-            confirmText: "Sil",
-            variant: "danger"
-        });
-        if (!confirmed) return;
-
-        try {
-            await deleteInspector(id);
-            setInspectors(prev => prev.filter(i => i.id !== id));
-            toast.success("Müfettiş listeden silindi.");
-        } catch (error) {
-            toast.error("Müfettiş silinemedi.");
-        }
-    };
 
     const handleUpdateRole = async (uid: string, role: 'admin' | 'moderator' | 'user') => {
         try {
@@ -574,7 +539,6 @@ export default function Settings() {
                         <SettingsNav icon={FileText} label="Rapor Ayarları" active={activeTab === "Rapor Ayarları"} onClick={() => setActiveTab("Rapor Ayarları")} />
                         <SettingsNav icon={Wand2} label="Yapay Zeka" active={activeTab === "Yapay Zeka"} onClick={() => setActiveTab("Yapay Zeka")} />
                         <SettingsNav icon={Bell} label="Bildirimler" active={activeTab === "Bildirimler"} onClick={() => setActiveTab("Bildirimler")} />
-                        <SettingsNav icon={Users} label="Müfettiş Listesi" active={activeTab === "Müfettiş Listesi"} onClick={() => setActiveTab("Müfettiş Listesi")} />
                         <SettingsNav icon={Shield} label="Güvenlik" active={activeTab === "Güvenlik"} onClick={() => setActiveTab("Güvenlik")} />
                         <SettingsNav icon={Database} label="Veri Ayarları" active={activeTab === "Veri Ayarları"} onClick={() => setActiveTab("Veri Ayarları")} />
                     </div>
@@ -980,8 +944,8 @@ export default function Settings() {
                         </Card>
                     )}
 
-                    {/* Müfettiş Listesi Sekmesi */}
-                    {activeTab === "Müfettiş Listesi" && (
+                    {/* Müfettiş Listesi Sekmesi - Kaldırıldı, /admin/inspectors sayfasına taşındı */}
+                    {false && (
                         <Card className="p-4 sm:p-6 md:p-10 space-y-6 md:space-y-8 rounded-3xl border-none shadow-xl bg-card">
                             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                                 <div className="flex items-center gap-3">
@@ -989,90 +953,20 @@ export default function Settings() {
                                     <h3 className="font-black text-xl font-outfit text-primary dark:text-primary/90 tracking-tight">Müfettiş Listesi</h3>
                                 </div>
                                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                                    <input 
-                                        type="file" 
-                                        ref={excelInputRef}
-                                        className="hidden" 
-                                        accept=".xlsx, .xls"
-                                        onChange={handleExcelImport}
-                                    />
-                                    <Button 
-                                        variant="outline"
-                                        disabled={excelLoading}
-                                        onClick={() => excelInputRef.current?.click()}
-                                        className="w-full sm:w-auto bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-xl px-6 h-12 font-bold"
-                                    >
-                                        {excelLoading ? <Loader2 size={18} className="animate-spin mr-2" /> : <Upload size={18} className="mr-2" />}
-                                        Liste Yükle
-                                    </Button>
+                                    {/* Manual import hidden as requested */}
                                 </div>
                             </div>
 
                             <p className="text-sm font-medium text-muted-foreground dark:text-slate-400">
-                                Görevlerde ekip arkadaşı olarak görevlendirebileceğiniz müfettişlerin listesini buradan yönetebilirsiniz. 
-                                Bu listedeki isimler "Görev Oluştur" ekranında seçenek olarak görünecektir.
+                                Sisteme kayıtlı olan tüm kullanıcıların listesidir. Bu listedeki isimler görev oluşturma ve mesajlaşma bölümlerinde aktif olarak görünür.
                             </p>
 
-                            {/* Yeni Müfettiş Ekleme Formu */}
-                            <div className="p-8 bg-muted dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 space-y-6">
-                                <h4 className="text-xs font-bold text-primary dark:text-primary/90">Yeni Müfettiş Ekle</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest ml-1">Ad Soyad</label>
-                                        <input 
-                                            className="w-full p-4 bg-card border border-border text-foreground rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 outline-none" 
-                                            placeholder="Sefa YAPRAKLI"
-                                            value={newInspector.name}
-                                            onChange={(e) => setNewInspector(prev => ({...prev, name: e.target.value}))}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest ml-1">E-Posta</label>
-                                        <input 
-                                            className="w-full p-4 bg-card border border-border text-foreground rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 outline-none" 
-                                            placeholder="sefa@gsb.gov.tr"
-                                            value={newInspector.email}
-                                            onChange={(e) => setNewInspector(prev => ({...prev, email: e.target.value}))}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 ml-1">Dahili / Cep</label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <input 
-                                                className="w-full p-4 bg-card border border-border text-foreground rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 outline-none" 
-                                                placeholder="Dahili"
-                                                value={newInspector.extension}
-                                                onChange={(e) => setNewInspector(prev => ({...prev, extension: e.target.value}))}
-                                            />
-                                            <input 
-                                                className="w-full p-4 bg-card border border-border text-foreground rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 outline-none" 
-                                                placeholder="Cep No"
-                                                value={newInspector.phone}
-                                                onChange={(e) => setNewInspector(prev => ({...prev, phone: e.target.value}))}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 ml-1">Oda No</label>
-                                        <input 
-                                            className="w-full p-4 bg-card border border-border text-foreground rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 outline-none" 
-                                            placeholder="402"
-                                            value={newInspector.room}
-                                            onChange={(e) => setNewInspector(prev => ({...prev, room: e.target.value}))}
-                                        />
-                                    </div>
-                                    <div className="flex items-end sm:col-span-2 lg:col-span-1">
-                                        <Button onClick={handleAddInspector} className="h-14 w-full rounded-2xl font-bold">
-                                            <Plus size={20} className="mr-2" /> Listeye Ekle
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
+                            {/* Yeni Müfettiş Ekleme Formu gizlendi */}
 
                             {/* Müfettiş Listesi */}
                             <div className="space-y-6">
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <h4 className="text-xs font-bold text-slate-400 ml-1">Kayıtlı Müfettişler</h4>
+                                    <h4 className="text-xs font-bold text-slate-400 ml-1">Kayıtlı Kullanıcılar</h4>
                                     
                                     {/* Arama Çubuğu */}
                                     <div className="relative group w-full md:w-64">
@@ -1127,15 +1021,27 @@ export default function Settings() {
                                                         </button>
                                                         {openRoleMenu === ins.id && (
                                                             <div className="absolute right-0 top-12 w-48 bg-muted border border-slate-100 dark:border-slate-700 rounded-2xl shadow-2xl z-50 py-2 animate-in fade-in zoom-in duration-200">
-                                                                <button onClick={() => { setEditingInspector(ins); setOpenRoleMenu(null); }} className="w-full text-left px-4 py-2.5 text-[11px] font-bold hover:bg-muted dark:hover:bg-slate-700 transition-colors text-primary dark:text-primary/90 flex items-center gap-2">
-                                                                    <Edit2 size={14} /> Bilgileri Düzenle
-                                                                </button>
-                                                                <div className="h-[1px] bg-muted dark:bg-slate-700 my-1" />
                                                                 <button onClick={() => handleUpdateRole(ins.id, 'admin')} className="w-full text-left px-4 py-2.5 text-[11px] font-bold hover:bg-muted dark:hover:bg-slate-700 transition-colors text-muted-foreground dark:text-slate-300">Yönetici Yap</button>
                                                                 <button onClick={() => handleUpdateRole(ins.id, 'moderator')} className="w-full text-left px-4 py-2.5 text-[11px] font-bold hover:bg-muted dark:hover:bg-slate-700 transition-colors text-muted-foreground dark:text-slate-300">Moderatör Yap</button>
                                                                 <button onClick={() => handleUpdateRole(ins.id, 'user')} className="w-full text-left px-4 py-2.5 text-[11px] font-bold hover:bg-muted dark:hover:bg-slate-700 transition-colors text-muted-foreground dark:text-slate-300">Yetkisini Kaldır</button>
                                                                 <div className="h-[1px] bg-muted dark:bg-slate-700 my-1" />
-                                                                <button onClick={() => handleDeleteInspector(ins.id)} className="w-full text-left px-4 py-2.5 text-[11px] font-bold hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-rose-500">Listeden Sil</button>
+                                                                <button onClick={async () => {
+                                                                    const confirmed = await confirm({
+                                                                        title: "Kullanıcıyı Sil",
+                                                                        message: "Bu kullanıcıyı sistemden kalıcı olarak silmek istediğinize emin misiniz?",
+                                                                        confirmText: "Sil",
+                                                                        variant: "danger"
+                                                                    });
+                                                                    if (confirmed) {
+                                                                        try {
+                                                                            await apiDeleteProfile(ins.id);
+                                                                            toast.success("Kullanıcı sistemden silindi.");
+                                                                            loadInspectors();
+                                                                        } catch (err) {
+                                                                            toast.error("Silme işlemi başarısız.");
+                                                                        }
+                                                                    }
+                                                                }} className="w-full text-left px-4 py-2.5 text-[11px] font-bold hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-rose-500">Sistemden Sil</button>
                                                             </div>
                                                         )}
                                                     </div>
@@ -1147,7 +1053,7 @@ export default function Settings() {
                                             <div className="text-center py-10 bg-muted dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
                                                 <Users size={32} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" />
                                                 <p className="text-xs font-medium text-slate-400 dark:text-slate-500">
-                                                    {searchTerm ? "Aranan kriterde müfettiş bulunamadı." : "Henüz hiç müfettiş eklenmemiş."}
+                                                    {searchTerm ? "Aranan kriterde kullanıcı bulunamadı." : "Henüz sisteme kayıtlı bir kullanıcı bulunmuyor."}
                                                 </p>
                                             </div>
                                         )}
@@ -1201,94 +1107,8 @@ export default function Settings() {
                             </div>
                         </Card>
                     )}
-                </div> {/* md:col-span-9 content area ends */}
-            </div> {/* grid-cols-12 ends */}
-            
-            {/* Müfettiş Düzenleme Modalı */}
-            {editingInspector && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-                    <Card className="w-full max-w-2xl p-10 space-y-8 rounded-[40px] shadow-2xl bg-card border-none animate-in zoom-in duration-300">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-3 bg-primary/10 dark:bg-primary/20 rounded-2xl text-primary dark:text-primary/90">
-                                    <Edit2 size={24} />
-                                </div>
-                                <div>
-                                    <h3 className="font-black text-xl font-outfit text-primary dark:text-primary/90 tracking-tight">Müfettiş Bilgilerini Güncelle</h3>
-                                    <p className="text-xs font-bold text-muted-foreground dark:text-slate-400 mt-1">{editingInspector.name}</p>
-                                </div>
-                            </div>
-                            <button onClick={() => setEditingInspector(null)} className="p-3 hover:bg-muted dark:hover:bg-slate-800 rounded-2xl text-slate-400 dark:text-slate-600 transition-colors">
-                                <X size={24} />
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 ml-1">Ad Soyad</label>
-                                <input 
-                                    className="w-full p-4 bg-muted border border-border rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 outline-none" 
-                                    value={editingInspector.name}
-                                    onChange={(e) => setEditingInspector({...editingInspector, name: e.target.value})}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 ml-1">E-Posta</label>
-                                <input 
-                                    className="w-full p-4 bg-muted border border-border rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 outline-none" 
-                                    value={editingInspector.email}
-                                    onChange={(e) => setEditingInspector({...editingInspector, email: e.target.value})}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 ml-1">Ünvan</label>
-                                <select 
-                                    className="w-full p-4 bg-muted border border-border rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 outline-none"
-                                    value={editingInspector.title}
-                                    onChange={(e) => setEditingInspector({...editingInspector, title: e.target.value})}
-                                >
-                                    <option className="dark:bg-slate-800">Başmüfettiş</option>
-                                    <option className="dark:bg-slate-800">Müfettiş</option>
-                                    <option className="dark:bg-slate-800">Müfettiş Yardımcısı</option>
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 ml-1">Cep Telefonu</label>
-                                <input 
-                                    className="w-full p-4 bg-muted border border-border rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 outline-none" 
-                                    value={editingInspector.phone || ""}
-                                    onChange={(e) => setEditingInspector({...editingInspector, phone: e.target.value})}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 ml-1">Dahili No</label>
-                                <input 
-                                    className="w-full p-4 bg-muted border border-border rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 outline-none" 
-                                    value={editingInspector.extension || ""}
-                                    onChange={(e) => setEditingInspector({...editingInspector, extension: e.target.value})}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 ml-1">Oda No</label>
-                                <input 
-                                    className="w-full p-4 bg-muted border border-border rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 outline-none" 
-                                    value={editingInspector.room || ""}
-                                    onChange={(e) => setEditingInspector({...editingInspector, room: e.target.value})}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex gap-4 pt-4">
-                            <Button onClick={() => setEditingInspector(null)} variant="outline" className="flex-1 h-16 rounded-2xl font-bold border-slate-100 dark:border-slate-800 dark:text-slate-400">
-                                Vazgeç
-                            </Button>
-                            <Button onClick={handleUpdateInspector} className="flex-[2] h-16 rounded-2xl font-bold shadow-xl shadow-primary/20">
-                                Değişiklikleri Kaydet
-                            </Button>
-                        </div>
-                    </Card>
                 </div>
-            )}
+            </div>
         </div>
     );
 }

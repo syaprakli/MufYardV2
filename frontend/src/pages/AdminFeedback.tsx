@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Star, Clock, User, Mail, MessageSquare, Loader2 } from 'lucide-react';
+import { Star, Clock, User, Mail, MessageSquare, Loader2, Trash2 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { API_URL } from '../lib/config';
 import { fetchWithTimeout } from '../lib/api/utils';
 import toast from 'react-hot-toast';
+import { useConfirm } from '../lib/context/ConfirmContext';
 
 interface Feedback {
     id: string;
@@ -17,22 +18,43 @@ interface Feedback {
 export default function AdminFeedback() {
     const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
     const [loading, setLoading] = useState(true);
+    const confirm = useConfirm();
+
+    const loadFeedbacks = async () => {
+        try {
+            const res = await fetchWithTimeout(`${API_URL}/feedback/`);
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            setFeedbacks(data);
+        } catch {
+            toast.error("Değerlendirmeler yüklenemedi.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const loadFeedbacks = async () => {
-            try {
-                const res = await fetchWithTimeout(`${API_URL}/feedback/`);
-                if (!res.ok) throw new Error();
-                const data = await res.json();
-                setFeedbacks(data);
-            } catch {
-                toast.error("Değerlendirmeler yüklenemedi.");
-            } finally {
-                setLoading(false);
-            }
-        };
         loadFeedbacks();
     }, []);
+
+    const handleDelete = async (id: string) => {
+        const ok = await confirm({
+            title: "Değerlendirmeyi Sil",
+            message: "Bu değerlendirmeyi kalıcı olarak silmek istediğinize emin misiniz?",
+            confirmText: "Sil",
+            cancelText: "Vazgeç",
+            variant: "danger"
+        });
+        if (!ok) return;
+        try {
+            const res = await fetchWithTimeout(`${API_URL}/feedback/${id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error();
+            toast.success("Değerlendirme silindi.");
+            setFeedbacks(prev => prev.filter(f => f.id !== id));
+        } catch {
+            toast.error("Silme işlemi başarısız.");
+        }
+    };
 
     if (loading) {
         return (
@@ -63,9 +85,18 @@ export default function AdminFeedback() {
                                     />
                                 ))}
                             </div>
-                            <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                <Clock size={12} />
-                                {new Date(fb.created_at).toLocaleDateString('tr-TR')}
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                    <Clock size={12} />
+                                    {new Date(fb.created_at).toLocaleDateString('tr-TR')}
+                                </div>
+                                <button
+                                    onClick={() => handleDelete(fb.id)}
+                                    className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                    title="Sil"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
                             </div>
                         </div>
 

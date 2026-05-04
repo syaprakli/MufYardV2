@@ -1,5 +1,5 @@
-// MufYard Service Worker — Cache-First with Network Fallback
-const CACHE_NAME = 'mufyard-v2-cache';
+// MufYard Service Worker — Network-First with Cache Fallback (Dev Mode Friendly)
+const CACHE_NAME = 'mufyard-v2-cache-v2'; // Changed name to trigger cache clear
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -24,7 +24,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
-          .filter((name) => name !== CACHE_NAME)
+          .filter((name) => name !== CACHE_NAME) // Deletes the old 'mufyard-v2-cache'
           .map((name) => caches.delete(name))
       );
     })
@@ -32,41 +32,34 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch: Network-first for API, Cache-first for static assets
+// Fetch: Network-first
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   // Skip non-GET and cross-origin requests
   if (event.request.method !== 'GET') return;
 
-  // API calls → always network (don't cache)
-  if (url.pathname.startsWith('/api/') || url.hostname !== self.location.hostname) {
-    return;
-  }
-
-  // Static assets → Cache first, then network
+  // Network-First Strategy
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-
-      return fetch(event.request).then((response) => {
-        // Only cache successful responses
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
+    fetch(event.request)
+      .then((response) => {
+        // Cache the successful fresh response
+        if (response && response.status === 200 && response.type === 'basic') {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
         }
-
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseClone);
-        });
-
         return response;
-      }).catch(() => {
-        // Offline fallback for navigation requests
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
-      });
-    })
+      })
+      .catch(() => {
+        // Fallback to cache if offline
+        return caches.match(event.request).then((cached) => {
+          if (cached) return cached;
+          if (event.request.mode === 'navigate') {
+            return caches.match('./index.html');
+          }
+        });
+      })
   );
 });

@@ -176,23 +176,26 @@ class ChatConnectionManager:
             else:
                 await self.broadcast_presence(room_id)
 
-    async def broadcast_presence(self, room_id: str):
-        if room_id not in self.rooms:
-            return
-            
-        users = []
+    async def broadcast_presence(self, room_id: str = None):
+        # Tüm odalardaki benzersiz kullanıcıları topla
+        all_users = []
         seen_uids = set()
-        for info in self.rooms[room_id].values():
-            if info["uid"] not in seen_uids:
-                users.append({"uid": info["uid"], "name": info["name"]})
-                seen_uids.add(info["uid"])
         
-        presence_msg = json.dumps({"type": "presence", "users": users})
-        for connection in self.rooms[room_id].keys():
-            try:
-                await connection.send_text(presence_msg)
-            except Exception:
-                pass
+        for room in self.rooms.values():
+            for info in room.values():
+                if info["uid"] not in seen_uids:
+                    all_users.append({"uid": info["uid"], "name": info["name"]})
+                    seen_uids.add(info["uid"])
+        
+        presence_msg = json.dumps({"type": "presence", "users": all_users})
+        
+        # Tüm odalardaki her bağlantıya bu listeyi gönder
+        for room in self.rooms.values():
+            for connection in room.keys():
+                try:
+                    await connection.send_text(presence_msg)
+                except Exception:
+                    pass
 
     async def broadcast(self, room_id: str, message: str):
         if room_id not in self.rooms:

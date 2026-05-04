@@ -10,7 +10,7 @@ import { toast } from "react-hot-toast";
 import { fetchTasks, createTask, updateTask, deleteTask, acceptTask, type Task, type TaskStep } from "../lib/api/tasks";
 import { fetchInspectors, type Inspector } from "../lib/api/inspectors";
 import { fetchAudits, createAudit, deleteAudit } from "../lib/api/audit";
-import { fetchAllProfiles } from "../lib/api/profiles";
+import { fetchAllProfiles, type Profile } from "../lib/api/profiles";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useTheme } from "../lib/context/ThemeContext";
 import ShareModal from "../components/ShareModal";
@@ -124,29 +124,37 @@ export default function Tasks() {
 
     const loadInspectors = async () => {
         try {
-            // "Herkesi kapsamalı" talebi için hem manuel eklenen müfettişleri 
-            // hem de sistemdeki tüm profilleri çekip birleştiriyoruz.
-            const [directoryData, profilesData] = await Promise.all([
-                fetchInspectors(),
-                fetchAllProfiles()
-            ]);
+            let profiles: Profile[] = [];
+            let directory: any[] = [];
+
+            try {
+                profiles = await fetchAllProfiles();
+            } catch (err) {
+                console.error("Profiller yüklenemedi:", err);
+                return;
+            }
+
+            try {
+                directory = await fetchInspectors();
+            } catch (err) {
+                console.warn("Rehber verisi alınamadı.");
+            }
             
-            // Unik listeleme (email bazlı)
-            const combined = [...directoryData];
-            profilesData.forEach((p: any) => {
-                if (!combined.find(c => c.email === p.email)) {
-                    combined.push({
-                        id: p.uid || p.id,
-                        name: p.full_name || p.display_name || p.email,
-                        email: p.email,
-                        title: "Sistem Kullanıcısı",
-                        created_at: new Date().toISOString()
-                    });
-                }
+            const combined: Inspector[] = profiles.map((p: any) => {
+                const dirEntry = directory.find(d => d.email?.toLowerCase() === p.email?.toLowerCase());
+                return {
+                    id: p.uid || p.id,
+                    name: p.full_name || p.display_name || p.email,
+                    email: p.email,
+                    title: p.title || dirEntry?.title || "Müfettiş",
+                    created_at: new Date().toISOString()
+                };
             });
 
             setInspectors(combined);
-        } catch { /* silent */ }
+        } catch (error) {
+            console.error("Kullanıcılar yüklenemedi:", error);
+        }
     };
 
     useEffect(() => {

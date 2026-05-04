@@ -36,3 +36,12 @@ async def get_feedbacks():
         d['id'] = doc.id
         feedbacks.append(d)
     return feedbacks
+
+@router.delete("/{feedback_id}")
+async def delete_feedback(feedback_id: str):
+    import asyncio
+    try:
+        await asyncio.to_thread(db.collection('feedbacks').document(feedback_id).delete)
+        return {"status": "deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

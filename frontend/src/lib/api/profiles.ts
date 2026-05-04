@@ -19,6 +19,7 @@ export interface Profile {
     fcm_token?: string | null;
     two_factor_enabled?: boolean;
     two_factor_secret?: string | null;
+    verified?: boolean;
 }
 
 export async function fetchProfile(uid: string, email?: string): Promise<Profile> {

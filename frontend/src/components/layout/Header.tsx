@@ -116,7 +116,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
                     </div>
                     <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
                         <Users size={12} />
-                        {onlineUsers.length} AKTİF
+                        {onlineUsers.length > 0 ? onlineUsers.length : '...'} AKTİF
                     </span>
                 </div>
 
@@ -146,11 +146,11 @@ export function Header({ toggleSidebar }: HeaderProps) {
                         onClick={() => setShowUserMenu(!showUserMenu)}
                         className="flex items-center gap-3 pl-6 border-l border-slate-100 dark:border-slate-800 group"
                     >
-                        <div className="text-right">
-                            <p className="text-sm font-black text-slate-800 dark:text-slate-200 leading-none truncate max-w-[150px] group-hover:text-primary transition-colors">
+                        <div className="text-right hidden sm:block">
+                            <p className="text-sm font-black text-slate-800 dark:text-slate-200 leading-none truncate max-w-[100px] lg:max-w-[150px] group-hover:text-primary transition-colors">
                                 {displayName}
                             </p>
-                            <p className="text-[10px] text-slate-400 font-black tracking-widest mt-1">
+                            <p className="text-[9px] lg:text-[10px] text-slate-400 font-black tracking-widest mt-1 truncate max-w-[100px] lg:max-w-[150px]">
                                 {user?.uid === "demo-user-123" ? "DEMO HESABI" : (profile?.title?.toLocaleUpperCase("tr-TR") || "MÜFETTİŞ")}
                             </p>
                         </div>

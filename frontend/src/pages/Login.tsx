@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { User, Lock, ArrowRight, AlertCircle, LogIn, CheckCircle2 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { signIn, signUp } from "../lib/firebase";
+import { fetchContacts } from "../lib/api/contacts";
+import { updateProfile as apiUpdateProfile } from "../lib/api/profiles";
 import { toast } from "react-hot-toast";
 
 import { Button } from "../components/ui/Button";
@@ -46,41 +48,27 @@ export default function Login() {
         setLoading(true);
         setError("");
         
+
         try {
             let result;
+            let userUid = null;
+            let userName = fullName;
+            let userEmail = email;
             if (isRegister) {
                 if (!fullName.trim()) throw new Error("Lütfen adınızı ve soyadınızı girin.");
-                
                 result = await signUp(email, password, fullName);
-                
-                // Profile sync for registration
-                try {
-                    const { updateProfile: apiUpdateProfile } = await import("../lib/api/profiles");
-                    if (result.user?.uid) {
-                        await apiUpdateProfile(result.user.uid, {
-                            full_name: fullName,
-                            email: email,
-                            institution: "Gençlik ve Spor Bakanlığı",
-                            title: "Müfettiş Yardımcısı"
-                        });
-                    }
-                } catch (profileErr) {
-                    console.error("Profile creation failed:", profileErr);
-                }
-
-                // Kayıt başarılıysa ama mail doğrulaması bekleniyorsa mesaj göster
-                setError("Kayıt başarılı! Lütfen e-postanıza gönderilen doğrulama linkine tıklayarak hesabınızı aktif edin. !!! ÖNEMLİ: Doğrulama e-postası GEREKSİZ (SPAM) klasörüne düşmüş olabilir, lütfen orayı da kontrol edin !!!");
-                setLoading(false);
-                return;
+                userUid = result.user?.uid;
+                userName = fullName;
+                userEmail = email;
             } else {
                 result = await signIn(email, password);
-                
+                userUid = result.user?.uid;
+                userName = result.user?.displayName || "";
+                userEmail = result.user?.email || email;
                 // E-POSTA DOĞRULAMA KONTROLÜ (Gerçek Firebase User ise kontrol et)
                 const fbUser = result.user as any;
-                // mufettis bypass hariç herkesi kontrol et
                 if (fbUser && fbUser.uid !== "mufettis-gsb-unique-id" && fbUser.uid !== "demo-user-123") {
                     if (fbUser.emailVerified === false) {
-                        // Firebase session'ı kapat ki giriş yapmış sayılmasın
                         import("firebase/auth").then(({ getAuth, signOut }) => {
                             signOut(getAuth());
                         });
@@ -88,7 +76,35 @@ export default function Login() {
                     }
                 }
             }
+
+            // Otomatik kurumsal eşleştirme
+            if (userUid && userName && userEmail) {
+                try {
+                    const contacts = await fetchContacts("corporate");
+                    // Önce email ile tam eşleşme
+                    let match = contacts.find(c => c.email?.trim().toLowerCase() === userEmail.trim().toLowerCase());
+                    // Yoksa ad-soyad ile (case-insensitive, boşlukları ignore)
+                    if (!match) {
+                        const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+                        match = contacts.find(c => norm(c.name) === norm(userName));
+                    }
+                    if (match) {
+                        await apiUpdateProfile(userUid, {
+                            full_name: match.name,
+                            title: match.title,
+                            institution: match.unit || "Gençlik ve Spor Bakanlığı",
+                            email: match.email,
+                            verified: true
+                        });
+                        // Eşleşme bulunduysa, localStorage'a da not düş
+                        localStorage.setItem(`id_skip_${userUid}`, "true");
+                    }
+                } catch (e) {
+                    // Sessiz hata
+                }
+            }
             
+
             // "Beni Hatırla" mantığı
             if (rememberMe) {
                 localStorage.setItem("remembered_email", email);
@@ -98,7 +114,7 @@ export default function Login() {
 
             // Başarılı giriş/kayıt
             localStorage.setItem("demo_user", JSON.stringify(result.user));
-            
+
             // Yönlendirme
             setTimeout(() => {
                 navigate("/dashboard");

@@ -347,13 +347,13 @@ export default function Legislation() {
             <div className="flex flex-1 gap-4 min-h-0 relative">
                 {/* Left Sidebar Overlay for mobile */}
                 <div className={cn(
-                    "fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm transition-opacity md:hidden",
+                    "fixed inset-0 z-[45] bg-black/60 backdrop-blur-sm transition-opacity md:hidden",
                     isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
                 )} onClick={() => setIsSidebarOpen(false)} />
 
                 {/* Left Sidebar - Folder Browser Tree */}
                 <div className={cn(
-                    "fixed md:relative inset-y-0 left-0 z-[70] w-72 md:w-72 bg-card md:bg-transparent transform transition-transform duration-300 md:transform-none flex flex-col gap-4",
+                    "fixed md:relative inset-y-0 left-0 z-[46] w-72 md:w-72 bg-card md:bg-transparent transform transition-transform duration-300 md:transform-none flex flex-col gap-4",
                     isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
                 )}>
                     <div className="bg-card border border-border dark:border-slate-800 rounded-r-2xl md:rounded-2xl flex flex-col h-full shadow-2xl md:shadow-sm overflow-hidden border-border/60 dark:border-slate-800/60">

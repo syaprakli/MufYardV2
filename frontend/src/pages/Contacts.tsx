@@ -4,7 +4,7 @@ import { useConfirm } from "../lib/context/ConfirmContext";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect } from "react";
 import { fetchContacts, createContact, shareContact, deleteContact, uploadAndSyncContacts, updateContact, type Contact } from "../lib/api/contacts";
 import { FileSpreadsheet, MessageSquare } from "lucide-react";
 import { useChat } from "../lib/context/ChatContext";
@@ -22,10 +22,6 @@ export default function Contacts() {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedRole, setSelectedRole] = useState("Tümü");
     const [editingContact, setEditingContact] = useState<Contact | null>(null);
-    const [debouncedSearch, setDebouncedSearch] = useState("");
-    
-    // In-memory cache for this session
-    const cacheRef = useRef<Record<string, Contact[]>>({});
 
     const { openChat } = useChat();
     const [newContact, setNewContact] = useState({
@@ -39,32 +35,14 @@ export default function Contacts() {
     });
 
     useEffect(() => {
-        // If we have cached data, show it immediately and update silently
-        if (cacheRef.current[activeTab]) {
-            setContacts(cacheRef.current[activeTab]);
-            setLoading(false);
-            loadContacts(true); 
-        } else {
-            loadContacts();
-        }
+        loadContacts();
     }, [activeTab]);
 
-    // Search Debouncer
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearch(searchQuery);
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [searchQuery]);
-
-    const loadContacts = async (silent = false) => {
+    const loadContacts = async () => {
         try {
-            if (!silent) setLoading(true);
+            setLoading(true);
             const data = await fetchContacts(activeTab, user?.uid);
-            const validData = Array.isArray(data) ? data : [];
-            setContacts(validData);
-            // Update cache
-            cacheRef.current[activeTab] = validData;
+            setContacts(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error("Rehber yüklenemedi:", error);
             setContacts([]);
@@ -201,59 +179,54 @@ export default function Contacts() {
         }
     };
 
-    const sortedContacts = useMemo(() => {
-        const filtered = contacts.filter(c => {
-            const normalize = (s: string) => s.toLowerCase()
-                .replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g')
-                .replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c')
-                .replace(/i̇/g, 'i');
+    const filteredContacts = contacts.filter(c => {
+        const normalize = (s: string) => s.toLowerCase()
+            .replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g')
+            .replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c')
+            .replace(/i̇/g, 'i'); // handle combining dot
 
-            const normSearch = normalize(debouncedSearch);
-            const normName = normalize(c.name || "");
-            const normUnit = normalize(c.unit || "");
-            const normTitle = normalize(c.title || "");
-            
-            const matchesSearch = !debouncedSearch || 
-                normName.includes(normSearch) || 
-                normUnit.includes(normSearch) || 
-                normTitle.includes(normSearch) || 
-                c.tags?.some(t => normalize(t).includes(normSearch));
-            
-            const normCategory = normalize(c.category || c.tags?.[0] || "");
-            const matchesRole = selectedRole === "Tümü" || normCategory === normalize(selectedRole);
-                 
-            return matchesSearch && matchesRole;
-        });
+        const normSearch = normalize(searchQuery);
+        const normName = normalize(c.name);
+        const normUnit = normalize(c.unit || "");
+        const normTitle = normalize(c.title || "");
+        
+        const matchesSearch = normName.includes(normSearch) || 
+            normUnit.includes(normSearch) || 
+            normTitle.includes(normSearch) || 
+            c.tags?.some(t => normalize(t).includes(normSearch));
+        
+        const normCategory = normalize(c.category || c.tags?.[0] || "");
+        const matchesRole = selectedRole === "Tümü" || normCategory === normalize(selectedRole);
+             
+        return matchesSearch && matchesRole;
+    });
 
-        return filtered.sort((a, b) => {
-            const aOrder = a.sort_order ?? Number.MAX_SAFE_INTEGER;
-            const bOrder = b.sort_order ?? Number.MAX_SAFE_INTEGER;
+    const sortedContacts = [...filteredContacts].sort((a, b) => {
+        const aOrder = a.sort_order ?? Number.MAX_SAFE_INTEGER;
+        const bOrder = b.sort_order ?? Number.MAX_SAFE_INTEGER;
 
-            if (aOrder !== bOrder) {
-                return aOrder - bOrder;
-            }
+        if (aOrder !== bOrder) {
+            return aOrder - bOrder;
+        }
 
-            return a.name.localeCompare(b.name, 'tr', { sensitivity: 'base' });
-        });
-    }, [contacts, debouncedSearch, selectedRole]);
+        return a.name.localeCompare(b.name, 'tr', { sensitivity: 'base' });
+    });
 
-    const roleOptions = useMemo(() => [
+    const roleOptions = [
         "Tümü",
         ...Array.from(new Set(contacts.map(contact => contact.category).filter((value): value is string => Boolean(value))))
-    ], [contacts]);
+    ];
 
-    const { groupedContacts, orderedGroupNames } = useMemo(() => {
-        const grouped = sortedContacts.reduce<Record<string, Contact[]>>((groups, contact) => {
-            const groupKey = contact.category || "Diğer";
-            if (!groups[groupKey]) {
-                groups[groupKey] = [];
-            }
-            groups[groupKey].push(contact);
-            return groups;
-        }, {});
-        const names = Array.from(new Set(sortedContacts.map(contact => contact.category || "Diğer")));
-        return { groupedContacts: grouped, orderedGroupNames: names };
-    }, [sortedContacts]);
+    const groupedContacts = sortedContacts.reduce<Record<string, Contact[]>>((groups, contact) => {
+        const groupKey = contact.category || "Diğer";
+        if (!groups[groupKey]) {
+            groups[groupKey] = [];
+        }
+        groups[groupKey].push(contact);
+        return groups;
+    }, {});
+
+    const orderedGroupNames = Array.from(new Set(sortedContacts.map(contact => contact.category || "Diğer")));
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -488,7 +461,6 @@ export default function Contacts() {
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-secondary uppercase tracking-widest">E-Posta</label>
                             <input 
-                                required
                                 type="email"
                                 className="w-full px-4 py-3 rounded-xl border border-border focus:ring-2 focus:ring-primary/20 outline-none font-outfit"
                                 placeholder="eposta@gsb.gov.tr"

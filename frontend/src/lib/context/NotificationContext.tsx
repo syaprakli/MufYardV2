@@ -52,31 +52,57 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     useEffect(() => {
         if (!user?.uid) return;
 
-        const socket = new WebSocket(`${WS_URL}/api/notifications/ws/${user.uid}`);
+        let socket: WebSocket | null = null;
+        let retryCount = 0;
+        let retryTimer: any = null;
 
-        socket.onmessage = (event) => {
-            try {
-                const newNotif = JSON.parse(event.data);
-                setNotifications(prev => [newNotif, ...prev]);
-                
-                // Show toast for new notification
-                toast.success(newNotif.title, {
-                    icon: '🔔',
-                    duration: 5000,
-                });
-            } catch (error) {
-                console.error('WS mesaj hatası:', error);
-            }
+        const connect = () => {
+            if (!user?.uid) return;
+            
+            socket = new WebSocket(`${WS_URL}/api/notifications/ws/${user.uid}`);
+
+            socket.onopen = () => {
+                console.log("Notification WS: Connected");
+                retryCount = 0;
+            };
+
+            socket.onmessage = (event) => {
+                try {
+                    const newNotif = JSON.parse(event.data);
+                    setNotifications(prev => [newNotif, ...prev]);
+                    
+                    toast.success(newNotif.title, {
+                        icon: '🔔',
+                        duration: 5000,
+                    });
+                } catch (error) {
+                    console.error('WS mesaj hatası:', error);
+                }
+            };
+
+            socket.onerror = (error) => {
+                console.error('Notification WS Error:', error);
+                socket?.close();
+            };
+
+            socket.onclose = () => {
+                const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+                console.log(`Notification WS: Disconnected, retrying in ${delay/1000}s...`);
+                retryTimer = setTimeout(connect, delay);
+                retryCount += 1;
+            };
         };
 
-        socket.onerror = (error) => {
-            console.error('Notification WS Error:', error);
-        };
+        connect();
 
         return () => {
-            socket.onerror = null;
-            socket.onmessage = null;
-            socket.close();
+            if (socket) {
+                socket.onclose = null;
+                socket.onerror = null;
+                socket.onmessage = null;
+                socket.close();
+            }
+            if (retryTimer) clearTimeout(retryTimer);
         };
     }, [user?.uid]);
 

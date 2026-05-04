@@ -38,7 +38,7 @@ from app.routers import (
     dashboard, audit, tasks, contacts, 
     inspectors, profiles, legislation, 
     notes, ai_knowledge, backup, files,
-    calendar, notifications, ai, collaboration, feedback
+    calendar, notifications, ai, collaboration, feedback, online
 )
 
 from app.services.contact_service import ContactService
@@ -178,6 +178,7 @@ app.include_router(files.router, prefix="/api/files", tags=["Files"])
 app.include_router(ai.router, prefix="/api/ai", tags=["AI"])
 app.include_router(collaboration.router, prefix="/api/collaboration", tags=["Collaboration"])
 app.include_router(ai_knowledge.router, prefix="/api/ai-knowledge", tags=["AI Knowledge"])
+app.include_router(online.router, prefix="/api/online", tags=["Online"])
 app.include_router(backup.router, prefix="/api/backup", tags=["Backup"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])

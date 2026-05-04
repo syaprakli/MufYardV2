@@ -46,13 +46,27 @@ class InspectorService:
         try:
             docs = await asyncio.to_thread(db.collection('inspectors').stream)
             inspectors = []
+            now = datetime.utcnow().isoformat()
+            
             for doc in docs:
                 data = doc.to_dict()
+                if not data: continue
+                
+                # Ensure required fields exist for schema validation
+                if 'name' not in data: data['name'] = "İsimsiz"
+                if 'email' not in data: data['email'] = InspectorService._generate_email_from_name(data['name'])
+                if 'title' not in data: data['title'] = "Müfettiş"
+                if 'created_at' not in data: 
+                    data['created_at'] = now
+                    # Update doc to include created_at for future
+                    await asyncio.to_thread(doc.reference.update, {'created_at': now})
+                
                 if not str(data.get('email', '')).strip() and str(data.get('name', '')).strip():
                     fallback_email = InspectorService._generate_email_from_name(str(data.get('name', '')))
                     if fallback_email:
                         data['email'] = fallback_email
                         await asyncio.to_thread(doc.reference.update, {'email': fallback_email})
+                
                 data['id'] = doc.id
                 inspectors.append(data)
             
@@ -65,12 +79,13 @@ class InspectorService:
                     {"name": "Ayşe KAYA", "email": "ayse@gsb.gov.tr", "title": "Müfettiş", "uid": "ayse@gsb.gov.tr"}
                 ]
                 for d in default_data:
-                    d['created_at'] = datetime.utcnow().isoformat()
+                    d['created_at'] = now
                     await asyncio.to_thread(db.collection('inspectors').add, d)
                 return await InspectorService.get_inspectors()
 
             return inspectors
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error getting inspectors: {e}")
             return []
 
     @staticmethod
