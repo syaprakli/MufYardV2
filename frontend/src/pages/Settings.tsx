@@ -388,7 +388,7 @@ export default function Settings() {
     const loadProfile = async (uid: string) => {
         try {
             setLoading(true);
-            const data = await fetchProfile(uid, user?.email || undefined);
+            const data = await fetchProfile(uid, user?.email || undefined, user?.displayName || undefined);
             setProfile(data);
             localStorage.setItem(`profile_${uid}`, JSON.stringify(data));
         } catch (error) {
@@ -583,6 +583,15 @@ export default function Settings() {
                                         <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] md:text-xs font-bold">{profile?.institution || "GSB"}</span>
                                     </div>
                                     <p className="text-[10px] md:text-xs text-muted-foreground font-medium truncate italic mt-2">{profile?.email}</p>
+                                    {Array.isArray((profile as any)?.emails) && (profile as any).emails.length > 1 && (
+                                        <div className="flex flex-wrap gap-1.5 mt-2">
+                                            {(profile as any).emails.map((mail: string) => (
+                                                <span key={mail} className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold lowercase">
+                                                    {mail}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

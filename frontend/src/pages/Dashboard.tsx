@@ -11,7 +11,7 @@ import { useAuth } from "../lib/hooks/useAuth";
 import { fetchOnlineUsers } from "../lib/api/online";
 import { useTheme } from "../lib/context/ThemeContext";
 import { fetchProfile, updateProfile } from "../lib/api/profiles";
-import { fetchContacts } from "../lib/api/contacts";
+import { fetchInspectors } from "../lib/api/inspectors";
 import { toast } from "react-hot-toast";
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -100,7 +100,7 @@ export default function Dashboard() {
                 const [statsResult, tasksResult, profileResult, onlineResult] = await Promise.allSettled([
                     fetchStats(),
                     fetchTasks(effectiveUid),
-                    fetchProfile(effectiveUid, currentUser.email || undefined),
+                    fetchProfile(effectiveUid, currentUser.email || undefined, currentUser.displayName || undefined),
                     fetchOnlineUsers()
                 ]);
 
@@ -133,20 +133,40 @@ export default function Dashboard() {
 
                 if (!isSpecialUser && !isVerified && isGeneric && !localStorage.getItem(`id_skip_${effectiveUid}`)) {
                     try {
-                        const contacts = await fetchContacts("corporate");
+                        const inspectors = await fetchInspectors();
+                        const normalizeName = (s: string) =>
+                            (s || "")
+                                .toLowerCase()
+                                .replace(/[.\-]/g, " ")
+                                .replace(/\s+/g, " ")
+                                .trim();
+
+                        const expectedName = normalizeName(currentUser.displayName || profileData?.full_name || "");
+                        const loginEmail = (currentUser.email || "").trim().toLowerCase();
+
                         // Önce email ile tam eşleşme
-                        let match = contacts.find(c => c.email?.trim().toLowerCase() === (currentUser.email || "").trim().toLowerCase());
-                        // Yoksa ad-soyad ile (case-insensitive, boşlukları ignore)
-                        if (!match && profileData?.full_name) {
-                            const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
-                            match = contacts.find(c => norm(c.name) === norm(profileData!.full_name));
+                        let match = inspectors.find(c => (c.email || "").trim().toLowerCase() === loginEmail);
+                        // Yoksa ad-soyad ile eşleştir
+                        if (!match && expectedName) {
+                            match = inspectors.find(c => normalizeName(c.name) === expectedName);
                         }
+
                         if (match) {
+                            const mergedEmails = Array.from(
+                                new Set([
+                                    ...(Array.isArray(profileData?.emails) ? profileData.emails : []),
+                                    profileData?.email,
+                                    currentUser.email,
+                                    match.email,
+                                ].filter(Boolean).map((v: any) => String(v).trim().toLowerCase()))
+                            );
+
                             await updateProfile(effectiveUid, {
                                 full_name: match.name,
                                 title: match.title,
-                                institution: match.unit || "Gençlik ve Spor Bakanlığı",
+                                institution: "Gençlik ve Spor Bakanlığı",
                                 email: match.email,
+                                emails: mergedEmails,
                                 verified: true
                             });
                             localStorage.setItem(`id_skip_${effectiveUid}`, "true");

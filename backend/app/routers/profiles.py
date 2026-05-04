@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 from app.services.profile_service import ProfileService
 from app.schemas.profile import ProfileUpdate, ProfileResponse
 from app.services.email_service import EmailService
-from app.lib.auth import get_current_user, require_roles
+from app.lib.auth import get_current_user
 
 router = APIRouter(tags=["profiles"])
 
@@ -12,8 +12,8 @@ async def get_all_profiles():
     return await ProfileService.get_all_profiles()
 
 @router.get("/{uid}", response_model=ProfileResponse)
-async def get_profile(uid: str, email: str = None):
-    profile = await ProfileService.get_profile(uid, email)
+async def get_profile(uid: str, email: str = None, full_name: str = None):
+    profile = await ProfileService.get_profile(uid, email, full_name)
     if not profile:
         raise HTTPException(status_code=404, detail="Profil bulunamadı.")
     return profile

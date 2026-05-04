@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Modal } from "./ui/Modal";
 import { Search, UserCheck, Loader2 } from "lucide-react";
-import { fetchContacts } from "../lib/api/contacts";
-import { updateProfile } from "../lib/api/profiles";
+import { fetchInspectors, type Inspector } from "../lib/api/inspectors";
+import { fetchProfile, updateProfile } from "../lib/api/profiles";
+import { auth } from "../lib/firebase";
 import { toast } from "react-hot-toast";
 
 interface IdentitySelectionModalProps {
@@ -13,15 +14,15 @@ interface IdentitySelectionModalProps {
 export function IdentitySelectionModal({ uid, onComplete }: IdentitySelectionModalProps) {
     const [isOpen, setIsOpen] = useState(true);
     const [search, setSearch] = useState("");
-    const [inspectors, setInspectors] = useState<any[]>([]);
+    const [inspectors, setInspectors] = useState<Inspector[]>([]);
     const [loading, setLoading] = useState(true);
     const [selecting, setSelecting] = useState(false);
+    const [submittedSearch, setSubmittedSearch] = useState("");
 
     useEffect(() => {
         const loadInspectors = async () => {
             try {
-                // Kurumsal rehberdeki herkesi çek
-                const data = await fetchContacts("corporate");
+                const data = await fetchInspectors();
                 setInspectors(data || []);
             } catch (err) {
                 console.error("Müfettiş listesi yüklenemedi:", err);
@@ -32,19 +33,30 @@ export function IdentitySelectionModal({ uid, onComplete }: IdentitySelectionMod
         loadInspectors();
     }, []);
 
+    const query = (submittedSearch || search).toLowerCase().trim();
     const filtered = inspectors.filter(i => 
-        i.name.toLowerCase().includes(search.toLowerCase()) ||
-        i.title.toLowerCase().includes(search.toLowerCase())
+        (i.name || "").toLowerCase().includes(query) ||
+        (i.title || "").toLowerCase().includes(query)
     ).slice(0, 5);
 
-    const handleSelect = async (inspector: any) => {
+    const handleSelect = async (inspector: Inspector) => {
         setSelecting(true);
         try {
+            const currentUserEmail = auth.currentUser?.email || "";
+            const currentProfile = await fetchProfile(uid, currentUserEmail || undefined, auth.currentUser?.displayName || undefined);
+            const mergedEmails = Array.from(new Set([
+                ...(Array.isArray(currentProfile?.emails) ? currentProfile.emails : []),
+                currentProfile?.email,
+                currentUserEmail,
+                inspector.email,
+            ].filter(Boolean).map(v => String(v).trim().toLowerCase())));
+
             await updateProfile(uid, {
                 full_name: inspector.name,
                 title: inspector.title,
-                institution: inspector.unit || "Gençlik ve Spor Bakanlığı",
+                institution: "Gençlik ve Spor Bakanlığı",
                 email: inspector.email,
+                emails: mergedEmails,
                 verified: true
             });
             localStorage.setItem(`id_skip_${uid}`, "true");
@@ -92,7 +104,22 @@ export function IdentitySelectionModal({ uid, onComplete }: IdentitySelectionMod
                         placeholder="İsminizi yazın..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                e.preventDefault();
+                                setSubmittedSearch(search);
+                            }
+                        }}
                     />
+                </div>
+
+                <div className="flex justify-end">
+                    <button
+                        onClick={() => setSubmittedSearch(search)}
+                        className="px-4 py-2 rounded-xl text-xs font-black border border-primary/20 text-primary hover:bg-primary/5 transition-all"
+                    >
+                        Ara
+                    </button>
                 </div>
 
                 <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
@@ -108,7 +135,7 @@ export function IdentitySelectionModal({ uid, onComplete }: IdentitySelectionMod
                             >
                                 <div className="text-left">
                                     <h4 className="font-black text-slate-900 group-hover:text-primary transition-colors">{inspector.name}</h4>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{inspector.title} - {inspector.unit}</p>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{inspector.title}</p>
                                 </div>
                                 <UserCheck className="text-slate-300 group-hover:text-primary transition-all transform group-hover:scale-110" />
                             </button>

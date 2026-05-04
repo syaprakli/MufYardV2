@@ -12,6 +12,32 @@ logger = logging.getLogger(__name__)
 
 class ProfileService:
     @staticmethod
+    def _normalize_email(value: Optional[str]) -> str:
+        return (value or "").strip().lower()
+
+    @staticmethod
+    def _merge_emails(*groups: Any) -> List[str]:
+        merged: List[str] = []
+        seen = set()
+
+        def push_one(raw: Any):
+            email = ProfileService._normalize_email(str(raw) if raw is not None else "")
+            if email and email not in seen:
+                seen.add(email)
+                merged.append(email)
+
+        for group in groups:
+            if group is None:
+                continue
+            if isinstance(group, (list, tuple, set)):
+                for item in group:
+                    push_one(item)
+            else:
+                push_one(group)
+
+        return merged
+
+    @staticmethod
     async def upload_avatar(uid: str, file: UploadFile) -> str:
         """Uploads an avatar to LOCAL storage and returns the local URL."""
         # Setup local paths
@@ -45,7 +71,7 @@ class ProfileService:
         return public_url
 
     @staticmethod
-    async def get_profile(uid: str, email: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def get_profile(uid: str, email: Optional[str] = None, full_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         doc_ref = db.collection('profiles').document(uid)
         doc = await asyncio.to_thread(doc_ref.get)
         
@@ -66,6 +92,7 @@ class ProfileService:
         search_email = (email or (uid if "@" in uid else None))
         if search_email:
             search_email = search_email.lower().strip()
+        requested_name = (full_name or "").strip()
             
         inspector_match = None
         
@@ -91,6 +118,19 @@ class ProfileService:
             if results:
                 inspector_match = results[0].to_dict()
 
+        if not inspector_match and requested_name:
+            inspectors_ref = db.collection('inspectors')
+
+            def clean_name(n):
+                return n.upper().replace(".", " ").replace("-", " ").strip()
+
+            cleaned_search = clean_name(requested_name)
+            all_inspectors = await asyncio.to_thread(lambda: [doc.to_dict() for doc in inspectors_ref.stream()])
+            for insp in all_inspectors:
+                if clean_name(insp.get('name', '')) == cleaned_search:
+                    inspector_match = insp
+                    break
+
         if not inspector_match and profile_data and profile_data.get('full_name'):
             # Try search by full_name in inspectors (Fuzzy match)
             # This handles cases like sefayaprakli@hotmail.com -> Sefa Yapraklı
@@ -113,11 +153,18 @@ class ProfileService:
                         break
 
         if inspector_match:
+            merged_emails = ProfileService._merge_emails(
+                (profile_data or {}).get('emails', []),
+                (profile_data or {}).get('email'),
+                search_email,
+                inspector_match.get('email')
+            )
             new_data = {
                 "uid": uid,
                 "full_name": inspector_match.get('name', profile_data.get('full_name') if profile_data else "Kullanıcı"),
                 "title": inspector_match.get('title', profile_data.get('title') if profile_data else "Müfettiş"),
                 "email": inspector_match.get('email', search_email or (profile_data.get('email') if profile_data else "")),
+                "emails": merged_emails,
                 "phone": inspector_match.get('phone', (profile_data.get('phone') if profile_data else "")),
                 "institution": "Gençlik ve Spor Bakanlığı",
                 "verified": True,
@@ -156,6 +203,15 @@ class ProfileService:
 
         if profile_data:
             profile_data['uid'] = doc.id
+            current_emails = ProfileService._merge_emails(
+                profile_data.get('emails', []),
+                profile_data.get('email'),
+                search_email,
+            )
+            if current_emails != profile_data.get('emails', []):
+                await asyncio.to_thread(lambda: doc_ref.update({"emails": current_emails, "updated_at": datetime.utcnow()}))
+                profile_data['emails'] = current_emails
+
             # Admin role enforcement for existing profiles
             _admin_emails = ["mufettis@gsb.gov.tr", "sefayaprakli@hotmail.com"]
             if (profile_data.get('email') or search_email or '').lower() in _admin_emails:
@@ -173,6 +229,7 @@ class ProfileService:
             "title": "Müfettiş",
             "institution": "Gençlik ve Spor Bakanlığı",
             "email": search_email or "mufettis@gsb.gov.tr",
+            "emails": ProfileService._merge_emails(search_email or "mufettis@gsb.gov.tr"),
             "theme": "navy",
             "ai_enabled": True,
             "ai_model": "Gemini 2.0 Flash",
@@ -204,6 +261,18 @@ class ProfileService:
             await ProfileService.get_profile(uid) # Initialize if not exists
             
         update_data = {k: v for k, v in profile_update.dict().items() if v is not None}
+        current_doc = await asyncio.to_thread(doc_ref.get)
+        current = current_doc.to_dict() or {}
+
+        merged_emails = ProfileService._merge_emails(
+            current.get('emails', []),
+            current.get('email'),
+            update_data.get('emails', []),
+            update_data.get('email')
+        )
+        if merged_emails:
+            update_data['emails'] = merged_emails
+
         update_data['updated_at'] = datetime.utcnow()
         
         await asyncio.to_thread(doc_ref.update, update_data)

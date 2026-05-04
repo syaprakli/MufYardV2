@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime
 
 class ProfileBase(BaseModel):
@@ -7,6 +7,7 @@ class ProfileBase(BaseModel):
     title: str = Field(default="Müfettiş", example="Müfettiş")
     institution: str = Field(default="Gençlik ve Spor Bakanlığı")
     email: str = Field(default="", example="sefa.yaprakli@gsb.gov.tr")
+    emails: List[str] = Field(default_factory=list)
     avatar_url: Optional[str] = None
     theme: str = Field(default="navy", example="dark") # "navy", "dark", "light"
     ai_enabled: bool = True
@@ -32,6 +33,8 @@ class ProfileUpdate(BaseModel):
     full_name: Optional[str] = None
     title: Optional[str] = None
     institution: Optional[str] = None
+    email: Optional[str] = None
+    emails: Optional[List[str]] = None
     avatar_url: Optional[str] = None
     theme: Optional[str] = None
     ai_enabled: Optional[bool] = None

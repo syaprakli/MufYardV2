@@ -7,7 +7,7 @@ import { fetchAllProfiles, deleteProfile, type Profile } from "../lib/api/profil
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { cn } from "../lib/utils";
 import { API_URL } from "../lib/config";
-import { fetchWithTimeout } from "../lib/api/utils";
+import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
 import toast from "react-hot-toast";
 
 export default function AdminInspectors() {
@@ -58,9 +58,10 @@ export default function AdminInspectors() {
 
     const handleUpdateRole = async (profileId: string, role: string) => {
         try {
+            const headers = await getAuthHeaders({ "Content-Type": "application/json" });
             await fetchWithTimeout(`${API_URL}/profiles/${profileId}`, {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" },
+                headers,
                 body: JSON.stringify({ role }),
             });
             toast.success("Rol güncellendi.");
@@ -236,7 +237,6 @@ export default function AdminInspectors() {
                                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Rol Değiştir</p>
                                                         </div>
                                                         <button onClick={() => handleUpdateRole(profile.uid, "admin")} className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-amber-50 dark:hover:bg-amber-950/20 text-amber-600 transition-colors">Yönetici Yap</button>
-                                                        <button onClick={() => handleUpdateRole(profile.uid, "moderator")} className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-muted transition-colors text-slate-600 dark:text-slate-300">Moderatör Yap</button>
                                                         <button onClick={() => handleUpdateRole(profile.uid, "user")} className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-muted transition-colors text-slate-600 dark:text-slate-300">Standart Kullanıcı</button>
                                                         <div className="h-px bg-border my-1" />
                                                         <button onClick={() => handleDeleteProfile(profile.uid)} className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-500 transition-colors">Sistemden Sil</button>
