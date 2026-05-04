@@ -180,6 +180,7 @@ export default function PublicSpace() {
                 setMessages(messagesRes.map((m: any) => ({ ...m, isMine: m.author_id === user?.uid })));
             } catch (err: any) {
                 console.error("Initial load error", err);
+            } finally {
                 setLoading(false);
             }
         };
@@ -497,7 +498,9 @@ export default function PublicSpace() {
                                     onClick={() => { setNewPost({ ...newPost, category: 'Duyurular' }); setShowPostCreator(true); }}
                                     className="flex-1 md:flex-none border-primary/20 text-primary font-black text-[10px] uppercase tracking-widest bg-primary/5 rounded-2xl h-11 px-4 md:px-6"
                                 >
-                                    <Bell size={16} className="hidden sm:inline mr-2" /> {window.innerWidth < 640 ? 'Duyuru' : 'Duyuru Ekle'}
+                                    <Bell size={16} className="hidden sm:inline mr-2" />
+                                    <span className="sm:hidden">Duyuru</span>
+                                    <span className="hidden sm:inline">Duyuru Ekle</span>
                                 </Button>
                             )}
                             <Button 
@@ -511,8 +514,9 @@ export default function PublicSpace() {
                                 }}
                                 className="flex-1 md:flex-none bg-primary text-white rounded-2xl px-4 md:px-6 h-11 font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2 text-[10px] capitalize tracking-widest hover:scale-105 transition-all"
                             >
-                                <Plus size={18} /> 
-                                {window.innerWidth < 640 ? 'Ekle' : (viewMode === 'SSS' ? 'Soru Ekle' : viewMode === 'Duyurular' ? 'Yeni Duyuru' : 'Yeni Konu')}
+                                <Plus size={18} />
+                                <span className="sm:hidden">Ekle</span>
+                                <span className="hidden sm:inline">{viewMode === 'SSS' ? 'Soru Ekle' : viewMode === 'Duyurular' ? 'Yeni Duyuru' : 'Yeni Konu'}</span>
                             </Button>
                         </div>
                     </div>
@@ -615,15 +619,7 @@ export default function PublicSpace() {
                                                 />
                                             ))}
                                     </motion.div>
-                                ) : viewMode === 'Sohbet' ? (
-                                    <motion.div key="sohbet" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col items-center justify-center text-center p-12 opacity-40 lg:hidden">
-                                        <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-6">
-                                            <MessageSquare size={40} className="text-primary" />
-                                        </div>
-                                        <h3 className="text-lg font-black text-foreground mb-2">Canlı Müzakere Kanalı</h3>
-                                        <p className="text-xs font-bold text-slate-400 max-w-xs">Sohbet paneli şu an aktif. Forum'a dönmek için yukarıdaki sekmeleri kullanabilirsiniz.</p>
-                                    </motion.div>
-                                ) : (
+                                ) : viewMode === 'Sohbet' ? null : (
                                     <motion.div key="forum" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
                                         <div className="flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
                                             <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar pb-1">
@@ -756,22 +752,23 @@ export default function PublicSpace() {
 
             <div 
                 className={cn(
-                    "fixed inset-y-0 right-0 z-[100] transition-all duration-300 lg:relative lg:z-10 flex",
-                    isChatCollapsed ? "translate-x-[calc(100%-32px)] lg:translate-x-0 lg:w-0" : "translate-x-0 lg:w-[384px]",
-                    "hidden lg:flex" // Mobile'da tamamen gizle, sadece desktop'ta göster
+                    "flex transition-all duration-300",
+                    // Mobile: viewMode Sohbet ise tam ekran overlay, değilse gizle
+                    viewMode === 'Sohbet'
+                        ? "fixed inset-0 z-[100] lg:static lg:inset-auto"
+                        : "hidden lg:flex",
+                    // Desktop genişlik
+                    isChatCollapsed ? "lg:w-0 lg:overflow-hidden" : "lg:w-[384px]",
                 )}
             >
                 <div className="flex h-full relative">
                     <button 
                         onClick={() => setIsChatCollapsed(!isChatCollapsed)}
-                        className={cn(
-                            "absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-20 bg-[#002B4B] text-white flex items-center justify-center rounded-l-2xl shadow-xl z-50 border-r border-white/10 hover:w-10 transition-all",
-                            "hidden lg:flex" // Sadece desktop'ta göster
-                        )}
+                        className="hidden lg:flex absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-20 bg-[#002B4B] text-white items-center justify-center rounded-l-2xl shadow-xl z-50 border-r border-white/10 hover:w-10 transition-all"
                     >
                         {isChatCollapsed ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
                     </button>
-                    <div className="w-full sm:w-[384px] lg:w-full h-full border-l border-border/50 bg-card flex flex-col shadow-2xl overflow-hidden">
+                    <div className="w-full lg:w-[384px] h-full border-l border-border/50 bg-card flex flex-col shadow-2xl overflow-hidden">
                         <div className="p-6 border-b border-white/10 bg-[#002B4B] text-white flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <button 
@@ -1026,9 +1023,9 @@ function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, 
     }
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 backdrop-blur-md bg-slate-900/40">
-            <motion.div key="post-creator-modal" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-card rounded-[40px] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="p-8 border-b border-border flex items-center justify-between bg-card relative">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-6 backdrop-blur-md bg-slate-900/40">
+            <motion.div key="post-creator-modal" initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-t-[32px] sm:rounded-[40px] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]">
+                <div className="p-5 md:p-8 border-b border-border flex items-center justify-between bg-card relative">
                     <div className="space-y-1">
                         <p className="text-[10px] font-black capitalize text-primary tracking-[0.3em]">{headerTitle}</p>
                         <h2 className="text-2xl font-black text-foreground tracking-tighter">{headerDesc}</h2>
@@ -1038,7 +1035,7 @@ function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, 
                     </button>
                 </div>
                 <input id="post-file-input" type="file" hidden onChange={onUpload} />
-                <div className="p-8 overflow-y-auto space-y-6">
+                <div className="p-5 md:p-8 overflow-y-auto space-y-5 md:space-y-6">
                     {step === 1 ? (
                         <>
                             {isForum && (
@@ -1108,7 +1105,7 @@ function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, 
                         </div>
                     )}
                 </div>
-                <div className="p-8 bg-muted border-t border-border flex items-center justify-between">
+                <div className="p-4 md:p-8 bg-muted border-t border-border flex items-center justify-between">
                     <div className="flex gap-2">
                         <button type="button" disabled={uploading} onClick={() => document.getElementById('post-file-input')?.click()} className="p-4 bg-card rounded-2xl text-slate-400 hover:text-primary transition-all border border-border flex items-center justify-center relative">
                             {uploading ? <Loader2 className="animate-spin" size={20} /> : <ImageIcon size={20} />}
@@ -1145,23 +1142,23 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
             </div>
             <div className="flex-1 overflow-y-auto pr-2 space-y-8 no-scrollbar pb-32">
                 <div className="bg-card border border-border/60 p-8 rounded-[32px] shadow-sm space-y-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-muted/80 rounded-2xl flex items-center justify-center font-black text-slate-400 text-lg">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 md:w-12 md:h-12 bg-muted/80 rounded-2xl flex items-center justify-center font-black text-slate-400 text-base md:text-lg shrink-0">
                                 {post.author_name?.charAt(0)}
                             </div>
-                            <div>
-                                <h2 className="font-black text-foreground text-lg tracking-tight">{post.author_name}</h2>
-                                <p className="text-[10px] font-bold text-slate-400 capitalize tracking-widest">Müfettiş • {new Date(post.created_at).toLocaleString('tr-TR')}</p>
+                            <div className="min-w-0">
+                                <h2 className="font-black text-foreground text-base md:text-lg tracking-tight truncate">{post.author_name}</h2>
+                                <p className="text-[10px] font-bold text-slate-400 capitalize tracking-widest">{new Date(post.created_at).toLocaleString('tr-TR')}</p>
                             </div>
                         </div>
                         {user?.uid === post.author_id && (
-                            <div className="flex gap-2">
-                                <button onClick={() => onEditPost(post)} className="flex items-center gap-2 p-3 bg-blue-50 text-blue-600 rounded-2xl font-black text-[10px] capitalize tracking-widest hover:bg-blue-100 transition-all">
-                                    <Edit3 size={14} /> Düzenle
+                            <div className="flex gap-2 shrink-0">
+                                <button onClick={() => onEditPost(post)} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl transition-all hover:bg-blue-100" title="Düzenle">
+                                    <Edit3 size={15} />
                                 </button>
-                                <button onClick={() => onDeletePost(post.id)} className="flex items-center gap-2 p-3 bg-rose-50 text-rose-600 rounded-2xl font-black text-[10px] capitalize tracking-widest hover:bg-rose-100 transition-all">
-                                    <Trash2 size={14} /> Sil
+                                <button onClick={() => onDeletePost(post.id)} className="p-2.5 bg-rose-50 text-rose-600 rounded-xl transition-all hover:bg-rose-100" title="Sil">
+                                    <Trash2 size={15} />
                                 </button>
                             </div>
                         )}
