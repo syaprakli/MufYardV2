@@ -24,8 +24,9 @@ interface SpecialDateEntry {
     type: SpecialDateType;
 }
 
-// Sabit Ulusal Tatiller — her yıl aynı MM-DD'de tekrarlanır
+// Sabit Ulusal Tatiller + Her Yıl Tekrarlanan Önemli Günler (MM-DD)
 const FIXED_HOLIDAYS: Record<string, SpecialDateEntry> = {
+    // ─── Resmi Tatiller ─────────────────────────────────────────────────────
     "01-01": { title: "Yılbaşı", short: "Yılbaşı", type: "tatil" },
     "04-23": { title: "Ulusal Egemenlik ve Çocuk Bayramı", short: "23 Nisan", type: "tatil" },
     "05-01": { title: "Emek ve Dayanışma Günü", short: "1 Mayıs", type: "tatil" },
@@ -34,9 +35,22 @@ const FIXED_HOLIDAYS: Record<string, SpecialDateEntry> = {
     "08-30": { title: "Zafer Bayramı", short: "30 Ağustos", type: "tatil" },
     "10-28": { title: "Cumhuriyet Bayramı (Yarım Gün)", short: "Cum.Bay.", type: "tatil" },
     "10-29": { title: "Cumhuriyet Bayramı", short: "29 Ekim", type: "tatil" },
+    // ─── Denetim & Mesleki Günler ───────────────────────────────────────────
+    "04-30": { title: "Denetim Haftası (Atatürk'ün 9. Ordu Müfettişliğine Atanması — 30 Nisan 1919)", short: "Denetim Haftası", type: "denetim" },
+    // ─── Spor & Gençlik Günleri ─────────────────────────────────────────────
+    "04-06": { title: "Beden Eğitimi ve Spor Günü", short: "Spor Günü", type: "ozel" },
+    "06-23": { title: "Olimpiyat Günü", short: "Olimpiyat G.", type: "ozel" },
+    // ─── Sosyal Farkındalık Günleri ─────────────────────────────────────────
+    "03-08": { title: "Dünya Kadınlar Günü", short: "Kadınlar G.", type: "ozel" },
+    "04-07": { title: "Dünya Sağlık Günü", short: "Sağlık G.", type: "ozel" },
+    "05-10": { title: "Engelliler Haftası Başlangıcı (10–16 Mayıs)", short: "Engelliler H.", type: "ozel" },
+    "11-10": { title: "Atatürk'ü Anma Günü", short: "10 Kasım", type: "ozel" },
+    "11-24": { title: "Öğretmenler Günü", short: "Öğretmen G.", type: "ozel" },
+    "12-03": { title: "Dünya Engelliler Günü", short: "Engelliler G.", type: "ozel" },
+    "12-10": { title: "İnsan Hakları Günü", short: "İnsan Hak.G.", type: "ozel" },
 };
 
-// Yıla özel tarihler — dini bayramlar, denetim dönemleri (YYYY-MM-DD)
+// Yıla özel tarihler — yalnızca tarihi yıldan yıla değişen dini bayramlar (YYYY-MM-DD)
 const VARIABLE_DATES: (SpecialDateEntry & { date: string })[] = [
     // ─── Ramazan Bayramı 2025 ───────────────────────────────────────────────
     { date: "2025-03-29", title: "Ramazan Bayramı Arifesi", short: "Ram.Arife", type: "bayram" },
@@ -60,55 +74,6 @@ const VARIABLE_DATES: (SpecialDateEntry & { date: string })[] = [
     { date: "2026-05-28", title: "Kurban Bayramı 2. Günü", short: "Kurban", type: "bayram" },
     { date: "2026-05-29", title: "Kurban Bayramı 3. Günü", short: "Kurban", type: "bayram" },
     { date: "2026-05-30", title: "Kurban Bayramı 4. Günü", short: "Kurban", type: "bayram" },
-    // ─── Denetim Dönemleri 2025 ─────────────────────────────────────────────
-    { date: "2025-01-06", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
-    { date: "2025-01-07", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
-    { date: "2025-01-08", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
-    { date: "2025-01-09", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
-    { date: "2025-01-10", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
-    { date: "2025-04-07", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
-    { date: "2025-04-08", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
-    { date: "2025-04-09", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
-    { date: "2025-04-10", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
-    { date: "2025-04-11", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
-    { date: "2025-10-06", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
-    { date: "2025-10-07", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
-    { date: "2025-10-08", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
-    { date: "2025-10-09", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
-    { date: "2025-10-10", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
-    { date: "2025-12-15", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
-    { date: "2025-12-16", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
-    { date: "2025-12-17", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
-    { date: "2025-12-18", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
-    { date: "2025-12-19", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
-    // ─── Denetim Dönemleri 2026 ─────────────────────────────────────────────
-    { date: "2026-01-05", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
-    { date: "2026-01-06", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
-    { date: "2026-01-07", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
-    { date: "2026-01-08", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
-    { date: "2026-01-09", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
-    { date: "2026-04-06", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
-    { date: "2026-04-07", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
-    { date: "2026-04-08", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
-    { date: "2026-04-09", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
-    { date: "2026-04-10", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
-    { date: "2026-10-05", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
-    { date: "2026-10-06", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
-    { date: "2026-10-07", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
-    { date: "2026-10-08", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
-    { date: "2026-10-09", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
-    { date: "2026-12-14", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
-    { date: "2026-12-15", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
-    { date: "2026-12-16", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
-    { date: "2026-12-17", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
-    { date: "2026-12-18", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
-    // ─── Özel Günler ────────────────────────────────────────────────────────
-    { date: "2025-03-08", title: "Dünya Kadınlar Günü", short: "Kadınlar G.", type: "ozel" },
-    { date: "2026-03-08", title: "Dünya Kadınlar Günü", short: "Kadınlar G.", type: "ozel" },
-    { date: "2025-04-07", title: "Dünya Sağlık Günü", short: "Sağlık G.", type: "ozel" },
-    { date: "2026-04-07", title: "Dünya Sağlık Günü", short: "Sağlık G.", type: "ozel" },
-    { date: "2025-11-24", title: "Öğretmenler Günü", short: "Öğretmen G.", type: "ozel" },
-    { date: "2026-11-24", title: "Öğretmenler Günü", short: "Öğretmen G.", type: "ozel" },
 ];
 
 const SPECIAL_DATE_COLORS: Record<SpecialDateType, { bg: string; text: string; badge: string }> = {
@@ -121,7 +86,7 @@ const SPECIAL_DATE_COLORS: Record<SpecialDateType, { bg: string; text: string; b
 const TYPE_LABELS: Record<SpecialDateType, string> = {
     tatil: "Resmi Tatil",
     bayram: "Dini Bayram",
-    denetim: "Denetim Dönemi",
+    denetim: "Denetim Haftası",
     ozel: "Özel Gün",
 };
 
