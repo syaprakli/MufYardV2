@@ -74,6 +74,11 @@ const VARIABLE_DATES: (SpecialDateEntry & { date: string })[] = [
     { date: "2026-05-28", title: "Kurban Bayramı 2. Günü", short: "Kurban", type: "bayram" },
     { date: "2026-05-29", title: "Kurban Bayramı 3. Günü", short: "Kurban", type: "bayram" },
     { date: "2026-05-30", title: "Kurban Bayramı 4. Günü", short: "Kurban", type: "bayram" },
+    // ─── Anneler & Babalar Günü ──────────────────────────────────────────────
+    { date: "2025-05-11", title: "Anneler Günü", short: "Anneler G.", type: "ozel" },
+    { date: "2025-06-15", title: "Babalar Günü", short: "Babalar G.", type: "ozel" },
+    { date: "2026-05-10", title: "Anneler Günü", short: "Anneler G.", type: "ozel" },
+    { date: "2026-06-21", title: "Babalar Günü", short: "Babalar G.", type: "ozel" },
 ];
 
 const SPECIAL_DATE_COLORS: Record<SpecialDateType, { bg: string; text: string; badge: string }> = {
