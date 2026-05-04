@@ -157,17 +157,6 @@ class ChatConnectionManager:
         if room_id not in self.rooms:
             self.rooms[room_id] = {}
 
-        # Aynı uid'den eski bağlantı varsa kapat (yeniden bağlanma / sekme yenileme)
-        stale = [ws for ws, info in self.rooms[room_id].items() if info["uid"] == user_id]
-        for old_ws in stale:
-            del self.rooms[room_id][old_ws]
-            if user_id in self.global_online_users:
-                self.global_online_users[user_id].discard(old_ws)
-            try:
-                await old_ws.close()
-            except Exception:
-                pass
-
         self.rooms[room_id][websocket] = {"uid": user_id, "name": user_name}
 
         # Update global presence
@@ -199,14 +188,16 @@ class ChatConnectionManager:
         # Tüm odalardaki benzersiz kullanıcıları topla
         all_users = []
         seen_uids = set()
+        total_connections = 0
         
         for room in self.rooms.values():
+            total_connections += len(room)
             for info in room.values():
                 if info["uid"] not in seen_uids:
                     all_users.append({"uid": info["uid"], "name": info["name"]})
                     seen_uids.add(info["uid"])
         
-        presence_msg = json.dumps({"type": "presence", "users": all_users})
+        presence_msg = json.dumps({"type": "presence", "users": all_users, "connections": total_connections})
         
         # Tüm odalardaki her bağlantıya bu listeyi gönder
         for room in self.rooms.values():

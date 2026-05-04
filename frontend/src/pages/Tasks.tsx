@@ -13,6 +13,7 @@ import { fetchAudits, createAudit, deleteAudit } from "../lib/api/audit";
 import { fetchAllProfiles, type Profile } from "../lib/api/profiles";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useTheme } from "../lib/context/ThemeContext";
+import { isElectron } from "../lib/firebase";
 import ShareModal from "../components/ShareModal";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -199,6 +200,12 @@ export default function Tasks() {
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!isElectron) {
+            toast.error("Görev oluşturma sadece masaüstü uygulamasında aktiftir. Lütfen masaüstü programından açınız.");
+            return;
+        }
+
         if (!form.rapor_adi.trim()) return;
         try {
             setSaving(true);
@@ -664,8 +671,13 @@ export default function Tasks() {
                             className="w-full h-12 rounded-xl bg-primary text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-lg shadow-primary/20"
                         >
                             {saving ? <Loader2 size={18} className="animate-spin mr-2" /> : <FileText size={18} className="mr-2" />}
-                            {saving ? "Oluşturuluyor..." : "Yeni Görev Oluştur"}
+                            {saving ? "Oluşturuluyor..." : (!isElectron ? "Masaüstünden Oluştur" : "Yeni Görev Oluştur")}
                         </Button>
+                        {!isElectron && (
+                            <p className="text-[11px] font-bold text-amber-600 mt-2">
+                                Web sürümünde görev oluşturma kapalıdır. Lütfen masaüstü programından açınız.
+                            </p>
+                        )}
                     </form>
                 </Card>
             )}

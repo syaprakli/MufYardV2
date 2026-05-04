@@ -18,6 +18,7 @@ interface Message {
 
 interface PresenceContextType {
     onlineUsers: OnlineUser[];
+    sessionCount: number;
     isUserOnline: (uid: string) => boolean;
     messages: Message[];
     sendMessage: (text: string, attachments?: any[]) => void;
@@ -28,6 +29,7 @@ const PresenceContext = createContext<PresenceContextType | undefined>(undefined
 export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
     const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+    const [sessionCount, setSessionCount] = useState<number>(0);
     const [messages, setMessages] = useState<Message[]>([]);
     const wsRef = useRef<WebSocket | null>(null);
     const retryTimer = useRef<any>(null);
@@ -69,6 +71,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                         const data = JSON.parse(event.data);
                         if (data.type === 'presence' && Array.isArray(data.users)) {
                             setOnlineUsers(data.users);
+                            setSessionCount(typeof data.connections === 'number' ? data.connections : data.users.length);
                         } else if (data.text) {
                             // Incoming chat message
                             setMessages(prev => {
@@ -141,7 +144,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <PresenceContext.Provider value={{ onlineUsers, isUserOnline, messages, sendMessage }}>
+        <PresenceContext.Provider value={{ onlineUsers, sessionCount, isUserOnline, messages, sendMessage }}>
             {children}
         </PresenceContext.Provider>
     );

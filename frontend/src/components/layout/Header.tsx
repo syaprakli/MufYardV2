@@ -6,8 +6,8 @@ import { useConfirm } from "../../lib/context/ConfirmContext";
 import { useNotifications } from "../../lib/context/NotificationContext";
 import { Search, Bell, ChevronDown, User, LogOut, Menu } from "lucide-react";
 import { fetchProfile } from "../../lib/api/profiles";
-import { fetchOnlineUsers } from "../../lib/api/online";
 import { cn } from "../../lib/utils";
+import { usePresence } from "../../lib/context/PresenceContext";
 
 interface HeaderProps {
     toggleSidebar: () => void;
@@ -15,10 +15,10 @@ interface HeaderProps {
 
 export function Header({ toggleSidebar }: HeaderProps) {
     const { user, logout } = useAuth();
+    const { onlineUsers, sessionCount } = usePresence();
     const navigate = useNavigate();
     const confirm = useConfirm();
     const { unreadCount } = useNotifications();
-    const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
     const [showNotifications, setShowNotifications] = useState(false);
 
 
@@ -37,32 +37,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
         }
     }, [user]);
 
-    useEffect(() => {
-        let mounted = true;
 
-        const loadOnline = async () => {
-            try {
-                const list = await fetchOnlineUsers();
-                if (mounted) {
-                    setOnlineUsers(Array.isArray(list) ? list : []);
-                }
-            } catch {
-                if (mounted) {
-                    setOnlineUsers([]);
-                }
-            }
-        };
-
-        loadOnline();
-        const interval = setInterval(loadOnline, 5000);
-
-        return () => {
-            mounted = false;
-            clearInterval(interval);
-        };
-    }, []);
-
-    
     // Build initials from first and last words (e.g. "Selin Yilmaz" -> "SY").
     const displayName = (profile?.full_name && profile.full_name !== "Kullanıcı") 
         ? profile.full_name 
@@ -136,7 +111,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
                 {/* Online Users Indicator */}
                 <div className="relative group flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 font-bold">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>{onlineUsers.length} kişi şu an online</span>
+                    <span>{sessionCount} aktif oturum</span>
                     {onlineUsers.length > 0 && (
                         <div className="pointer-events-none absolute left-0 top-7 z-50 hidden group-hover:block bg-card border border-border rounded-xl shadow-xl p-2 min-w-[220px] max-w-[320px]">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Online Kullanıcılar</p>
