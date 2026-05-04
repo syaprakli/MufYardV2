@@ -316,6 +316,15 @@ export default function Tasks() {
             const allAudits = await fetchAudits(effectiveUid || "", currentUser?.email || undefined);
             const associated = allAudits.filter(a => String(a.task_id).trim() === String(task.id).trim());
             setTaskAudits(associated);
+
+            if (!isElectron) {
+                if (associated.length > 0) {
+                    setShowReportSelector(task);
+                } else {
+                    toast.error("Web sürümünde rapor oluşturma kapalıdır. Lütfen masaüstü programından açınız.");
+                }
+                return;
+            }
             
             const nextSeq = Math.max(0, ...associated.map(a => a.report_seq || 0)) + 1;
 
@@ -530,7 +539,15 @@ export default function Tasks() {
             </div>
 
             {/* Görev Oluşturma Formu */}
-            {activeTab === 'kisisel' && (
+            {!isElectron && activeTab === 'kisisel' && (
+                <Card className="p-4 md:p-5 bg-amber-50 border border-amber-200 shadow-sm mb-6">
+                    <p className="text-amber-700 text-sm font-bold">
+                        Web sürümünde görev oluşturma kapalıdır. Lütfen masaüstü programından açınız.
+                    </p>
+                </Card>
+            )}
+
+            {activeTab === 'kisisel' && isElectron && (
                 <Card className="p-4 md:p-8 bg-card border border-border shadow-sm mb-6">
                     <form onSubmit={handleCreate} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
@@ -673,11 +690,6 @@ export default function Tasks() {
                             {saving ? <Loader2 size={18} className="animate-spin mr-2" /> : <FileText size={18} className="mr-2" />}
                             {saving ? "Oluşturuluyor..." : (!isElectron ? "Masaüstünden Oluştur" : "Yeni Görev Oluştur")}
                         </Button>
-                        {!isElectron && (
-                            <p className="text-[11px] font-bold text-amber-600 mt-2">
-                                Web sürümünde görev oluşturma kapalıdır. Lütfen masaüstü programından açınız.
-                            </p>
-                        )}
                     </form>
                 </Card>
             )}
@@ -1000,24 +1012,31 @@ export default function Tasks() {
                             ))}
                         </div>
 
-                        <button 
-                            onClick={() => {
-                                const nextSeq = Math.max(0, ...taskAudits.map(a => a.report_seq || 0)) + 1;
-                                setNewAudit({
-                                    ...newAudit,
-                                    title: `${showReportSelector.rapor_adi} - Ek Rapor`,
-                                    location: taskAudits[0]?.location || "Merkez / Yerinde",
-                                    report_seq: nextSeq,
-                                    template: "Boş Rapor"
-                                });
-                                setIsNewAuditModalOpen(showReportSelector);
-                                setShowReportSelector(null);
-                            }}
-                            className="w-100 p-4 rounded-2xl bg-primary text-white font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
-                        >
-                            <FileText size={18} />
-                            YENİ RAPOR EKLE (/{Math.max(0, ...taskAudits.map(a => a.report_seq || 0)) + 1})
-                        </button>
+                        {isElectron && (
+                            <button 
+                                onClick={() => {
+                                    const nextSeq = Math.max(0, ...taskAudits.map(a => a.report_seq || 0)) + 1;
+                                    setNewAudit({
+                                        ...newAudit,
+                                        title: `${showReportSelector.rapor_adi} - Ek Rapor`,
+                                        location: taskAudits[0]?.location || "Merkez / Yerinde",
+                                        report_seq: nextSeq,
+                                        template: "Boş Rapor"
+                                    });
+                                    setIsNewAuditModalOpen(showReportSelector);
+                                    setShowReportSelector(null);
+                                }}
+                                className="w-100 p-4 rounded-2xl bg-primary text-white font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+                            >
+                                <FileText size={18} />
+                                YENİ RAPOR EKLE (/{Math.max(0, ...taskAudits.map(a => a.report_seq || 0)) + 1})
+                            </button>
+                        )}
+                        {!isElectron && (
+                            <p className="text-xs font-bold text-amber-600 text-center">
+                                Web sürümünde rapor oluşturma kapalıdır. Sadece mevcut raporlar görüntülenebilir.
+                            </p>
+                        )}
                     </div>
                 </div>
             )}
