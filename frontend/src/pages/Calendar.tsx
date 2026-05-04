@@ -79,6 +79,19 @@ const VARIABLE_DATES: (SpecialDateEntry & { date: string })[] = [
     { date: "2025-06-15", title: "Babalar Günü", short: "Babalar G.", type: "ozel" },
     { date: "2026-05-10", title: "Anneler Günü", short: "Anneler G.", type: "ozel" },
     { date: "2026-06-21", title: "Babalar Günü", short: "Babalar G.", type: "ozel" },
+    { date: "2027-05-09", title: "Anneler Günü", short: "Anneler G.", type: "ozel" },
+    { date: "2027-06-20", title: "Babalar Günü", short: "Babalar G.", type: "ozel" },
+    // ─── Ramazan Bayramı 2027 ───────────────────────────────────────────────
+    { date: "2027-03-08", title: "Ramazan Bayramı Arifesi", short: "Ram.Arife", type: "bayram" },
+    { date: "2027-03-09", title: "Ramazan Bayramı 1. Günü", short: "Ram.Byr.", type: "bayram" },
+    { date: "2027-03-10", title: "Ramazan Bayramı 2. Günü", short: "Ram.Byr.", type: "bayram" },
+    { date: "2027-03-11", title: "Ramazan Bayramı 3. Günü", short: "Ram.Byr.", type: "bayram" },
+    // ─── Kurban Bayramı 2027 ────────────────────────────────────────────────
+    { date: "2027-05-15", title: "Kurban Bayramı Arifesi", short: "Krb.Arife", type: "bayram" },
+    { date: "2027-05-16", title: "Kurban Bayramı 1. Günü", short: "Kurban", type: "bayram" },
+    { date: "2027-05-17", title: "Kurban Bayramı 2. Günü", short: "Kurban", type: "bayram" },
+    { date: "2027-05-18", title: "Kurban Bayramı 3. Günü", short: "Kurban", type: "bayram" },
+    { date: "2027-05-19", title: "Kurban Bayramı 4. Günü", short: "Kurban", type: "bayram" },
 ];
 
 const SPECIAL_DATE_COLORS: Record<SpecialDateType, { bg: string; text: string; badge: string }> = {
