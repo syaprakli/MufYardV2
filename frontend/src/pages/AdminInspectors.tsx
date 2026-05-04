@@ -177,7 +177,7 @@ export default function AdminInspectors() {
                 </button>
             </div>
 
-            <Card className="rounded-3xl border-none shadow-xl bg-card overflow-hidden">
+            <Card className="rounded-3xl border-none shadow-xl bg-card">
                 {loading ? (
                     <div className="flex flex-col items-center py-20">
                         <Loader2 className="w-10 h-10 text-primary animate-spin" />

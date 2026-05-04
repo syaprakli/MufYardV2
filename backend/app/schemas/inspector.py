@@ -19,6 +19,7 @@ class InspectorResponse(InspectorBase):
     extension: Optional[str] = None
     phone: Optional[str] = None
     room: Optional[str] = None
+    force_unlinked: Optional[bool] = None
     created_at: str
 
     class Config:

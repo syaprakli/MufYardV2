@@ -18,6 +18,13 @@ async def get_message_history(limit: int = 50):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/messages", response_model=MessageResponse)
+async def save_global_message(message: MessageCreate):
+    try:
+        return await CollaborationService.save_message(message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.delete("/messages/{message_id}")
 async def delete_message(message_id: str):
     if await CollaborationService.delete_message(message_id):

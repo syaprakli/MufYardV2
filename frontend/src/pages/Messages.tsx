@@ -304,7 +304,7 @@ export default function Messages() {
                         </div>
                         
                         <div className="flex items-center gap-2">
-                          {userRole === 'admin' && (contact.isRegistered || contact.directoryId) && (
+                          {(userRole === 'admin' || userRole === 'founder') && (contact.isRegistered || contact.directoryId) && (
                             <button 
                               onClick={(e) => handleDeleteProfile(e, contact as any)}
                               className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
