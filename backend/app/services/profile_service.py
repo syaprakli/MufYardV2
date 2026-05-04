@@ -156,9 +156,17 @@ class ProfileService:
 
         if profile_data:
             profile_data['uid'] = doc.id
+            # Admin role enforcement for existing profiles
+            _admin_emails = ["mufettis@gsb.gov.tr", "sefayaprakli@hotmail.com"]
+            if (profile_data.get('email') or search_email or '').lower() in _admin_emails:
+                if profile_data.get('role') != 'admin':
+                    await asyncio.to_thread(lambda: doc_ref.update({"role": "admin"}))
+                    profile_data['role'] = 'admin'
             return profile_data
 
         # Final Fallback
+        _admin_emails = ["mufettis@gsb.gov.tr", "sefayaprakli@hotmail.com"]
+        _fallback_role = "admin" if (search_email or "").lower() in _admin_emails else "user"
         default_profile = {
             "uid": uid,
             "full_name": "Kullanıcı",
@@ -170,7 +178,7 @@ class ProfileService:
             "ai_model": "Gemini 2.0 Flash",
             "ai_temperature": 0.7,
             "notifications_enabled": True,
-            "role": "user",
+            "role": _fallback_role,
             "verified": False,
             "updated_at": datetime.utcnow()
         }
