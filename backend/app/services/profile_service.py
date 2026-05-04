@@ -235,6 +235,12 @@ class ProfileService:
         if not exists:
             return False
         await asyncio.to_thread(doc_ref.delete)
+        # Firebase Auth hesabını da sil
+        try:
+            from firebase_admin import auth as firebase_auth
+            await asyncio.to_thread(firebase_auth.delete_user, uid)
+        except Exception as e:
+            logger.warning(f"Firebase Auth kullanıcısı silinemedi (uid={uid}): {e}")
         return True
 
     @staticmethod
