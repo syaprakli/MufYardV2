@@ -3,7 +3,7 @@ import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Modal } from "../components/ui/Modal";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
@@ -14,6 +14,132 @@ import {
     deleteCalendarNote,
     type CalendarNote,
 } from "../lib/api/calendar";
+
+// ── Önemli Tarihler Verisi ───────────────────────────────────────────────────
+type SpecialDateType = 'tatil' | 'bayram' | 'denetim' | 'ozel';
+
+interface SpecialDateEntry {
+    title: string;
+    short: string;
+    type: SpecialDateType;
+}
+
+// Sabit Ulusal Tatiller — her yıl aynı MM-DD'de tekrarlanır
+const FIXED_HOLIDAYS: Record<string, SpecialDateEntry> = {
+    "01-01": { title: "Yılbaşı", short: "Yılbaşı", type: "tatil" },
+    "04-23": { title: "Ulusal Egemenlik ve Çocuk Bayramı", short: "23 Nisan", type: "tatil" },
+    "05-01": { title: "Emek ve Dayanışma Günü", short: "1 Mayıs", type: "tatil" },
+    "05-19": { title: "Atatürk'ü Anma, Gençlik ve Spor Bayramı", short: "19 Mayıs", type: "tatil" },
+    "07-15": { title: "Demokrasi ve Milli Birlik Günü", short: "15 Temmuz", type: "tatil" },
+    "08-30": { title: "Zafer Bayramı", short: "30 Ağustos", type: "tatil" },
+    "10-28": { title: "Cumhuriyet Bayramı (Yarım Gün)", short: "Cum.Bay.", type: "tatil" },
+    "10-29": { title: "Cumhuriyet Bayramı", short: "29 Ekim", type: "tatil" },
+};
+
+// Yıla özel tarihler — dini bayramlar, denetim dönemleri (YYYY-MM-DD)
+const VARIABLE_DATES: (SpecialDateEntry & { date: string })[] = [
+    // ─── Ramazan Bayramı 2025 ───────────────────────────────────────────────
+    { date: "2025-03-29", title: "Ramazan Bayramı Arifesi", short: "Ram.Arife", type: "bayram" },
+    { date: "2025-03-30", title: "Ramazan Bayramı 1. Günü", short: "Ram.Byr.", type: "bayram" },
+    { date: "2025-03-31", title: "Ramazan Bayramı 2. Günü", short: "Ram.Byr.", type: "bayram" },
+    { date: "2025-04-01", title: "Ramazan Bayramı 3. Günü", short: "Ram.Byr.", type: "bayram" },
+    // ─── Kurban Bayramı 2025 ────────────────────────────────────────────────
+    { date: "2025-06-05", title: "Kurban Bayramı Arifesi", short: "Krb.Arife", type: "bayram" },
+    { date: "2025-06-06", title: "Kurban Bayramı 1. Günü", short: "Kurban", type: "bayram" },
+    { date: "2025-06-07", title: "Kurban Bayramı 2. Günü", short: "Kurban", type: "bayram" },
+    { date: "2025-06-08", title: "Kurban Bayramı 3. Günü", short: "Kurban", type: "bayram" },
+    { date: "2025-06-09", title: "Kurban Bayramı 4. Günü", short: "Kurban", type: "bayram" },
+    // ─── Ramazan Bayramı 2026 ───────────────────────────────────────────────
+    { date: "2026-03-19", title: "Ramazan Bayramı Arifesi", short: "Ram.Arife", type: "bayram" },
+    { date: "2026-03-20", title: "Ramazan Bayramı 1. Günü", short: "Ram.Byr.", type: "bayram" },
+    { date: "2026-03-21", title: "Ramazan Bayramı 2. Günü", short: "Ram.Byr.", type: "bayram" },
+    { date: "2026-03-22", title: "Ramazan Bayramı 3. Günü", short: "Ram.Byr.", type: "bayram" },
+    // ─── Kurban Bayramı 2026 ────────────────────────────────────────────────
+    { date: "2026-05-26", title: "Kurban Bayramı Arifesi", short: "Krb.Arife", type: "bayram" },
+    { date: "2026-05-27", title: "Kurban Bayramı 1. Günü", short: "Kurban", type: "bayram" },
+    { date: "2026-05-28", title: "Kurban Bayramı 2. Günü", short: "Kurban", type: "bayram" },
+    { date: "2026-05-29", title: "Kurban Bayramı 3. Günü", short: "Kurban", type: "bayram" },
+    { date: "2026-05-30", title: "Kurban Bayramı 4. Günü", short: "Kurban", type: "bayram" },
+    // ─── Denetim Dönemleri 2025 ─────────────────────────────────────────────
+    { date: "2025-01-06", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
+    { date: "2025-01-07", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
+    { date: "2025-01-08", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
+    { date: "2025-01-09", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
+    { date: "2025-01-10", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
+    { date: "2025-04-07", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
+    { date: "2025-04-08", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
+    { date: "2025-04-09", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
+    { date: "2025-04-10", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
+    { date: "2025-04-11", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
+    { date: "2025-10-06", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
+    { date: "2025-10-07", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
+    { date: "2025-10-08", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
+    { date: "2025-10-09", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
+    { date: "2025-10-10", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
+    { date: "2025-12-15", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
+    { date: "2025-12-16", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
+    { date: "2025-12-17", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
+    { date: "2025-12-18", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
+    { date: "2025-12-19", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
+    // ─── Denetim Dönemleri 2026 ─────────────────────────────────────────────
+    { date: "2026-01-05", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
+    { date: "2026-01-06", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
+    { date: "2026-01-07", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
+    { date: "2026-01-08", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
+    { date: "2026-01-09", title: "Yıllık Denetim Programı Hazırlık Haftası", short: "Yıllık Prog.", type: "denetim" },
+    { date: "2026-04-06", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
+    { date: "2026-04-07", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
+    { date: "2026-04-08", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
+    { date: "2026-04-09", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
+    { date: "2026-04-10", title: "Bahar Denetim Haftası", short: "Bahar Den.", type: "denetim" },
+    { date: "2026-10-05", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
+    { date: "2026-10-06", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
+    { date: "2026-10-07", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
+    { date: "2026-10-08", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
+    { date: "2026-10-09", title: "Güz Denetim Haftası", short: "Güz Den.", type: "denetim" },
+    { date: "2026-12-14", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
+    { date: "2026-12-15", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
+    { date: "2026-12-16", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
+    { date: "2026-12-17", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
+    { date: "2026-12-18", title: "Yıl Sonu Denetim Değerlendirme Haftası", short: "YS Değ.", type: "denetim" },
+    // ─── Özel Günler ────────────────────────────────────────────────────────
+    { date: "2025-03-08", title: "Dünya Kadınlar Günü", short: "Kadınlar G.", type: "ozel" },
+    { date: "2026-03-08", title: "Dünya Kadınlar Günü", short: "Kadınlar G.", type: "ozel" },
+    { date: "2025-04-07", title: "Dünya Sağlık Günü", short: "Sağlık G.", type: "ozel" },
+    { date: "2026-04-07", title: "Dünya Sağlık Günü", short: "Sağlık G.", type: "ozel" },
+    { date: "2025-11-24", title: "Öğretmenler Günü", short: "Öğretmen G.", type: "ozel" },
+    { date: "2026-11-24", title: "Öğretmenler Günü", short: "Öğretmen G.", type: "ozel" },
+];
+
+const SPECIAL_DATE_COLORS: Record<SpecialDateType, { bg: string; text: string; badge: string }> = {
+    tatil:   { bg: "bg-emerald-50 border border-emerald-200",  text: "text-emerald-700", badge: "bg-emerald-500 text-white" },
+    bayram:  { bg: "bg-violet-50 border border-violet-200",    text: "text-violet-700",  badge: "bg-violet-500 text-white" },
+    denetim: { bg: "bg-orange-50 border border-orange-200",    text: "text-orange-700",  badge: "bg-orange-500 text-white" },
+    ozel:    { bg: "bg-sky-50 border border-sky-200",          text: "text-sky-700",     badge: "bg-sky-500 text-white" },
+};
+
+const TYPE_LABELS: Record<SpecialDateType, string> = {
+    tatil: "Resmi Tatil",
+    bayram: "Dini Bayram",
+    denetim: "Denetim Dönemi",
+    ozel: "Özel Gün",
+};
+
+const TYPE_PRIORITY: Record<SpecialDateType, number> = { tatil: 0, bayram: 1, denetim: 2, ozel: 3 };
+
+function getSpecialDatesForDay(y: number, m: number, day: number): SpecialDateEntry[] {
+    const mmdd = `${String(m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const fullDate = `${y}-${String(m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const results: SpecialDateEntry[] = [];
+    if (FIXED_HOLIDAYS[mmdd]) results.push(FIXED_HOLIDAYS[mmdd]);
+    for (const v of VARIABLE_DATES) {
+        if (v.date === fullDate) results.push(v);
+    }
+    const seen = new Set<string>();
+    return results
+        .filter(r => { if (seen.has(r.title)) return false; seen.add(r.title); return true; })
+        .sort((a, b) => TYPE_PRIORITY[a.type] - TYPE_PRIORITY[b.type]);
+}
 
 export default function Calendar() {
     const { user, loading: authLoading } = useAuth();
@@ -173,6 +299,18 @@ export default function Calendar() {
 
     const selectedNotes = selectedDateKey ? notesForDateKey(selectedDateKey) : [];
 
+    // Bu aydaki önemli günler (sidebar için)
+    const monthSpecialDates = useMemo(() => {
+        const daysCount = getDaysInMonth(year, month);
+        const seen = new Map<string, SpecialDateEntry & { day: number }>();
+        for (let d = 1; d <= daysCount; d++) {
+            for (const s of getSpecialDatesForDay(year, month, d)) {
+                if (!seen.has(s.title)) seen.set(s.title, { day: d, ...s });
+            }
+        }
+        return Array.from(seen.values()).sort((a, b) => a.day - b.day);
+    }, [year, month]);
+
     // ── render ────────────────────────────────────────────────────────────────
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -222,6 +360,8 @@ export default function Calendar() {
                             const dayNotesList = notesForDateKey(dateKey);
                             const hasNotes = dayNotesList.length > 0;
                             const targetDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNumber).padStart(2, "0")}`;
+                            const specialDates = getSpecialDatesForDay(year, month, dayNumber);
+                            const primarySpecial = specialDates[0] ?? null;
 
                             return (
                                 <div
@@ -240,6 +380,14 @@ export default function Calendar() {
                                     </span>
 
                                     <div className="space-y-1 overflow-hidden">
+                                        {primarySpecial && (
+                                            <div
+                                                className={`p-1 text-[8px] rounded font-bold truncate shadow-sm ${SPECIAL_DATE_COLORS[primarySpecial.type].badge}`}
+                                                title={specialDates.map(s => s.title).join(' | ')}
+                                            >
+                                                {primarySpecial.short}{specialDates.length > 1 ? ` +${specialDates.length - 1}` : ''}
+                                            </div>
+                                        )}
                                         {tasks.filter(t => isDateInTaskRange(year, month, dayNumber, t)).slice(0, 2).map(t => {
                                             const isStart = new Date(t.baslama_tarihi).toISOString().split("T")[0] === targetDate;
                                             return (
@@ -296,6 +444,30 @@ export default function Calendar() {
                         </div>
                     </Card>
 
+                    <Card className="p-6">
+                        <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-4">Bu Aydaki Önemli Günler</h3>
+                        <div className="space-y-2">
+                            {monthSpecialDates.length > 0 ? monthSpecialDates.map((s, i) => (
+                                <div key={i} className={`flex items-center gap-3 p-2.5 rounded-xl ${SPECIAL_DATE_COLORS[s.type].bg}`}>
+                                    <div className="shrink-0">
+                                        <span className="text-lg">
+                                            {s.type === 'tatil' ? '🏖' : s.type === 'bayram' ? '🌙' : s.type === 'denetim' ? '🔍' : '⭐'}
+                                        </span>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className={`text-[10px] font-black uppercase tracking-widest ${SPECIAL_DATE_COLORS[s.type].text}`}>{TYPE_LABELS[s.type]}</p>
+                                        <p className="text-xs font-bold text-foreground truncate">{s.title}</p>
+                                    </div>
+                                    <span className={`shrink-0 text-[10px] font-black ${SPECIAL_DATE_COLORS[s.type].text}`}>{s.day}</span>
+                                </div>
+                            )) : (
+                                <div className="py-6 text-center">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bu ayda özel gün yok</p>
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+
                     <Card className="p-6 bg-card border border-border">
                         <h4 className="font-bold mb-2 text-primary">Etkinlik Ekle</h4>
                         <p className="text-xs text-muted-foreground mb-4">Bugün için hızlıca bir not veya hatırlatıcı ekleyin.</p>
@@ -344,6 +516,15 @@ export default function Calendar() {
                             <FileText size={16} /> Görevler & Notlar
                         </h4>
                         <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin">
+                            {/* Önemli Günler */}
+                            {selectedDay && getSpecialDatesForDay(year, month, selectedDay).map((s, i) => (
+                                <div key={i} className={`p-3 rounded-xl ${SPECIAL_DATE_COLORS[s.type].bg}`}>
+                                    <p className={`text-[10px] font-black uppercase tracking-widest ${SPECIAL_DATE_COLORS[s.type].text}`}>
+                                        {s.type === 'tatil' ? '🏖 Resmi Tatil' : s.type === 'bayram' ? '🌙 Dini Bayram' : s.type === 'denetim' ? '🔍 Denetim Dönemi' : '⭐ Özel Gün'}
+                                    </p>
+                                    <p className={`font-bold text-sm mt-0.5 ${SPECIAL_DATE_COLORS[s.type].text}`}>{s.title}</p>
+                                </div>
+                            ))}
                             {/* Tasks on this day */}
                             {selectedDay && tasks.filter(t => isDateInTaskRange(year, month, selectedDay, t)).map(t => {
                                 const isStart = new Date(t.baslama_tarihi).setHours(0, 0, 0, 0) === new Date(year, month, selectedDay).setHours(0, 0, 0, 0);

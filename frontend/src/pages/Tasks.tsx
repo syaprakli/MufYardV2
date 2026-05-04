@@ -806,12 +806,16 @@ export default function Tasks() {
                                                 <ActionBtn title="İş Adımları" color="#3b82f6" onClick={() => setExpandedRow(expandedRow === task.id ? null : task.id)}>
                                                     <ClipboardList size={14} />
                                                 </ActionBtn>
-                                                <ActionBtn title="Rapor Başlat" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
-                                                    <FileText size={14} />
-                                                </ActionBtn>
-                                                <ActionBtn title="Düzenle" color="#f59e0b" onClick={() => setEditingTask(task)}>
-                                                    <Edit3 size={14} />
-                                                </ActionBtn>
+                                                {isElectron && (
+                                                    <ActionBtn title="Rapor Başlat" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
+                                                        <FileText size={14} />
+                                                    </ActionBtn>
+                                                )}
+                                                {isElectron && (
+                                                    <ActionBtn title="Düzenle" color="#f59e0b" onClick={() => setEditingTask(task)}>
+                                                        <Edit3 size={14} />
+                                                    </ActionBtn>
+                                                )}
                                                 <ActionBtn title="Paylaş" color="#8b5cf6" onClick={() => setShareTask(task)}>
                                                     <UserPlus size={14} />
                                                 </ActionBtn>
@@ -916,12 +920,16 @@ export default function Tasks() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-2">
-                                                        <ActionBtn title="Rapor Başlat" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
-                                                            <FileText size={16} />
-                                                        </ActionBtn>
-                                                        <ActionBtn title="Görevi Düzenle" color="#f59e0b" onClick={() => setEditingTask(task)}>
-                                                            <Edit3 size={16} />
-                                                        </ActionBtn>
+                                                        {isElectron && (
+                                                            <ActionBtn title="Rapor Başlat" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
+                                                                <FileText size={16} />
+                                                            </ActionBtn>
+                                                        )}
+                                                        {isElectron && (
+                                                            <ActionBtn title="Görevi Düzenle" color="#f59e0b" onClick={() => setEditingTask(task)}>
+                                                                <Edit3 size={16} />
+                                                            </ActionBtn>
+                                                        )}
                                                         <ActionBtn title="Paylaş" color="#8b5cf6" onClick={() => setShareTask(task)}>
                                                             <UserPlus size={16} />
                                                         </ActionBtn>

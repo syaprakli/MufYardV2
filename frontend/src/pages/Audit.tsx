@@ -9,6 +9,7 @@ import { Modal } from "../components/ui/Modal";
 import { fetchAudits, createAudit, deleteAudit, updateAudit, exportAuditsToExcel, exportAuditToWord, type Audit as AuditType } from "../lib/api/audit";
 import { fetchTasks, updateTask, type Task } from "../lib/api/tasks";
 import { useAuth } from "../lib/hooks/useAuth";
+import { isElectron } from "../lib/firebase";
 import { cn } from "../lib/utils";
 
 const RAPOR_SABLONLARI: Record<string, string> = {
@@ -329,9 +330,11 @@ export default function Audit() {
                     <Button variant="outline" onClick={handleExportExcel} className="h-12 px-6 border-emerald-100 text-emerald-600 hover:bg-emerald-50 rounded-xl font-bold shadow-sm">
                         <FileSpreadsheet className="mr-2" size={18} /> Excel'e Aktar
                     </Button>
-                    <Button className="h-12 px-6 shadow-lg shadow-primary/20 rounded-xl" onClick={() => setIsModalOpen(true)}>
-                        <Plus className="mr-2" size={20} /> Yeni Rapor Başlat
-                    </Button>
+                    {isElectron && (
+                        <Button className="h-12 px-6 shadow-lg shadow-primary/20 rounded-xl" onClick={() => setIsModalOpen(true)}>
+                            <Plus className="mr-2" size={20} /> Yeni Rapor Başlat
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -650,25 +653,29 @@ function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect
                     </span>
 
                     <div className="flex items-center gap-2 w-full md:w-auto">
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={onEdit}
-                            className="flex-1 md:flex-none h-11 md:h-12 px-3 md:px-6 rounded-xl md:rounded-2xl font-bold text-primary hover:bg-primary hover:text-white border-primary/20 shadow-sm transition-all flex items-center justify-center gap-1.5 md:gap-2 text-[10px] md:text-xs uppercase tracking-widest"
-                        >
-                            <Edit3 size={16} /> <span className="inline">Düzenle</span>
-                        </Button>
+                        {isElectron && (
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={onEdit}
+                                className="flex-1 md:flex-none h-11 md:h-12 px-3 md:px-6 rounded-xl md:rounded-2xl font-bold text-primary hover:bg-primary hover:text-white border-primary/20 shadow-sm transition-all flex items-center justify-center gap-1.5 md:gap-2 text-[10px] md:text-xs uppercase tracking-widest"
+                            >
+                                <Edit3 size={16} /> <span className="inline">Düzenle</span>
+                            </Button>
+                        )}
                         
                         <div className="flex items-center gap-1 shrink-0">
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={onExportWord}
-                                className="w-11 h-11 md:w-12 md:h-12 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-xl"
-                                title="Word olarak indir"
-                            >
-                                <Download size={20} />
-                            </Button>
+                            {isElectron && (
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={onExportWord}
+                                    className="w-11 h-11 md:w-12 md:h-12 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-xl"
+                                    title="Word olarak indir"
+                                >
+                                    <Download size={20} />
+                                </Button>
+                            )}
                             
                             <div className="relative">
                                 <Button 
