@@ -35,7 +35,10 @@ async def update_profile(
     return updated
 
 @router.delete("/{uid}")
-async def delete_profile(uid: str):
+async def delete_profile(uid: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    caller_role = (current_user.get("role") or "user").strip().lower()
+    if caller_role != "admin":
+        raise HTTPException(status_code=403, detail="Kullanıcı silme yetkisi yalnızca yöneticilere aittir.")
     success = await ProfileService.delete_profile(uid)
     if not success:
         raise HTTPException(status_code=404, detail="Profil bulunamadı.")

@@ -92,7 +92,7 @@ class TaskService:
 
         # Ensure owner_id is set
         if not task_data.get('owner_id'):
-             task_data['owner_id'] = "mufettis@gsb.gov.tr" # Fallback only as last resort
+             task_data['owner_id'] = "sefa.yaprakli@gsb.gov.tr" # Fallback only as last resort
 
         try:
             result = await asyncio.to_thread(db.collection('tasks').add, task_data)

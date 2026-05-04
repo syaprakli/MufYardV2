@@ -78,8 +78,10 @@ export async function uploadAvatar(uid: string, file: File): Promise<{avatar_url
 }
 
 export async function deleteProfile(uid: string): Promise<boolean> {
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${API_BASE_URL}/profiles/${uid}`, {
         method: "DELETE",
+        headers,
     });
     return response.ok;
 }
