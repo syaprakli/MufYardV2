@@ -29,7 +29,7 @@ class TaskService:
         
         try:
             # 1. Admin/Demo bypass
-            admin_id = "mufettis@gsb.gov.tr"
+            admin_id = "sefa.yaprakli@gsb.gov.tr"
             if user_id == admin_id or user_email == admin_id or user_id == "admin":
                 docs = await asyncio.to_thread(lambda: tasks_ref.order_by('created_at', direction='DESCENDING').stream())
                 return [ {**doc.to_dict(), 'id': doc.id} for doc in docs ]

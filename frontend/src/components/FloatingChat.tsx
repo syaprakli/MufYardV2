@@ -55,10 +55,12 @@ interface FloatingChatProps {
   title: string;
   onClose: () => void;
   type?: 'dm' | 'audit' | 'global';
+  inline?: boolean;
+  isOnline?: boolean;
 }
 
 // ─── COMPONENT ──────────────────────────────────────────────────────────────
-export default function FloatingChat({ roomId, title, onClose, type = 'dm' }: FloatingChatProps) {
+export default function FloatingChat({ roomId, title, onClose, type = 'dm', inline = false, isOnline }: FloatingChatProps) {
   const { user } = useAuth();
   const { theme } = useTheme();
   const isDark = (theme as string) === "dark";
@@ -322,21 +324,29 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm' }: Fl
 
   // ── full window ───────────────────────────────────────────────────────
   return (
-    <div className="relative w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-t-2xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5 duration-300" style={{ height: 420 }}>
+    <div className={inline
+      ? "w-full h-full bg-card border border-slate-200 dark:border-slate-800 rounded-3xl flex flex-col overflow-hidden"
+      : "relative w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-t-2xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5 duration-300"
+    } style={inline ? undefined : { height: 420 }}>
 
       {/* Header */}
-      <div className="bg-slate-900 p-3 rounded-t-2xl flex items-center justify-between text-white border-b border-white/10 shrink-0">
+      <div className="bg-slate-900 p-3 flex items-center justify-between text-white border-b border-white/10 shrink-0" style={inline ? { borderRadius: 'calc(1.5rem - 1px) calc(1.5rem - 1px) 0 0' } : { borderRadius: '1rem 1rem 0 0' }}>
         <div className="flex items-center gap-2">
           <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-red-400'}`} />
+          {inline && isOnline !== undefined && (
+            <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]' : 'bg-slate-500'}`} />
+          )}
           <div className="flex flex-col">
             <span className="text-xs font-black uppercase tracking-widest truncate max-w-[160px]">{title}</span>
             <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
-              {type === 'audit' ? 'Denetim Odası' : type === 'dm' ? 'Özel Mesaj' : 'Genel Sohbet'}
+              {inline && isOnline !== undefined
+                ? (isOnline ? 'Şu an Online' : 'Çevrimdışı — Mesaj iletilecek')
+                : type === 'audit' ? 'Denetim Odası' : type === 'dm' ? 'Özel Mesaj' : 'Genel Sohbet'}
             </span>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setIsMinimized(true)} className="p-1 hover:bg-white/10 rounded transition-colors"><Minus size={14} /></button>
+          {!inline && <button onClick={() => setIsMinimized(true)} className="p-1 hover:bg-white/10 rounded transition-colors"><Minus size={14} /></button>}
           <button onClick={onClose} className="p-1 hover:bg-red-500 rounded transition-colors"><X size={14} /></button>
         </div>
       </div>

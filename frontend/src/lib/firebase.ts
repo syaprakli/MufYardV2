@@ -43,12 +43,12 @@ export const signIn = async (email: string, pass: string) => {
   const normalizedEmail = email.trim().toLowerCase();
 
   // 1. ÖNCELİKLİ BYPASS: Sabit hesap doğrudan geçer
-  if (normalizedEmail === "mufettis@gsb.gov.tr" && pass === "123456") {
+  if (normalizedEmail === "sefa.yaprakli@gsb.gov.tr" && pass === "123456") {
     console.log("✅ Sabit hesap bypass aktif.");
     return { 
       user: { 
         email: normalizedEmail, 
-        uid: "mufettis-gsb-unique-id", 
+        uid: "sefa-yaprakli-gsb-unique-id", 
         displayName: "Sefa Yapraklı",
         photoURL: null
       } 
@@ -63,8 +63,8 @@ export const signIn = async (email: string, pass: string) => {
     return await firebaseSignIn(auth, email, pass);
   } catch (error) {
     // Firebase hata verse bile eğer bu bizim özel hesabımızsa içeri al
-    if (normalizedEmail === "mufettis@gsb.gov.tr" && pass === "123456") {
-       return { user: { email: normalizedEmail, uid: "mufettis-gsb-unique-id", displayName: "Sefa Yapraklı" } };
+    if (normalizedEmail === "sefa.yaprakli@gsb.gov.tr" && pass === "123456") {
+       return { user: { email: normalizedEmail, uid: "sefa-yaprakli-gsb-unique-id", displayName: "Sefa Yapraklı" } };
     }
     throw error;
   }

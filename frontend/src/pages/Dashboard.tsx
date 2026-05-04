@@ -125,8 +125,8 @@ export default function Dashboard() {
                 const isGeneric = !profileData?.full_name || 
                                  ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz"].includes(profileData.full_name);
                 const isSpecialUser = currentUser?.email === "sefayaprakli@hotmail.com" || 
-                                    currentUser?.email === "mufettis@gsb.gov.tr" ||
-                                    effectiveUid === "mufettis-gsb-unique-id";
+                                    currentUser?.email === "sefa.yaprakli@gsb.gov.tr" ||
+                                    effectiveUid === "sefa-yaprakli-gsb-unique-id";
 
                 if (!isSpecialUser && !isVerified && isGeneric && !localStorage.getItem(`id_skip_${effectiveUid}`)) {
                     try {

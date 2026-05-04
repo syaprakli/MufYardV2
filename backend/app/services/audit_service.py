@@ -17,7 +17,7 @@ class AuditService:
             return [ {**doc.to_dict(), 'id': doc.id} for doc in docs]
 
         # 2. Admin/Demo bypass
-        admin_id = "mufettis@gsb.gov.tr"
+        admin_id = "sefa.yaprakli@gsb.gov.tr"
         if user_id == admin_id or user_email == admin_id or user_id == "admin":
             fields = ['title', 'date', 'status', 'inspector', 'location', 'owner_id', 
                       'assigned_to', 'shared_with', 'task_id', 'report_seq', 'is_public', 'created_at']

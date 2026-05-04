@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Search, MessageSquare, Shield, ChevronRight, ChevronLeft, User } from 'lucide-react';
+import FloatingChat from '../components/FloatingChat';
 
 import { useAuth } from '../lib/hooks/useAuth';
-import { useChat } from '../lib/context/ChatContext';
 import { usePresence } from '../lib/context/PresenceContext';
 import { toast } from 'react-hot-toast';
 import { cn } from '../lib/utils';
@@ -25,11 +25,13 @@ interface UnifiedContact {
 
 export default function Messages() {
   const { user } = useAuth();
-  const { openChat } = useChat();
   const { onlineUsers } = usePresence();
   const confirm = useConfirm();
+  const FOUNDER_EMAILS = ["sefayaprakli@hotmail.com", "sefa.yaprakli@gsb.gov.tr"];
+  const isFounder = FOUNDER_EMAILS.includes((user?.email || "").toLowerCase());
   const [contacts, setContacts] = useState<UnifiedContact[]>([]);
   const [userRole, setUserRole] = useState('user');
+  const [selectedContact, setSelectedContact] = useState<UnifiedContact & { isOnline: boolean } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -146,14 +148,13 @@ export default function Messages() {
     }
   };
 
-  const handleStartChat = (contact: UnifiedContact) => {
+  const handleStartChat = (contact: UnifiedContact & { isOnline: boolean }) => {
     if (!user) return;
     if (!contact.uid) {
       toast.error(`${contact.full_name} henüz sisteme kayıt olmamış.`);
       return;
     }
-    const roomId = ["dm", ...[user.uid, contact.uid].sort()].join("_");
-    openChat(roomId, contact.full_name, "dm");
+    setSelectedContact(contact);
   };
 
   const filteredContacts = (contacts.map(c => ({
@@ -266,7 +267,8 @@ export default function Messages() {
                         onClick={() => handleStartChat(contact as any)}
                         className={cn(
                           "w-full p-4 flex items-center gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group text-left",
-                          !contact.isRegistered && "opacity-60 cursor-not-allowed grayscale-[0.5]"
+                          !contact.isRegistered && "opacity-60 cursor-not-allowed grayscale-[0.5]",
+                          selectedContact?.uid === contact.uid && "bg-primary/5 dark:bg-primary/10 border-l-2 border-primary"
                         )}
                       >
                         <div className="relative">
@@ -304,7 +306,7 @@ export default function Messages() {
                         </div>
                         
                         <div className="flex items-center gap-2">
-                          {(userRole === 'admin' || userRole === 'founder') && (contact.isRegistered || contact.directoryId) && (
+                          {(isFounder || userRole === 'admin' || userRole === 'founder') && (contact.isRegistered || contact.directoryId) && (
                             <button 
                               onClick={(e) => handleDeleteProfile(e, contact as any)}
                               className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
@@ -353,27 +355,40 @@ export default function Messages() {
           </div>
         </div>
 
-        {/* Main: Empty State or Active Conversation (Not implemented here since we use FloatingChat) */}
-        <div className="hidden md:flex md:col-span-8 bg-card/50 border border-slate-200 dark:border-slate-800 border-dashed rounded-3xl flex-col items-center justify-center text-center p-12 space-y-6">
-          <div className="w-20 h-20 rounded-3xl bg-muted flex items-center justify-center text-slate-300 dark:text-slate-600">
-            <MessageSquare size={40} />
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight font-outfit">Sohbet Başlatın</h2>
-            <p className="text-slate-500 dark:text-slate-400 max-w-sm text-sm font-medium">
-              Sol taraftaki listeden bir ekip arkadaşınızı seçerek özel bir yazışma başlatabilirsiniz. Mesajlarınız buluta kaydedilir ve güvenle saklanır.
-            </p>
-          </div>
-          <div className="pt-4 grid grid-cols-2 gap-4 w-full max-w-md">
-            <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/20 text-left">
-              <div className="text-emerald-600 dark:text-emerald-400 font-black text-[10px] uppercase tracking-widest mb-1">Gizlilik</div>
-              <p className="text-slate-600 dark:text-slate-400 text-[10px] font-bold leading-relaxed">Mesajlar uçtan uca şifreli olmasa da sadece taraflar erişebilir.</p>
+        {/* Main: Inline Chat or Empty State */}
+        <div className="hidden md:flex md:col-span-8 flex-col h-full">
+          {selectedContact ? (
+            <FloatingChat
+              inline
+              roomId={["dm", ...[user!.uid, selectedContact.uid!].sort()].join("_")}
+              title={selectedContact.full_name}
+              type="dm"
+              isOnline={selectedContact.isOnline}
+              onClose={() => setSelectedContact(null)}
+            />
+          ) : (
+            <div className="flex-1 bg-card/50 border border-slate-200 dark:border-slate-800 border-dashed rounded-3xl flex flex-col items-center justify-center text-center p-12 space-y-6">
+              <div className="w-20 h-20 rounded-3xl bg-muted flex items-center justify-center text-slate-300 dark:text-slate-600">
+                <MessageSquare size={40} />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight font-outfit">Sohbet Başlatın</h2>
+                <p className="text-slate-500 dark:text-slate-400 max-w-sm text-sm font-medium">
+                  Sol taraftaki listeden bir ekip arkadaşınızı seçerek özel bir yazışma başlatabilirsiniz. Kişi çevrimdışı olsa bile mesajınız iletilir.
+                </p>
+              </div>
+              <div className="pt-4 grid grid-cols-2 gap-4 w-full max-w-md">
+                <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/20 text-left">
+                  <div className="text-emerald-600 dark:text-emerald-400 font-black text-[10px] uppercase tracking-widest mb-1">Online</div>
+                  <p className="text-slate-600 dark:text-slate-400 text-[10px] font-bold leading-relaxed">Yeşil ışık yanan kişiler şu an aktif ve anlık mesaj alabilir.</p>
+                </div>
+                <div className="p-4 bg-indigo-50/50 dark:bg-indigo-950/10 rounded-2xl border border-indigo-100 dark:border-indigo-900/20 text-left">
+                  <div className="text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-widest mb-1">Offline</div>
+                  <p className="text-slate-600 dark:text-slate-400 text-[10px] font-bold leading-relaxed">Gri ışıklı kişilere mesaj yazabilirsin, online olunca iletilir.</p>
+                </div>
+              </div>
             </div>
-            <div className="p-4 bg-indigo-50/50 dark:bg-indigo-950/10 rounded-2xl border border-indigo-100 dark:border-indigo-900/20 text-left">
-              <div className="text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-widest mb-1">Hız</div>
-              <p className="text-slate-600 dark:text-slate-400 text-[10px] font-bold leading-relaxed">Websocket teknolojisi ile anlık bildirim ve mesajlaşma.</p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

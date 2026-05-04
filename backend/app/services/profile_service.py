@@ -179,11 +179,11 @@ class ProfileService:
                     "ai_model": "Gemini 2.0 Flash",
                     "ai_temperature": 0.7,
                     "notifications_enabled": True,
-                    "role": "admin" if email in ["mufettis@gsb.gov.tr", "sefayaprakli@hotmail.com"] else "user"
+                    "role": "admin" if email in ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com"] else "user"
                 })
             
             # Admin role enforcement
-            if email in ["mufettis@gsb.gov.tr", "sefayaprakli@hotmail.com"]:
+            if email in ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com"]:
                 new_data["role"] = "admin"
 
             await asyncio.to_thread(lambda: doc_ref.set(new_data, merge=True))
@@ -213,7 +213,7 @@ class ProfileService:
                 profile_data['emails'] = current_emails
 
             # Admin role enforcement for existing profiles
-            _admin_emails = ["mufettis@gsb.gov.tr", "sefayaprakli@hotmail.com"]
+            _admin_emails = ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com"]
             if (profile_data.get('email') or search_email or '').lower() in _admin_emails:
                 if profile_data.get('role') != 'admin':
                     await asyncio.to_thread(lambda: doc_ref.update({"role": "admin"}))
@@ -221,15 +221,15 @@ class ProfileService:
             return profile_data
 
         # Final Fallback
-        _admin_emails = ["mufettis@gsb.gov.tr", "sefayaprakli@hotmail.com"]
+        _admin_emails = ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com"]
         _fallback_role = "admin" if (search_email or "").lower() in _admin_emails else "user"
         default_profile = {
             "uid": uid,
             "full_name": "Kullanıcı",
             "title": "Müfettiş",
             "institution": "Gençlik ve Spor Bakanlığı",
-            "email": search_email or "mufettis@gsb.gov.tr",
-            "emails": ProfileService._merge_emails(search_email or "mufettis@gsb.gov.tr"),
+            "email": search_email or "sefa.yaprakli@gsb.gov.tr",
+            "emails": ProfileService._merge_emails(search_email or "sefa.yaprakli@gsb.gov.tr"),
             "theme": "navy",
             "ai_enabled": True,
             "ai_model": "Gemini 2.0 Flash",

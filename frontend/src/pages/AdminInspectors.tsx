@@ -228,7 +228,7 @@ export default function AdminInspectors() {
                                         )}
                                         {registered && profile && (
                                             <div className="relative">
-                                                <button onClick={() => setOpenRoleMenu(openRoleMenu === ins.id ? null : ins.id)} className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                                                <button onClick={() => setOpenRoleMenu(openRoleMenu === ins.id ? null : ins.id)} className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-xl transition-all">
                                                     <MoreVertical size={16} />
                                                 </button>
                                                 {openRoleMenu === ins.id && (

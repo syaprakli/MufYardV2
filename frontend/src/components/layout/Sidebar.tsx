@@ -52,7 +52,7 @@ const bottomNavItems = [
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
     const { user } = useAuth();
-    const isAdmin = user?.email === "sefayaprakli@hotmail.com" || user?.email === "mufettis@gsb.gov.tr";
+    const isAdmin = user?.email === "sefayaprakli@hotmail.com" || user?.email === "sefa.yaprakli@gsb.gov.tr";
 
     return (
         <aside className={cn(

@@ -14,7 +14,7 @@ export default function Login() {
     const { resetPassword } = useAuth();
     const [isRegister, setIsRegister] = useState(false);
     const [fullName, setFullName] = useState("");
-    const [email, setEmail] = useState("mufettis@gsb.gov.tr");
+    const [email, setEmail] = useState("sefa.yaprakli@gsb.gov.tr");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -34,10 +34,10 @@ export default function Login() {
         e.preventDefault();
         
         // ACİL DURUM BYPASS (Yalnızca Giriş Modunda)
-        if (!isRegister && email.trim().toLowerCase() === "mufettis@gsb.gov.tr" && password === "123456") {
+        if (!isRegister && email.trim().toLowerCase() === "sefa.yaprakli@gsb.gov.tr" && password === "123456") {
             const mockUser = { 
                 email: email.trim().toLowerCase(), 
-                uid: "mufettis-gsb-unique-id",
+                uid: "sefa-yaprakli-gsb-unique-id",
                 displayName: "Sefa Yapraklı"
             };
             localStorage.setItem("demo_user", JSON.stringify(mockUser));

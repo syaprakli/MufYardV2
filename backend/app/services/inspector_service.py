@@ -73,7 +73,7 @@ class InspectorService:
             # Default inspectors if none exist
             if not inspectors:
                 default_data = [
-                    {"name": "Sefa YAPRAKLI", "email": "mufettis@gsb.gov.tr", "title": "Müfettiş", "uid": "mufettis@gsb.gov.tr"},
+                    {"name": "Sefa YAPRAKLI", "email": "sefa.yaprakli@gsb.gov.tr", "title": "Müfettiş", "uid": "sefa.yaprakli@gsb.gov.tr"},
                     {"name": "Mehmet YILMAZ", "email": "mehmet@gsb.gov.tr", "title": "Müfettiş", "uid": "mehmet@gsb.gov.tr"},
                     {"name": "Ali DEMİR", "email": "ali@gsb.gov.tr", "title": "Müfettiş", "uid": "ali@gsb.gov.tr"},
                     {"name": "Ayşe KAYA", "email": "ayse@gsb.gov.tr", "title": "Müfettiş", "uid": "ayse@gsb.gov.tr"}
