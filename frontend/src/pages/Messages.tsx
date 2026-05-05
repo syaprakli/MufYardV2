@@ -148,6 +148,20 @@ export default function Messages() {
         </div>
       </div>
 
+      {/* Mobil: Kişi seçildiğinde tam ekran chat */}
+      {selectedContact && (
+        <div className="md:hidden fixed inset-0 z-50 bg-background flex flex-col">
+          <FloatingChat
+            inline
+            roomId={["dm", ...[user!.uid, selectedContact.uid!].sort()].join("_")}
+            title={selectedContact.full_name}
+            type="dm"
+            isOnline={selectedContact.isOnline}
+            onClose={() => setSelectedContact(null)}
+          />
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 h-[calc(100vh-280px)]">
         {/* Sidebar: User List */}
         <div className="md:col-span-4 flex flex-col space-y-4">
