@@ -35,6 +35,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const retryTimer = useRef<any>(null);
     const pingTimer = useRef<any>(null);
     const retryCountRef = useRef(0);
+    const activeNameRef = useRef<string>('Müfettiş');
     const [profileName, setProfileName] = useState<string | null>(null);
 
     useEffect(() => {
@@ -43,6 +44,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                 api.fetchProfile(user.uid, user.email || undefined).then(p => {
                     if (p.full_name && p.full_name !== "Kullanıcı") {
                         setProfileName(p.full_name);
+                        activeNameRef.current = p.full_name;
                     }
                 });
             });
@@ -54,7 +56,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             if (!user?.uid) return;
 
             try {
-                const activeName = profileName || user.displayName || 'Müfettiş';
+                const activeName = activeNameRef.current || profileName || user.displayName || 'Müfettiş';
                 const baseWsUrl = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
                 const wsUrl = `${baseWsUrl}/ws?uid=${user.uid}&name=${encodeURIComponent(activeName)}&room_id=global`;
                 
@@ -133,7 +135,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             }
             clearInterval(pingTimer.current);
         };
-    }, [user?.uid, user?.displayName, profileName]);
+    }, [user?.uid]);
 
     const isUserOnline = (uid: string) => {
         return onlineUsers.some(u => u.uid === uid);

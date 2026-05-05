@@ -752,24 +752,27 @@ export default function PublicSpace() {
                 </div>
             </div>
 
+            {/* Desktop chat toggle butonu - container dışında, her zaman görünür */}
+            <button 
+                onClick={() => setIsChatCollapsed(!isChatCollapsed)}
+                className="hidden lg:flex fixed right-0 top-1/2 -translate-y-1/2 w-8 h-20 bg-[#002B4B] text-white items-center justify-center rounded-l-2xl shadow-xl z-50 border-r border-white/10 hover:w-10 transition-all"
+                style={{ right: isChatCollapsed ? 0 : 384 }}
+            >
+                {isChatCollapsed ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+            </button>
+
             <div 
                 className={cn(
-                    "flex transition-all duration-300",
+                    "transition-all duration-300",
                     // Mobile: viewMode Sohbet ise tam ekran overlay, değilse gizle
                     viewMode === 'Sohbet'
-                        ? "fixed inset-0 z-[100] lg:static lg:inset-auto"
+                        ? "fixed inset-0 z-[100] lg:static lg:inset-auto flex"
                         : "hidden lg:flex",
                     // Desktop genişlik
-                    isChatCollapsed ? "lg:w-0 lg:overflow-hidden" : "lg:w-[384px]",
+                    isChatCollapsed ? "lg:w-0 lg:overflow-hidden lg:opacity-0" : "lg:w-[384px]",
                 )}
             >
-                <div className="flex h-full relative">
-                    <button 
-                        onClick={() => setIsChatCollapsed(!isChatCollapsed)}
-                        className="hidden lg:flex absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-20 bg-[#002B4B] text-white items-center justify-center rounded-l-2xl shadow-xl z-50 border-r border-white/10 hover:w-10 transition-all"
-                    >
-                        {isChatCollapsed ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-                    </button>
+                <div className="flex h-full relative w-full">
                     <div className="w-full lg:w-[384px] h-full border-l border-border/50 bg-card flex flex-col shadow-2xl overflow-hidden">
                         <div className="p-6 border-b border-white/10 bg-[#002B4B] text-white flex items-center justify-between">
                             <div className="flex items-center gap-3">
