@@ -1,0 +1,13 @@
+uploads/
+Mevzuat/
+Raporlar/
+build/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.log
+*.txt
+import_mevzuat/
+scripts/
