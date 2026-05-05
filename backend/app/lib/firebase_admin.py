@@ -31,9 +31,14 @@ try:
         try:
             from app.lib.firebase_secrets import FIREBASE_CONFIG
             if FIREBASE_CONFIG:
-                cred = credentials.Certificate(FIREBASE_CONFIG)
+                # Normalize private key line endings (CRLF → LF for Linux/Docker)
+                config_copy = dict(FIREBASE_CONFIG)
+                if config_copy.get('private_key'):
+                    config_copy['private_key'] = config_copy['private_key'].replace('\r\n', '\n').replace('\r', '\n')
+                cred = credentials.Certificate(config_copy)
                 logger.info("Firebase: Using credentials from app.lib.firebase_secrets.")
-        except (ImportError, Exception):
+        except (ImportError, Exception) as secrets_err:
+            logger.error(f"Firebase: firebase_secrets loading failed: {secrets_err}")
             pass
 
     # 3. Try from Local File Path
@@ -50,17 +55,8 @@ try:
             
             _db = firestore.client()
             _messaging = messaging
-            
-            # --- AUTH CHECK ---
-            try:
-                _db.collection('health').document('check').get(timeout=5)
-                logger.info("Firebase Firestore connectivity verified.")
-                is_mock = False
-            except Exception as auth_err:
-                logger.error(f"Firebase Connectivity Check FAILED: {auth_err}")
-                is_mock = True
-                _db = None
-            # ------------------
+            is_mock = False
+            logger.info("Firebase initialized successfully.")
 
             if not is_mock:
                 try:
