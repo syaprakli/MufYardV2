@@ -91,7 +91,7 @@ export default function PublicSpace() {
     const confirm = useConfirm();
 
     const location = useLocation();
-    const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage } = usePresence();
+    const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage, wsConnected } = usePresence();
     const [posts, setPosts] = useState<Post[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
     const [categories, setCategories] = useState<string[]>([]);
@@ -196,6 +196,24 @@ export default function PublicSpace() {
             });
         }
     }, [globalMessages, user?.uid]);
+
+    // WS bağlı değilse polling ile yeni mesajları çek
+    useEffect(() => {
+        if (wsConnected || !user?.uid) return;
+        const poll = async () => {
+            try {
+                const res = await fetchWithTimeout(`${API_URL}/collaboration/messages`);
+                const data = await res.json();
+                setMessages(prev => {
+                    const newMsgs = data.filter((m: any) => !prev.some((pm: any) => pm.id === m.id));
+                    if (newMsgs.length === 0) return prev;
+                    return [...prev, ...newMsgs.map((m: any) => ({ ...m, isMine: m.author_id === user?.uid }))];
+                });
+            } catch {}
+        };
+        const timer = setInterval(poll, 5000);
+        return () => clearInterval(timer);
+    }, [wsConnected, user?.uid]);
 
     useEffect(() => {
         const loadPosts = async () => {
