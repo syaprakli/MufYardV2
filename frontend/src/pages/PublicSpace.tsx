@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { 
     Send, User, MessageSquare, Search,
     Loader2, Trash2,
@@ -19,6 +19,7 @@ import { fetchWithTimeout } from "../lib/api/utils";
 import toast from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNotifications } from "../lib/context/NotificationContext";
 
 interface Post {
     id: string;
@@ -62,6 +63,29 @@ interface Message {
     attachments?: Attachment[];
 }
 
+const CHAT_COLOR_PALETTES = [
+    { bubble: 'bg-sky-600 text-white', meta: 'text-sky-200' },
+    { bubble: 'bg-emerald-600 text-white', meta: 'text-emerald-200' },
+    { bubble: 'bg-violet-600 text-white', meta: 'text-violet-200' },
+    { bubble: 'bg-amber-500 text-slate-950', meta: 'text-amber-200' },
+    { bubble: 'bg-fuchsia-600 text-white', meta: 'text-fuchsia-200' },
+    { bubble: 'bg-cyan-600 text-white', meta: 'text-cyan-200' },
+];
+
+function getMessagePalette(authorId?: string, authorName?: string) {
+    const identity = `${authorId || ''}|${authorName || ''}`.toLowerCase();
+    if (identity.includes('sefa') || identity.includes('admin')) {
+        return { bubble: 'bg-rose-600 text-white', meta: 'text-rose-200' };
+    }
+
+    let hash = 0;
+    for (let i = 0; i < identity.length; i += 1) {
+        hash = (hash * 31 + identity.charCodeAt(i)) >>> 0;
+    }
+
+    return CHAT_COLOR_PALETTES[hash % CHAT_COLOR_PALETTES.length];
+}
+
 const FAQ_DATA = [
     {
         id: "static-1",
@@ -89,6 +113,8 @@ const FAQ_DATA = [
 export default function PublicSpace() {
     const { user, loading: authLoading } = useAuth();
     const confirm = useConfirm();
+    const navigate = useNavigate();
+    const { notifications } = useNotifications();
 
     const location = useLocation();
     const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage, wsConnected } = usePresence();
@@ -123,6 +149,7 @@ export default function PublicSpace() {
     const [sortBy, setSortBy] = useState<'newest' | 'popular'>('newest');
     const [showEmojiPicker, setShowEmojiPicker] = useState<'chat' | 'comment' | null>(null);
     const [showGifPicker, setShowGifPicker] = useState<'chat' | 'comment' | null>(null);
+    const [showOnlinePanel, setShowOnlinePanel] = useState(false);
     const [gifSearchQuery, setGifSearchQuery] = useState("");
     const [onlineGifs, setOnlineGifs] = useState<any[]>([]);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -130,6 +157,7 @@ export default function PublicSpace() {
     const [editingPost, setEditingPost] = useState<Post | null>(null);
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [editCommentText, setEditCommentText] = useState("");
+    const unreadDirectMessages = notifications.filter((notif) => !notif.read && notif.type === 'collaboration').length;
 
     useEffect(() => {
         const handleStatus = () => setIsOnline(navigator.onLine);
@@ -804,26 +832,46 @@ export default function PublicSpace() {
                                     <MessageSquare size={16} className="text-blue-400" /> Canlı Müzakere
                                 </h3>
                             </div>
-                            <div className="flex flex-col items-end gap-2 max-h-28 overflow-y-auto pr-1">
-                                {Array.isArray(onlineUsers) && onlineUsers.slice(0, 5).map((u) => (
-                                    <div key={u.uid} title={u.name} className="flex items-center gap-2 rounded-full bg-white/5 px-2.5 py-1 ring-1 ring-white/10">
-                                        <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-[10px] font-black capitalize text-white">
-                                            {u.name ? u.name.charAt(0) : '?'}
-                                        </div>
-                                        <span className="max-w-[120px] truncate text-[10px] font-black capitalize text-white/90">{u.name || 'Bilinmeyen'}</span>
-                                    </div>
-                                ))}
-                                {onlineUsers.length > 5 && (
-                                    <div className="rounded-full bg-slate-700 px-3 py-1 text-[10px] font-black text-white/90">
-                                        +{onlineUsers.length - 5} kişi daha
-                                    </div>
-                                )}
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowOnlinePanel((prev) => !prev)}
+                                className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-[10px] font-black tracking-widest text-white/90 transition-colors hover:bg-white/15"
+                            >
+                                <span>{onlineUsers.length} kişi online</span>
+                                {showOnlinePanel ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            </button>
                         </div>
+                        <AnimatePresence>
+                            {showOnlinePanel && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-hidden border-b border-border bg-[#0a385d]"
+                                >
+                                    <div className="max-h-40 overflow-y-auto px-6 py-4 space-y-2">
+                                        {onlineUsers.length === 0 ? (
+                                            <p className="text-[11px] font-bold text-white/60">Şu an çevrimiçi kullanıcı yok.</p>
+                                        ) : (
+                                            onlineUsers.map((u) => (
+                                                <div key={u.uid} className="flex items-center gap-2 rounded-2xl bg-white/5 px-3 py-2 text-white/90 ring-1 ring-white/10">
+                                                    <div className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                                                    <span className="truncate text-[11px] font-bold capitalize">{u.name || u.uid}</span>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                         <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
                             {messages.map((msg: any) => (
                                 <div key={msg.id} className={cn("flex flex-col", (msg.isMine || msg.author_id === user?.uid) ? "items-end" : "items-start")}>
-                                    <div className={cn("max-w-[85%] p-4 rounded-3xl text-sm font-medium shadow-sm space-y-2", (msg.isMine || msg.author_id === user?.uid) ? "bg-primary text-white rounded-tr-none" : "bg-muted/80 text-foreground rounded-tl-none")}>
+                                    <div className={cn(
+                                        "max-w-[85%] p-4 rounded-3xl text-sm font-medium shadow-sm space-y-2",
+                                        getMessagePalette(msg.author_id, msg.author_name).bubble,
+                                        (msg.isMine || msg.author_id === user?.uid) ? "rounded-tr-none" : "rounded-tl-none"
+                                    )}>
                                         {msg.text !== "GIF" && msg.text}
                                         {msg.attachments && msg.attachments.length > 0 && msg.attachments[0].url && (
                                             <div className="rounded-2xl overflow-hidden shadow-md">
@@ -832,7 +880,7 @@ export default function PublicSpace() {
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2 mt-1 px-2 group">
-                                        <span className="text-[10px] font-bold text-slate-400">{msg.author_name} • {new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                        <span className={cn("text-[10px] font-bold", getMessagePalette(msg.author_id, msg.author_name).meta)}>{msg.author_name} • {new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
                                         {(msg.author_id === user?.uid || userRole === 'admin') && (
                                             <button 
                                                 onClick={() => handleDeleteMessage(msg.id)}
@@ -903,7 +951,18 @@ export default function PublicSpace() {
                 </div>
             </div>
 
-            <div className="lg:hidden fixed bottom-6 right-6 z-40">
+            <div className="lg:hidden fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+                <Button
+                    onClick={() => navigate('/messages')}
+                    className="w-14 h-14 rounded-full bg-indigo-600 text-white shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all relative"
+                >
+                    <Bell size={22} />
+                    {unreadDirectMessages > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-rose-500 border-2 border-indigo-600 rounded-full flex items-center justify-center text-[8px] font-black">
+                            {unreadDirectMessages > 9 ? '9+' : unreadDirectMessages}
+                        </span>
+                    )}
+                </Button>
                 <Button 
                     onClick={() => {
                         if (viewMode !== 'Sohbet') {

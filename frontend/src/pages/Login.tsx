@@ -22,15 +22,11 @@ export default function Login() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Sadece kullanıcı açıkça istediğinde e-postayı hatırla.
         const savedEmail = localStorage.getItem("remembered_email");
         const rememberEnabled = localStorage.getItem("remembered_email_enabled") === "true";
         if (rememberEnabled && savedEmail) {
             setEmail(savedEmail);
             setRememberMe(true);
-        } else {
-            localStorage.removeItem("remembered_email");
-            localStorage.removeItem("remembered_email_enabled");
         }
     }, []);
 

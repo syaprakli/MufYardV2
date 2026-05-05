@@ -6,10 +6,8 @@ import { useAuth } from '../lib/hooks/useAuth';
 import { usePresence } from '../lib/context/PresenceContext';
 import { toast } from 'react-hot-toast';
 import { cn } from '../lib/utils';
-import { fetchAllProfiles, deleteProfile as apiDeleteProfile, type Profile } from '../lib/api/profiles';
+import { fetchAllProfiles, type Profile } from '../lib/api/profiles';
 import { fetchInspectors } from '../lib/api/inspectors';
-import { useConfirm } from '../lib/context/ConfirmContext';
-import { Trash2 } from 'lucide-react';
 
 interface UnifiedContact {
   uid: string | null;
@@ -26,11 +24,7 @@ interface UnifiedContact {
 export default function Messages() {
   const { user } = useAuth();
   const { onlineUsers } = usePresence();
-  const confirm = useConfirm();
-  const FOUNDER_EMAILS = ["sefayaprakli@hotmail.com", "sefa.yaprakli@gsb.gov.tr"];
-  const isFounder = FOUNDER_EMAILS.includes((user?.email || "").toLowerCase());
   const [contacts, setContacts] = useState<UnifiedContact[]>([]);
-  const [userRole, setUserRole] = useState('user');
   const [selectedContact, setSelectedContact] = useState<UnifiedContact & { isOnline: boolean } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -76,15 +70,9 @@ export default function Messages() {
         console.warn("Rehber verisi alınamadı, sadece kayıtlı kullanıcılar gösteriliyor.");
       }
       
-      // Set current user role
-      if (user) {
-        const myProfile = profiles.find(p => p.uid === user.uid);
-        if (myProfile?.role) setUserRole(myProfile.role);
-      }
-      
       const unified: UnifiedContact[] = [];
 
-      // Sadece kayıtlı profilleri ekle ve rehber bilgisiyle zenginleştir
+      // Kayıtlı profilleri ekle ve rehber bilgisiyle zenginleştir.
       profiles.forEach(profile => {
         const isMe = profile.uid === user?.uid;
         const dirEntry = directory.find(d => d.email?.toLowerCase() === profile.email?.toLowerCase());
@@ -101,6 +89,26 @@ export default function Messages() {
         });
       });
 
+      // Rehberde olup profili silinmiş kullanıcıları da görünür tut.
+      directory.forEach((entry: any) => {
+        const alreadyExists = unified.some(
+          (item) => item.email.toLowerCase() === (entry.email || '').toLowerCase()
+        );
+
+        if (alreadyExists) return;
+
+        unified.push({
+          uid: entry.uid || null,
+          full_name: entry.name || entry.email || 'İsimsiz Kullanıcı',
+          title: entry.title || 'Müfettiş',
+          email: entry.email || '',
+          avatar_url: null,
+          isRegistered: !!entry.uid,
+          isMe: false,
+          directoryId: entry.id || null,
+        });
+      });
+
       // Listeyi alfabetik sırala
       unified.sort((a, b) => a.full_name.localeCompare(b.full_name));
 
@@ -109,47 +117,6 @@ export default function Messages() {
       console.error("Kullanıcılar yüklenemedi:", error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDeleteProfile = async (e: React.MouseEvent, contact: UnifiedContact) => {
-    e.stopPropagation();
-    
-    const isRegistered = !!contact.uid;
-
-    const confirmed = await confirm({
-      title: "Kullanıcıyı Sil",
-      message: `${contact.full_name} kullanıcısını ${isRegistered ? "sistemden ve " : ""}rehberden tamamen silmek istediğinize emin misiniz?`,
-      confirmText: "Sil",
-      variant: "danger"
-    });
-    
-    if (confirmed) {
-      try {
-        let successCount = 0;
-        
-        // 1. Profil sil (Kayıtlı ise)
-        if (contact.uid) {
-          const res = await apiDeleteProfile(contact.uid);
-          if (res) successCount++;
-        }
-
-        // 2. Rehberden sil (Directory ID varsa)
-        if (contact.directoryId) {
-          const { deleteInspector } = await import('../lib/api/inspectors');
-          await deleteInspector(contact.directoryId);
-          successCount++;
-        }
-
-        if (successCount > 0) {
-          toast.success("Kullanıcı başarıyla silindi.");
-          fetchUsers();
-        } else {
-          toast.error("Silme işlemi başarısız.");
-        }
-      } catch (err) {
-        toast.error("Hata oluştu.");
-      }
     }
   };
 
@@ -311,15 +278,6 @@ export default function Messages() {
                         </div>
                         
                         <div className="flex items-center gap-2">
-                          {(isFounder || userRole === 'admin' || userRole === 'founder') && (contact.isRegistered || contact.directoryId) && (
-                            <button 
-                              onClick={(e) => handleDeleteProfile(e, contact as any)}
-                              className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                              title="Profili Sil"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
                           <ChevronRight size={16} className="text-slate-300 group-hover:text-primary transition-colors translate-x-0 group-hover:translate-x-1" />
                         </div>
                       </button>
