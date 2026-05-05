@@ -26,6 +26,19 @@ interface PresenceContextType {
 
 const PresenceContext = createContext<PresenceContextType | undefined>(undefined);
 
+function resolvePresenceName(user: any, profileName?: string) {
+    const normalizedProfile = (profileName || '').trim();
+    if (normalizedProfile && normalizedProfile !== 'Müfettiş' && normalizedProfile !== 'Kullanıcı') {
+        return normalizedProfile;
+    }
+    const displayName = (user?.displayName || '').trim();
+    if (displayName && displayName !== 'Müfettiş' && displayName !== 'Kullanıcı') {
+        return displayName;
+    }
+    const emailPrefix = (user?.email || '').split('@')[0]?.trim();
+    return emailPrefix || user?.email || 'Kullanıcı';
+}
+
 export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
     const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
@@ -36,16 +49,15 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const pingTimer = useRef<any>(null);
     const pongTimer = useRef<any>(null);
     const retryCountRef = useRef(0);
-    const activeNameRef = useRef<string>('Müfettiş');
+    const activeNameRef = useRef<string>('Kullanıcı');
     const connectRef = useRef<(() => void) | null>(null);
 
     useEffect(() => {
         if (user?.uid) {
+            activeNameRef.current = resolvePresenceName(user);
             import('../api/profiles').then(api => {
                 api.fetchProfile(user.uid, user.email || undefined).then(p => {
-                    if (p.full_name && p.full_name !== "Kullanıcı") {
-                        activeNameRef.current = p.full_name;
-                    }
+                    activeNameRef.current = resolvePresenceName(user, p.full_name);
                 }).catch(() => {});
             });
         }
@@ -60,7 +72,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             clearTimeout(retryTimer.current);
 
             try {
-                const activeName = activeNameRef.current || user.displayName || 'Müfettiş';
+                const activeName = activeNameRef.current || resolvePresenceName(user);
                 const baseWsUrl = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
                 const wsUrl = `${baseWsUrl}/ws?uid=${encodeURIComponent(user.uid)}&name=${encodeURIComponent(activeName)}&room_id=global`;
 
@@ -103,6 +115,18 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                                     author_name: data.author_name || 'Müfettiş',
                                     timestamp: data.timestamp || new Date().toISOString(),
                                     attachments: data.attachments || []
+                                }];
+                            });
+                        } else if (data.content || data.sender_name) {
+                            setMessages(prev => {
+                                if (prev.some(m => m.id === data.id)) return prev;
+                                return [...prev, {
+                                    id: data.id || Date.now().toString(),
+                                    text: data.content || '',
+                                    author_id: data.sender_id,
+                                    author_name: data.sender_name || 'Kullanıcı',
+                                    timestamp: data.timestamp || new Date().toISOString(),
+                                    attachments: data.attachment ? [data.attachment] : []
                                 }];
                             });
                         }
@@ -177,7 +201,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                 text,
                 attachments,
                 author_id: user?.uid,
-                author_name: activeNameRef.current || user?.displayName || 'Müfettiş',
+                author_name: activeNameRef.current || resolvePresenceName(user),
                 timestamp: new Date().toISOString()
             }));
         }

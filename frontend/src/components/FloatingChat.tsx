@@ -59,6 +59,16 @@ interface FloatingChatProps {
   isOnline?: boolean;
 }
 
+function getDirectRoomUserIds(roomId: string, currentUid: string) {
+  const normalized = roomId.startsWith('dm_') ? roomId.slice(3) : roomId;
+  const parts = normalized.split('_');
+  if (parts.length === 2) {
+    return parts;
+  }
+  const otherUid = parts.find(part => part !== currentUid);
+  return [currentUid, otherUid || currentUid];
+}
+
 // ─── COMPONENT ──────────────────────────────────────────────────────────────
 export default function FloatingChat({ roomId, title, onClose, type = 'dm', inline = false, isOnline }: FloatingChatProps) {
   const { user } = useAuth();
@@ -94,9 +104,8 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
     if (type === 'dm' && user) {
       const fetchHistory = async () => {
         try {
-          // room_id: dm_uid1_uid2 formatında
-          const parts = roomId.split('_');
-          const otherUid = parts[1] === user.uid ? parts[2] : parts[1];
+          const [uid1, uid2] = getDirectRoomUserIds(roomId, user.uid);
+          const otherUid = uid1 === user.uid ? uid2 : uid1;
           const res = await fetch(`${API_URL}/collaboration/dm/history?uid1=${user.uid}&uid2=${otherUid}`);
           if (res.ok) {
             const data = await res.json();
@@ -127,7 +136,9 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
     const connect = () => {
       if (!user) return;
       const baseWs = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
-      const socketUrl = `${baseWs}/ws?uid=${user.uid}&name=${encodeURIComponent(user.displayName || user.email || 'Müfettiş')}&room_id=${roomId}`;
+      const senderName = user.displayName || user.email?.split('@')[0] || user.email || 'Kullanıcı';
+      const normalizedRoomId = type === 'dm' && !roomId.startsWith('dm_') ? `dm_${roomId}` : roomId;
+      const socketUrl = `${baseWs}/ws?uid=${user.uid}&name=${encodeURIComponent(senderName)}&room_id=${normalizedRoomId}`;
       
       ws.current = new WebSocket(socketUrl);
 

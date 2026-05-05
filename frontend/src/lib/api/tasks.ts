@@ -94,8 +94,11 @@ export async function deleteTask(id: string): Promise<{ status: string; message:
     return response.json();
 }
 
-export async function acceptTask(id: string, userId: string): Promise<{ status: string; message: string }> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/${id}/accept?user_id=${userId}`, {
+export async function acceptTask(id: string, userId: string, userEmail?: string): Promise<{ status: string; message: string }> {
+    const params = new URLSearchParams();
+    if (userId) params.set("user_id", userId);
+    if (userEmail) params.set("user_email", userEmail);
+    const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/${id}/accept?${params.toString()}`, {
         method: "POST",
     });
     if (!response.ok) throw new Error("Görev kabul edilemedi.");

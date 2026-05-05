@@ -804,15 +804,18 @@ export default function PublicSpace() {
                                     <MessageSquare size={16} className="text-blue-400" /> Canlı Müzakere
                                 </h3>
                             </div>
-                            <div className="flex -space-x-2 overflow-hidden">
+                            <div className="flex flex-col items-end gap-2 max-h-28 overflow-y-auto pr-1">
                                 {Array.isArray(onlineUsers) && onlineUsers.slice(0, 5).map((u) => (
-                                    <div key={u.uid} title={u.name} className="inline-block h-8 w-8 rounded-full ring-2 ring-[#002B4B] bg-blue-500 flex items-center justify-center text-[10px] font-black capitalize">
-                                        {u.name ? u.name.charAt(0) : '?'}
+                                    <div key={u.uid} title={u.name} className="flex items-center gap-2 rounded-full bg-white/5 px-2.5 py-1 ring-1 ring-white/10">
+                                        <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-[10px] font-black capitalize text-white">
+                                            {u.name ? u.name.charAt(0) : '?'}
+                                        </div>
+                                        <span className="max-w-[120px] truncate text-[10px] font-black capitalize text-white/90">{u.name || 'Bilinmeyen'}</span>
                                     </div>
                                 ))}
                                 {onlineUsers.length > 5 && (
-                                    <div className="inline-block h-8 w-8 rounded-full ring-2 ring-[#002B4B] bg-slate-700 flex items-center justify-center text-[8px] font-black">
-                                        +{onlineUsers.length - 5}
+                                    <div className="rounded-full bg-slate-700 px-3 py-1 text-[10px] font-black text-white/90">
+                                        +{onlineUsers.length - 5} kişi daha
                                     </div>
                                 )}
                             </div>

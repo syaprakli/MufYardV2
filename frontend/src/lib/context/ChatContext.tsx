@@ -18,8 +18,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [activeChats, setActiveChats] = useState<ChatWindow[]>([]);
 
   const openChat = (roomId: string, title: string, type: 'dm' | 'audit' | 'global') => {
+    const normalizedRoomId = type === 'dm' && !roomId.startsWith('dm_') ? `dm_${roomId}` : roomId;
     // Check if room already open
-    if (activeChats.find(c => c.roomId === roomId)) {
+    if (activeChats.find(c => c.roomId === normalizedRoomId)) {
       // Move to front/focus logic could be added here
       return;
     }
@@ -27,7 +28,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     // Limit max 3-4 chats
     setActiveChats(prev => {
         const filtered = prev.length >= 3 ? prev.slice(1) : prev;
-        return [...filtered, { roomId, title, type }];
+        return [...filtered, { roomId: normalizedRoomId, title, type }];
     });
   };
 

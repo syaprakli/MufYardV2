@@ -63,6 +63,8 @@ export default function Tasks() {
     
     const currentUser = user;
     const effectiveUid = currentUser?.uid;
+    const effectiveEmail = currentUser?.email?.toLowerCase();
+    const userKeys = [effectiveUid, effectiveEmail].filter(Boolean) as string[];
 
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -176,16 +178,16 @@ export default function Tasks() {
         if (!effectiveUid) return;
         try {
             setLoading(true);
-            const data = await fetchTasks(effectiveUid);
+            const data = await fetchTasks(effectiveUid, effectiveEmail);
             
             const accepted = data.filter(t => 
-                t.owner_id === effectiveUid || 
-                t.accepted_collaborators?.includes(effectiveUid)
+                userKeys.includes(t.owner_id || '') || 
+                (t.accepted_collaborators || []).some(value => userKeys.includes(value))
             );
             
             const pending = data.filter(t => 
-                t.pending_collaborators?.includes(effectiveUid) &&
-                t.owner_id !== effectiveUid
+                (t.pending_collaborators || []).some(value => userKeys.includes(value)) &&
+                !userKeys.includes(t.owner_id || '')
             );
 
             setTasks(accepted);
@@ -217,7 +219,7 @@ export default function Tasks() {
                 steps: [],
                 is_public: activeTab === 'ortak',
                 owner_id: currentUser?.uid || "",
-                assigned_to: form.assigned_to.length > 0 ? form.assigned_to : [currentUser?.uid || ""]
+                assigned_to: form.assigned_to.length > 0 ? form.assigned_to : [currentUser?.uid || currentUser?.email || ""]
             });
             setForm({ 
                 rapor_kodu: "", 
@@ -245,7 +247,7 @@ export default function Tasks() {
     const handleAcceptInvitation = async (taskId: string) => {
         try {
             setSaving(true);
-            await acceptTask(taskId, effectiveUid || "");
+            await acceptTask(taskId, effectiveUid || "", effectiveEmail);
             toast.success("Görev kabul edildi ve listenize eklendi.");
             await loadTasks();
         } catch (error) {
@@ -615,7 +617,7 @@ export default function Tasks() {
                                         <span className="text-slate-400 text-sm font-medium">Kişi seç veya ara...</span>
                                     ) : (
                                         form.assigned_to.map(id => {
-                                            const ins = inspectors.find(i => i.email === id);
+                                            const ins = inspectors.find(i => (i.id || i.email) === id || i.email === id);
                                             return ins ? (
                                                 <span key={id} className="inline-flex items-center gap-1 bg-slate-900 text-white rounded-lg px-2 py-1 text-[11px] font-bold">
                                                     {ins.name.split(' ')[0]}
@@ -648,11 +650,12 @@ export default function Tasks() {
                                             {inspectors
                                                 .filter(ins => ins.name.toLowerCase().includes(inspectorSearch.toLowerCase()) || ins.email.toLowerCase().includes(inspectorSearch.toLowerCase()))
                                                 .map(inspector => {
-                                                    const isSelected = form.assigned_to.includes(inspector.email);
+                                                    const inspectorKey = inspector.id || inspector.email;
+                                                    const isSelected = form.assigned_to.includes(inspectorKey);
                                                     return (
                                                         <div
                                                             key={inspector.id}
-                                                            onClick={() => toggleInspector(inspector.email)}
+                                                            onClick={() => toggleInspector(inspectorKey)}
                                                             className={cn(
                                                                 "flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors",
                                                                 isSelected ? "bg-primary/5 text-primary" : "hover:bg-muted"

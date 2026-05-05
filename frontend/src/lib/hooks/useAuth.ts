@@ -4,6 +4,16 @@ import type { User } from "firebase/auth";
 import { auth } from "../firebase";
 import { setOnline, removeOnline, removeOnlineBeacon } from "../api/online";
 
+function resolveUserName(user: User | null) {
+    if (!user) return "Kullanıcı";
+    const displayName = (user.displayName || "").trim();
+    if (displayName && displayName !== "Müfettiş" && displayName !== "Kullanıcı") {
+        return displayName;
+    }
+    const emailPrefix = (user.email || "").split("@")[0]?.trim();
+    return emailPrefix || user.email || "Kullanıcı";
+}
+
 export function useAuth() {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
@@ -19,7 +29,7 @@ export function useAuth() {
     useEffect(() => {
         if (!user?.uid) return;
 
-        const name = user.displayName || user.email || "Kullanıcı";
+        const name = resolveUserName(user);
 
         // İlk girişte online yaz
         setOnline(user.uid, name).catch(() => undefined);
@@ -40,7 +50,7 @@ export function useAuth() {
             window.removeEventListener("beforeunload", handleBeforeUnload);
             removeOnline(user.uid).catch(() => undefined);
         };
-    }, [user?.uid, user?.displayName, user?.email]);
+    }, [user]);
 
     const logout = async () => {
         try {

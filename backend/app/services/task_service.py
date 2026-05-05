@@ -177,7 +177,7 @@ class TaskService:
             return None
 
     @staticmethod
-    async def accept_task(task_id: str, user_id: str) -> bool:
+    async def accept_task(task_id: str, user_id: Optional[str], user_email: Optional[str] = None) -> bool:
         try:
             doc_ref = db.collection('tasks').document(task_id)
             doc = await asyncio.to_thread(doc_ref.get)
@@ -187,11 +187,15 @@ class TaskService:
             task_data = doc.to_dict()
             pending = task_data.get('pending_collaborators', [])
             accepted = task_data.get('accepted_collaborators', [])
+            identity_keys = [value for value in [user_id, user_email] if value]
             
-            if user_id in pending:
-                pending.remove(user_id)
-                if user_id not in accepted:
-                    accepted.append(user_id)
+            matched_identity = next((value for value in identity_keys if value in pending), None)
+
+            if matched_identity:
+                pending = [value for value in pending if value not in identity_keys]
+                for identity in identity_keys:
+                    if identity not in accepted:
+                        accepted.append(identity)
                 
                 await asyncio.to_thread(doc_ref.update, {
                     'pending_collaborators': pending,

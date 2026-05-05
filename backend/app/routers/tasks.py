@@ -36,9 +36,9 @@ async def update_task(task_id: str, task_update: TaskUpdate):
 
 
 @router.post("/{task_id}/accept")
-async def accept_task(task_id: str, user_id: str):
+async def accept_task(task_id: str, user_id: Optional[str] = None, user_email: Optional[str] = None):
     try:
-        success = await TaskService.accept_task(task_id, user_id)
+        success = await TaskService.accept_task(task_id, user_id, user_email)
         if not success:
             raise HTTPException(status_code=400, detail="Görev kabul edilemedi veya bulunamadı.")
         return {"status": "success", "message": "Görev kabul edildi."}

@@ -51,7 +51,7 @@ async def send_dm(msg: DirectMessageCreate, uid: str, name: str):
             title=f"Yeni Mesaj: {name}",
             message=msg.content[:100] + ("..." if len(msg.content) > 100 else ""),
             type="collaboration",
-            chat_room_id="_".join(sorted([uid, msg.recipient_id]))
+            chat_room_id="dm_" + "_".join(sorted([uid, msg.recipient_id]))
         )
         await NotificationService.create_notification(notif)
         

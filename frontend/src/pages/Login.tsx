@@ -14,19 +14,23 @@ export default function Login() {
     const { resetPassword } = useAuth();
     const [isRegister, setIsRegister] = useState(false);
     const [fullName, setFullName] = useState("");
-    const [email, setEmail] = useState("sefa.yaprakli@gsb.gov.tr");
+    const [email, setEmail] = useState("mufettis@gsb.gov.tr");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    const [rememberMe, setRememberMe] = useState(true);
+    const [rememberMe, setRememberMe] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Otomatik giriş kontrolü
+        // Sadece kullanıcı açıkça istediğinde e-postayı hatırla.
         const savedEmail = localStorage.getItem("remembered_email");
-        if (savedEmail) {
+        const rememberEnabled = localStorage.getItem("remembered_email_enabled") === "true";
+        if (rememberEnabled && savedEmail) {
             setEmail(savedEmail);
             setRememberMe(true);
+        } else {
+            localStorage.removeItem("remembered_email");
+            localStorage.removeItem("remembered_email_enabled");
         }
     }, []);
 
@@ -108,12 +112,18 @@ export default function Login() {
             // "Beni Hatırla" mantığı
             if (rememberMe) {
                 localStorage.setItem("remembered_email", email);
+                localStorage.setItem("remembered_email_enabled", "true");
             } else {
                 localStorage.removeItem("remembered_email");
+                localStorage.removeItem("remembered_email_enabled");
             }
 
             // Başarılı giriş/kayıt
             localStorage.setItem("demo_user", JSON.stringify(result.user));
+
+            if (isRegister) {
+                toast.success("Doğrulama e-postası gönderildi. Lütfen gelen kutusu veya spam klasörünü kontrol edin.");
+            }
 
             // Yönlendirme
             setTimeout(() => {
@@ -154,7 +164,7 @@ export default function Login() {
 
         try {
             await resetPassword(normalizedEmail);
-            toast.success(`${normalizedEmail} adresine şifre sıfırlama bağlantısı gönderildi.`);
+            toast.success(`${normalizedEmail} adresine şifre sıfırlama bağlantısı gönderildi. Lütfen spam klasörünü de kontrol edin.`);
         } catch (err: any) {
             setError(err?.message || "Şifre sıfırlama bağlantısı gönderilemedi.");
         }
