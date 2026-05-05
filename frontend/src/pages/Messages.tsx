@@ -29,7 +29,7 @@ export default function Messages() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'online' | 'offline'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'online' | 'offline'>('all');
   const itemsPerPage = 8;
 
   useEffect(() => {
@@ -89,25 +89,8 @@ export default function Messages() {
         });
       });
 
-      // Rehberde olup profili silinmiş kullanıcıları da görünür tut.
-      directory.forEach((entry: any) => {
-        const alreadyExists = unified.some(
-          (item) => item.email.toLowerCase() === (entry.email || '').toLowerCase()
-        );
-
-        if (alreadyExists) return;
-
-        unified.push({
-          uid: entry.uid || null,
-          full_name: entry.name || entry.email || 'İsimsiz Kullanıcı',
-          title: entry.title || 'Müfettiş',
-          email: entry.email || '',
-          avatar_url: null,
-          isRegistered: !!entry.uid,
-          isMe: false,
-          directoryId: entry.id || null,
-        });
-      });
+      // Sadece kayıtlı (profili olan) kullanıcılar gösterilir.
+      // Rehber-only kullanıcılar Mesajlar listesine dahil edilmez.
 
       // Listeyi alfabetik sırala
       unified.sort((a, b) => a.full_name.localeCompare(b.full_name));
@@ -138,10 +121,8 @@ export default function Messages() {
       c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.email.toLowerCase().includes(searchQuery.toLowerCase());
     
-    if (filterStatus === 'active') return matchesSearch && c.isRegistered;
-    if (filterStatus === 'inactive') return matchesSearch && !c.isRegistered;
     if (filterStatus === 'online') return matchesSearch && c.isOnline;
-    if (filterStatus === 'offline') return matchesSearch && c.isRegistered && !c.isOnline;
+    if (filterStatus === 'offline') return matchesSearch && !c.isOnline;
     return matchesSearch;
   });
 
@@ -202,22 +183,13 @@ export default function Messages() {
               Online
             </button>
             <button
-              onClick={() => setFilterStatus('active')}
+              onClick={() => setFilterStatus('offline')}
               className={cn(
                 "flex-1 min-w-[60px] py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all",
-                filterStatus === 'active' ? "bg-card text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                filterStatus === 'offline' ? "bg-card text-slate-600 dark:text-slate-300 shadow-sm" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
               )}
             >
-              Kayıtlı
-            </button>
-            <button
-              onClick={() => setFilterStatus('inactive')}
-              className={cn(
-                "flex-1 min-w-[60px] py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all",
-                filterStatus === 'inactive' ? "bg-card text-slate-600 dark:text-slate-300 shadow-sm" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-              )}
-            >
-              İnaktif
+              Çevrimdışı
             </button>
           </div>
 

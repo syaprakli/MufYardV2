@@ -28,6 +28,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
     const [profile, setProfile] = useState<any>(null);
     const notificationRef = useRef<HTMLDivElement>(null);
     const userMenuRef = useRef<HTMLDivElement>(null);
+    const presenceReady = wsConnected || onlineUsers.length > 0;
 
     useEffect(() => {
         if (user?.uid) {
@@ -110,8 +111,8 @@ export function Header({ toggleSidebar }: HeaderProps) {
             <div className="flex items-center gap-4 lg:gap-6">
                 {/* Online Users Indicator */}
                 <div className="relative group flex items-center gap-2 text-xs font-bold whitespace-nowrap">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${wsConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300 animate-pulse'}`} />
-                    {!wsConnected ? (
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${presenceReady ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300 animate-pulse'}`} />
+                    {!presenceReady ? (
                         <span className="text-slate-400">Bağlanıyor...</span>
                     ) : onlineUsers.length > 0 ? (
                         <span className="text-emerald-600 dark:text-emerald-400">
@@ -120,7 +121,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
                     ) : (
                         <span className="text-emerald-600 dark:text-emerald-400">Online</span>
                     )}
-                    {wsConnected && onlineUsers.length > 0 && (
+                    {presenceReady && onlineUsers.length > 0 && (
                         <div className="pointer-events-none absolute left-0 top-7 z-50 hidden group-hover:block bg-card border border-border rounded-xl shadow-xl p-2 min-w-[220px] max-w-[320px]">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Çevrimiçi ({onlineUsers.length})</p>
                             <p className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed break-words">

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { WS_URL } from '../config';
+import { fetchOnlineUsers } from '../api/online';
 
 interface OnlineUser {
     uid: string;
@@ -25,6 +26,15 @@ interface PresenceContextType {
 }
 
 const PresenceContext = createContext<PresenceContextType | undefined>(undefined);
+
+function normalizeOnlineUsers(users: OnlineUser[]) {
+    const seen = new Set<string>();
+    return users.filter((user) => {
+        if (!user?.uid || seen.has(user.uid)) return false;
+        seen.add(user.uid);
+        return true;
+    });
+}
 
 function resolvePresenceName(user: any, profileName?: string) {
     const normalizedProfile = (profileName || '').trim();
@@ -62,6 +72,34 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             });
         }
     }, [user]);
+
+    useEffect(() => {
+        if (!user?.uid) {
+            setOnlineUsers([]);
+            return;
+        }
+
+        let cancelled = false;
+
+        const syncOnlineUsers = async () => {
+            try {
+                const data = await fetchOnlineUsers();
+                if (!cancelled && Array.isArray(data)) {
+                    setOnlineUsers(normalizeOnlineUsers(data));
+                }
+            } catch {
+                // REST fallback sessiz çalışır; WS varsa zaten presence akacak.
+            }
+        };
+
+        syncOnlineUsers();
+        const timer = setInterval(syncOnlineUsers, 10000);
+
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, [user?.uid]);
 
     useEffect(() => {
         const connect = () => {
@@ -104,7 +142,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                             return;
                         }
                         if (data.type === 'presence' && Array.isArray(data.users)) {
-                            setOnlineUsers(data.users);
+                            setOnlineUsers(normalizeOnlineUsers(data.users));
                         } else if (data.text) {
                             setMessages(prev => {
                                 if (prev.some(m => m.id === data.id)) return prev;

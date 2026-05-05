@@ -32,6 +32,7 @@ import About from "./pages/About";
 import Notifications from "./pages/Notifications";
 import Messages from "./pages/Messages";
 import Feedback from "./pages/Feedback";
+import ChatContainer from "./components/ChatContainer";
 
 import { useVersionCheck } from "./lib/hooks/useVersionCheck";
 import { UpdateModal } from "./components/ui/UpdateModal";
@@ -142,6 +143,7 @@ function App() {
                   <Route path="*" element={<Navigate to="/" />} />
                 </Routes>
               </Router>
+              <ChatContainer />
             </PresenceProvider>
           </NotificationProvider>
         </ConfirmProvider>
