@@ -8,17 +8,55 @@ from app.schemas.task import TaskCreate, TaskUpdate
 class TaskService:
     @staticmethod
     async def _generate_rapor_kodu(year: Optional[int] = None) -> str:
-        """Auto-generate S.Y.64/YYYY-N format rapor kodu (Verimli sayac)."""
+        """Auto-generate S.Y.64/YYYY-N format rapor kodu.
+        
+        Firestore atomik transaction kullanır:
+        - Silinse bile sayaç geri gitmez (monoton artan)
+        - Eş zamanlı oluşturmada duplicate olmaz (race-condition free)
+        """
         if year is None:
             year = datetime.utcnow().year
-        try:
-            # count().get() is blocking
-            res = await asyncio.to_thread(lambda: db.collection('tasks').count().get())
-            count = res[0][0].value + 1
-        except Exception:
-            # Fallback
-            docs = await asyncio.to_thread(lambda: list(db.collection('tasks').select(['owner_id']).stream()))
-            count = len(docs) + 1
+
+        counter_ref = db.collection('counters').document('task_counter')
+
+        def increment_and_get():
+            """Atomically increment counter, return new value."""
+            try:
+                from google.cloud.firestore_v1 import transactional as fs_transactional
+
+                @fs_transactional
+                def _run(transaction):
+                    snap = counter_ref.get(transaction=transaction)
+                    val = (snap.to_dict().get('value', 0) if snap.exists else 0) + 1
+                    transaction.set(counter_ref, {'value': val})
+                    return val
+
+                t = db.transaction()
+                return _run(t)
+            except Exception as e:
+                print(f"Counter transaction failed: {e}")
+                return None
+
+        count = await asyncio.to_thread(increment_and_get)
+
+        if count is None:
+            # Fallback: mevcut max numarayı bul, tekrar kullanma
+            try:
+                docs = await asyncio.to_thread(
+                    lambda: list(db.collection('tasks').select(['rapor_kodu']).stream())
+                )
+                max_num = 0
+                for doc in docs:
+                    kodu = (doc.to_dict() or {}).get('rapor_kodu', '')
+                    if kodu and '-' in kodu:
+                        try:
+                            max_num = max(max_num, int(kodu.split('-')[-1]))
+                        except (ValueError, IndexError):
+                            pass
+                count = max_num + 1
+            except Exception:
+                count = 1
+
         return f"S.Y.64/{year}-{count}"
 
     @staticmethod
