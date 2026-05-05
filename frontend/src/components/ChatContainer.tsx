@@ -7,7 +7,7 @@ export default function ChatContainer() {
   if (activeChats.length === 0) return null;
 
   return (
-    <div className="fixed bottom-0 right-8 z-[9999] flex items-end gap-4 pointer-events-none lg:hidden">
+    <div className="fixed bottom-0 right-8 z-[9999] flex items-end gap-4 pointer-events-none">
       {activeChats.map((chat) => (
         <div key={chat.roomId} className="pointer-events-auto">
           <FloatingChat 

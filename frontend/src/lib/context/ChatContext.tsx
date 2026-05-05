@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
 interface ChatWindow {
   roomId: string;
@@ -21,11 +21,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const normalizedRoomId = type === 'dm' && !roomId.startsWith('dm_') ? `dm_${roomId}` : roomId;
     // Check if room already open
     if (activeChats.find(c => c.roomId === normalizedRoomId)) {
-      // Move to front/focus logic could be added here
       return;
     }
     
-    // Limit max 3-4 chats
+    // Limit max 3 chats
     setActiveChats(prev => {
         const filtered = prev.length >= 3 ? prev.slice(1) : prev;
         return [...filtered, { roomId: normalizedRoomId, title, type }];
@@ -35,6 +34,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const closeChat = (roomId: string) => {
     setActiveChats(prev => prev.filter(c => c.roomId !== roomId));
   };
+
+  // dm:open custom event dinle → DM bildirimi gelince balonu aç
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { roomId, title } = (e as CustomEvent).detail;
+      openChat(roomId, title, 'dm');
+    };
+    window.addEventListener('dm:open', handler);
+    return () => window.removeEventListener('dm:open', handler);
+  }, [activeChats]);
 
   return (
     <ChatContext.Provider value={{ activeChats, openChat, closeChat }}>

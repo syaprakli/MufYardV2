@@ -71,6 +71,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                     const newNotif = JSON.parse(event.data);
                     setNotifications(prev => [newNotif, ...prev]);
                     
+                    // DM bildirimi → toast yerine chat balonu aç
+                    if (newNotif.type === 'dm' && newNotif.chat_room_id) {
+                        const senderName = newNotif.title?.replace('Yeni Mesaj: ', '') || 'Birileri';
+                        window.dispatchEvent(new CustomEvent('dm:open', {
+                            detail: {
+                                roomId: newNotif.chat_room_id,
+                                title: senderName,
+                            }
+                        }));
+                        return;
+                    }
+                    
                     toast.success(newNotif.title, {
                         icon: '🔔',
                         duration: 5000,

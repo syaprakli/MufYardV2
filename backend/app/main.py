@@ -225,7 +225,7 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                     user_id=recipient_id,
                     title=f"Yeni Mesaj: {name}",
                     message=data.get("content", "")[:100],
-                    type="collaboration",
+                    type="dm",
                     chat_room_id=room_id
                 )
                 asyncio.create_task(NotificationService.create_notification(notif))
