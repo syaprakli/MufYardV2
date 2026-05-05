@@ -44,8 +44,7 @@ export default function ReportEditor() {
     const [versions, setVersions] = useState<AuditVersion[]>([]);
     const [zoom, setZoom] = useState(100);
     const [showRuler, setShowRuler] = useState(true);
-    const [showOutline, setShowOutline] = useState(true);
-    const [pageMode, setPageMode] = useState(true);
+    const pageMode = true;
     const [docHeader, setDocHeader] = useState("T.C. GENÇLİK VE SPOR BAKANLIĞI");
     const [docFooter, setDocFooter] = useState("Müfettişlik Raporu");
 
@@ -99,7 +98,7 @@ export default function ReportEditor() {
         const seen = new Set<string>();
         const unique: any[] = [];
         activeUsers.forEach((u) => {
-            const key = (u?.name || '').trim().toLowerCase();
+            const key = (u?.uid || u?.name || '').toString().trim().toLowerCase();
             if (!key || seen.has(key)) return;
             seen.add(key);
             unique.push(u);
@@ -116,18 +115,6 @@ export default function ReportEditor() {
     const wordCount = useMemo(() => (plainText ? plainText.split(" ").length : 0), [plainText]);
     const charCount = plainText.length;
     const estimatedPages = useMemo(() => Math.max(1, Math.ceil(wordCount / 450)), [wordCount]);
-    const headings = useMemo(() => {
-        const list: Array<{ level: number; text: string }> = [];
-        const regex = /<h([1-3])[^>]*>(.*?)<\/h\1>/gi;
-        let match: RegExpExecArray | null;
-        while ((match = regex.exec(content)) !== null) {
-            const level = Number(match[1]);
-            const text = match[2].replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
-            if (text) list.push({ level, text });
-        }
-        return list;
-    }, [content]);
-
     useEffect(() => {
         if (!id || loading) return;
 
@@ -158,6 +145,7 @@ export default function ReportEditor() {
             const cursorColor = '#' + Math.floor(Math.random()*16777215).toString(16);
             
             provider.awareness.setLocalStateField("user", {
+                uid: user?.uid || "",
                 name: userName,
                 color: cursorColor,
             });
@@ -383,17 +371,6 @@ export default function ReportEditor() {
         }
     };
 
-    const jumpToHeading = (headingText: string) => {
-        if (!quillRef.current) return;
-        const editor = quillRef.current.getEditor();
-        const text = editor.getText() || "";
-        const idx = text.indexOf(headingText);
-        if (idx >= 0) {
-            editor.setSelection(idx, 0, "user");
-            editor.focus();
-        }
-    };
-
     if (loading) {
         return (
             <div className="h-full flex flex-col items-center justify-center space-y-4">
@@ -406,8 +383,8 @@ export default function ReportEditor() {
     return (
         <div className="h-screen flex flex-col bg-[#f3f4f6]">
             {/* Toolbar */}
-            <div className="bg-white border-b border-border px-6 py-2 flex items-center justify-between shadow-sm shrink-0 z-50">
-                <div className="flex items-center gap-4">
+            <div className="bg-white border-b border-border px-6 py-2 flex items-center shadow-sm shrink-0 z-50 overflow-x-auto">
+                <div className="flex items-center gap-4 min-w-max">
                     <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="rounded-full w-8 h-8 p-0">
                         <ArrowLeft size={18} />
                     </Button>
@@ -429,17 +406,13 @@ export default function ReportEditor() {
                             )}
                         </div>
                     </div>
-                </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="hidden lg:flex items-center gap-2">
+                    <div className="hidden lg:flex items-center gap-2 ml-2">
                         <div className="flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1 bg-slate-50/50">
                             <button type="button" onClick={() => setZoom((z) => Math.max(70, z - 10))} className="text-[10px] font-black text-slate-400 hover:text-slate-800 px-1">-</button>
                             <span className="text-[10px] font-black text-slate-600 min-w-[32px] text-center">{zoom}%</span>
                             <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="text-[10px] font-black text-slate-400 hover:text-slate-800 px-1">+</button>
                         </div>
-                        <button type="button" onClick={() => setPageMode((v) => !v)} className="text-[10px] font-bold text-slate-500 hover:text-slate-800 px-2 border-l">{pageMode ? 'Sayfa' : 'Akış'}</button>
-                        <button type="button" onClick={() => setShowOutline((v) => !v)} className="text-[10px] font-bold text-slate-500 hover:text-slate-800 px-2 border-l">{showOutline ? 'Anahat' : 'Tam'}</button>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -547,29 +520,6 @@ export default function ReportEditor() {
 
             {/* Editor Area */}
             <div className="flex-1 overflow-y-auto p-12 flex justify-center gap-6">
-                {showOutline && (
-                    <aside className="hidden 2xl:block w-72 shrink-0 h-fit sticky top-24">
-                        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4">
-                            <div className="text-xs font-black uppercase tracking-wider text-slate-500 mb-3">Belge Anahattı</div>
-                            <div className="space-y-1 max-h-[70vh] overflow-y-auto">
-                                {headings.length === 0 && (
-                                    <p className="text-xs text-slate-400 italic">Henüz başlık yok</p>
-                                )}
-                                {headings.map((h, i) => (
-                                    <button
-                                        type="button"
-                                        key={`${h.text}_${i}`}
-                                        onClick={() => jumpToHeading(h.text)}
-                                        className={`block w-full text-left text-xs hover:bg-slate-50 rounded-md px-2 py-1.5 truncate ${h.level === 1 ? 'font-bold text-slate-700' : h.level === 2 ? 'font-semibold text-slate-600 pl-4' : 'font-medium text-slate-500 pl-6'}`}
-                                        title={h.text}
-                                    >
-                                        {h.text}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </aside>
-                )}
                 <div className="w-full max-w-[850px]">
                     <div className="mb-3 flex items-center justify-between px-2">
                         <div className="text-xs font-semibold text-slate-500">
