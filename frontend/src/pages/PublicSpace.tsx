@@ -211,7 +211,7 @@ export default function PublicSpace() {
                 });
             } catch {}
         };
-        const timer = setInterval(poll, 5000);
+        const timer = setInterval(poll, 1000);
         return () => clearInterval(timer);
     }, [wsConnected, user?.uid]);
 

@@ -34,6 +34,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const wsRef = useRef<WebSocket | null>(null);
     const retryTimer = useRef<any>(null);
     const pingTimer = useRef<any>(null);
+    const pongTimer = useRef<any>(null);
     const retryCountRef = useRef(0);
     const activeNameRef = useRef<string>('Müfettiş');
     const connectRef = useRef<(() => void) | null>(null);
@@ -70,10 +71,15 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                     setWsConnected(true);
                     retryCountRef.current = 0;
                     clearInterval(pingTimer.current);
-                    // Her 20sn ping ile Railway timeout'unu önle
+                    // Her 20sn ping gönder; 25sn içinde pong gelmezse zombie → kapat ve yeniden bağlan
                     pingTimer.current = setInterval(() => {
                         if (ws.readyState === WebSocket.OPEN) {
                             ws.send(JSON.stringify({ type: 'ping' }));
+                            clearTimeout(pongTimer.current);
+                            pongTimer.current = setTimeout(() => {
+                                // Pong gelmedi: Railway zombie bağlantı
+                                ws.close();
+                            }, 5000);
                         }
                     }, 20000);
                 };
@@ -81,7 +87,10 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                 ws.onmessage = (event) => {
                     try {
                         const data = JSON.parse(event.data);
-                        if (data.type === 'pong') return;
+                        if (data.type === 'pong') {
+                            clearTimeout(pongTimer.current);
+                            return;
+                        }
                         if (data.type === 'presence' && Array.isArray(data.users)) {
                             setOnlineUsers(data.users);
                         } else if (data.text) {
@@ -105,6 +114,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                 ws.onclose = () => {
                     setWsConnected(false);
                     clearInterval(pingTimer.current);
+                    clearTimeout(pongTimer.current);
                     // Max 5sn'de bir yeniden dene (30sn'den kısaltıldı)
                     const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 5000);
                     retryCountRef.current += 1;
@@ -150,6 +160,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             }
             clearTimeout(retryTimer.current);
             clearInterval(pingTimer.current);
+            clearTimeout(pongTimer.current);
         };
     }, [user?.uid]);
 

@@ -188,24 +188,41 @@ class ChatConnectionManager:
         # Tüm odalardaki benzersiz kullanıcıları topla
         all_users = []
         seen_uids = set()
-        total_connections = 0
         
         for room in self.rooms.values():
-            total_connections += len(room)
             for info in room.values():
                 if info["uid"] not in seen_uids:
                     all_users.append({"uid": info["uid"], "name": info["name"]})
                     seen_uids.add(info["uid"])
         
-        presence_msg = json.dumps({"type": "presence", "users": all_users, "connections": total_connections})
+        presence_msg = json.dumps({"type": "presence", "users": all_users})
         
-        # Tüm odalardaki her bağlantıya bu listeyi gönder
-        for room in self.rooms.values():
-            for connection in room.keys():
+        # Zombie WS'leri tespit et ve temizle
+        dead: list = []
+        for rid, room in self.rooms.items():
+            for connection in list(room.keys()):
                 try:
                     await connection.send_text(presence_msg)
                 except Exception:
-                    pass
+                    dead.append((rid, connection))
+        
+        # Ölü bağlantıları rooms ve global_online_users'dan sil
+        changed = False
+        for rid, ws in dead:
+            if rid in self.rooms and ws in self.rooms[rid]:
+                uid = self.rooms[rid][ws]["uid"]
+                del self.rooms[rid][ws]
+                if uid in self.global_online_users:
+                    self.global_online_users[uid].discard(ws)
+                    if not self.global_online_users[uid]:
+                        del self.global_online_users[uid]
+                if not self.rooms[rid]:
+                    del self.rooms[rid]
+                changed = True
+        
+        # Eğer zombie temizlendiyse güncel presence'ı tekrar yayınla
+        if changed:
+            await self.broadcast_presence()
 
     async def broadcast(self, room_id: str, message: str):
         if room_id not in self.rooms:
