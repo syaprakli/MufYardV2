@@ -9,5 +9,6 @@ __pycache__/
 venv/
 *.log
 *.txt
+!requirements.txt
 import_mevzuat/
 scripts/
