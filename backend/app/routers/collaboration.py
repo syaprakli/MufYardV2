@@ -92,6 +92,35 @@ async def delete_dm(room_id: str, message_id: str, uid: str):
         return {"status": "success"}
     raise HTTPException(status_code=403, detail="Mesaj silinemedi veya yetkiniz yok.")
 
+@router.patch("/dm/{room_id}/{message_id}")
+async def update_dm(room_id: str, message_id: str, payload: Dict[str, Any], uid: str):
+    content = (payload.get("content") or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="Mesaj metni boş olamaz.")
+
+    updated = await CollaborationService.update_private_message(room_id, message_id, uid, content)
+    if not updated:
+        raise HTTPException(status_code=403, detail="Mesaj düzenlenemedi veya yetkiniz yok.")
+
+    update_event = json.dumps({
+        "type": "update_message",
+        "room_id": room_id,
+        "message": updated,
+    })
+    await chat_manager.broadcast(room_id, update_event)
+    return updated
+
+@router.delete("/dm/{room_id}")
+async def clear_dm(room_id: str, uid: str):
+    deleted_count = await CollaborationService.clear_private_messages(room_id, uid)
+    clear_event = json.dumps({
+        "type": "clear_messages",
+        "room_id": room_id,
+        "uid": uid,
+    })
+    await chat_manager.broadcast(room_id, clear_event)
+    return {"status": "success", "deleted": deleted_count}
+
 # --- FORUM / PUBLIC FEED ---
 
 @router.get("/posts", response_model=List[PostResponse])

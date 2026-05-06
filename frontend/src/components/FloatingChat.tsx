@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Minus, MessageSquare, Send, Paperclip, Smile, Image as ImageIcon, Search, FileText, Trash2 } from 'lucide-react';
+import { X, Minus, MessageSquare, Send, Paperclip, Smile, Image as ImageIcon, Search, FileText, Trash2, Edit3 } from 'lucide-react';
 import { WS_URL, API_URL } from '../lib/config';
 import { useAuth } from '../lib/hooks/useAuth';
 import { useTheme } from "../lib/context/ThemeContext";
@@ -86,6 +86,8 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
   const [gifQuery, setGifQuery] = useState('');
   const [gifs, setGifs] = useState<GifResult[]>([]);
   const [gifLoading, setGifLoading] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
 
   const ws = useRef<WebSocket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -167,6 +169,25 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
           
           if (data.type === 'delete_message') {
             setMessages(prev => prev.filter(m => m.id !== data.message_id));
+            return;
+          }
+
+          if (data.type === 'update_message' && data.message) {
+            const updated = data.message;
+            setMessages(prev => prev.map((m) => (
+              m.id === updated.id
+                ? {
+                    ...m,
+                    content: updated.content || m.content,
+                    timestamp: updated.timestamp || m.timestamp,
+                  }
+                : m
+            )));
+            return;
+          }
+
+          if (data.type === 'clear_messages' && data.uid) {
+            setMessages(prev => prev.filter(m => m.sender_id !== data.uid));
             return;
           }
 
@@ -297,6 +318,53 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
     }
   };
 
+  const startEditMessage = (msg: Message) => {
+    setEditingMessageId(msg.id);
+    setEditText(msg.content || '');
+  };
+
+  const cancelEditMessage = () => {
+    setEditingMessageId(null);
+    setEditText('');
+  };
+
+  const saveEditMessage = async (messageId: string) => {
+    const trimmed = editText.trim();
+    if (!trimmed || !user) return;
+    try {
+      const res = await fetch(`${API_URL}/collaboration/dm/${roomId}/${messageId}?uid=${user.uid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: trimmed }),
+      });
+      if (!res.ok) {
+        toast.error('Mesaj düzenlenemedi.');
+        return;
+      }
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, content: trimmed } : m)));
+      cancelEditMessage();
+    } catch (e) {
+      console.error('Düzenleme hatası:', e);
+      toast.error('Mesaj düzenlenemedi.');
+    }
+  };
+
+  const clearMyMessages = async () => {
+    if (!user || type !== 'dm') return;
+    try {
+      const res = await fetch(`${API_URL}/collaboration/dm/${roomId}?uid=${user.uid}`, { method: 'DELETE' });
+      if (!res.ok) {
+        toast.error('Sohbet temizlenemedi.');
+        return;
+      }
+      setMessages((prev) => prev.filter((m) => m.sender_id !== user.uid));
+      toast.success('Kendi mesajlarınız temizlendi.');
+    } catch (e) {
+      console.error('Sohbet temizleme hatası:', e);
+      toast.error('Sohbet temizlenemedi.');
+    }
+  };
+
   // ── render helpers ────────────────────────────────────────────────────
   const renderAttachment = (att: Attachment, isOwn: boolean) => {
     if (att.type === 'gif') {
@@ -357,6 +425,15 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {type === 'dm' && (
+            <button
+              onClick={clearMyMessages}
+              className="px-2 py-1 text-[10px] font-bold rounded bg-white/10 hover:bg-white/20 transition-colors"
+              title="Sadece kendi mesajlarınızı temizler"
+            >
+              Bende Temizle
+            </button>
+          )}
           {!inline && <button onClick={() => setIsMinimized(true)} className="p-1 hover:bg-white/10 rounded transition-colors"><Minus size={14} /></button>}
           <button onClick={onClose} className="p-1 hover:bg-red-500 rounded transition-colors"><X size={14} /></button>
         </div>
@@ -379,16 +456,43 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
             <div key={msg.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
               {!isOwn && <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.1em] mb-1 ml-1">{msg.sender_name}</span>}
               <div className={`group relative max-w-[85%] ${msg.content ? 'p-3' : 'p-1'} rounded-2xl text-xs font-medium shadow-sm leading-relaxed ${isOwn ? 'bg-primary text-white rounded-tr-none' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-100 dark:border-slate-700 rounded-tl-none'}`}>
-                {msg.content && <span>{msg.content}</span>}
-                {msg.attachment && renderAttachment(msg.attachment, isOwn)}
+                {editingMessageId === msg.id ? (
+                  <div className="space-y-2 min-w-[220px]">
+                    <input
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      className="w-full rounded-lg px-2 py-1 text-xs text-slate-900"
+                      autoFocus
+                    />
+                    <div className="flex items-center justify-end gap-2">
+                      <button type="button" onClick={cancelEditMessage} className="px-2 py-1 text-[10px] rounded bg-white/20">Vazgeç</button>
+                      <button type="button" onClick={() => saveEditMessage(msg.id)} className="px-2 py-1 text-[10px] rounded bg-white text-primary">Kaydet</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {msg.content && <span>{msg.content}</span>}
+                    {msg.attachment && renderAttachment(msg.attachment, isOwn)}
+                  </>
+                )}
                 
-                {isOwn && type === 'dm' && (
-                  <button 
-                    onClick={() => deleteMessage(msg.id)}
-                    className="absolute -left-8 top-1/2 -translate-y-1/2 p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                {isOwn && type === 'dm' && editingMessageId !== msg.id && (
+                  <div className="absolute -left-14 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                    <button 
+                      onClick={() => startEditMessage(msg)}
+                      className="p-1.5 text-slate-300 hover:text-blue-500"
+                      title="Düzenle"
+                    >
+                      <Edit3 size={12} />
+                    </button>
+                    <button 
+                      onClick={() => deleteMessage(msg.id)}
+                      className="p-1.5 text-slate-300 hover:text-red-500"
+                      title="Sil"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 )}
               </div>
               <span className="text-[8px] font-bold text-slate-300 mt-1 uppercase">

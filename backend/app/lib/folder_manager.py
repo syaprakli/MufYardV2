@@ -22,6 +22,19 @@ STANDARD_SUBFOLDERS = [
 
 class FolderManager:
     @staticmethod
+    def detect_file_type(file_name: str) -> str:
+        ext = os.path.splitext(file_name)[1].lower()
+        if ext in {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg"}:
+            return "image"
+        if ext in {".mp4", ".mov", ".avi", ".mkv", ".webm"}:
+            return "video"
+        if ext in {".mp3", ".wav", ".ogg", ".m4a", ".flac"}:
+            return "audio"
+        if ext == ".pdf":
+            return "pdf"
+        return "file"
+
+    @staticmethod
     def load_permissions() -> dict:
         """file_permissions.json dosyasını yükler."""
         if not os.path.exists(PERMISSIONS_FILE):
@@ -141,8 +154,11 @@ class FolderManager:
                     
                     if not is_dir:
                         stats = entry.stat()
+                        rel_path_from_data = os.path.relpath(entry.path, settings.DATA_DIR).replace("\\", "/")
                         node["size"] = FolderManager.format_size(stats.st_size)
                         node["date"] = datetime.fromtimestamp(stats.st_mtime).strftime("%d.%m.%Y %H:%M")
+                        node["type"] = FolderManager.detect_file_type(entry.name)
+                        node["url"] = f"/{rel_path_from_data}"
                     
                     items.append(node)
                     if is_dir:

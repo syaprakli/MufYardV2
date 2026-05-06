@@ -107,6 +107,53 @@ class CollaborationService:
         await asyncio.to_thread(doc_ref.delete)
         return True
 
+    @staticmethod
+    async def update_private_message(room_id: str, message_id: str, requester_uid: str, content: str) -> Optional[Dict[str, Any]]:
+        """Özel mesajı düzenler. Sadece gönderen düzenleyebilir."""
+        doc_ref = db.collection('private_messages').document(room_id).collection('chats').document(message_id)
+        doc = await asyncio.to_thread(doc_ref.get)
+        if not doc.exists:
+            return None
+
+        data = doc.to_dict() or {}
+        if data.get('sender_id') != requester_uid:
+            return None
+
+        now = datetime.utcnow()
+        await asyncio.to_thread(doc_ref.update, {
+            'content': content,
+            'edited': True,
+            'updated_at': now,
+        })
+
+        updated_doc = await asyncio.to_thread(doc_ref.get)
+        updated = updated_doc.to_dict() or {}
+        updated['id'] = message_id
+        if 'timestamp' in updated and hasattr(updated['timestamp'], 'isoformat'):
+            updated['timestamp'] = updated['timestamp'].isoformat()
+        if 'updated_at' in updated and hasattr(updated['updated_at'], 'isoformat'):
+            updated['updated_at'] = updated['updated_at'].isoformat()
+        return updated
+
+    @staticmethod
+    async def clear_private_messages(room_id: str, requester_uid: str) -> int:
+        """Kullanıcının kendi gönderdiği özel mesajları temizler."""
+        chats_ref = db.collection('private_messages').document(room_id).collection('chats')
+        docs = await asyncio.to_thread(
+            lambda: list(chats_ref.where('sender_id', '==', requester_uid).stream())
+        )
+        if not docs:
+            return 0
+
+        def _batch_delete() -> None:
+            batch = db.batch()
+            for doc in docs:
+                batch.delete(doc.reference)
+            batch.commit()
+
+        await asyncio.to_thread(_batch_delete)
+        return len(docs)
+
     # --- Forum/Post Service ---
     @staticmethod
     async def get_posts(
