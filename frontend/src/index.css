@@ -117,3 +117,18 @@ button {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
 }
+
+/* Custom Animations */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: inline-flex;
+  animation: marquee 50s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}

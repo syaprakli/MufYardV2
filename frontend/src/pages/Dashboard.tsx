@@ -1,4 +1,4 @@
-import { FileText, Loader2, AlertCircle, Clock, CheckCircle2, TrendingUp, Filter, FileSpreadsheet, Zap, Bell, ArrowUpRight, BarChart3, PieChart as PieIcon, Shield, ChevronRight, X, Download, Bot, Sparkles, ExternalLink, Globe, BookOpen } from "lucide-react";
+import { FileText, Loader2, AlertCircle, Clock, CheckCircle2, TrendingUp, Filter, FileSpreadsheet, Zap, Bell, ArrowUpRight, BarChart3, PieChart as PieIcon, Shield, ChevronRight, X, Download, Bot, Sparkles, ExternalLink, Globe, BookOpen, Cake } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -63,6 +63,7 @@ export default function Dashboard() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [showIdentityModal, setShowIdentityModal] = useState(false);
+    const [birthdayUsers, setBirthdayUsers] = useState<any[]>([]);
 
     // ─── Filtre State ───
     const [showFilters, setShowFilters] = useState(false);
@@ -179,6 +180,18 @@ export default function Dashboard() {
                 setData(stats);
                 setTasks(myTasks);
                 setProfile(profileData);
+                
+                // Doğum günü kontrolü - tüm profilleri çek
+                try {
+                    const profilesRes = await fetchWithTimeout(`${API_URL}/profiles/`);
+                    const allProfiles = await profilesRes.json();
+                    const today = new Date();
+                    const todayMD = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                    const bdayUsers = (Array.isArray(allProfiles) ? allProfiles : []).filter(
+                        (p: any) => p.birthday && p.birthday === todayMD && p.uid !== effectiveUid
+                    );
+                    setBirthdayUsers(bdayUsers);
+                } catch { /* sessizce geç */ }
             } catch (err) {
                 console.error("Dashboard yüklenirken hata:", err);
             } finally {
@@ -545,6 +558,28 @@ Lütfen şunları analiz et:
                 />
             </div>
 
+            {/* Doğum Günü Kutlaması */}
+            {birthdayUsers.length > 0 && (
+                <Card className="relative overflow-hidden border-amber-200 dark:border-amber-900/30 bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 dark:from-amber-950/20 dark:via-orange-950/20 dark:to-rose-950/20 p-5 shadow-sm">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-200/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                    <div className="relative z-10 flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 animate-bounce">
+                            <Cake size={28} />
+                        </div>
+                        <div>
+                            <h3 className="font-black text-lg text-amber-800 dark:text-amber-300 tracking-tight">
+                                🎂 Doğum Günü Kutlu Olsun!
+                            </h3>
+                            <p className="text-sm font-semibold text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+                                Bugün <span className="font-black text-amber-900 dark:text-amber-200">
+                                    {birthdayUsers.map(u => u.full_name || 'Bir arkadaşınız').join(', ')}
+                                </span>'ın doğum günü! 🎉
+                            </p>
+                        </div>
+                    </div>
+                </Card>
+            )}
+
             {/* Charts Section: Pastel & Integrated Layout */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 {/* Süre Durumu */}
@@ -671,20 +706,60 @@ Lütfen şunları analiz et:
                             Tümünü Gör <TrendingUp size={14} className="ml-2 group-hover:translate-x-1 transition-transform opacity-60" />
                         </Button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {data?.news?.map((news: any, index: number) => (
-                            <div 
-                                key={index} 
-                                onClick={() => navigate('/public-space', { state: { category: 'Duyurular', postId: news.id } })}
-                                className="bg-white dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-primary/20 transition-all cursor-pointer group"
-                            >
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-primary/5 text-primary rounded-md">{news.category}</span>
-                                    <span className="text-[9px] font-bold text-slate-400">{news.date}</span>
+                    <div className="flex flex-col gap-6">
+                        {/* İlk 2 Sabit Haber */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {(data?.news || []).slice(0, 2).map((news: any, index: number) => (
+                                <div 
+                                    key={index} 
+                                    onClick={() => navigate('/public-space', { state: { category: 'Duyurular', postId: news.id } })}
+                                    className="bg-white dark:bg-slate-950 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-primary/30 transition-all cursor-pointer group shadow-sm flex flex-col gap-3"
+                                >
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-primary/10 text-primary rounded-md tracking-widest">{news.category}</span>
+                                        <div className="flex items-center gap-1 text-slate-400">
+                                            <Clock size={10} />
+                                            <span className="text-[9px] font-bold">{news.date}</span>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs font-black text-slate-800 dark:text-slate-200 leading-relaxed group-hover:text-primary transition-colors line-clamp-2">{news.title}</p>
                                 </div>
-                                <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 leading-relaxed group-hover:text-primary transition-colors">{news.title}</p>
+                            ))}
+                        </div>
+
+                        {/* Diğerleri Kayan Yazı (Marquee) */}
+                        {(data?.news || []).length > 2 && (
+                            <div className="relative overflow-hidden bg-slate-50 dark:bg-slate-900/50 h-10 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 flex items-center">
+                                <div className="absolute left-0 top-0 bottom-0 px-4 bg-primary text-white text-[10px] font-black flex items-center z-10 shadow-lg">
+                                    DİĞER DUYURULAR
+                                </div>
+                                <div className="animate-marquee whitespace-nowrap flex items-center gap-12 pl-40">
+                                    {(data?.news || []).slice(2).map((news: any, index: number) => (
+                                        <button 
+                                            key={index}
+                                            onClick={() => navigate('/public-space', { state: { category: 'Duyurular', postId: news.id } })}
+                                            className="text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-primary transition-colors flex items-center gap-2"
+                                        >
+                                            <span className="w-1.5 h-1.5 bg-primary rounded-full" />
+                                            {news.title}
+                                            <span className="text-[9px] opacity-50 font-medium">({news.date})</span>
+                                        </button>
+                                    ))}
+                                    {/* Loop for seamless scroll */}
+                                    {(data?.news || []).slice(2).map((news: any, index: number) => (
+                                        <button 
+                                            key={`loop-${index}`}
+                                            onClick={() => navigate('/public-space', { state: { category: 'Duyurular', postId: news.id } })}
+                                            className="text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-primary transition-colors flex items-center gap-2"
+                                        >
+                                            <span className="w-1.5 h-1.5 bg-primary rounded-full" />
+                                            {news.title}
+                                            <span className="text-[9px] opacity-50 font-medium">({news.date})</span>
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                        ))}
+                        )}
                     </div>
                 </Card>
 

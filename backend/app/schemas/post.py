@@ -12,6 +12,9 @@ class PostBase(BaseModel):
     is_public: bool = True
     shared_with: Optional[List[str]] = Field(default_factory=list, example=["user-id-1", "user-id-2"])
     attachments: Optional[List[dict]] = Field(default_factory=list, example=[{"url": "...", "type": "image", "name": "..."}])
+    is_approved: bool = True
+    approved_by: Optional[str] = None
+    approved_at: Optional[datetime] = None
 
 class PostCreate(PostBase):
     pass
@@ -20,6 +23,9 @@ class PostUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
     category: Optional[str] = None
+    is_approved: Optional[bool] = None
+    approved_by: Optional[str] = None
+    approved_at: Optional[datetime] = None
 
 class CommentUpdate(BaseModel):
     content: Optional[str] = None

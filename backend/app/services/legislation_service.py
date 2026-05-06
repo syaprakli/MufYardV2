@@ -66,14 +66,19 @@ class LegislationService:
                 blob_path = f"mevzuat/{category}/{name}_{timestamp}{ext}"
 
             def _upload():
-                blob = bucket.blob(blob_path)
-                file.file.seek(0)
-                blob.upload_from_file(
-                    file.file,
-                    content_type=file.content_type or "application/octet-stream",
-                )
-                blob.make_public()
-                return blob.public_url
+                try:
+                    blob = bucket.blob(blob_path)
+                    file.file.seek(0)
+                    blob.upload_from_file(
+                        file.file,
+                        content_type=file.content_type or "application/octet-stream",
+                    )
+                    blob.make_public()
+                    return blob.public_url
+                except Exception as e:
+                    if "does not exist" in str(e).lower() or "404" in str(e):
+                        raise Exception("Firebase Storage bucket başlatılmamış. Lütfen Firebase Console'dan Storage bölümüne gidip 'Get Started' butonuna tıklayarak Storage'ı aktif hale getirin.")
+                    raise e
 
             public_url = await asyncio.to_thread(_upload)
             return public_url  # e.g. https://storage.googleapis.com/mufyardv2.appspot.com/mevzuat/...
@@ -108,18 +113,51 @@ class LegislationService:
 
 
     @staticmethod
-    async def create_legislation(legislation: LegislationCreate) -> Dict[str, Any]:
+    async def create_legislation(legislation: LegislationCreate, is_admin: bool = False) -> Dict[str, Any]:
         leg_data = legislation.dict()
         leg_data['created_at'] = datetime.utcnow()
         if 'is_archived' not in leg_data:
             leg_data['is_archived'] = False
         
+        # Onay mekanizması
+        if not is_admin and leg_data.get('is_public', True):
+            leg_data['is_approved'] = False
+        else:
+            leg_data['is_approved'] = True
+            
         doc_ref = await asyncio.to_thread(db.collection('legislations').add, leg_data)
         
         new_doc = await asyncio.to_thread(doc_ref[1].get)
         new_leg = new_doc.to_dict()
         new_leg['id'] = doc_ref[1].id
         return new_leg
+
+    @staticmethod
+    async def approve_legislation(legislation_id: str, admin_name: str) -> bool:
+        doc_ref = db.collection('legislations').document(legislation_id)
+        doc = await asyncio.to_thread(doc_ref.get)
+        if not doc.exists:
+            return False
+            
+        await asyncio.to_thread(doc_ref.update, {
+            'is_approved': True,
+            'approved_by': admin_name,
+            'approved_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow()
+        })
+        return True
+
+    @staticmethod
+    async def reject_legislation(legislation_id: str) -> bool:
+        # Reddedilirse tamamen silebiliriz veya 'rejected' statusü verebiliriz.
+        # Kullanıcının talebine göre: "onay bekleyenler", silebiliriz.
+        doc_ref = db.collection('legislations').document(legislation_id)
+        doc = await asyncio.to_thread(doc_ref.get)
+        if not doc.exists:
+            return False
+        
+        await asyncio.to_thread(doc_ref.delete)
+        return True
 
     @staticmethod
     async def update_legislation(legislation_id: str, leg_update: LegislationUpdate) -> Optional[Dict[str, Any]]:

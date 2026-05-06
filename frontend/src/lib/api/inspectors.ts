@@ -1,6 +1,8 @@
 import { API_URL as API_BASE_URL } from "../config";
 import { fetchWithTimeout } from "./utils";
 
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export interface Inspector {
     id: string;
     name: string;
@@ -25,9 +27,25 @@ export interface InspectorCreate {
 }
 
 export async function fetchInspectors(): Promise<Inspector[]> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/inspectors/`);
-    if (!response.ok) throw new Error("Müfettişler yüklenemedi.");
-    return response.json();
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+            const response = await fetchWithTimeout(`${API_BASE_URL}/inspectors/`, { timeout: 25000 });
+            if (!response.ok) {
+                throw new Error("Müfettişler yüklenemedi.");
+            }
+            return response.json();
+        } catch (error) {
+            lastError = error;
+            if (attempt === 0) {
+                await delay(1200);
+                continue;
+            }
+        }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error("Müfettişler yüklenemedi.");
 }
 
 export async function addInspector(inspector: InspectorCreate): Promise<Inspector> {

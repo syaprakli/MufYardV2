@@ -14,13 +14,26 @@ function resolveUserName(user: User | null) {
     return emailPrefix || user.email || "Kullanıcı";
 }
 
+import { fetchProfile, type Profile } from "../api/profiles";
+
 export function useAuth() {
     const [user, setUser] = useState<User | null>(null);
+    const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             setUser(firebaseUser);
+            if (firebaseUser) {
+                try {
+                    const prof = await fetchProfile(firebaseUser.uid, firebaseUser.email || undefined, firebaseUser.displayName || undefined);
+                    setProfile(prof);
+                } catch (e) {
+                    console.error("Profile fetch error in useAuth:", e);
+                }
+            } else {
+                setProfile(null);
+            }
             setLoading(false);
         });
         return () => unsubscribe();
@@ -80,5 +93,5 @@ export function useAuth() {
         }
     };
 
-    return { user, loading, logout, resetPassword };
+    return { user, profile, loading, logout, resetPassword };
 }

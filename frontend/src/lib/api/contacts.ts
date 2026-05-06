@@ -29,16 +29,39 @@ export interface ContactCreate {
     owner_id: string;
 }
 
-export async function fetchContacts(category: 'corporate' | 'personal', userId?: string): Promise<Contact[]> {
+export async function fetchContacts(category: 'corporate' | 'personal', userId?: string, userEmail?: string): Promise<Contact[]> {
     let url = `${API_BASE_URL}/contacts/?category=${category}`;
     if (userId) {
         url += `&user_id=${userId}`;
+    }
+    if (userEmail) {
+        url += `&user_email=${encodeURIComponent(userEmail)}`;
     }
     
     const response = await fetchWithTimeout(url);
     if (!response.ok) {
         throw new Error("Rehber verileri yüklenemedi.");
     }
+    return response.json();
+}
+
+export async function acceptContact(id: string, userId: string, userEmail?: string): Promise<{status: string, message: string}> {
+    const params = new URLSearchParams({ user_id: userId });
+    if (userEmail) params.append("user_email", userEmail);
+    const response = await fetchWithTimeout(`${API_BASE_URL}/contacts/${id}/accept?${params.toString()}`, {
+        method: "POST"
+    });
+    if (!response.ok) throw new Error("Kişi kabul edilemedi.");
+    return response.json();
+}
+
+export async function rejectContact(id: string, userId: string, userEmail?: string): Promise<{status: string, message: string}> {
+    const params = new URLSearchParams({ user_id: userId });
+    if (userEmail) params.append("user_email", userEmail);
+    const response = await fetchWithTimeout(`${API_BASE_URL}/contacts/${id}/reject?${params.toString()}`, {
+        method: "POST"
+    });
+    if (!response.ok) throw new Error("Kişi reddedilemedi.");
     return response.json();
 }
 

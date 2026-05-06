@@ -16,6 +16,9 @@ class LegislationBase(BaseModel):
     is_archived: bool = False
     created_by_name: Optional[str] = None
     last_updated_by_name: Optional[str] = None
+    is_approved: bool = True  # Varsayılan True (admin eklerken), kullanıcı eklerken False set edilecek
+    approved_by: Optional[str] = None
+    approved_at: Optional[datetime] = None
 
 class LegislationCreate(LegislationBase):
     owner_id: Optional[str] = Field(None, example="user_123")
@@ -35,6 +38,9 @@ class LegislationUpdate(BaseModel):
     is_public: Optional[bool] = None
     is_archived: Optional[bool] = None
     last_updated_by_name: Optional[str] = None
+    is_approved: Optional[bool] = None
+    approved_by: Optional[str] = None
+    approved_at: Optional[datetime] = None
 
 
 

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Users, Search, ChevronLeft, ChevronRight, UserCheck, UserX, Loader2, MoreVertical, ShieldAlert, Shield, Link2, X } from "lucide-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -218,11 +218,11 @@ export default function AdminInspectors() {
                                     </div>
                                     <div className="flex items-center gap-1 ml-3 shrink-0">
                                         {registered ? (
-                                            <button onClick={() => handleUnlink(ins.id, ins.name)} title="Eşleştirmeyi Kaldır" className="p-2 text-emerald-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                                            <button onClick={() => handleUnlink(ins.id, ins.name)} title="Eşleştirmeyi Kaldır" className="p-2 text-emerald-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-all">
                                                 <Link2 size={15} />
                                             </button>
                                         ) : (
-                                            <button onClick={() => setLinkModal({ inspectorId: ins.id, inspectorName: ins.name })} className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black text-primary border border-primary/30 hover:bg-primary/10 rounded-xl transition-all opacity-0 group-hover:opacity-100 whitespace-nowrap">
+                                            <button onClick={() => setLinkModal({ inspectorId: ins.id, inspectorName: ins.name })} className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black text-primary border border-primary/30 hover:bg-primary/10 rounded-xl transition-all whitespace-nowrap">
                                                 <Link2 size={12} /> Eşleştir
                                             </button>
                                         )}
@@ -237,6 +237,7 @@ export default function AdminInspectors() {
                                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Rol Değiştir</p>
                                                         </div>
                                                         <button onClick={() => handleUpdateRole(profile.uid, "admin")} className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-amber-50 dark:hover:bg-amber-950/20 text-amber-600 transition-colors">Yönetici Yap</button>
+                                                        <button onClick={() => handleUpdateRole(profile.uid, "moderator")} className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-blue-50 dark:hover:bg-blue-950/20 text-blue-600 transition-colors">Moderatör Yap</button>
                                                         <button onClick={() => handleUpdateRole(profile.uid, "user")} className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-muted transition-colors text-slate-600 dark:text-slate-300">Standart Kullanıcı</button>
                                                         <div className="h-px bg-border my-1" />
                                                         <button onClick={() => handleDeleteProfile(profile.uid)} className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-500 transition-colors">Sistemden Sil</button>

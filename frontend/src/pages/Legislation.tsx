@@ -1,11 +1,11 @@
-import { Search, Plus, Loader2, Tag, Pin, FileText, Trash2, Shield, ChevronRight, ChevronDown, Upload, Folder, Filter, Archive, ExternalLink, X } from "lucide-react";
+import { Search, Plus, Loader2, Tag, Pin, FileText, Trash2, Shield, ChevronRight, ChevronDown, Upload, Folder, Filter, Archive, ExternalLink, X, Check } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
 import { useState, useEffect, useMemo } from "react";
-import { fetchLegislations, createLegislation, deleteLegislation, uploadLegislationFile, openLegislationFolder, promoteToPublic, type Legislation } from "../lib/api/legislation";
-import { RefreshCcw, UserCheck } from "lucide-react";
+import { fetchLegislations, createLegislation, deleteLegislation, uploadLegislationFile, openLegislationFolder, promoteToPublic, approveLegislation, rejectLegislation, fetchExternalLegislation, type Legislation } from "../lib/api/legislation";
+import { RefreshCcw, UserCheck, Zap } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
 import { Lock, Globe } from "lucide-react";
@@ -16,7 +16,9 @@ const CATEGORIES = ["Tümü", "GSB", "KYK", "Federasyon", "Özel Yurt", "Spor Ku
 const DOC_TYPES = ["Kanun", "KHK", "Yönetmelik", "Genelge", "Özelge", "Yazı"];
 
 export default function Legislation() {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
+    const isAdminOrMod = profile?.role === 'admin' || profile?.role === 'moderator' ||
+                         user?.email === 'sefa.yaprakli@hotmail.com' || user?.email === 'sefa.yaprakli@gsb.gov.tr';
     const confirm = useConfirm();
     const [selectedCategory, setSelectedCategory] = useState("Tümü");
     const [selectedSubType, setSelectedSubType] = useState<string | null>(null);
@@ -50,6 +52,7 @@ export default function Legislation() {
     const [isCreatingCategory, setIsCreatingCategory] = useState(false);
     const [uploadingFile, setUploadingFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [isFetchingExternal, setIsFetchingExternal] = useState(false);
 
 
     useEffect(() => {
@@ -59,7 +62,7 @@ export default function Legislation() {
     const loadLegislations = async () => {
         try {
             setLoading(true);
-            const data = await fetchLegislations(user?.uid || undefined, selectedCategory === "Tümü" ? "All" : selectedCategory);
+            const data = await fetchLegislations(user?.uid || undefined, selectedCategory === "Tümü" ? "All" : selectedCategory, isAdminOrMod);
             setLegislations(data);
         } catch (error) {
             console.error("Mevzuat yüklenemedi:", error);
@@ -68,6 +71,33 @@ export default function Legislation() {
         }
     };
 
+
+    const handleFetchExternal = async () => {
+        if (!newLeg.document_url || !newLeg.document_url.includes("mevzuat.gov.tr")) {
+            toast.error("Lütfen geçerli bir mevzuat.gov.tr bağlantısı girin.");
+            return;
+        }
+
+        try {
+            setIsFetchingExternal(true);
+            const data = await fetchExternalLegislation(newLeg.document_url);
+            
+            setNewLeg(prev => ({
+                ...prev,
+                title: data.title || prev.title,
+                official_gazette_info: data.official_gazette_info || prev.official_gazette_info,
+                summary: data.summary || prev.summary,
+                content: data.content || prev.content,
+                doc_type: data.doc_type || prev.doc_type
+            }));
+            
+            toast.success("Bilgiler mevzuat.gov.tr'den başarıyla çekildi.");
+        } catch (error: any) {
+            toast.error("Veri çekilemedi: " + error.message);
+        } finally {
+            setIsFetchingExternal(false);
+        }
+    };
 
     const handleCreateLeg = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -97,7 +127,7 @@ export default function Legislation() {
                 is_pinned: newLeg.is_pinned,
                 owner_id: user?.uid || undefined,
                 is_public: newLeg.is_public
-            });
+            }, isAdminOrMod);
 
             setIsModalOpen(false);
             resetForm();
@@ -335,7 +365,10 @@ export default function Legislation() {
                             </Button>
                         )}
                         <Button 
-                            onClick={() => setIsModalOpen(true)} 
+                            onClick={() => {
+                                // Artık herkese açık seçimini yapabiliyorlar
+                                setIsModalOpen(true);
+                            }} 
                             className="flex-[2] md:flex-none h-11 md:h-9 px-6 rounded-lg shadow-lg shadow-primary/20 bg-primary text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest"
                         >
                             <Plus size={16} className="mr-1.5" /> EKLE
@@ -481,8 +514,32 @@ export default function Legislation() {
                                             key={leg.id}
                                             leg={leg}
                                             isOwner={leg.owner_id === user?.uid}
+                                            canDelete={isAdminOrMod || leg.owner_id === user?.uid}
+                                            isAdmin={isAdminOrMod}
                                             onDelete={() => handleDelete(leg.id)}
                                             onPromote={() => handlePromote(leg.id, leg.title)}
+                                            onApprove={async () => {
+                                                try {
+                                                    await approveLegislation(leg.id, user?.displayName || user?.email || "Admin");
+                                                    toast.success("Mevzuat onaylandı.");
+                                                    loadLegislations();
+                                                } catch (e) { toast.error("Hata!"); }
+                                            }}
+                                            onReject={async () => {
+                                                const confirmed = await confirm({
+                                                    title: "Mevzuatı Reddet",
+                                                    message: "Bu mevzuat kaydını reddetmek ve silmek istediğinize emin misiniz?",
+                                                    confirmText: "Reddet ve Sil",
+                                                    variant: "danger"
+                                                });
+                                                if (confirmed) {
+                                                    try {
+                                                        await rejectLegislation(leg.id);
+                                                        toast.success("Mevzuat reddedildi.");
+                                                        loadLegislations();
+                                                    } catch (e) { toast.error("Hata!"); }
+                                                }
+                                            }}
                                         />
 
                                     ))}
@@ -505,19 +562,42 @@ export default function Legislation() {
                 size="large"
             >
                 <div className="mb-6 p-4 bg-primary/5 rounded-2xl border border-primary/10 border-dashed relative overflow-hidden group">
-                    <div className="flex items-center justify-between gap-4 relative z-10">
-                        <div className="flex-1">
-                            <h4 className="text-sm font-bold text-primary mb-1 text-outfit">Hızlı Belge Aktarımı</h4>
-                            <p className="text-[11px] text-slate-500 font-medium">Belgeniz seçtiğiniz klasöre otomatik olarak indekslenir.</p>
+                    <div className="flex flex-col gap-4 relative z-10">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex-1">
+                                <h4 className="text-sm font-bold text-primary mb-1 text-outfit">Hızlı Belge Aktarımı</h4>
+                                <p className="text-[11px] text-slate-500 font-medium">Yerel bir dosya yükleyin veya mevzuat.gov.tr bağlantısı kullanın.</p>
+                            </div>
+                            <label className={cn(
+                                "cursor-pointer px-4 py-2 rounded-xl bg-card border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-sm flex items-center gap-2",
+                                isUploading && "opacity-50 pointer-events-none"
+                            )}>
+                                <Upload size={14} />
+                                {uploadingFile ? 'Yüklenecek' : 'Dosya Seç'}
+                                <input type="file" className="hidden" accept=".pdf,.docx,.txt,.jpg,.jpeg,.png" onChange={handleFileSelect} />
+                            </label>
                         </div>
-                        <label className={cn(
-                            "cursor-pointer px-4 py-2 rounded-xl bg-card border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-sm flex items-center gap-2",
-                            isUploading && "opacity-50 pointer-events-none"
-                        )}>
-                            <Upload size={14} />
-                            {uploadingFile ? 'Yüklenecek' : 'Dosya Seç'}
-                            <input type="file" className="hidden" accept=".pdf,.docx,.txt,.jpg,.jpeg,.png" onChange={handleFileSelect} />
-                        </label>
+
+                        <div className="flex items-center gap-2">
+                            <div className="relative flex-1">
+                                <ExternalLink size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input 
+                                    className="w-full pl-9 pr-4 py-2 rounded-xl border border-primary/20 bg-white/50 focus:bg-white outline-none text-[11px] font-medium"
+                                    placeholder="mevzuat.gov.tr bağlantısını buraya yapıştırın..."
+                                    value={newLeg.document_url}
+                                    onChange={(e) => setNewLeg({...newLeg, document_url: e.target.value})}
+                                />
+                            </div>
+                            <Button 
+                                type="button"
+                                onClick={handleFetchExternal}
+                                disabled={isFetchingExternal || !newLeg.document_url}
+                                className="h-9 px-4 rounded-xl bg-primary text-white text-[10px] font-bold flex items-center gap-2 shadow-lg shadow-primary/20"
+                            >
+                                {isFetchingExternal ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                                OTOMATİK DOLDUR
+                            </Button>
+                        </div>
                     </div>
                     {uploadingFile && (
                         <div className="mt-2 text-[10px] font-black text-primary flex items-center gap-1 animate-in fade-in duration-300">
@@ -653,7 +733,8 @@ export default function Legislation() {
                                 />
                             </div>
                         </div>
-                        <div className="space-y-2">
+                        {/* Erişim Toggle - Genel seçimi sadece admin/moderatör için */}
+                         <div className="space-y-2">
                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Erişim / Gizlilik</label>
                              <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner h-11">
                                 <button 
@@ -677,6 +758,11 @@ export default function Legislation() {
                                     <Lock size={14} /> <span className="text-[10px]">Kişisel</span>
                                 </button>
                              </div>
+                             {!isAdminOrMod && newLeg.is_public && (
+                                 <p className="text-[9px] font-bold text-amber-600 mt-1 uppercase italic tracking-tighter">
+                                     * Genel mevzuat eklemeleri onaydan sonra yayınlanır.
+                                 </p>
+                             )}
                         </div>
                         <div className="flex items-center gap-2 py-2 md:py-8">
                             <input 
@@ -703,7 +789,25 @@ export default function Legislation() {
     );
 }
 
-function LegislationRow({ leg, isOwner, onDelete, onPromote }: { leg: Legislation, isOwner: boolean, onDelete: () => void, onPromote: () => void }) {
+function LegislationRow({ 
+    leg, 
+    isOwner, 
+    canDelete, 
+    isAdmin, 
+    onDelete, 
+    onPromote,
+    onApprove,
+    onReject 
+}: { 
+    leg: Legislation, 
+    isOwner: boolean, 
+    canDelete?: boolean, 
+    isAdmin?: boolean,
+    onDelete: () => void, 
+    onPromote: () => void,
+    onApprove: () => void,
+    onReject: () => void
+}) {
 
     return (
         <div className="flex flex-col md:grid md:grid-cols-12 gap-3 md:gap-4 px-4 md:px-6 py-4 md:py-2.5 hover:bg-muted/50 dark:hover:bg-slate-800/50 transition-all group items-center border-b border-slate-100 dark:border-slate-800/50 last:border-0 relative">
@@ -725,6 +829,11 @@ function LegislationRow({ leg, isOwner, onDelete, onPromote }: { leg: Legislatio
                     )}>
                         {leg.is_public ? "Genel" : "Kişisel"}
                     </span>
+                    {leg.is_public && leg.is_approved === false && (
+                        <span className="px-2 py-0.5 rounded bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest shadow-sm">
+                            Onay Bekliyor
+                        </span>
+                    )}
                 </div>
             </div>
             <div className="md:col-span-5 pr-0 md:pr-4 w-full">
@@ -754,6 +863,9 @@ function LegislationRow({ leg, isOwner, onDelete, onPromote }: { leg: Legislatio
                  <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 font-bold text-[10px] uppercase">
                     {leg.is_public ? <Globe size={11} className="text-slate-300 dark:text-muted-foreground" /> : <Lock size={11} className="text-indigo-400 dark:text-indigo-500" />}
                     <span className={cn("truncate", !leg.is_public && "text-indigo-500 dark:text-indigo-400")}>{leg.is_public ? "Genel" : "Kişisel"}</span>
+                    {leg.is_public && leg.is_approved === false && (
+                        <span className="shrink-0 w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Onay Bekliyor" />
+                    )}
                     <span className="mx-1 text-slate-200 dark:text-foreground">|</span>
                     <span className="truncate">{leg.category}</span>
                 </div>
@@ -789,9 +901,34 @@ function LegislationRow({ leg, isOwner, onDelete, onPromote }: { leg: Legislatio
                     </Button>
                 )}
 
+                {isAdmin && leg.is_public && leg.is_approved === false && (
+                    <div className="flex items-center gap-1">
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="w-10 h-10 md:w-7 md:h-7 rounded-lg text-emerald-600 hover:bg-emerald-100 border border-emerald-200 shadow-sm bg-card"
+                            title="Onayla"
+                            onClick={onApprove}
+                        >
+                            <Check size={14} />
+                        </Button>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="w-10 h-10 md:w-7 md:h-7 rounded-lg text-rose-600 hover:bg-rose-100 border border-rose-200 shadow-sm bg-card"
+                            title="Reddet ve Sil"
+                            onClick={onReject}
+                        >
+                            <X size={14} />
+                        </Button>
+                    </div>
+                )}
+
+                {canDelete && (
                 <Button variant="ghost" size="icon" onClick={onDelete} className="w-10 h-10 md:w-7 md:h-7 text-red-400 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg md:opacity-0 md:group-hover:opacity-100 transition-all border border-red-100 dark:border-red-900/30 bg-card ml-auto md:ml-2">
                     <Trash2 size={14} className="md:w-3 md:h-3" />
                 </Button>
+                )}
             </div>
 
         </div>

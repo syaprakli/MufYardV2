@@ -28,6 +28,7 @@ class ProfileBase(BaseModel):
     ai_temperature: float = Field(default=0.7)
     ai_system_prompt: Optional[str] = None
     verified: bool = Field(default=False)
+    birthday: Optional[str] = None  # "MM-DD" formatında
 
 class ProfileUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -55,6 +56,7 @@ class ProfileUpdate(BaseModel):
     ai_temperature: Optional[float] = None
     ai_system_prompt: Optional[str] = None
     verified: Optional[bool] = None
+    birthday: Optional[str] = None
 
 class ProfileResponse(ProfileBase):
     uid: str

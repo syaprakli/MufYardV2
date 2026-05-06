@@ -18,3 +18,6 @@ langchain-openai
 langchain-community
 python-multipart
 gunicorn
+httpx
+beautifulsoup4
+lxml

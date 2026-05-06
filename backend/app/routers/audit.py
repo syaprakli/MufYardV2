@@ -43,6 +43,30 @@ async def update_audit(id: str, audit: AuditUpdate):
         raise HTTPException(status_code=404, detail="Denetim güncellenemedi.")
     return updated
 
+@router.post("/{id}/accept")
+async def accept_audit(id: str, user_id: Optional[str] = None, user_email: Optional[str] = None):
+    try:
+        success = await AuditService.accept_audit(id, user_id, user_email)
+        if not success:
+            raise HTTPException(status_code=400, detail="Denetim reddedilemedi veya bulunamadı.")
+        return {"status": "success", "message": "Denetim kabul edildi."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{id}/reject")
+async def reject_audit(id: str, user_id: Optional[str] = None, user_email: Optional[str] = None):
+    try:
+        success = await AuditService.reject_audit(id, user_id, user_email)
+        if not success:
+            raise HTTPException(status_code=400, detail="Denetim reddedilemedi veya bulunamadı.")
+        return {"status": "success", "message": "Denetim reddedildi."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.delete("/{id}")
 async def delete_audit(id: str):
     success = await AuditService.delete_audit(id)

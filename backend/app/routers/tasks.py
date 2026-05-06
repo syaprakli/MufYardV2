@@ -48,6 +48,19 @@ async def accept_task(task_id: str, user_id: Optional[str] = None, user_email: O
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/{task_id}/reject")
+async def reject_task(task_id: str, user_id: Optional[str] = None, user_email: Optional[str] = None):
+    try:
+        success = await TaskService.reject_task(task_id, user_id, user_email)
+        if not success:
+            raise HTTPException(status_code=400, detail="Görev reddedilemedi veya bulunamadı.")
+        return {"status": "success", "message": "Görev reddedildi."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/{task_id}")
 async def delete_task(task_id: str):
     try:

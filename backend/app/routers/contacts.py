@@ -8,11 +8,12 @@ router = APIRouter(tags=["contacts"])
 
 @router.get("/", response_model=List[ContactResponse])
 async def get_contacts(
-    category: str = Query("corporate", description="Rehber kategorisi: 'corporate' veya 'personal'"),
-    user_id: Optional[str] = Query(None, description="Kişisel rehber için kullanıcı ID")
+    category: str = Query(..., description="'corporate' veya 'personal'"),
+    user_id: Optional[str] = Query(None, description="Kişisel rehber için kullanıcı ID'si"),
+    user_email: Optional[str] = Query(None, description="Kullanıcı e-postası")
 ):
     try:
-        return await ContactService.get_contacts(category, user_id)
+        return await ContactService.get_contacts(category, user_id, user_email)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -59,15 +60,41 @@ async def create_contact(contact: ContactCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.patch("/{contact_id}/share")
-async def share_contact(contact_id: str, user_id: str = Query(..., description="Paylaşan kullanıcının ID'si")):
+@router.post("/{contact_id}/share")
+async def share_contact(contact_id: str, user_id: str):
     try:
         success = await ContactService.share_contact(contact_id, user_id)
         if not success:
-            raise HTTPException(status_code=404, detail="Kişi bulunamadı.")
-        return {"status": "success", "message": "Kişi kurumsal rehberde paylaşıldı."}
+            raise HTTPException(status_code=404, detail="Kişi bulunamadı")
+        return {"status": "success", "message": "Kişi kurumsal rehberde paylaşıldı"}
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{contact_id}/accept")
+async def accept_contact(contact_id: str, user_id: Optional[str] = None, user_email: Optional[str] = None):
+    try:
+        success = await ContactService.accept_contact(contact_id, user_id, user_email)
+        if not success:
+            raise HTTPException(status_code=400, detail="Kişi reddedilemedi veya bulunamadı.")
+        return {"status": "success", "message": "Kişi eklendi."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{contact_id}/reject")
+async def reject_contact(contact_id: str, user_id: Optional[str] = None, user_email: Optional[str] = None):
+    try:
+        success = await ContactService.reject_contact(contact_id, user_id, user_email)
+        if not success:
+            raise HTTPException(status_code=400, detail="Kişi reddedilemedi veya bulunamadı.")
+        return {"status": "success", "message": "Kişi reddedildi."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.patch("/{contact_id}", response_model=ContactResponse)
 async def update_contact(contact_id: str, contact_update: ContactUpdate, user_id: str = Query(..., description="Güncelleyen kullanıcının ID'si")):

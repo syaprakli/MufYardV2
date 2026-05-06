@@ -38,7 +38,11 @@ class AuditService:
             audits_ref.where('assigned_to', 'array_contains', user_id) if user_id else None,
             audits_ref.where('assigned_to', 'array_contains', user_email) if user_email else None,
             audits_ref.where('shared_with', 'array_contains', user_id) if user_id else None,
-            audits_ref.where('shared_with', 'array_contains', user_email) if user_email else None
+            audits_ref.where('shared_with', 'array_contains', user_email) if user_email else None,
+            audits_ref.where('accepted_collaborators', 'array_contains', user_id) if user_id else None,
+            audits_ref.where('accepted_collaborators', 'array_contains', user_email) if user_email else None,
+            audits_ref.where('pending_collaborators', 'array_contains', user_id) if user_id else None,
+            audits_ref.where('pending_collaborators', 'array_contains', user_email) if user_email else None
         ]
         
         results = await asyncio.gather(*(run_query(q) for q in queries))
@@ -179,3 +183,57 @@ class AuditService:
             
         await asyncio.to_thread(doc_ref.delete)
         return True
+
+    @staticmethod
+    async def accept_audit(audit_id: str, user_id: Optional[str], user_email: Optional[str] = None) -> bool:
+        try:
+            doc_ref = db.collection('audits').document(audit_id)
+            doc = await asyncio.to_thread(doc_ref.get)
+            if not doc.exists:
+                return False
+            
+            audit_data = doc.to_dict()
+            pending = audit_data.get('pending_collaborators', [])
+            accepted = audit_data.get('accepted_collaborators', [])
+            identity_keys = [value for value in [user_id, user_email] if value]
+            
+            matched_identity = next((value for value in identity_keys if value in pending), None)
+
+            if matched_identity:
+                pending = [value for value in pending if value not in identity_keys]
+                for identity in identity_keys:
+                    if identity not in accepted:
+                        accepted.append(identity)
+                
+                await asyncio.to_thread(doc_ref.update, {
+                    'pending_collaborators': pending,
+                    'accepted_collaborators': accepted
+                })
+                return True
+            return False
+        except Exception:
+            return False
+
+    @staticmethod
+    async def reject_audit(audit_id: str, user_id: Optional[str], user_email: Optional[str] = None) -> bool:
+        try:
+            doc_ref = db.collection('audits').document(audit_id)
+            doc = await asyncio.to_thread(doc_ref.get)
+            if not doc.exists:
+                return False
+            
+            audit_data = doc.to_dict()
+            pending = audit_data.get('pending_collaborators', [])
+            identity_keys = [value for value in [user_id, user_email] if value]
+            
+            matched_identity = next((value for value in identity_keys if value in pending), None)
+
+            if matched_identity:
+                pending = [value for value in pending if value not in identity_keys]
+                await asyncio.to_thread(doc_ref.update, {
+                    'pending_collaborators': pending
+                })
+                return True
+            return False
+        except Exception:
+            return False

@@ -201,7 +201,10 @@ export default function PublicSpace() {
                 setUserRole(prof.role || 'user');
                 setCategories(cats);
                 setAllInspectors(insps.filter((i: any) => i.uid !== user?.uid));
-                setMessages([]);
+                // Eski mesajları yükleme (Kullanıcı talebi #5)
+                setMessages([]); 
+                // Oturum başlama zamanını kaydet
+                (window as any).chatSessionStartTime = new Date().toISOString();
             } catch (err: any) {
                 console.error("Initial load error", err);
             } finally {
@@ -211,12 +214,44 @@ export default function PublicSpace() {
         loadInitialData();
     }, [user]);
 
+    // 1 saniyede bir mesajları otomatik yenileme (Kullanıcı talebi #1)
+    useEffect(() => {
+        if (!user) return;
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetchWithTimeout(`${API_URL}/collaboration/messages?limit=50`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const startTime = (window as any).chatSessionStartTime;
+                    setMessages(prev => {
+                        const newMsgs = data.filter((m: any) => 
+                            !prev.some(pm => pm.id === m.id) && 
+                            (!startTime || new Date(m.timestamp) >= new Date(startTime))
+                        );
+                        if (newMsgs.length === 0) return prev;
+                        // Yeni gelenleri mevcut listeye ekle ve sırala
+                        const combined = [...prev, ...newMsgs.map((m: any) => ({ ...m, isMine: m.author_id === user?.uid }))];
+                        return combined.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                    });
+                }
+            } catch (err) {
+                console.error("Message polling error:", err);
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [user]);
+
     useEffect(() => {
         if (globalMessages.length > 0) {
+            const startTime = (window as any).chatSessionStartTime;
             setMessages(prev => {
-                const newMsgs = globalMessages.filter(gm => !prev.some(pm => pm.id === gm.id));
+                const newMsgs = globalMessages.filter(gm => 
+                    !prev.some(pm => pm.id === gm.id) &&
+                    (!startTime || new Date(gm.timestamp) >= new Date(startTime))
+                );
                 if (newMsgs.length === 0) return prev;
-                return [...prev, ...newMsgs.map(m => ({ ...m, isMine: m.author_id === user?.uid }))];
+                const combined = [...prev, ...newMsgs.map(m => ({ ...m, isMine: m.author_id === user?.uid }))];
+                return combined.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
             });
         }
     }, [globalMessages, user?.uid]);
@@ -228,6 +263,7 @@ export default function PublicSpace() {
                 const url = new URL(`${API_URL}/collaboration/posts`);
                 if (selectedCategory !== 'Hepsi') url.searchParams.append('category', selectedCategory);
                 if (user?.uid) url.searchParams.append('user_id', user.uid);
+                if (userRole === 'admin' || userRole === 'moderator') url.searchParams.append('is_admin', 'true');
                 
                 const postsRes = await fetchWithTimeout(url.toString());
                 const postsData = await postsRes.json();
@@ -464,9 +500,14 @@ export default function PublicSpace() {
         if (!newPost.content.trim() || !newPost.title.trim() || !user) return;
         setIsPosting(true);
         try {
-            const url = editingPost 
+            const isModerator = userRole === 'admin' || userRole === 'moderator';
+            let url = editingPost 
                 ? `${API_URL}/collaboration/posts/${editingPost.id}` 
                 : `${API_URL}/collaboration/posts`;
+            
+            // Onay mekanizması için rolü gönderiyoruz
+            url += `?role=${encodeURIComponent(userRole)}`;
+
             const method = editingPost ? 'PATCH' : 'POST';
             const payload = editingPost ? {
                 title: newPost.title,
@@ -499,14 +540,55 @@ export default function PublicSpace() {
             } else {
                 setPosts(prev => [result, ...prev]);
             }
+            if (!editingPost && !isModerator && (sharedWith.length === 0)) {
+                toast.success("Paylaşımınız onay bekliyor. Admin onayından sonra yayınlanacaktır.");
+            } else {
+                toast.success(editingPost ? "Güncellendi!" : "Paylaşıldı!");
+            }
             setNewPost({ title: "", content: "", category: "Genel", attachments: [] });
             setSharedWith([]);
             setShowPostCreator(false);
-            toast.success(editingPost ? "Güncellendi!" : "Paylaşıldı!");
         } catch {
             toast.error("Hata oluştu.");
         } finally {
             setIsPosting(false);
+        }
+    };
+
+    const handleApprovePost = async (postId: string) => {
+        try {
+            const adminName = user?.displayName || user?.email || "Admin";
+            const res = await fetchWithTimeout(`${API_URL}/collaboration/posts/${postId}/approve?admin_name=${encodeURIComponent(adminName)}`, {
+                method: 'POST'
+            });
+            if (!res.ok) throw new Error();
+            setPosts(prev => prev.map(p => p.id === postId ? { ...p, is_approved: true } : p));
+            if (selectedPost?.id === postId) setSelectedPost(prev => prev ? { ...prev, is_approved: true } : null);
+            toast.success("Onaylandı.");
+        } catch {
+            toast.error("İşlem başarısız.");
+        }
+    };
+
+    const handleRejectPost = async (postId: string) => {
+        const confirmed = await confirm({
+            title: "Paylaşımı Reddet",
+            message: "Bu paylaşımı reddetmek ve silmek istediğinize emin misiniz?",
+            confirmText: "Reddet ve Sil",
+            variant: "danger"
+        });
+        if (!confirmed) return;
+
+        try {
+            const res = await fetchWithTimeout(`${API_URL}/collaboration/posts/${postId}/reject`, {
+                method: 'POST'
+            });
+            if (!res.ok) throw new Error();
+            setPosts(prev => prev.filter(p => p.id !== postId));
+            if (selectedPost?.id === postId) setSelectedPost(null);
+            toast.success("Reddedildi ve silindi.");
+        } catch {
+            toast.error("İşlem başarısız.");
         }
     };
 
@@ -606,6 +688,8 @@ export default function PublicSpace() {
                                     <span className="hidden sm:inline">Duyuru Ekle</span>
                                 </Button>
                             )}
+                            {/* Forum: herkes konu açabilir. SSS/Duyurular: sadece admin/moderatör */}
+                            {(viewMode === 'Forum' || userRole === 'admin' || userRole === 'moderator') && (
                             <Button 
                                 onClick={() => {
                                     setEditingPost(null);
@@ -621,6 +705,7 @@ export default function PublicSpace() {
                                 <span className="sm:hidden">Ekle</span>
                                 <span className="hidden sm:inline">{viewMode === 'SSS' ? 'Soru Ekle' : viewMode === 'Duyurular' ? 'Yeni Duyuru' : 'Yeni Konu'}</span>
                             </Button>
+                            )}
                         </div>
                     </div>
                     <div className="flex items-center gap-4 md:gap-8 overflow-x-auto no-scrollbar pb-1">
@@ -701,7 +786,15 @@ export default function PublicSpace() {
                                 {viewMode === 'SSS' ? (
                                     <motion.div key="sss" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-4xl mx-auto space-y-4">
                                         {[...FAQ_DATA, ...posts.filter(p => p.category?.toLowerCase() === 'sss')].map((faq, idx) => (
-                                            <FAQCard key={faq.id} faq={faq} isOpen={openFAQIndex === idx} onToggle={() => setOpenFAQIndex(openFAQIndex === idx ? null : idx)} />
+                                            <FAQCard 
+                                                key={faq.id} 
+                                                faq={faq} 
+                                                isOpen={openFAQIndex === idx} 
+                                                onToggle={() => setOpenFAQIndex(openFAQIndex === idx ? null : idx)}
+                                                isAdmin={userRole === 'admin' || userRole === 'moderator'}
+                                                onApprove={() => handleApprovePost(faq.id)}
+                                                onReject={() => handleRejectPost(faq.id)}
+                                            />
                                         ))}
                                     </motion.div>
                                 ) : viewMode === 'Duyurular' ? (
@@ -717,8 +810,11 @@ export default function PublicSpace() {
                                                         setNewPost({ title: post.title, content: post.content, category: post.category, attachments: post.attachments || [] });
                                                         setShowPostCreator(true);
                                                     }}
-                                                    canDelete={userRole === 'admin' || post.author_id === user?.uid}
-                                                    canEdit={post.author_id === user?.uid}
+                                                    onApprove={() => handleApprovePost(post.id)}
+                                                    onReject={() => handleRejectPost(post.id)}
+                                                    isAdmin={userRole === 'admin' || userRole === 'moderator'}
+                                                    canDelete={userRole === 'admin' || userRole === 'moderator' || post.author_id === user?.uid}
+                                                    canEdit={userRole === 'admin' || userRole === 'moderator' || post.author_id === user?.uid}
                                                 />
                                             ))}
                                     </motion.div>
@@ -840,8 +936,11 @@ export default function PublicSpace() {
                                                             setNewPost({ title: post.title, content: post.content, category: post.category, attachments: post.attachments || [] });
                                                             setShowPostCreator(true);
                                                         }}
-                                                        canDelete={userRole === 'admin' || post.author_id === user?.uid}
-                                                        canEdit={post.author_id === user?.uid}
+                                                        onApprove={() => handleApprovePost(post.id)}
+                                                        onReject={() => handleRejectPost(post.id)}
+                                                        isAdmin={userRole === 'admin' || userRole === 'moderator'}
+                                                        canDelete={userRole === 'admin' || userRole === 'moderator' || post.author_id === user?.uid}
+                                                        canEdit={userRole === 'admin' || userRole === 'moderator' || post.author_id === user?.uid}
                                                     />
                                                 ))}
                                         </div>
@@ -1089,6 +1188,7 @@ export default function PublicSpace() {
                         onSharedWithChange={setSharedWith}
                         onUpload={handleFileUpload}
                         uploading={fileUploading}
+                        isAdmin={userRole === 'admin' || userRole === 'moderator'}
                     />
                 )}
                 {zoomedAttachment && <GalleryOverlay attachment={zoomedAttachment} onClose={() => setZoomedAttachment(null)} />}
@@ -1097,7 +1197,7 @@ export default function PublicSpace() {
     );
 }
 
-function TopicRow({ post, onClick, onDelete, onEdit, canDelete, canEdit }: any) {
+function TopicRow({ post, onClick, onDelete, onEdit, onApprove, onReject, canDelete, canEdit, isAdmin }: any) {
     return (
         <div onClick={onClick} className="group p-4 md:p-5 bg-card border border-border/60 rounded-3xl shadow-sm hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center gap-4 md:gap-6 relative overflow-hidden">
             <div className="w-12 h-12 md:w-14 md:h-14 bg-muted rounded-2xl flex items-center justify-center text-primary/40 group-hover:bg-primary/5 group-hover:text-primary transition-all shrink-0 mx-auto sm:mx-0">
@@ -1106,6 +1206,9 @@ function TopicRow({ post, onClick, onDelete, onEdit, canDelete, canEdit }: any) 
             <div className="flex-1 space-y-1 text-center sm:text-left min-w-0">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-1 sm:mb-0">
                     <span className="inline-block self-center sm:self-start px-2.5 py-1 bg-muted/80 text-muted-foreground rounded-lg text-[9px] font-black capitalize tracking-widest w-fit">{post.category}</span>
+                    {post.is_approved === false && (
+                        <span className="inline-block self-center sm:self-start px-2.5 py-1 bg-amber-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest w-fit animate-pulse">Onay Bekliyor</span>
+                    )}
                     <h3 className="font-black text-foreground text-sm md:text-[13px] group-hover:text-primary transition-colors leading-tight truncate">{post.title}</h3>
                 </div>
                 <div className="flex flex-wrap justify-center sm:justify-start items-center gap-x-4 gap-y-1 text-[10px] font-bold text-slate-400">
@@ -1122,6 +1225,16 @@ function TopicRow({ post, onClick, onDelete, onEdit, canDelete, canEdit }: any) 
                     <p className="text-[9px] font-bold text-slate-400 capitalize tracking-widest">Beğeni</p>
                 </div>
                 <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all">
+                    {isAdmin && post.is_approved === false && (
+                        <>
+                            <button onClick={(e) => { e.stopPropagation(); onApprove(); }} className="p-2.5 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-xl transition-all" title="Onayla">
+                                <Check size={18} />
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); onReject(); }} className="p-2.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-all" title="Reddet">
+                                <X size={18} />
+                            </button>
+                        </>
+                    )}
                     {canEdit && (
                         <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-2.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-xl transition-all">
                             <Edit3 size={18} />
@@ -1138,7 +1251,7 @@ function TopicRow({ post, onClick, onDelete, onEdit, canDelete, canEdit }: any) 
     );
 }
 
-function FAQCard({ faq, isOpen, onToggle }: any) {
+function FAQCard({ faq, isOpen, onToggle, onApprove, onReject, isAdmin }: any) {
     return (
         <Card className="overflow-hidden border-border rounded-3xl group shadow-sm hover:shadow-md transition-all">
             <button onClick={onToggle} className="w-full flex items-center justify-between p-6 text-left hover:bg-muted transition-colors">
@@ -1146,9 +1259,22 @@ function FAQCard({ faq, isOpen, onToggle }: any) {
                     <div className="w-10 h-10 bg-primary/5 text-primary rounded-xl flex items-center justify-center">
                         <HelpCircle size={20} />
                     </div>
-                    <span className="font-black text-foreground text-sm tracking-tight">{faq.title}</span>
+                    <div className="flex flex-col">
+                        <span className="font-black text-foreground text-sm tracking-tight">{faq.title}</span>
+                        {faq.is_approved === false && (
+                            <span className="text-[9px] font-black text-amber-500 uppercase tracking-tighter">Onay Bekliyor</span>
+                        )}
+                    </div>
                 </div>
-                {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                <div className="flex items-center gap-2">
+                    {isAdmin && faq.is_approved === false && (
+                        <div className="flex items-center gap-1 mr-4">
+                            <button onClick={(e) => { e.stopPropagation(); onApprove(); }} className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg"><Check size={16} /></button>
+                            <button onClick={(e) => { e.stopPropagation(); onReject(); }} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg"><X size={16} /></button>
+                        </div>
+                    )}
+                    {isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </div>
             </button>
             <AnimatePresence>
                 {isOpen && (
@@ -1163,7 +1289,7 @@ function FAQCard({ faq, isOpen, onToggle }: any) {
     );
 }
 
-function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, isEdit, inspectors, sharedWith, onSharedWithChange, onUpload, uploading }: any) {
+function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, isEdit, inspectors, sharedWith, onSharedWithChange, onUpload, uploading, isAdmin }: any) {
     const [step, setStep] = useState(1);
     const isAnnouncement = post.category === 'Duyurular';
     const isSSS = post.category === 'SSS';
@@ -1267,6 +1393,14 @@ function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, 
                                     </div>
                                 </div>
                             </div>
+                            {!isAdmin && !isEdit && sharedWith.length === 0 && (
+                                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-start gap-3">
+                                    <Shield size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                                    <p className="text-[10px] font-bold text-amber-700 leading-normal uppercase">
+                                        Genel paylaşımlar (Forum, SSS, Duyuru) moderatör onayından sonra diğer kullanıcılara görünür olacaktır.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     )}
                     {post.attachments && post.attachments.length > 0 && (

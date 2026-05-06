@@ -8,6 +8,10 @@ from app.schemas.post import PostCreate, PostUpdate
 
 class CollaborationService:
     @staticmethod
+    def _normalize_dm_room_id(room_id: str) -> str:
+        return room_id[3:] if room_id.startswith("dm_") else room_id
+
+    @staticmethod
     def _where_eq(query: Any, field_name: str, value: Any):
         """Firestore yeni filter API'sini kullanır; mock db için eski imzaya düşer."""
         try:
@@ -93,7 +97,8 @@ class CollaborationService:
     @staticmethod
     async def delete_private_message(room_id: str, message_id: str, requester_uid: str) -> bool:
         """Özel mesajı siler (Herkesten sil). Sadece gönderen silebilir."""
-        doc_ref = db.collection('private_messages').document(room_id).collection('chats').document(message_id)
+        normalized_room_id = CollaborationService._normalize_dm_room_id(room_id)
+        doc_ref = db.collection('private_messages').document(normalized_room_id).collection('chats').document(message_id)
         doc = await asyncio.to_thread(doc_ref.get)
         
         if not doc.exists:
@@ -110,7 +115,8 @@ class CollaborationService:
     @staticmethod
     async def update_private_message(room_id: str, message_id: str, requester_uid: str, content: str) -> Optional[Dict[str, Any]]:
         """Özel mesajı düzenler. Sadece gönderen düzenleyebilir."""
-        doc_ref = db.collection('private_messages').document(room_id).collection('chats').document(message_id)
+        normalized_room_id = CollaborationService._normalize_dm_room_id(room_id)
+        doc_ref = db.collection('private_messages').document(normalized_room_id).collection('chats').document(message_id)
         doc = await asyncio.to_thread(doc_ref.get)
         if not doc.exists:
             return None
@@ -138,7 +144,8 @@ class CollaborationService:
     @staticmethod
     async def clear_private_messages(room_id: str, requester_uid: str) -> int:
         """Kullanıcının kendi gönderdiği özel mesajları temizler."""
-        chats_ref = db.collection('private_messages').document(room_id).collection('chats')
+        normalized_room_id = CollaborationService._normalize_dm_room_id(room_id)
+        chats_ref = db.collection('private_messages').document(normalized_room_id).collection('chats')
         docs = await asyncio.to_thread(
             lambda: list(chats_ref.where('sender_id', '==', requester_uid).stream())
         )
@@ -174,12 +181,20 @@ class CollaborationService:
                 item = doc.to_dict()
                 item['id'] = doc.id
                 
-                # Visibility logic: show if public OR user is in shared_with OR user is the author
+                # Visibility logic
                 is_public = item.get('is_public', True)
+                is_approved = item.get('is_approved', True)
                 shared_with = item.get('shared_with', [])
                 author_id = item.get('author_id')
                 
-                if is_public or (user_uid and (user_uid in shared_with or user_uid == author_id)):
+                # Admin/Moderator her şeyi görür
+                if user_uid and user_uid == "admin": # Not: user_uid role kontrolü ile güncellenmeli
+                    posts.append(item)
+                # Normal kullanıcı: Public + Approved olanları VEYA kendisine özel paylaşılanları VEYA kendi postlarını görür
+                elif is_public:
+                    if is_approved or (user_uid and user_uid == author_id):
+                        posts.append(item)
+                elif user_uid and (user_uid in shared_with or user_uid == author_id):
                     posts.append(item)
 
             # Firestore composite index ihtiyacını azaltmak için sıralama uygulama tarafında yapılıyor.
@@ -217,16 +232,47 @@ class CollaborationService:
         return posts
 
     @staticmethod
-    async def create_post(post: PostCreate) -> Dict[str, Any]:
+    async def create_post(post: PostCreate, is_admin: bool = False) -> Dict[str, Any]:
         post_data = post.dict()
         post_data['created_at'] = datetime.utcnow()
         post_data['likes_count'] = 0
         
+        # Onay mekanizması
+        if not is_admin and post_data.get('is_public', True):
+            post_data['is_approved'] = False
+        else:
+            post_data['is_approved'] = True
+            
         doc_ref = await asyncio.to_thread(db.collection('posts').add, post_data)
         new_post_doc = await asyncio.to_thread(doc_ref[1].get)
         new_post = new_post_doc.to_dict()
         new_post['id'] = doc_ref[1].id
         return new_post
+
+    @staticmethod
+    async def approve_post(post_id: str, admin_name: str) -> bool:
+        doc_ref = db.collection('posts').document(post_id)
+        doc = await asyncio.to_thread(doc_ref.get)
+        if not doc.exists:
+            return False
+            
+        await asyncio.to_thread(doc_ref.update, {
+            'is_approved': True,
+            'approved_by': admin_name,
+            'approved_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow()
+        })
+        return True
+
+    @staticmethod
+    async def reject_post(post_id: str) -> bool:
+        doc_ref = db.collection('posts').document(post_id)
+        doc = await asyncio.to_thread(doc_ref.get)
+        if not doc.exists:
+            return False
+        
+        await asyncio.to_thread(doc_ref.delete)
+        return True
 
     @staticmethod
     async def delete_post(post_id: str) -> bool:
@@ -420,4 +466,133 @@ class CollaborationService:
             return True
         except Exception:
             return False
+
+    # --- Generic Collaboration Approval ---
+    @staticmethod
+    async def accept_resource(resource_type: str, resource_id: str, user_id: str) -> bool:
+        """Paylaşılan bir kaynağı (Task, Note, Contact) kabul eder."""
+        collection_map = {
+            'TASK': 'tasks',
+            'NOTE': 'notes',
+            'CONTACT': 'contacts'
+        }
+        collection_name = collection_map.get(resource_type.upper())
+        if not collection_name:
+            return False
+
+        try:
+            doc_ref = db.collection(collection_name).document(resource_id)
+            doc = await asyncio.to_thread(doc_ref.get)
+            if not doc.exists:
+                return False
+            
+            data = doc.to_dict()
+            pending = data.get('pending_collaborators', [])
+            accepted = data.get('accepted_collaborators', [])
+
+            if user_id in pending:
+                pending.remove(user_id)
+                if user_id not in accepted:
+                    accepted.append(user_id)
+                
+                await asyncio.to_thread(doc_ref.update, {
+                    'pending_collaborators': pending,
+                    'accepted_collaborators': accepted
+                })
+                return True
+            return False
+        except Exception as e:
+            print(f"Error accepting resource {resource_type}: {e}")
+            return False
+
+    @staticmethod
+    async def reject_resource(resource_type: str, resource_id: str, user_id: str) -> bool:
+        """Paylaşılan bir kaynağı (Task, Note, Contact) reddeder."""
+        collection_map = {
+            'TASK': 'tasks',
+            'NOTE': 'notes',
+            'CONTACT': 'contacts'
+        }
+        collection_name = collection_map.get(resource_type.upper())
+        if not collection_name:
+            return False
+
+        try:
+            doc_ref = db.collection(collection_name).document(resource_id)
+            doc = await asyncio.to_thread(doc_ref.get)
+            if not doc.exists:
+                return False
+            
+            data = doc.to_dict()
+            pending = data.get('pending_collaborators', [])
+            shared_with = data.get('shared_with', [])
+
+            changed = False
+            if user_id in pending:
+                pending.remove(user_id)
+                changed = True
+            
+            if user_id in shared_with:
+                shared_with.remove(user_id)
+                changed = True
+
+            if changed:
+                await asyncio.to_thread(doc_ref.update, {
+                    'pending_collaborators': pending,
+                    'shared_with': shared_with
+                })
+                return True
+            return False
+        except Exception as e:
+            print(f"Error rejecting resource {resource_type}: {e}")
+            return False
+
+    @staticmethod
+    async def get_pending_requests(user_id: str) -> List[Dict[str, Any]]:
+        """Kullanıcının onay bekleyen tüm paylaşım isteklerini getirir."""
+        results = []
+        
+        # 1. Bekleyen Görevler/Raporlar
+        tasks = await asyncio.to_thread(
+            lambda: list(db.collection('tasks').where('pending_collaborators', 'array_contains', user_id).stream())
+        )
+        for t in tasks:
+            td = t.to_dict()
+            results.append({
+                'id': t.id,
+                'type': 'TASK',
+                'title': td.get('rapor_adi') or td.get('title') or 'İsimsiz Görev',
+                'sender_name': td.get('owner_name') or 'Bir Müfettiş',
+                'created_at': td.get('created_at')
+            })
+
+        # 2. Bekleyen Notlar
+        notes = await asyncio.to_thread(
+            lambda: list(db.collection('notes').where('pending_collaborators', 'array_contains', user_id).stream())
+        )
+        for n in notes:
+            nd = n.to_dict()
+            results.append({
+                'id': n.id,
+                'type': 'NOTE',
+                'title': nd.get('title') or 'İsimsiz Not',
+                'sender_name': nd.get('owner_name') or 'Bir Müfettiş',
+                'created_at': nd.get('created_at')
+            })
+
+        # 3. Bekleyen Rehber Kayıtları
+        contacts = await asyncio.to_thread(
+            lambda: list(db.collection('contacts').where('pending_collaborators', 'array_contains', user_id).stream())
+        )
+        for c in contacts:
+            cd = c.to_dict()
+            results.append({
+                'id': c.id,
+                'type': 'CONTACT',
+                'title': cd.get('name') or 'İsimsiz Kişi',
+                'sender_name': cd.get('owner_name') or 'Bir Müfettiş',
+                'created_at': cd.get('created_at')
+            })
+
+        return results
 

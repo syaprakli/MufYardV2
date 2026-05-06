@@ -38,7 +38,7 @@ from app.routers import (
     dashboard, audit, tasks, contacts, 
     inspectors, profiles, legislation, 
     notes, ai_knowledge, backup, files,
-    calendar, notifications, ai, collaboration, feedback, online
+    calendar, notifications, ai, collaboration, feedback, online, settings as settings_router
 )
 
 from app.services.contact_service import ContactService
@@ -169,9 +169,9 @@ _allowed_origins = list(set(_default_origins + _env_origins))
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_allowed_origins,
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 # app.add_middleware(CSPMiddleware) # Removed as it blocks local frontend connections
@@ -194,6 +194,7 @@ app.include_router(backup.router, prefix="/api/backup", tags=["Backup"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
+app.include_router(settings_router.router, prefix="/api/settings", tags=["Settings"])
 
 # --- WEBSOCKET CHAT ENDPOINT ---
 # Moved here to avoid 404 issues with router prefixes in production

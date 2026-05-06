@@ -63,6 +63,11 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const connectRef = useRef<(() => void) | null>(null);
 
     useEffect(() => {
+        // Kullanıcı değişiminde önceki oturum mesajlarını taşıma.
+        setMessages([]);
+    }, [user?.uid]);
+
+    useEffect(() => {
         if (user?.uid) {
             activeNameRef.current = resolvePresenceName(user);
             import('../api/profiles').then(api => {

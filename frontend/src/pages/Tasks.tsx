@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield
@@ -47,6 +47,27 @@ const RAPOR_SABLONLARI: Record<string, string> = {
     "Spor Kulüpleri": `<h1 style="text-align: center;">SPOR KULÜBÜ DENETİM RAPORU</h1><p><br></p><p><strong>1. GİRİŞ</strong></p><p>7405 sayılı Spor Kulüpleri ve Spor Federasyonları Kanunu kapsamında ....... Spor Kulübü'nün idari ve mali denetimi hakkındadır.</p><p><br></p><p><strong>2. İDARİ YAPI VE İŞLEYİŞ</strong></p><p>Tüzük uygunluğu, üye kayıt defteri, yönetim kurulu karar defterinin incelenmesi.</p><p><br></p><p><strong>3. MALİ İNCELEME</strong></p><p>Gelir-gider tabloları, bağış makbuzları ve bilanço değerleri.</p><p><br></p><p><strong>4. SONUÇ</strong></p><p>İyileştirilmesi gereken alanlar ve mevzuata aykırı eylemlere ilişkin bildirimler.</p>`
 };
 const RAPOR_DURUMLARI = ["Başlanmadı", "Devam Ediyor", "Evrak Bekleniyor", "İncelemede", "Tamamlandı"];
+
+function extractTaskSeq(raporKodu: string | undefined, prefix: string, year: number): number | null {
+    if (!raporKodu) return null;
+    const expectedPrefix = `${prefix}/${year}-`;
+    if (!raporKodu.startsWith(expectedPrefix)) return null;
+    const raw = raporKodu.slice(expectedPrefix.length).trim();
+    if (!/^\d+$/.test(raw)) return null;
+    const value = Number(raw);
+    return value > 0 ? value : null;
+}
+
+function getNextMissingTaskSeq(codes: Array<string | undefined>, prefix: string, year: number): number {
+    const used = new Set<number>();
+    for (const code of codes) {
+        const seq = extractTaskSeq(code, prefix, year);
+        if (seq) used.add(seq);
+    }
+    let next = 1;
+    while (used.has(next)) next += 1;
+    return next;
+}
 
 function getNextReportSequence(audits: Array<{ report_seq?: number }>): number {
     const used = new Set(
@@ -107,7 +128,12 @@ export default function Tasks() {
     const inspectorDropdownRef = useRef<HTMLDivElement>(null);
 
     const raporOnek = localStorage.getItem('raporKoduOnek') || 'S.Y.64';
-    const autoKodu = `${raporOnek}/${new Date().getFullYear()}-${tasks.length + 1}`;
+    const currentYear = new Date().getFullYear();
+    const autoKodu = useMemo(() => {
+        const allCodes = [...tasks, ...invitations].map((t) => t.rapor_kodu);
+        const nextSeq = getNextMissingTaskSeq(allCodes, raporOnek, currentYear);
+        return `${raporOnek}/${currentYear}-${nextSeq}`;
+    }, [tasks, invitations, raporOnek, currentYear]);
     
     const [form, setForm] = useState({
         rapor_kodu: "",
@@ -171,11 +197,7 @@ export default function Tasks() {
         }
     };
 
-    useEffect(() => {
-        if (!form.rapor_kodu) {
-            setForm(prev => ({ ...prev, rapor_kodu: autoKodu }));
-        }
-    }, [autoKodu, form.rapor_kodu]);
+
 
     if (!user) {
         return (
@@ -348,7 +370,7 @@ export default function Tasks() {
                 setNewAudit({
                     ...newAudit,
                     title: task.rapor_adi,
-                    location: "Merkez / Yerinde",
+                    location: "",
                     report_seq: nextSeq
                 });
                 setIsNewAuditModalOpen(task);
@@ -427,7 +449,7 @@ export default function Tasks() {
             const auditPayload: any = {
                 task_id: taskId,
                 title: taskAudits.length === 0 ? task.rapor_adi : `${task.rapor_adi} - Ek Rapor`,
-                location: "Merkez / Yerinde",
+                location: "",
                 date: new Date().toLocaleDateString("tr-TR"),
                 status: "Rapor Yazılıyor",
                 inspector: currentUser?.email?.split('@')[0] || "Müfettiş",
@@ -474,9 +496,9 @@ export default function Tasks() {
     const handleShareUpdate = async (newSharedWith: string[]) => {
         if (!shareTask) return;
         try {
-            await updateTask(shareTask.id, { shared_with: newSharedWith });
-            setTasks(prev => prev.map(t => t.id === shareTask.id ? { ...t, shared_with: newSharedWith } : t));
-            toast.success("Paylaşım güncellendi.");
+            await updateTask(shareTask.id, { pending_collaborators: newSharedWith });
+            setTasks(prev => prev.map(t => t.id === shareTask.id ? { ...t, pending_collaborators: newSharedWith } : t));
+            toast.success("Görev paylaşım davetleri gönderildi.");
         } catch { toast.error("Paylaşım güncellenemedi."); }
     };
 
@@ -569,7 +591,7 @@ export default function Tasks() {
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Rapor No</label>
                                 <input
                                     placeholder={autoKodu}
-                                    value={form.rapor_kodu}
+                                    value={form.rapor_kodu || autoKodu}
                                     onChange={e => setForm({ ...form, rapor_kodu: e.target.value })}
                                     className="w-full px-4 py-3 rounded-xl border border-border bg-muted/30 focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold tracking-tight outline-none"
                                 />
@@ -1042,7 +1064,7 @@ export default function Tasks() {
                                     setNewAudit({
                                         ...newAudit,
                                         title: `${showReportSelector.rapor_adi} - Ek Rapor`,
-                                        location: taskAudits[0]?.location || "Merkez / Yerinde",
+                                        location: taskAudits[0]?.location || "",
                                         report_seq: nextSeq,
                                         template: "Boş Rapor"
                                     });

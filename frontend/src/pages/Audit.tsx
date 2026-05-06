@@ -1,4 +1,4 @@
-import { Plus, Search, Filter, FileText, Download, Loader2, FileSpreadsheet, Edit3, Shield, MapPin, Clock, Trash2, MoreVertical, ChevronRight } from "lucide-react";
+import { Plus, Search, Filter, FileText, Download, Loader2, FileSpreadsheet, Edit3, Shield, MapPin, Clock, Trash2, MoreVertical, ChevronRight, Share2, UserPlus } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { useEffect, useState, useMemo, useRef } from "react";
@@ -6,11 +6,12 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
-import { fetchAudits, createAudit, deleteAudit, updateAudit, exportAuditsToExcel, exportAuditToWord, type Audit as AuditType } from "../lib/api/audit";
+import { fetchAudits, createAudit, deleteAudit, updateAudit, exportAuditsToExcel, exportAuditToWord, acceptAudit, type Audit as AuditType } from "../lib/api/audit";
 import { fetchTasks, updateTask, type Task } from "../lib/api/tasks";
 import { useAuth } from "../lib/hooks/useAuth";
 import { isElectron } from "../lib/firebase";
 import { cn } from "../lib/utils";
+import ShareModal from "../components/ShareModal";
 
 const RAPOR_SABLONLARI: Record<string, string> = {
     "Boş Rapor": "",
@@ -36,6 +37,8 @@ export default function Audit() {
     const [filterInspector, setFilterInspector] = useState("Tümü");
     const [filterTaskType, setFilterTaskType] = useState("Tümü");
     const [debouncedSearch, setDebouncedSearch] = useState("");
+    const [invitations, setInvitations] = useState<AuditType[]>([]);
+    const [shareAudit, setShareAudit] = useState<AuditType | null>(null);
     
     // Simple local cache for the session
     const cacheRef = useRef<{audits?: AuditType[], tasks?: Task[]}>({});
@@ -81,6 +84,17 @@ export default function Audit() {
             
             setAudits(auditsData);
             setTasks(tasksData);
+            
+            // Separate pending invitations
+            const uid = user?.uid || localUser?.uid;
+            const email = (user?.email || localUser?.email || '').toLowerCase();
+            const userKeys = [uid, email].filter(Boolean) as string[];
+            
+            const pending = auditsData.filter((a: any) =>
+                (a.pending_collaborators || []).some((v: string) => userKeys.includes(v)) &&
+                !userKeys.includes(a.owner_id || '')
+            );
+            setInvitations(pending);
             
             // Update cache
             cacheRef.current = { audits: auditsData, tasks: tasksData };
@@ -171,7 +185,7 @@ export default function Audit() {
                 ...newAudit,
                 task_id: taskId,
                 title: nextSeq === 1 ? selectedTask.rapor_adi : `${selectedTask.rapor_adi} - Ek Rapor`,
-                location: "Merkez / Yerinde",
+                location: "",
                 report_seq: nextSeq
             });
         } else {
@@ -256,6 +270,27 @@ export default function Audit() {
         }
     };
 
+    const handleAcceptInvitation = async (auditId: string) => {
+        if (!user?.uid) return;
+        try {
+            await acceptAudit(auditId, user.uid, user.email || undefined);
+            toast.success("Rapor kabul edildi ve listenize eklendi.");
+            loadData();
+        } catch (error) {
+            toast.error("Rapor kabul edilemedi.");
+        }
+    };
+
+    const handleShareAuditUpdate = async (newSharedWith: string[]) => {
+        if (!shareAudit) return;
+        try {
+            await updateAudit(shareAudit.id, { pending_collaborators: newSharedWith } as any);
+            toast.success("Rapor paylaşım davetleri gönderildi.");
+            setShareAudit(null);
+            loadData();
+        } catch { toast.error("Paylaşım güncellenemedi."); }
+    };
+
     const filteredAudits = useMemo(() => {
         return audits.filter(a => {
             const matchesSearch = !debouncedSearch || 
@@ -308,7 +343,11 @@ export default function Audit() {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">
                         Rapor Yönetimi
                     </h1>
-                    <p className="text-slate-500 text-sm font-medium mt-1">Denetim formlarını doldurun ve raporlarınızı oluşturun.</p>
+                    <p className="text-slate-500 text-sm font-medium mt-1">
+                        {isElectron
+                            ? "Denetim formlarını doldurun ve raporlarınızı oluşturun."
+                            : "Web sürümünde raporlar sadece izlenebilir; yeni rapor oluşturmak için masaüstü uygulamasını kullanın."}
+                    </p>
                 </div>
                 
                 <div className="flex bg-muted p-1.5 rounded-xl ml-auto mr-6">
@@ -444,7 +483,41 @@ export default function Audit() {
                     <Loader2 className="w-12 h-12 text-primary animate-spin" />
                     <p className="text-muted-foreground font-bold italic tracking-widest uppercase text-[10px]">Veriler Getiriliyor...</p>
                 </div>
-            ) : filteredAudits.length > 0 ? (
+            ) : (
+            <>
+            {/* Bekleyen Rapor Davetleri */}
+            {invitations.length > 0 && (
+                <div className="space-y-4 animate-in slide-in-from-top-4 duration-500 mb-8">
+                    <div className="flex items-center gap-2 px-1 text-blue-600">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                        <h3 className="text-xs font-black tracking-widest font-outfit">Bekleyen Rapor Davetleri ({invitations.length})</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {invitations.map(inv => (
+                            <div key={inv.id} className="bg-blue-50/50 border border-blue-100 rounded-2xl p-5 flex flex-col justify-between group hover:bg-blue-50 transition-all shadow-sm">
+                                <div>
+                                    <div className="flex justify-between items-start mb-3">
+                                        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-[9px] font-black rounded-lg tracking-widest">Paylaşılan Rapor</span>
+                                        <FileText size={14} className="text-blue-500" />
+                                    </div>
+                                    <h4 className="font-bold text-foreground text-sm mb-1">{inv.title}</h4>
+                                    <p className="text-[10px] text-slate-500 font-medium mb-4 italic flex items-center gap-1">
+                                        <UserPlus size={10} /> Gönderen: {inv.inspector || inv.owner_id}
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={() => handleAcceptInvitation(inv.id)} 
+                                    className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl h-10 font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-blue-200/50 transition-all active:scale-95"
+                                >
+                                    Raporu Kabul Et ve Listeye Ekle
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {filteredAudits.length > 0 ? (
                 <div className="space-y-4">
                     {filteredAudits.map((audit) => (
                         <AuditListItem
@@ -457,6 +530,7 @@ export default function Audit() {
                             onEdit={() => navigate(`/audit/${audit.id}/report`)}
                             onUpdate={handleUpdateAudit}
                             onDelete={() => handleSingleDelete(audit.id)}
+                            onShare={() => setShareAudit(audit)}
                         />
                     ))}
                 </div>
@@ -469,10 +543,18 @@ export default function Audit() {
                         <h3 className="text-2xl font-bold text-primary font-outfit">Kayıt Bulunamadı</h3>
                         <p className="text-muted-foreground mt-2 max-w-sm font-medium">Aradığınız kriterlere uygun denetim bulunmuyor veya henüz hiç denetim başlatmadınız.</p>
                     </div>
-                    <Button variant="outline" className="rounded-xl px-8 h-12" onClick={() => setIsModalOpen(true)}>
-                        <Plus size={18} className="mr-2" /> İlk Raporu Oluştur
-                    </Button>
+                    {isElectron ? (
+                        <Button variant="outline" className="rounded-xl px-8 h-12" onClick={() => setIsModalOpen(true)}>
+                            <Plus size={18} className="mr-2" /> İlk Raporu Oluştur
+                        </Button>
+                    ) : (
+                        <div className="max-w-md rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-700">
+                            Web sürümünde rapor oluşturma kapalıdır. Görev oluşturulamadığı için bu ekranda sadece mevcut raporlar izlenebilir.
+                        </div>
+                    )}
                 </Card>
+            )}
+            </>
             )}
 
             {isModalOpen && (
@@ -506,16 +588,7 @@ export default function Audit() {
                             onChange={(e) => setNewAudit({...newAudit, title: e.target.value})}
                         />
                     </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Denetim Mahalli (Yer)</label>
-                        <input 
-                            required
-                            className="w-full p-4 bg-muted border border-border rounded-2xl text-sm font-bold text-foreground outline-none focus:ring-4 focus:ring-primary/10 transition-all"
-                            placeholder="Örn: Ankara"
-                            value={newAudit.location}
-                            onChange={(e) => setNewAudit({...newAudit, location: e.target.value})}
-                        />
-                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Tarih</label>
@@ -559,11 +632,21 @@ export default function Audit() {
                 </form>
             </Modal>
             )}
+            
+            {shareAudit && (
+                <ShareModal
+                    isOpen={!!shareAudit}
+                    onClose={() => setShareAudit(null)}
+                    title="Raporu Paylaş"
+                    sharedWith={(shareAudit as any).pending_collaborators || []}
+                    onShare={handleShareAuditUpdate}
+                />
+            )}
         </div>
     );
 }
 
-function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect, task, onUpdate, onDelete }: { audit: AuditType, onExportWord: () => void, onEdit: () => void, isSelected: boolean, onToggleSelect: () => void, task?: Task, onUpdate: (id: string, updates: Partial<AuditType>) => void, onDelete: () => void }) {
+function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect, task, onUpdate, onDelete, onShare }: { audit: AuditType, onExportWord: () => void, onEdit: () => void, isSelected: boolean, onToggleSelect: () => void, task?: Task, onUpdate: (id: string, updates: Partial<AuditType>) => void, onDelete: () => void, onShare: () => void }) {
     const { title, date, status, inspector, location } = audit;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const statusColors: any = {
@@ -689,7 +772,7 @@ function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect
                                 </Button>
                                 {isMenuOpen && (
                                     <div 
-                                        className="absolute right-0 bottom-full md:bottom-auto md:top-full mb-2 md:mb-0 md:mt-2 w-64 bg-card rounded-xl shadow-2xl border border-slate-200 z-[100] p-2 flex flex-col gap-1 ring-1 ring-black/5"
+                                        className="absolute right-0 top-full mt-2 w-64 bg-card rounded-xl shadow-2xl border border-slate-200 z-[9999] p-2 flex flex-col gap-1 ring-1 ring-black/5"
                                         onClick={(e) => e.stopPropagation()}
                                     >
                                         <button 
@@ -697,6 +780,12 @@ function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect
                                             onClick={() => { onUpdate(audit.id, { is_public: !(audit as any).is_public }); setIsMenuOpen(false); }}
                                         >
                                             {(audit as any).is_public ? '📥 Arşivden Çıkar' : '📤 Arşive Ekle / Paylaş'}
+                                        </button>
+                                        <button 
+                                            className="flex items-center gap-2 text-left px-3 py-3 text-xs font-bold hover:bg-blue-50 text-blue-600 rounded-lg transition-colors"
+                                            onClick={() => { onShare(); setIsMenuOpen(false); }}
+                                        >
+                                            <Share2 size={16} /> Kişilerle Paylaş
                                         </button>
                                         {!task && (
                                             <button 

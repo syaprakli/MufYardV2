@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import {
     LayoutDashboard,
@@ -14,6 +15,7 @@ import {
     Sparkles,
     Star,
     MessageSquare,
+    ClipboardCheck,
     X
 } from "lucide-react";
 import { cn } from "../../lib/utils";
@@ -43,6 +45,7 @@ const navItems = [
 
 const comingSoonItems = [
     { icon: Sparkles, label: "AI Bilgi Bankası", href: "/ai-knowledge" },
+    { icon: ClipboardCheck, label: "Denetim", href: "/denetim" },
 ];
 
 const bottomNavItems = [
@@ -51,8 +54,56 @@ const bottomNavItems = [
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
-    const { user } = useAuth();
-    const isAdmin = user?.email === "sefayaprakli@hotmail.com" || user?.email === "sefa.yaprakli@gsb.gov.tr";
+    const { user, profile } = useAuth();
+    
+    // Check role from profile, or fallback to hardcoded emails for initial setup
+    const isAdmin = profile?.role === 'admin' || 
+                    user?.email === "sefayaprakli@hotmail.com" || 
+                    user?.email === "sefa.yaprakli@gsb.gov.tr";
+    
+    // A moderator could have a specific role
+    const isModerator = profile?.role === 'moderator' || isAdmin;
+    
+    const [modPermissions, setModPermissions] = useState<string[]>([]);
+    
+    useEffect(() => {
+        if (isModerator && !isAdmin) {
+            import("../../lib/api/settings").then(mod => {
+                mod.fetchRolesSettings().then(data => {
+                    setModPermissions(data.moderator_permissions || []);
+                }).catch(err => console.error("Could not load moderator permissions", err));
+            });
+        }
+    }, [isModerator, isAdmin]);
+
+    // Role-based visibility check
+    const isVisible = (href: string) => {
+        if (isAdmin) return true; // Admin sees everything
+        if (!isModerator) return true; // Standard user sees everything by default? Wait!
+        
+        // If they are a moderator, and NOT an admin, they ONLY see what is permitted.
+        // Wait, standard users see everything. Why would a moderator see LESS?
+        // Ah, "moderatör sadece kamusal alandaki sayfaya erişimi olacak ama bunu ben belirleyeceğim"
+        // Wait! If they are a moderator, do we hide things from them that a standard user can see?
+        // Actually, maybe the user wants the moderator to manage specific modules. But the prompt says "Seçili olmayan sayfalar moderatörün sol menüsünde görünmeyecektir." 
+        // Let's hide unpermitted ones.
+        const pathMapping: Record<string, string> = {
+            "/": "dashboard",
+            "/tasks": "tasks",
+            "/audit": "audit",
+            "/contacts": "contacts",
+            "/legislation": "legislation",
+            "/notes": "notes",
+            "/calendar": "calendar",
+            "/feedback": "feedback"
+        };
+        
+        const modId = pathMapping[href];
+        if (modId) {
+            return modPermissions.includes(modId);
+        }
+        return true; // Other pages (settings, etc) are visible
+    };
 
     return (
         <aside className={cn(
@@ -83,8 +134,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <nav className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-0.5">
                 {navItems.filter(item => {
                     // Dosyalar sayfası sadece Electron (Masaüstü Paket) sürümünde görünsün
-                    if (item.href === "/files") return isElectron;
-                    return true;
+                    if (item.href === "/files" && !isElectron) return false;
+                    return isVisible(item.href);
                 }).map((item) => (
                     <NavLink
                         key={item.href}
@@ -155,6 +206,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         >
                             <Users size={18} />
                             <span className="font-bold text-sm">Müfettiş Listesi</span>
+                        </NavLink>
+                        <NavLink
+                            to="/admin/roles"
+                            onClick={() => {
+                                if (window.innerWidth < 1024) onClose();
+                            }}
+                            className={({ isActive }) => cn(
+                                "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 border border-amber-500/20 bg-amber-500/5 mt-1",
+                                isActive
+                                    ? "bg-amber-500 text-white shadow-md"
+                                    : "text-amber-500 hover:bg-amber-500/10"
+                            )}
+                        >
+                            <Settings size={18} />
+                            <span className="font-bold text-sm">Moderatör İzinleri</span>
                         </NavLink>
                     </div>
                 )}

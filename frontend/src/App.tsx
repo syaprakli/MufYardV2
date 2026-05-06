@@ -10,6 +10,7 @@ import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth";
 import { auth, isElectron } from "./lib/firebase";
 import AdminFeedback from "./pages/AdminFeedback";
 import AdminInspectors from "./pages/AdminInspectors";
+import AdminRoleSettings from "./pages/AdminRoleSettings";
 import { Toaster } from "react-hot-toast";
 import { Loader2 } from "lucide-react";
 
@@ -139,11 +140,12 @@ function App() {
                     <Route path="feedback" element={<Feedback />} />
                     <Route path="admin/feedback" element={<AdminFeedback />} />
                     <Route path="admin/inspectors" element={<AdminInspectors />} />
+                    <Route path="admin/roles" element={<AdminRoleSettings />} />
                   </Route>
                   <Route path="*" element={<Navigate to="/" />} />
                 </Routes>
+                {user && <ChatContainer />}
               </Router>
-              <ChatContainer />
             </PresenceProvider>
           </NotificationProvider>
         </ConfirmProvider>

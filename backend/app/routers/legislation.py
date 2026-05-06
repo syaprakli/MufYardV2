@@ -5,12 +5,25 @@ from typing import List, Optional
 import asyncio
 from app.services.legislation_service import LegislationService
 from app.services.extractor_service import ExtractorService
+from app.services.legislation_crawler import LegislationCrawlerService
 from app.config import get_settings
 settings = get_settings()
 
 MEVZUAT_DIR = settings.MEVZUAT_DIR
 
 router = APIRouter(tags=["legislation"])
+
+@router.post("/fetch-external")
+async def fetch_external_legislation(data: dict):
+    """Fetches legislation metadata from an external source like mevzuat.gov.tr"""
+    url = data.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="URL belirtilmedi.")
+    
+    result = await LegislationCrawlerService.fetch_from_mevzuat_gov_tr(url)
+    if not result:
+        raise HTTPException(status_code=400, detail="Mevzuat bilgileri çekilemedi. Lütfen URL'yi kontrol edin.")
+    return result
 
 @router.post("/open-folder")
 async def open_legislation_folder(
@@ -71,20 +84,35 @@ async def extract_text(file: UploadFile = File(...)):
 @router.get("/", response_model=List[LegislationResponse])
 async def get_legislations(
     uid: Optional[str] = Query(None),
-    category: Optional[str] = Query(None, description="Mevzuat kategorisi (Genel, Personel, vb.)")
+    category: Optional[str] = Query(None, description="Mevzuat kategorisi (Genel, Personel, vb.)"),
+    is_admin: bool = Query(False)
 ):
     try:
-        return await LegislationService.get_legislations(uid, category)
+        return await LegislationService.get_legislations(uid, category, is_admin)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/", response_model=LegislationResponse)
-async def create_legislation(legislation: LegislationCreate):
+async def create_legislation(legislation: LegislationCreate, is_admin: bool = Query(False)):
     try:
-        return await LegislationService.create_legislation(legislation)
+        return await LegislationService.create_legislation(legislation, is_admin)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{leg_id}/approve")
+async def approve_legislation(leg_id: str, admin_name: str = Query(...)):
+    success = await LegislationService.approve_legislation(leg_id, admin_name)
+    if not success:
+        raise HTTPException(status_code=404, detail="Mevzuat bulunamadı.")
+    return {"status": "success"}
+
+@router.post("/{leg_id}/reject")
+async def reject_legislation(leg_id: str):
+    success = await LegislationService.reject_legislation(leg_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Mevzuat bulunamadı.")
+    return {"status": "success"}
 
 @router.patch("/{leg_id}", response_model=LegislationResponse)
 async def update_legislation(leg_id: str, leg_update: LegislationUpdate):
@@ -107,4 +135,6 @@ async def promote_legislation(leg_id: str, user_name: str = Query(...)):
     if not promoted:
         raise HTTPException(status_code=404, detail="Mevzuat bulunamadı.")
     return promoted
+
+
 

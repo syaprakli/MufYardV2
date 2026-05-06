@@ -1,14 +1,40 @@
 from fastapi import APIRouter, HTTPException
-from typing import List
+from typing import List, Optional
 from app.services.note_service import NoteService
 from app.schemas.note import NoteCreate, NoteUpdate, NoteResponse
 
 router = APIRouter(tags=["notes"])
 
 @router.get("/", response_model=List[NoteResponse])
-async def get_notes(uid: str):
+async def get_notes(uid: str, email: Optional[str] = None):
     try:
-        return await NoteService.get_notes(uid)
+        return await NoteService.get_notes(uid, email)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@router.post("/{note_id}/accept")
+async def accept_note(note_id: str, user_id: Optional[str] = None, user_email: Optional[str] = None):
+    try:
+        success = await NoteService.accept_note(note_id, user_id, user_email)
+        if not success:
+            raise HTTPException(status_code=400, detail="Not reddedilemedi veya bulunamadı.")
+        return {"status": "success", "message": "Not kabul edildi."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{note_id}/reject")
+async def reject_note(note_id: str, user_id: Optional[str] = None, user_email: Optional[str] = None):
+    try:
+        success = await NoteService.reject_note(note_id, user_id, user_email)
+        if not success:
+            raise HTTPException(status_code=400, detail="Not reddedilemedi veya bulunamadı.")
+        return {"status": "success", "message": "Not reddedildi."}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

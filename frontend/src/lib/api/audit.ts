@@ -15,6 +15,8 @@ export interface Audit {
     owner_id?: string;
     assigned_to?: string[];
     shared_with?: string[];
+    pending_collaborators?: string[];
+    accepted_collaborators?: string[];
     is_public?: boolean;
     report_seq?: number;
 }
@@ -129,5 +131,27 @@ export async function restoreAuditVersion(id: string, versionId: string): Promis
         throw new Error("Sürüm geri yüklenemedi.");
     }
     auditCache = {}; // Invalidate cache
+    return response.json();
+}
+
+export async function acceptAudit(id: string, userId: string, userEmail?: string): Promise<{status: string, message: string}> {
+    const params = new URLSearchParams({ user_id: userId });
+    if (userEmail) params.append("user_email", userEmail);
+    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}/accept?${params.toString()}`, {
+        method: "POST"
+    });
+    if (!response.ok) throw new Error("Rapor kabul edilemedi.");
+    auditCache = {};
+    return response.json();
+}
+
+export async function rejectAudit(id: string, userId: string, userEmail?: string): Promise<{status: string, message: string}> {
+    const params = new URLSearchParams({ user_id: userId });
+    if (userEmail) params.append("user_email", userEmail);
+    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}/reject?${params.toString()}`, {
+        method: "POST"
+    });
+    if (!response.ok) throw new Error("Rapor reddedilemedi.");
+    auditCache = {};
     return response.json();
 }

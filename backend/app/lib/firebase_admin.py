@@ -53,10 +53,14 @@ try:
                 init_kwargs["storageBucket"] = settings.FIREBASE_STORAGE_BUCKET
             firebase_admin.initialize_app(cred, init_kwargs)
             
-            _db = firestore.client()
-            _messaging = messaging
-            is_mock = False
-            logger.info("Firebase initialized successfully.")
+            try:
+                _db = firestore.client()
+                _messaging = messaging
+                is_mock = False
+                logger.info("Firebase initialized successfully.")
+            except Exception as db_err:
+                logger.error(f"Firebase Client Error (Quota?): {db_err}")
+                is_mock = True
 
             if not is_mock:
                 try:
@@ -67,6 +71,7 @@ try:
                     logger.warning(f"Storage bucket could not be initialized: {bucket_err}")
     else:
         logger.warning("Firebase certificate not found. Using Demo Mock DB.")
+        is_mock = True
 except Exception as e:
     logger.error(f"Failed to initialize Firebase: {e}. Falling back to Mock DB.")
     is_mock = True

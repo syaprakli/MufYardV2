@@ -12,6 +12,9 @@ class ContactBase(BaseModel):
     category: Optional[str] = Field(default=None, example="Başmüfettiş")
     sort_order: Optional[int] = Field(default=None, example=14)
     is_shared: bool = False
+    shared_with: List[str] = Field(default_factory=list)
+    pending_collaborators: List[str] = Field(default_factory=list)
+    accepted_collaborators: List[str] = Field(default_factory=list)
 
 class ContactCreate(ContactBase):
     owner_id: str

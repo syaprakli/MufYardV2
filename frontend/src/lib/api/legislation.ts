@@ -12,12 +12,15 @@ export interface Legislation {
     official_gazette_info?: string;
     document_url?: string;
     local_path?: string;
-    is_pinned: boolean;
-    is_public: boolean;
-    is_archived: boolean;
+    is_approved: boolean;
+    approved_by?: string;
+    approved_at?: string;
     owner_id?: string;
     created_by_name?: string;
     last_updated_by_name?: string;
+    is_public: boolean;
+    is_pinned: boolean;
+    is_archived: boolean;
     created_at: string;
 }
 
@@ -41,12 +44,13 @@ export interface LegislationCreate {
     is_pinned: boolean;
 }
 
-export async function fetchLegislations(uid?: string, category?: string): Promise<Legislation[]> {
+export async function fetchLegislations(uid?: string, category?: string, isAdmin: boolean = false): Promise<Legislation[]> {
     const params = new URLSearchParams();
     if (uid) params.append("uid", uid);
     if (category && category !== 'All' && category !== 'Tümü') {
         params.append("category", category);
     }
+    if (isAdmin) params.append("is_admin", "true");
     
     const url = `${API_BASE_URL}/legislation/${params.toString() ? '?' + params.toString() : ''}`;
     
@@ -85,8 +89,9 @@ export async function uploadLegislationFile(
     return response.json();
 }
 
-export async function createLegislation(legislation: Partial<Legislation>): Promise<Legislation> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/legislation/`, {
+export async function createLegislation(legislation: Partial<Legislation>, isAdmin: boolean = false): Promise<Legislation> {
+    const url = `${API_BASE_URL}/legislation/${isAdmin ? '?is_admin=true' : ''}`;
+    const response = await fetchWithTimeout(url, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -97,6 +102,20 @@ export async function createLegislation(legislation: Partial<Legislation>): Prom
         throw new Error("Mevzuat oluşturulamadı.");
     }
     return response.json();
+}
+
+export async function approveLegislation(id: string, adminName: string): Promise<void> {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/legislation/${id}/approve?admin_name=${encodeURIComponent(adminName)}`, {
+        method: "POST"
+    });
+    if (!response.ok) throw new Error("Onaylanamadı.");
+}
+
+export async function rejectLegislation(id: string): Promise<void> {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/legislation/${id}/reject`, {
+        method: "POST"
+    });
+    if (!response.ok) throw new Error("Reddedilemedi.");
 }
 
 export async function updateLegislation(id: string, update: Partial<LegislationCreate>): Promise<Legislation> {
@@ -165,4 +184,19 @@ export async function extractLegislationText(file: File): Promise<string> {
     
     const data = await response.json();
     return data.text;
+}
+
+export async function fetchExternalLegislation(url: string): Promise<Partial<Legislation>> {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/legislation/fetch-external`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ url })
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || "Dış kaynaktan veri çekilemedi.");
+    }
+    return response.json();
 }

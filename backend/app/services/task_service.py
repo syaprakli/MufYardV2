@@ -5,36 +5,53 @@ import uuid
 from app.lib.firebase_admin import db
 from app.schemas.task import TaskCreate, TaskUpdate
 
+_task_creation_lock = asyncio.Lock()
+
 class TaskService:
+    @staticmethod
+    def _extract_rapor_seq(rapor_kodu: str, year: int, prefix: str = "S.Y.64") -> Optional[int]:
+        """S.Y.64/YYYY-N formatindan N degerini doner."""
+        if not rapor_kodu:
+            return None
+        expected_prefix = f"{prefix}/{year}-"
+        if not rapor_kodu.startswith(expected_prefix):
+            return None
+        tail = rapor_kodu[len(expected_prefix):].strip()
+        if not tail.isdigit():
+            return None
+        value = int(tail)
+        return value if value > 0 else None
+
     @staticmethod
     async def _generate_rapor_kodu(year: Optional[int] = None) -> str:
         """Auto-generate S.Y.64/YYYY-N format rapor kodu.
-        
-        Son oluşturulan görevin rapor_kodu'ndan N alınır, +1 yapılır.
+
+        Var olan kodlar icinde en kucuk bos numarayi (gap filling) verir.
         """
         if year is None:
             year = datetime.utcnow().year
 
         try:
-            # Tüm görevleri çekmek yerine sadece en son oluşturulanı çek
+            # Sadece rapor_kodu alanini cek
             docs = await asyncio.to_thread(
                 lambda: list(
                     db.collection('tasks')
-                    .order_by('created_at', direction='DESCENDING')
-                    .limit(50)
+                    .limit(1000)
                     .select(['rapor_kodu'])
                     .stream()
                 )
             )
-            max_num = 0
+
+            used_numbers = set()
             for doc in docs:
                 kodu = (doc.to_dict() or {}).get('rapor_kodu', '')
-                if kodu and '-' in kodu:
-                    try:
-                        max_num = max(max_num, int(kodu.split('-')[-1]))
-                    except (ValueError, IndexError):
-                        pass
-            count = max_num + 1
+                seq = TaskService._extract_rapor_seq(kodu, year)
+                if seq is not None:
+                    used_numbers.add(seq)
+
+            count = 1
+            while count in used_numbers:
+                count += 1
         except Exception as e:
             print(f"rapor_kodu generate error: {e}")
             count = 1
@@ -101,9 +118,6 @@ class TaskService:
         task_data = task.dict()
         task_data['created_at'] = datetime.utcnow().isoformat()
 
-        if not task_data.get('rapor_kodu'):
-            task_data['rapor_kodu'] = await TaskService._generate_rapor_kodu()
-
         owner_id = task_data.get('owner_id')
         assigned = task_data.get('assigned_to', [])
         pending_uids = [uid for uid in assigned if uid != owner_id]
@@ -115,7 +129,11 @@ class TaskService:
              task_data['owner_id'] = "sefa.yaprakli@gsb.gov.tr" # Fallback only as last resort
 
         try:
-            result = await asyncio.to_thread(db.collection('tasks').add, task_data)
+            async with _task_creation_lock:
+                if not task_data.get('rapor_kodu'):
+                    task_data['rapor_kodu'] = await TaskService._generate_rapor_kodu()
+                result = await asyncio.to_thread(db.collection('tasks').add, task_data)
+                
             if result and result[1]:
                 task_id = result[1].id
                 
@@ -205,6 +223,30 @@ class TaskService:
                 await asyncio.to_thread(doc_ref.update, {
                     'pending_collaborators': pending,
                     'accepted_collaborators': accepted
+                })
+                return True
+            return False
+        except Exception:
+            return False
+
+    @staticmethod
+    async def reject_task(task_id: str, user_id: Optional[str], user_email: Optional[str] = None) -> bool:
+        try:
+            doc_ref = db.collection('tasks').document(task_id)
+            doc = await asyncio.to_thread(doc_ref.get)
+            if not doc.exists:
+                return False
+            
+            task_data = doc.to_dict()
+            pending = task_data.get('pending_collaborators', [])
+            identity_keys = [value for value in [user_id, user_email] if value]
+            
+            matched_identity = next((value for value in identity_keys if value in pending), None)
+
+            if matched_identity:
+                pending = [value for value in pending if value not in identity_keys]
+                await asyncio.to_thread(doc_ref.update, {
+                    'pending_collaborators': pending
                 })
                 return True
             return False

@@ -1,4 +1,4 @@
-import { Plus, StickyNote, Trash2, Search, Pin, PinOff, Loader2, Lock, AlertCircle, Shield, ChevronRight } from "lucide-react";
+import { Plus, StickyNote, Trash2, Search, Pin, PinOff, Loader2, Lock, AlertCircle, Shield, ChevronRight, Share2, UserPlus } from "lucide-react";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { toast } from "react-hot-toast";
@@ -7,7 +7,8 @@ import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
 import { useState, useEffect } from "react";
 import { cn } from "../lib/utils";
-import { fetchNotes, createNote, updateNote, deleteNote, type Note } from "../lib/api/notes";
+import { fetchNotes, createNote, updateNote, deleteNote, acceptNote, type Note } from "../lib/api/notes";
+import ShareModal from "../components/ShareModal";
 
 const NOTE_COLORS = [
     { id: 'amber', bg: 'bg-amber-50 dark:bg-amber-900/10', border: 'border-t-amber-500', text: 'text-amber-900 dark:text-amber-400', iconBg: 'bg-amber-200 dark:bg-amber-900/40' },
@@ -22,6 +23,8 @@ export default function Notes() {
     const { user, loading: authLoading } = useAuth();
     const confirm = useConfirm();
     const [notes, setNotes] = useState<Note[]>([]);
+    const [invitations, setInvitations] = useState<Note[]>([]);
+    const [shareNote, setShareNote] = useState<Note | null>(null);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
@@ -48,7 +51,22 @@ export default function Notes() {
         try {
             setLoading(true);
             const data = await fetchNotes(uid);
-            setNotes(data);
+            const userEmail = user?.email?.toLowerCase();
+            const userKeys = [uid, userEmail].filter(Boolean) as string[];
+            
+            const accepted = data.filter(n => 
+                userKeys.includes(n.owner_id || '') || 
+                (n.accepted_collaborators || []).some(value => userKeys.includes(value)) ||
+                (n.shared_with || []).some(value => userKeys.includes(value))
+            );
+            
+            const pending = data.filter(n => 
+                (n.pending_collaborators || []).some(value => userKeys.includes(value)) &&
+                !userKeys.includes(n.owner_id || '')
+            );
+
+            setNotes(accepted);
+            setInvitations(pending);
         } catch (error) {
             console.error("Notlar yüklenemedi:", error);
         } finally {
@@ -110,6 +128,27 @@ export default function Notes() {
         }
     };
 
+    const handleAcceptInvitation = async (noteId: string) => {
+        if (!user?.uid) return;
+        try {
+            await acceptNote(noteId, user.uid, user.email || undefined);
+            toast.success("Not kabul edildi ve listenize eklendi.");
+            loadNotes(user.uid);
+        } catch (error) {
+            toast.error("Not kabul edilemedi.");
+        }
+    };
+
+    const handleShareUpdate = async (newSharedWith: string[]) => {
+        if (!shareNote) return;
+        try {
+            await updateNote(shareNote.id, { pending_collaborators: newSharedWith });
+            toast.success("Paylaşım davetleri gönderildi.");
+            setShareNote(null);
+            if (user?.uid) loadNotes(user.uid);
+        } catch { toast.error("Paylaşım güncellenemedi."); }
+    };
+
 
     const filteredNotes = notes.filter(n => {
         const matchesSearch = n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -161,6 +200,38 @@ export default function Notes() {
                 </div>
             </div>
 
+            {/* Bekleyen Not Davetleri */}
+            {invitations.length > 0 && (
+                <div className="space-y-4 animate-in slide-in-from-top-4 duration-500 mb-8 font-inter">
+                    <div className="flex items-center gap-2 px-1 text-amber-600">
+                        <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                        <h3 className="text-xs font-black tracking-widest font-outfit">Bekleyen Not Davetleri ({invitations.length})</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {invitations.map(inv => (
+                            <div key={inv.id} className="bg-amber-50/50 border border-amber-100 rounded-2xl p-5 flex flex-col justify-between group hover:bg-amber-50 transition-all shadow-sm">
+                                <div>
+                                    <div className="flex justify-between items-start mb-3">
+                                        <span className="px-2 py-1 bg-amber-100 text-amber-700 text-[9px] font-black rounded-lg tracking-widest">Paylaşılan Not</span>
+                                        <StickyNote size={14} className="text-amber-500" />
+                                    </div>
+                                    <h4 className="font-bold text-foreground dark:text-slate-100 text-sm mb-1">{inv.title}</h4>
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-4 italic flex items-center gap-1">
+                                        <UserPlus size={10} /> Gönderen: {inv.owner_id}
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={() => handleAcceptInvitation(inv.id)} 
+                                    className="w-full bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-10 font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-amber-200/50 transition-all active:scale-95"
+                                >
+                                    Notu Kabul Et ve Listeye Ekle
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {loading ? (
                 <div className="flex flex-col items-center justify-center py-20">
                     <Loader2 className="w-10 h-10 text-primary animate-spin" />
@@ -174,6 +245,7 @@ export default function Notes() {
                             note={note}
                             onPin={() => handleTogglePin(note.id, note.is_pinned)}
                             onDelete={() => handleDelete(note.id)}
+                            onShare={() => setShareNote(note)}
                             onClick={() => {
                                 setEditingNote(note);
                                 setNewNote({
@@ -282,11 +354,21 @@ export default function Notes() {
                     </div>
                 </form>
             </Modal>
+            
+            {shareNote && (
+                <ShareModal
+                    isOpen={!!shareNote}
+                    onClose={() => setShareNote(null)}
+                    title="Notu Paylaş"
+                    sharedWith={(shareNote as any).pending_collaborators || []}
+                    onShare={handleShareUpdate}
+                />
+            )}
         </div>
     );
 }
 
-function NoteCard({ note, onPin, onDelete, onClick }: { note: Note, onPin: () => void, onDelete: () => void, onClick: () => void }) {
+function NoteCard({ note, onPin, onDelete, onShare, onClick }: { note: Note, onPin: () => void, onDelete: () => void, onShare: () => void, onClick: () => void }) {
     const color = NOTE_COLORS.find(c => c.id === note.color) || NOTE_COLORS[0];
     const isUrgent = (note as any).priority === 'urgent';
 
@@ -313,6 +395,13 @@ function NoteCard({ note, onPin, onDelete, onClick }: { note: Note, onPin: () =>
                     className="p-1.5 bg-card hover:bg-white dark:hover:bg-slate-700 rounded-full shadow-sm text-primary transition-all"
                 >
                     {note.is_pinned ? <Pin size={16} className="fill-current" /> : <PinOff size={16} className="text-muted-foreground dark:text-slate-500" />}
+                </button>
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onShare(); }} 
+                    title="Paylaş" 
+                    className="p-1.5 bg-card hover:bg-white dark:hover:bg-slate-700 rounded-full shadow-sm text-blue-500 transition-all"
+                >
+                    <Share2 size={16} />
                 </button>
                 <button 
                     onClick={(e) => { e.stopPropagation(); onDelete(); }} 

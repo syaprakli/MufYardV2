@@ -8,6 +8,9 @@ import { Search, Bell, ChevronDown, User, LogOut, Menu } from "lucide-react";
 import { fetchProfile } from "../../lib/api/profiles";
 import { cn } from "../../lib/utils";
 import { usePresence } from "../../lib/context/PresenceContext";
+import { fetchPendingRequests } from "../../lib/api/collaboration";
+import type { PendingRequest } from "../../lib/api/collaboration";
+import { UserPlus, Check, X as CloseIcon } from "lucide-react";
 
 interface HeaderProps {
     toggleSidebar: () => void;
@@ -20,6 +23,9 @@ export function Header({ toggleSidebar }: HeaderProps) {
     const confirm = useConfirm();
     const { unreadCount } = useNotifications();
     const [showNotifications, setShowNotifications] = useState(false);
+    const [showCollaborationRequests, setShowCollaborationRequests] = useState(false);
+    const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+    const collaborationRef = useRef<HTMLDivElement>(null);
 
 
 
@@ -35,6 +41,12 @@ export function Header({ toggleSidebar }: HeaderProps) {
             fetchProfile(user.uid, user.email || undefined)
                 .then(setProfile)
                 .catch(err => console.error("Header profile load error:", err));
+            
+            // Bekleyen istekleri çek ve periyodik olarak güncelle (30 saniye)
+            const updateRequests = () => fetchPendingRequests(user.uid).then(setPendingRequests);
+            updateRequests();
+            const interval = setInterval(updateRequests, 30000);
+            return () => clearInterval(interval);
         }
     }, [user]);
 
@@ -58,6 +70,9 @@ export function Header({ toggleSidebar }: HeaderProps) {
         function handleClickOutside(event: MouseEvent) {
             if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
                 setShowNotifications(false);
+            }
+            if (collaborationRef.current && !collaborationRef.current.contains(event.target as Node)) {
+                setShowCollaborationRequests(false);
             }
             if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
                 setShowUserMenu(false);
@@ -150,6 +165,78 @@ export function Header({ toggleSidebar }: HeaderProps) {
 
 
                     {showNotifications && <NotificationDropdown />}
+                </div>
+
+                <div className="relative" ref={collaborationRef}>
+                    <button 
+                        onClick={() => setShowCollaborationRequests(!showCollaborationRequests)}
+                        className={`relative p-2 rounded-xl transition-all ${
+                            showCollaborationRequests 
+                            ? 'text-primary bg-primary/5 shadow-inner' 
+                            : 'text-slate-400 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800'
+                        }`}
+                        title="Paylaşım İstekleri"
+                    >
+                        <UserPlus size={20} />
+                        {pendingRequests.length > 0 && (
+                            <span className="absolute top-2 right-2 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center text-[8px] text-white font-black leading-none">
+                                {pendingRequests.length}
+                            </span>
+                        )}
+                    </button>
+
+                    {showCollaborationRequests && (
+                        <div className="absolute top-full right-[-50px] sm:right-0 mt-2 w-[280px] sm:w-80 bg-card border border-border rounded-[24px] shadow-2xl py-4 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300 z-[9999]">
+                            <div className="px-6 pb-3 border-b border-slate-50 flex items-center justify-between">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Paylaşım İstekleri</p>
+                                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black">{pendingRequests.length} Yeni</span>
+                            </div>
+                            <div className="max-h-[400px] overflow-y-auto no-scrollbar">
+                                {pendingRequests.length === 0 ? (
+                                    <div className="py-12 px-6 text-center space-y-3">
+                                        <div className="w-12 h-12 bg-muted rounded-2xl flex items-center justify-center mx-auto text-slate-300">
+                                            <UserPlus size={24} />
+                                        </div>
+                                        <p className="text-xs font-bold text-slate-400">Bekleyen istek bulunmuyor.</p>
+                                    </div>
+                                ) : (
+                                    pendingRequests.map((req) => (
+                                        <div key={`${req.type}-${req.id}`} className="px-6 py-4 hover:bg-muted/50 transition-colors border-b border-slate-50 last:border-none group">
+                                            <div className="flex items-start gap-4">
+                                                <div className="w-10 h-10 rounded-xl bg-primary/5 text-primary flex items-center justify-center shrink-0">
+                                                    {req.type === 'TASK' ? <Bell size={18} /> : (req.type === 'NOTE' ? <Menu size={18} /> : <User size={18} />)}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-black text-slate-800 truncate mb-0.5">{req.title}</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 truncate">{req.sender_name} paylaştı</p>
+                                                    <div className="flex items-center gap-2 mt-3">
+                                                        <button 
+                                                            onClick={async () => {
+                                                                const ok = await (await import("../../lib/api/collaboration")).acceptRequest(req.type, req.id, user!.uid);
+                                                                if (ok) setPendingRequests(prev => prev.filter(r => r.id !== req.id));
+                                                            }}
+                                                            className="flex-1 h-8 bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1"
+                                                        >
+                                                            <Check size={12} /> Kabul Et
+                                                        </button>
+                                                        <button 
+                                                            onClick={async () => {
+                                                                const ok = await (await import("../../lib/api/collaboration")).rejectRequest(req.type, req.id, user!.uid);
+                                                                if (ok) setPendingRequests(prev => prev.filter(r => r.id !== req.id));
+                                                            }}
+                                                            className="w-8 h-8 bg-muted text-slate-400 rounded-lg flex items-center justify-center hover:bg-rose-50 hover:text-rose-500 transition-all"
+                                                        >
+                                                            <CloseIcon size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="relative" ref={userMenuRef}>

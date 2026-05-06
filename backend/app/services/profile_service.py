@@ -72,8 +72,14 @@ class ProfileService:
 
     @staticmethod
     async def get_profile(uid: str, email: Optional[str] = None, full_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        doc_ref = db.collection('profiles').document(uid)
-        doc = await asyncio.to_thread(doc_ref.get)
+        try:
+            doc_ref = db.collection('profiles').document(uid)
+            doc = await asyncio.to_thread(doc_ref.get)
+        except Exception as e:
+            logger.error(f"Firestore Quota Error: {e}")
+            # Fallback will be handled at the end of method
+            doc = type('obj', (object,), {'exists': False})
+
         
         profile_data = None
         is_generic = False
@@ -94,42 +100,43 @@ class ProfileService:
             search_email = search_email.lower().strip()
         requested_name = (full_name or "").strip()
             
-        inspector_match = None
-        
-        if search_email:
-            # Search by email in inspectors
-            inspectors_ref = db.collection('inspectors')
-            # Try exact match first
-            query = inspectors_ref.where('email', '==', search_email).limit(1)
-            results = await asyncio.to_thread(lambda: list(query.stream()))
-            if results:
-                inspector_match = results[0].to_dict()
-            else:
-                # Try search by UID if email match fails
-                query = inspectors_ref.where('uid', '==', search_email).limit(1)
+        try:
+            if search_email:
+                # Search by email in inspectors
+                inspectors_ref = db.collection('inspectors')
+                # Try exact match first
+                query = inspectors_ref.where('email', '==', search_email).limit(1)
                 results = await asyncio.to_thread(lambda: list(query.stream()))
                 if results:
                     inspector_match = results[0].to_dict()
-        
-        if not inspector_match:
-            # Try search by uid in inspectors
-            query = db.collection('inspectors').where('uid', '==', uid).limit(1)
-            results = await asyncio.to_thread(lambda: list(query.stream()))
-            if results:
-                inspector_match = results[0].to_dict()
+                else:
+                    # Try search by UID if email match fails
+                    query = inspectors_ref.where('uid', '==', search_email).limit(1)
+                    results = await asyncio.to_thread(lambda: list(query.stream()))
+                    if results:
+                        inspector_match = results[0].to_dict()
+            
+            if not inspector_match:
+                # Try search by uid in inspectors
+                query = db.collection('inspectors').where('uid', '==', uid).limit(1)
+                results = await asyncio.to_thread(lambda: list(query.stream()))
+                if results:
+                    inspector_match = results[0].to_dict()
 
-        if not inspector_match and requested_name:
-            inspectors_ref = db.collection('inspectors')
+            if not inspector_match and requested_name:
+                inspectors_ref = db.collection('inspectors')
 
-            def clean_name(n):
-                return n.upper().replace(".", " ").replace("-", " ").strip()
+                def clean_name(n):
+                    return n.upper().replace(".", " ").replace("-", " ").strip()
 
-            cleaned_search = clean_name(requested_name)
-            all_inspectors = await asyncio.to_thread(lambda: [doc.to_dict() for doc in inspectors_ref.stream()])
-            for insp in all_inspectors:
-                if clean_name(insp.get('name', '')) == cleaned_search:
-                    inspector_match = insp
-                    break
+                cleaned_search = clean_name(requested_name)
+                all_inspectors = await asyncio.to_thread(lambda: [doc.to_dict() for doc in inspectors_ref.stream()])
+                for insp in all_inspectors:
+                    if clean_name(insp.get('name', '')) == cleaned_search:
+                        inspector_match = insp
+                        break
+        except Exception as e:
+            logger.warning(f"Firestore Discovery error (Quota?): {e}")
 
         if not inspector_match and profile_data and profile_data.get('full_name'):
             # Try search by full_name in inspectors (Fuzzy match)
@@ -186,38 +193,42 @@ class ProfileService:
             if email in ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com"]:
                 new_data["role"] = "admin"
 
-            await asyncio.to_thread(lambda: doc_ref.set(new_data, merge=True))
-            
-            # Welcome Notification
-            if not profile_data:
-                await asyncio.to_thread(db.collection('notifications').add, {
-                    "user_id": uid,
-                    "title": "Aramıza Hoş Geldiniz! 🚀",
-                    "message": "MufYard platformuna başarıyla kayıt oldunuz. Dijital denetim süreçlerinizi buradan yönetebilirsiniz.",
-                    "type": "system",
-                    "read": False,
-                    "created_at": datetime.utcnow()
-                })
+            try:
+                await asyncio.to_thread(lambda: doc_ref.set(new_data, merge=True))
+                
+                # Welcome Notification
+                if not profile_data:
+                    await asyncio.to_thread(db.collection('notifications').add, {
+                        "user_id": uid,
+                        "title": "Aramıza Hoş Geldiniz! 🚀",
+                        "message": "MufYard platformuna başarıyla kayıt oldunuz. Dijital denetim süreçlerinizi buradan yönetebilirsiniz.",
+                        "type": "system",
+                        "read": False,
+                        "created_at": datetime.utcnow()
+                    })
+            except: pass # Quota exceeded
                 
             return new_data
 
         if profile_data:
-            profile_data['uid'] = doc.id
-            current_emails = ProfileService._merge_emails(
-                profile_data.get('emails', []),
-                profile_data.get('email'),
-                search_email,
-            )
-            if current_emails != profile_data.get('emails', []):
-                await asyncio.to_thread(lambda: doc_ref.update({"emails": current_emails, "updated_at": datetime.utcnow()}))
-                profile_data['emails'] = current_emails
+            profile_data['uid'] = uid
+            try:
+                current_emails = ProfileService._merge_emails(
+                    profile_data.get('emails', []),
+                    profile_data.get('email'),
+                    search_email,
+                )
+                if current_emails != profile_data.get('emails', []):
+                    await asyncio.to_thread(lambda: doc_ref.update({"emails": current_emails, "updated_at": datetime.utcnow()}))
+                    profile_data['emails'] = current_emails
 
-            # Admin role enforcement for existing profiles
-            _admin_emails = ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com"]
-            if (profile_data.get('email') or search_email or '').lower() in _admin_emails:
-                if profile_data.get('role') != 'admin':
-                    await asyncio.to_thread(lambda: doc_ref.update({"role": "admin"}))
-                    profile_data['role'] = 'admin'
+                # Admin role enforcement for existing profiles
+                _admin_emails = ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com"]
+                if (profile_data.get('email') or search_email or '').lower() in _admin_emails:
+                    if profile_data.get('role') != 'admin':
+                        await asyncio.to_thread(lambda: doc_ref.update({"role": "admin"}))
+                        profile_data['role'] = 'admin'
+            except: pass # Quota
             return profile_data
 
         # Final Fallback
@@ -225,7 +236,7 @@ class ProfileService:
         _fallback_role = "admin" if (search_email or "").lower() in _admin_emails else "user"
         default_profile = {
             "uid": uid,
-            "full_name": "Kullanıcı",
+            "full_name": "Kullanıcı (Mod-Dışı)",
             "title": "Müfettiş",
             "institution": "Gençlik ve Spor Bakanlığı",
             "email": search_email or "sefa.yaprakli@gsb.gov.tr",
@@ -239,17 +250,20 @@ class ProfileService:
             "verified": False,
             "updated_at": datetime.utcnow()
         }
-        await asyncio.to_thread(lambda: doc_ref.set(default_profile))
         
-        # Welcome Notification
-        await asyncio.to_thread(db.collection('notifications').add, {
-            "user_id": uid,
-            "title": "Aramıza Hoş Geldiniz! 🚀",
-            "message": "MufYard platformuna başarıyla kayıt oldunuz. Hesabınızı kişiselleştirmek için ayarlar menüsünü kullanabilirsiniz.",
-            "type": "system",
-            "read": False,
-            "created_at": datetime.utcnow()
-        })
+        try:
+            await asyncio.to_thread(lambda: doc_ref.set(default_profile))
+            
+            # Welcome Notification
+            await asyncio.to_thread(db.collection('notifications').add, {
+                "user_id": uid,
+                "title": "Aramıza Hoş Geldiniz! 🚀",
+                "message": "MufYard platformuna başarıyla kayıt oldunuz. Hesabınızı kişiselleştirmek için ayarlar menüsünü kullanabilirsiniz.",
+                "type": "system",
+                "read": False,
+                "created_at": datetime.utcnow()
+            })
+        except: pass
         
         return default_profile
 

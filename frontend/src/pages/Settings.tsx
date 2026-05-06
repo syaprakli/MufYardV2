@@ -629,6 +629,20 @@ export default function Settings() {
                                         placeholder="0(5xx)..."
                                     />
                                 </div>
+                                <div className="space-y-2 md:col-span-2">
+                                    <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-[0.2em] ml-1">Doğum Tarihi</label>
+                                    <input 
+                                        type="date"
+                                        className="w-full p-4 bg-muted border border-border rounded-2xl text-sm font-bold dark:text-slate-100 focus:ring-4 focus:ring-primary/10 transition-all outline-none" 
+                                        value={(profile as any)?.birthday_full || ""} 
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            const mmdd = val ? `${val.slice(5, 7)}-${val.slice(8, 10)}` : '';
+                                            setProfile(prev => prev ? {...prev, birthday: mmdd, birthday_full: val} : null);
+                                        }}
+                                    />
+                                    <p className="text-[10px] text-slate-400 ml-1 font-medium">🎂 Doğum gününüzde Dashboard'da kutlama mesajı gösterilecektir.</p>
+                                </div>
 
                             </div>
 

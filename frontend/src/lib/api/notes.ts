@@ -9,6 +9,9 @@ export interface Note {
     is_pinned: boolean;
     color: string;
     created_at: string;
+    shared_with?: string[];
+    pending_collaborators?: string[];
+    accepted_collaborators?: string[];
 }
 
 export interface NoteCreate {
@@ -17,6 +20,8 @@ export interface NoteCreate {
     text: string;
     is_pinned: boolean;
     color: string;
+    pending_collaborators?: string[];
+    accepted_collaborators?: string[];
 }
 
 export async function fetchNotes(uid: string): Promise<Note[]> {
@@ -63,5 +68,25 @@ export async function deleteNote(id: string): Promise<{status: string, message: 
     if (!response.ok) {
         throw new Error("Not silinemedi.");
     }
+    return response.json();
+}
+
+export async function acceptNote(id: string, userId: string, userEmail?: string): Promise<{status: string, message: string}> {
+    const params = new URLSearchParams({ user_id: userId });
+    if (userEmail) params.append("user_email", userEmail);
+    const response = await fetchWithTimeout(`${API_BASE_URL}/notes/${id}/accept?${params.toString()}`, {
+        method: "POST"
+    });
+    if (!response.ok) throw new Error("Not kabul edilemedi.");
+    return response.json();
+}
+
+export async function rejectNote(id: string, userId: string, userEmail?: string): Promise<{status: string, message: string}> {
+    const params = new URLSearchParams({ user_id: userId });
+    if (userEmail) params.append("user_email", userEmail);
+    const response = await fetchWithTimeout(`${API_BASE_URL}/notes/${id}/reject?${params.toString()}`, {
+        method: "POST"
+    });
+    if (!response.ok) throw new Error("Not reddedilemedi.");
     return response.json();
 }

@@ -1,6 +1,8 @@
 import { API_URL as API_BASE_URL } from "../config";
 import { fetchWithTimeout, getAuthHeaders } from "./utils";
 
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export interface Profile {
     uid: string;
     full_name: string;
@@ -37,11 +39,25 @@ export async function fetchProfile(uid: string, email?: string, fullName?: strin
 }
 
 export async function fetchAllProfiles(): Promise<Profile[]> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/profiles/`);
-    if (!response.ok) {
-        throw new Error("Profiller yüklenemedi.");
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+            const response = await fetchWithTimeout(`${API_BASE_URL}/profiles/`, { timeout: 25000 });
+            if (!response.ok) {
+                throw new Error("Profiller yüklenemedi.");
+            }
+            return response.json();
+        } catch (error) {
+            lastError = error;
+            if (attempt === 0) {
+                await delay(1200);
+                continue;
+            }
+        }
     }
-    return response.json();
+
+    throw lastError instanceof Error ? lastError : new Error("Profiller yüklenemedi.");
 }
 
 export async function updateProfile(uid: string, update: Partial<Profile>): Promise<Profile> {

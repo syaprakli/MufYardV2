@@ -30,31 +30,102 @@ class ContactService:
         return deleted_count
 
     @staticmethod
-    async def get_contacts(category: str, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        contacts_ref = db.collection('contacts')
-        
-        if category == 'corporate':
-            # Kurumsal rehber: Paylaşılan her şey
-            query = contacts_ref.where('is_shared', '==', True).limit(500)
-        else:
-            # Kişisel rehber: Sadece bana ait olan her şey
-            if not user_id:
-                return []
-            query = contacts_ref.where('owner_id', '==', user_id).limit(300)
+    async def get_contacts(category: str, user_id: Optional[str] = None, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
+        try:
+            contacts_ref = db.collection('contacts')
             
-        docs = await asyncio.to_thread(query.stream)
-        
-        contacts = []
-        for doc in docs:
-            contact_data = doc.to_dict()
-            contact_data['id'] = doc.id
-            contacts.append(contact_data)
+            if category == 'corporate':
+                query = contacts_ref.where('is_shared', '==', True).limit(500)
+                docs = await asyncio.to_thread(query.stream)
+                contacts = []
+                for doc in docs:
+                    contact_data = doc.to_dict()
+                    contact_data['id'] = doc.id
+                    contacts.append(contact_data)
+                contacts.sort(key=lambda x: (x.get('sort_order') is None, x.get('sort_order', 10**9), x.get('name', '').lower()))
+                return contacts
+            else:
+                if not user_id:
+                    return []
+                    
+                async def run_query(q):
+                    if q is None: return []
+                    return await asyncio.to_thread(lambda: list(q.stream()))
+                    
+                queries = [
+                    contacts_ref.where('owner_id', '==', user_id),
+                    contacts_ref.where('accepted_collaborators', 'array_contains', user_id),
+                    contacts_ref.where('accepted_collaborators', 'array_contains', user_email) if user_email else None,
+                    contacts_ref.where('pending_collaborators', 'array_contains', user_id),
+                    contacts_ref.where('pending_collaborators', 'array_contains', user_email) if user_email else None
+                ]
+                
+                results = await asyncio.gather(*(run_query(q) for q in queries))
+                
+                all_docs = []
+                for res in results: all_docs.extend(res)
+
+                unique_contacts = {}
+                for doc in all_docs:
+                    if doc.id not in unique_contacts:
+                        d = doc.to_dict()
+                        d['id'] = doc.id
+                        unique_contacts[doc.id] = d
+                
+                contacts = list(unique_contacts.values())
+                contacts.sort(key=lambda x: x.get('name', '').lower())
+                return contacts
+        except Exception as e:
+            from app.lib.firebase_admin import logger as fb_logger
+            fb_logger.error(f"ContactService Quota Exceeded or Firestore Error: {e}")
             
-        if category == 'corporate':
-            contacts.sort(key=lambda x: (x.get('sort_order') is None, x.get('sort_order', 10**9), x.get('name', '').lower()))
-        else:
-            contacts.sort(key=lambda x: x.get('name', '').lower())
-        return contacts
+            # FALLBACK: If corporate, read from local Excel
+            if category == 'corporate':
+                fb_logger.info("Falling back to local Excel for Corporate Directory")
+                try:
+                    import os
+                    import pandas as pd
+                    import hashlib
+                    
+                    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                    file_path = os.path.join(base_dir, "rehber.xlsx")
+                    if not os.path.exists(file_path):
+                        file_path = os.path.join(base_dir, "Rdb_rehber.xlsx")
+                    
+                    if os.path.exists(file_path):
+                        df = await asyncio.to_thread(pd.read_excel, file_path, header=None)
+                        contacts = []
+                        current_cat = "Personel"
+                        
+                        # Use a simplified version of the sync logic to extract data
+                        for _, row in df.iterrows():
+                            vals = row.tolist()
+                            if len(vals) < 2 or pd.isna(vals[1]): continue
+                            
+                            name_raw = str(vals[1]).strip()
+                            if name_raw.upper() == "ADI SOYADI": continue
+                            
+                            # Row logic
+                            is_cat = pd.isna(vals[0]) and pd.isna(vals[2]) and pd.isna(vals[3])
+                            if is_cat:
+                                current_cat = name_raw
+                                continue
+                                
+                            contacts.append({
+                                "id": hashlib.md5(name_raw.encode()).hexdigest(),
+                                "name": name_raw,
+                                "title": str(vals[2]).strip() if len(vals) > 2 and not pd.isna(vals[2]) else current_cat,
+                                "phone": str(vals[3]).strip() if len(vals) > 3 and not pd.isna(vals[3]) else "-",
+                                "unit": current_cat,
+                                "is_shared": True,
+                                "owner_id": "system_admin"
+                            })
+                        return contacts
+                except Exception as ex:
+                    fb_logger.error(f"Excel Fallback also failed: {ex}")
+            
+            return [] # Final safety net
+
 
     @staticmethod
     async def get_contact_by_id(contact_id: str) -> Optional[Dict[str, Any]]:
@@ -71,6 +142,12 @@ class ContactService:
         contact_data = contact.dict()
         contact_data['created_at'] = datetime.utcnow()
         
+        owner_id = contact_data.get('owner_id')
+        shared = contact_data.get('shared_with', [])
+        # Kişisel rehber kayıtlarını paylaşırken de onay mekanizmasını devreye sokuyoruz
+        contact_data['pending_collaborators'] = [uid for uid in shared if uid != owner_id]
+        contact_data['accepted_collaborators'] = []
+
         # Add to Firestore
         doc_ref = await asyncio.to_thread(db.collection('contacts').add, contact_data)
         
@@ -124,6 +201,60 @@ class ContactService:
             
         await asyncio.to_thread(doc_ref.delete)
         return True
+
+    @staticmethod
+    async def accept_contact(contact_id: str, user_id: Optional[str], user_email: Optional[str] = None) -> bool:
+        try:
+            doc_ref = db.collection('contacts').document(contact_id)
+            doc = await asyncio.to_thread(doc_ref.get)
+            if not doc.exists:
+                return False
+            
+            contact_data = doc.to_dict()
+            pending = contact_data.get('pending_collaborators', [])
+            accepted = contact_data.get('accepted_collaborators', [])
+            identity_keys = [value for value in [user_id, user_email] if value]
+            
+            matched_identity = next((value for value in identity_keys if value in pending), None)
+
+            if matched_identity:
+                pending = [value for value in pending if value not in identity_keys]
+                for identity in identity_keys:
+                    if identity not in accepted:
+                        accepted.append(identity)
+                
+                await asyncio.to_thread(doc_ref.update, {
+                    'pending_collaborators': pending,
+                    'accepted_collaborators': accepted
+                })
+                return True
+            return False
+        except Exception:
+            return False
+
+    @staticmethod
+    async def reject_contact(contact_id: str, user_id: Optional[str], user_email: Optional[str] = None) -> bool:
+        try:
+            doc_ref = db.collection('contacts').document(contact_id)
+            doc = await asyncio.to_thread(doc_ref.get)
+            if not doc.exists:
+                return False
+            
+            contact_data = doc.to_dict()
+            pending = contact_data.get('pending_collaborators', [])
+            identity_keys = [value for value in [user_id, user_email] if value]
+            
+            matched_identity = next((value for value in identity_keys if value in pending), None)
+
+            if matched_identity:
+                pending = [value for value in pending if value not in identity_keys]
+                await asyncio.to_thread(doc_ref.update, {
+                    'pending_collaborators': pending
+                })
+                return True
+            return False
+        except Exception:
+            return False
 
     @staticmethod
     async def sync_from_rdb_rehber_v6(file_path: str = None) -> Dict[str, Any]:

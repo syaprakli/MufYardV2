@@ -1,14 +1,15 @@
-import { Search, MapPin, Phone, Mail, User, Building2, Plus, Share2, Trash2, Loader2, Tag, Shield, ChevronRight, Edit2 } from "lucide-react";
+import { Search, MapPin, Phone, Mail, User, Building2, Plus, Share2, Trash2, Loader2, Tag, Shield, ChevronRight, Edit2, Star } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
 import { useState, useEffect } from "react";
-import { fetchContacts, createContact, shareContact, deleteContact, uploadAndSyncContacts, updateContact, type Contact } from "../lib/api/contacts";
-import { FileSpreadsheet, MessageSquare } from "lucide-react";
+import { fetchContacts, createContact, shareContact, deleteContact, updateContact, acceptContact, type Contact } from "../lib/api/contacts";
+import { MessageSquare } from "lucide-react";
 import { useChat } from "../lib/context/ChatContext";
 import { useAuth } from "../lib/hooks/useAuth";
+import ShareModal from "../components/ShareModal";
 
 
 export default function Contacts() {
@@ -17,11 +18,28 @@ export default function Contacts() {
     const [activeTab, setActiveTab] = useState<"corporate" | "personal">("personal");
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [loading, setLoading] = useState(true);
-    const [syncing, setSyncing] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedRole, setSelectedRole] = useState("Tümü");
+    const [favorites, setFavorites] = useState<string[]>([]);
+    const [invitations, setInvitations] = useState<Contact[]>([]);
+    const [shareContactItem, setShareContactItem] = useState<Contact | null>(null);
     const [editingContact, setEditingContact] = useState<Contact | null>(null);
+
+    useEffect(() => {
+        if (user) {
+            const saved = localStorage.getItem(`mufyard_favorites_${user.uid}`);
+            if (saved) setFavorites(JSON.parse(saved));
+        }
+    }, [user]);
+
+    const toggleFavorite = (id: string) => {
+        setFavorites(prev => {
+            const newFavs = prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id];
+            if (user) localStorage.setItem(`mufyard_favorites_${user.uid}`, JSON.stringify(newFavs));
+            return newFavs;
+        });
+    };
 
     const { openChat } = useChat();
     const [newContact, setNewContact] = useState({
@@ -39,10 +57,35 @@ export default function Contacts() {
     }, [activeTab]);
 
     const loadContacts = async () => {
+        if (!user) return;
         try {
             setLoading(true);
-            const data = await fetchContacts(activeTab, user?.uid);
-            setContacts(Array.isArray(data) ? data : []);
+            const userEmail = user.email?.toLowerCase();
+            const data = await fetchContacts(activeTab, user.uid, userEmail);
+            
+            if (activeTab === "personal") {
+                const userKeys = [user.uid, userEmail].filter(Boolean) as string[];
+                
+                // Kendi eklediklerim + kabul ettiklerim
+                const accepted = data.filter(c => {
+                    const isOwner = c.owner_id === user.uid || (userEmail && c.owner_id === userEmail);
+                    const isAcceptedCollab = (c as any).accepted_collaborators?.some((v: string) => userKeys.includes(v.toLowerCase()));
+                    return isOwner || isAcceptedCollab;
+                });
+
+                // Henüz bekleyen davetler
+                const pending = data.filter(c => {
+                    const isOwner = c.owner_id === user.uid || (userEmail && c.owner_id === userEmail);
+                    const isPendingCollab = (c as any).pending_collaborators?.some((v: string) => userKeys.includes(v.toLowerCase()));
+                    return !isOwner && isPendingCollab;
+                });
+
+                setContacts(accepted.length > 0 ? accepted : (data.length > 0 && activeTab === "personal" ? data.filter(c => c.owner_id === user.uid) : []));
+                setInvitations(pending);
+            } else {
+                setContacts(Array.isArray(data) ? data : []);
+                setInvitations([]);
+            }
         } catch (error) {
             console.error("Rehber yüklenemedi:", error);
             setContacts([]);
@@ -50,6 +93,30 @@ export default function Contacts() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleAcceptInvitation = async (contactId: string) => {
+        if (!user?.uid) return;
+        try {
+            await acceptContact(contactId, user.uid, user.email || undefined);
+            toast.success("Kişi kabul edildi ve rehberinize eklendi.");
+            loadContacts();
+        } catch (error) {
+            toast.error("Kişi kabul edilemedi.");
+        }
+    };
+
+    const handleShareUpdate = async (newSharedWith: string[]) => {
+        if (!shareContactItem) return;
+        try {
+            await updateContact(shareContactItem.id, user!.uid, { 
+                pending_collaborators: newSharedWith,
+                is_shared: shareContactItem.is_shared 
+            } as any);
+            toast.success("Paylaşım davetleri gönderildi.");
+            setShareContactItem(null);
+            loadContacts();
+        } catch { toast.error("Paylaşım güncellenemedi."); }
     };
 
     const handleCreateContact = async (e: React.FormEvent) => {
@@ -156,28 +223,7 @@ export default function Contacts() {
         }
     };
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
 
-        if (!file.name.toLowerCase().endsWith('.xlsx') && !file.name.toLowerCase().endsWith('.xls')) {
-            toast.error("Lütfen sadece Excel (.xlsx, .xls) dosyası yükleyin.");
-            return;
-        }
-
-        try {
-            setSyncing(true);
-            const res = await uploadAndSyncContacts(file);
-            toast.success(res.message || "Rehber başarıyla güncellendi.");
-            loadContacts();
-        } catch (error: any) {
-            console.error("Yükleme hatası:", error);
-            toast.error(error.message || "Excel yüklenirken bir hata oluştu.");
-        } finally {
-            setSyncing(false);
-            if (e.target) e.target.value = "";
-        }
-    };
 
     const filteredContacts = contacts.filter(c => {
         const normalize = (s: string) => s.toLowerCase()
@@ -196,7 +242,11 @@ export default function Contacts() {
             c.tags?.some(t => normalize(t).includes(normSearch));
         
         const normCategory = normalize(c.category || c.tags?.[0] || "");
-        const matchesRole = selectedRole === "Tümü" || normCategory === normalize(selectedRole);
+        
+        let matchesRole = false;
+        if (selectedRole === "Tümü") matchesRole = true;
+        else if (selectedRole === "Favoriler") matchesRole = favorites.includes(c.id);
+        else matchesRole = normCategory === normalize(selectedRole);
              
         return matchesSearch && matchesRole;
     });
@@ -214,6 +264,7 @@ export default function Contacts() {
 
     const roleOptions = [
         "Tümü",
+        "Favoriler",
         ...Array.from(new Set(contacts.map(contact => contact.category).filter((value): value is string => Boolean(value))))
     ];
 
@@ -264,31 +315,7 @@ export default function Contacts() {
                         </button>
                     </div>
                     
-                    {activeTab === "corporate" && (
-                        <>
-                            <input
-                                type="file"
-                                id="excel-upload"
-                                className="hidden"
-                                accept=".xlsx, .xls"
-                                onChange={handleFileUpload}
-                                disabled={syncing}
-                            />
-                            <Button 
-                                variant="outline" 
-                                onClick={() => document.getElementById('excel-upload')?.click()}
-                                disabled={syncing}
-                                className="h-11 max-w-full px-3 sm:px-4 rounded-xl border-dashed border-2 hover:border-primary transition-all whitespace-normal sm:whitespace-nowrap text-xs sm:text-sm leading-tight"
-                            >
-                                {syncing ? (
-                                    <Loader2 size={18} className="mr-2 animate-spin" />
-                                ) : (
-                                    <FileSpreadsheet size={18} className="mr-2 text-emerald-600" />
-                                )}
-                                {syncing ? "Senkronize Ediliyor..." : "Yeni Liste Yükle (xlsx)"}
-                            </Button>
-                        </>
-                    )}
+
 
                     <Button onClick={() => {
                         setEditingContact(null);
@@ -333,6 +360,38 @@ export default function Contacts() {
                 </div>
             </div>
 
+            {/* Bekleyen Kişi Davetleri */}
+            {activeTab === "personal" && invitations.length > 0 && (
+                <div className="space-y-4 animate-in slide-in-from-top-4 duration-500 mb-8 font-inter">
+                    <div className="flex items-center gap-2 px-1 text-indigo-600">
+                        <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+                        <h3 className="text-xs font-black tracking-widest font-outfit">Bekleyen Rehber Kayıtları ({invitations.length})</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {invitations.map(inv => (
+                            <div key={inv.id} className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-5 flex flex-col justify-between group hover:bg-indigo-50 transition-all shadow-sm">
+                                <div>
+                                    <div className="flex justify-between items-start mb-3">
+                                        <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-[9px] font-black rounded-lg tracking-widest">Paylaşılan Kişi</span>
+                                        <User size={14} className="text-indigo-500" />
+                                    </div>
+                                    <h4 className="font-bold text-foreground dark:text-slate-100 text-sm mb-1">{inv.name}</h4>
+                                    <p className="text-[10px] text-slate-500 font-medium mb-4 italic flex items-center gap-1">
+                                        {inv.title} - {inv.unit}
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={() => handleAcceptInvitation(inv.id)} 
+                                    className="w-full bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl h-10 font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-200/50 transition-all active:scale-95"
+                                >
+                                    Kişiyi Kabul Et ve Kaydet
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 space-y-4">
                     <Loader2 className="w-10 h-10 text-primary animate-spin" />
@@ -353,20 +412,22 @@ export default function Contacts() {
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                                     {(groupedContacts[groupName] || []).map(contact => (
-                                        <ContactCard
-                                            key={contact.id}
-                                            contact={contact}
-                                            isOwner={contact.owner_id === user?.uid || contact.is_shared}
-                                            onEdit={() => openEditModal(contact)}
-                                            onShare={() => handleShare(contact.id)}
-                                            onDelete={() => handleDelete(contact.id)}
-                                            onChat={() => {
-                                                if (!user) return;
-                                                // Her kişi için benzersiz oda: kendi uid + kişinin Firestore doc id (sabit, eşsiz)
-                                                const roomId = ["dm", ...[user.uid, contact.id].sort()].join("_");
-                                                openChat(roomId, contact.name, "dm");
-                                            }}
-                                        />
+                                            <ContactCard
+                                                key={contact.id}
+                                                contact={contact}
+                                                isFavorite={favorites.includes(contact.id)}
+                                                onToggleFavorite={() => toggleFavorite(contact.id)}
+                                                isOwner={contact.owner_id === user?.uid || contact.is_shared}
+                                                onEdit={() => openEditModal(contact)}
+                                                onShare={() => setShareContactItem(contact)}
+                                                onShareCorporate={() => handleShare(contact.id)}
+                                                onDelete={() => handleDelete(contact.id)}
+                                                onChat={() => {
+                                                    if (!user) return;
+                                                    const roomId = ["dm", ...[user.uid, contact.id].sort()].join("_");
+                                                    openChat(roomId, contact.name, "dm");
+                                                }}
+                                            />
                                     ))}
                                 </div>
                             </section>
@@ -378,9 +439,12 @@ export default function Contacts() {
                             <ContactCard
                                 key={contact.id}
                                 contact={contact}
+                                isFavorite={favorites.includes(contact.id)}
+                                onToggleFavorite={() => toggleFavorite(contact.id)}
                                 isOwner={contact.owner_id === user?.uid || contact.is_shared}
                                 onEdit={() => openEditModal(contact)}
-                                onShare={() => handleShare(contact.id)}
+                                onShare={() => setShareContactItem(contact)}
+                                onShareCorporate={() => handleShare(contact.id)}
                                 onDelete={() => handleDelete(contact.id)}
                                 onChat={() => {
                                     if (!user) return;
@@ -497,11 +561,21 @@ export default function Contacts() {
                     </div>
                 </form>
             </Modal>
+            
+            {shareContactItem && (
+                <ShareModal
+                    isOpen={!!shareContactItem}
+                    onClose={() => setShareContactItem(null)}
+                    title="Kişiyi Paylaş"
+                    sharedWith={(shareContactItem as any).pending_collaborators || []}
+                    onShare={handleShareUpdate}
+                />
+            )}
         </div>
     );
 }
 
-function ContactCard({ contact, isOwner, onEdit, onShare, onDelete, onChat }: { contact: Contact, isOwner: boolean, onEdit: () => void, onShare: () => void, onDelete: () => void, onChat: () => void }) {
+function ContactCard({ contact, isOwner, isFavorite, onToggleFavorite, onEdit, onShare, onShareCorporate, onDelete, onChat }: { contact: Contact, isOwner: boolean, isFavorite?: boolean, onToggleFavorite?: () => void, onEdit: () => void, onShare: () => void, onShareCorporate: () => void, onDelete: () => void, onChat: () => void }) {
 
     return (
         <Card className="p-6 relative group overflow-hidden border border-border hover:border-primary/50 transition-all shadow-sm hover:shadow-md h-full flex flex-col">
@@ -511,16 +585,31 @@ function ContactCard({ contact, isOwner, onEdit, onShare, onDelete, onChat }: { 
                 </div>
                 {isOwner && (
                     <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" onClick={onToggleFavorite} title={isFavorite ? "Favorilerden Çıkar" : "Favorilere Ekle"} className="text-amber-500 hover:bg-amber-50">
+                            <Star size={18} fill={isFavorite ? "currentColor" : "none"} className={isFavorite ? "text-amber-500" : "text-slate-400"} />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={onEdit} title="Kişiyi Düzenle" className="text-amber-500 hover:bg-amber-50">
                             <Edit2 size={18} />
                         </Button>
                         {!contact.is_shared && (
-                            <Button variant="ghost" size="icon" onClick={onShare} title="Kurumsal Rehberde Paylaş" className="text-indigo-600 hover:bg-indigo-50">
-                                <Share2 size={18} />
-                            </Button>
+                            <>
+                                <Button variant="ghost" size="icon" onClick={onShare} title="Kişilerle Paylaş" className="text-indigo-600 hover:bg-indigo-50">
+                                    <Share2 size={18} />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={onShareCorporate} title="Kurumsal Rehberde Paylaş" className="text-emerald-600 hover:bg-emerald-50">
+                                    <Building2 size={18} />
+                                </Button>
+                            </>
                         )}
                         <Button variant="ghost" size="icon" onClick={onDelete} title="Kişiyi Sil" className="text-red-500 hover:bg-red-50">
                             <Trash2 size={18} />
+                        </Button>
+                    </div>
+                )}
+                {!isOwner && onToggleFavorite && (
+                    <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                         <Button variant="ghost" size="icon" onClick={onToggleFavorite} title={isFavorite ? "Favorilerden Çıkar" : "Favorilere Ekle"} className="text-amber-500 hover:bg-amber-50">
+                            <Star size={18} fill={isFavorite ? "currentColor" : "none"} className={isFavorite ? "text-amber-500" : "text-slate-400"} />
                         </Button>
                     </div>
                 )}

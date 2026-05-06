@@ -352,7 +352,8 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
   const clearMyMessages = async () => {
     if (!user || type !== 'dm') return;
     try {
-      const res = await fetch(`${API_URL}/collaboration/dm/${roomId}?uid=${user.uid}`, { method: 'DELETE' });
+      const encodedRoomId = encodeURIComponent(roomId);
+      const res = await fetch(`${API_URL}/collaboration/dm/${encodedRoomId}/clear?uid=${encodeURIComponent(user.uid)}`, { method: 'DELETE' });
       if (!res.ok) {
         toast.error('Sohbet temizlenemedi.');
         return;
@@ -390,13 +391,32 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
 
   // ── minimized ─────────────────────────────────────────────────────────
   if (isMinimized) {
+    // Kişinin baş harflerini al
+    const getInitials = (name: string) => {
+      const parts = name.trim().split(/\s+/);
+      if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+      return name.slice(0, 2).toUpperCase();
+    };
+    const initials = getInitials(title);
+    
     return (
-      <div onClick={() => setIsMinimized(false)} className="w-64 bg-slate-900 text-white p-3 rounded-t-xl cursor-pointer flex items-center justify-between shadow-2xl hover:bg-slate-800 transition-all border-b-4 border-primary">
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-red-500'}`} />
-          <span className="text-xs font-bold truncate max-w-[140px] uppercase tracking-wider">{title}</span>
+      <div className="relative group">
+        <div 
+          onClick={() => setIsMinimized(false)} 
+          className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center cursor-pointer shadow-xl shadow-primary/30 hover:scale-110 active:scale-95 transition-all border-2 border-white"
+          title={title}
+        >
+          <span className="text-xs font-black tracking-tight">{initials}</span>
         </div>
-        <X size={14} className="hover:text-red-400" onClick={(e) => { e.stopPropagation(); onClose(); }} />
+        {/* Bağlantı durumu noktası */}
+        <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${isConnected ? 'bg-emerald-500' : 'bg-red-500'}`} />
+        {/* Kapatma butonu */}
+        <button 
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          className="absolute -top-1 -left-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600 shadow-sm"
+        >
+          <X size={10} />
+        </button>
       </div>
     );
   }
@@ -429,9 +449,9 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
             <button
               onClick={clearMyMessages}
               className="px-2 py-1 text-[10px] font-bold rounded bg-white/10 hover:bg-white/20 transition-colors"
-              title="Sadece kendi mesajlarınızı temizler"
+              title="Kendi mesajlarınızı temizler"
             >
-              Bende Temizle
+              Sohbeti Temizle
             </button>
           )}
           {!inline && <button onClick={() => setIsMinimized(true)} className="p-1 hover:bg-white/10 rounded transition-colors"><Minus size={14} /></button>}

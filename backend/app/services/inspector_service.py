@@ -39,7 +39,7 @@ class InspectorService:
         normalized = InspectorService._normalize_text(name)
         cleaned = "".join(ch if ch.isalnum() or ch.isspace() else " " for ch in normalized)
         username = ".".join(part for part in cleaned.split() if part)
-        return f"{username}@gsb.gov.tr" if username else ""
+        return f"{username}@gsb.gov.tr".lower() if username else ""
 
     @staticmethod
     async def get_inspectors() -> List[Dict[str, Any]]:
@@ -55,6 +55,7 @@ class InspectorService:
                 # Ensure required fields exist for schema validation
                 if 'name' not in data: data['name'] = "İsimsiz"
                 if 'email' not in data: data['email'] = InspectorService._generate_email_from_name(data['name'])
+                data['email'] = str(data['email']).lower()
                 if 'title' not in data: data['title'] = "Müfettiş"
                 if 'created_at' not in data:
                     data['created_at'] = now
@@ -66,6 +67,13 @@ class InspectorService:
                     if fallback_email:
                         data['email'] = fallback_email
                         asyncio.create_task(asyncio.to_thread(doc.reference.update, {'email': fallback_email}))
+                else:
+                    if 'email' in data and data['email']:
+                        # Ensure stored in DB as lowercase
+                        lowered_email = data['email'].lower()
+                        if data['email'] != lowered_email:
+                            data['email'] = lowered_email
+                            asyncio.create_task(asyncio.to_thread(doc.reference.update, {'email': lowered_email}))
                 
                 data['id'] = doc.id
                 inspectors.append(data)
@@ -91,6 +99,8 @@ class InspectorService:
     @staticmethod
     async def add_inspector(inspector: InspectorCreate) -> Dict[str, Any]:
         data = inspector.dict()
+        if data.get('email'):
+            data['email'] = data['email'].lower()
         data['created_at'] = datetime.utcnow().isoformat()
         try:
             res = await asyncio.to_thread(db.collection('inspectors').add, data)
@@ -110,6 +120,8 @@ class InspectorService:
         for inspector in inspectors:
             doc_ref = db.collection('inspectors').document()
             data = inspector.dict()
+            if data.get('email'):
+                data['email'] = data['email'].lower()
             data['created_at'] = now
             batch.set(doc_ref, data)
             count += 1
@@ -129,6 +141,8 @@ class InspectorService:
     async def update_inspector(inspector_id: str, inspector: InspectorCreate) -> Optional[Dict[str, Any]]:
         try:
             data = inspector.dict()
+            if data.get('email'):
+                data['email'] = data['email'].lower()
             await asyncio.to_thread(db.collection('inspectors').document(inspector_id).update, data)
             data['id'] = inspector_id
             return data
@@ -329,12 +343,13 @@ class InspectorService:
                 if not name:
                     continue
 
-                email = str(data.get("email", "")).strip()
+                email = str(data.get("email", "")).strip().lower()
                 if not email:
                     email = InspectorService._generate_email_from_name(name)
 
                 if not email:
                     continue
+                email = email.lower()
                 phone = str(data.get("phone", "")).strip()
 
                 extension = ""
