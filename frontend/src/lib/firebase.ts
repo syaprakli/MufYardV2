@@ -32,7 +32,18 @@ export const storage = getStorage(app);
 export const messaging = null; // Mobil Bildirimler Devre Dışı
 
 // Electron environment detection
-export const isElectron = typeof window !== 'undefined' && window.navigator.userAgent.includes('Electron');
+// User-Agent bazli kontrol bazi makinelerde false donebiliyor.
+// Bu nedenle process.versions.electron ve renderer tipi ile birlikte kontrol ediyoruz.
+export const isElectron = (() => {
+  if (typeof window === 'undefined') return false;
+
+  const maybeProcess = (window as any).process;
+  const hasElectronProcess = !!maybeProcess?.versions?.electron;
+  const isRendererProcess = maybeProcess?.type === 'renderer';
+  const hasElectronUA = window.navigator.userAgent.includes('Electron');
+
+  return hasElectronProcess || isRendererProcess || hasElectronUA;
+})();
 
 export const requestForToken = async () => null;
 
