@@ -5,6 +5,10 @@ docs/
 .firebase/
 .venv/
 venv/
+dist/
+backend/dist/
+backend/.venv/
+backend/venv/
 __pycache__/
 *.pyc
 *.pyo
