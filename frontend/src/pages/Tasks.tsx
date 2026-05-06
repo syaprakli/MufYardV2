@@ -9,7 +9,7 @@ import { toast } from "react-hot-toast";
 
 import { fetchTasks, createTask, updateTask, deleteTask, acceptTask, type Task, type TaskStep } from "../lib/api/tasks";
 import { fetchInspectors, type Inspector } from "../lib/api/inspectors";
-import { fetchAudits, createAudit, deleteAudit } from "../lib/api/audit";
+import { fetchAudits, createAudit, deleteAudit, invalidateAuditCache } from "../lib/api/audit";
 import { fetchAllProfiles, type Profile } from "../lib/api/profiles";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useTheme } from "../lib/context/ThemeContext";
@@ -47,6 +47,17 @@ const RAPOR_SABLONLARI: Record<string, string> = {
     "Spor Kulüpleri": `<h1 style="text-align: center;">SPOR KULÜBÜ DENETİM RAPORU</h1><p><br></p><p><strong>1. GİRİŞ</strong></p><p>7405 sayılı Spor Kulüpleri ve Spor Federasyonları Kanunu kapsamında ....... Spor Kulübü'nün idari ve mali denetimi hakkındadır.</p><p><br></p><p><strong>2. İDARİ YAPI VE İŞLEYİŞ</strong></p><p>Tüzük uygunluğu, üye kayıt defteri, yönetim kurulu karar defterinin incelenmesi.</p><p><br></p><p><strong>3. MALİ İNCELEME</strong></p><p>Gelir-gider tabloları, bağış makbuzları ve bilanço değerleri.</p><p><br></p><p><strong>4. SONUÇ</strong></p><p>İyileştirilmesi gereken alanlar ve mevzuata aykırı eylemlere ilişkin bildirimler.</p>`
 };
 const RAPOR_DURUMLARI = ["Başlanmadı", "Devam Ediyor", "Evrak Bekleniyor", "İncelemede", "Tamamlandı"];
+
+function getNextReportSequence(audits: Array<{ report_seq?: number }>): number {
+    const used = new Set(
+        audits
+            .map((a) => Number(a.report_seq || 0))
+            .filter((n) => Number.isInteger(n) && n > 0)
+    );
+    let seq = 1;
+    while (used.has(seq)) seq += 1;
+    return seq;
+}
 
 export default function Tasks() {
     const navigate = useNavigate();
@@ -265,11 +276,12 @@ export default function Tasks() {
         if (!deleteConfirmId) return;
         try {
             // 1. Find and delete all associated audits first (Cascading Delete)
-            const allAudits = await fetchAudits(effectiveUid);
+            const allAudits = await fetchAudits(effectiveUid, effectiveEmail, true);
             const associatedAudits = allAudits.filter(a => a.task_id === deleteConfirmId);
             
             if (associatedAudits.length > 0) {
                 await Promise.all(associatedAudits.map(a => deleteAudit(a.id)));
+                invalidateAuditCache();
             }
 
             // 2. Delete the task itself
@@ -315,7 +327,7 @@ export default function Tasks() {
         try {
             setLoading(true);
             // Hem UID hem Email ile sorgulayarak yetki kapsamını genişletiyoruz
-            const allAudits = await fetchAudits(effectiveUid || "", currentUser?.email || undefined);
+            const allAudits = await fetchAudits(effectiveUid || "", currentUser?.email || undefined, true);
             const associated = allAudits.filter(a => String(a.task_id).trim() === String(task.id).trim());
             setTaskAudits(associated);
 
@@ -328,7 +340,7 @@ export default function Tasks() {
                 return;
             }
             
-            const nextSeq = Math.max(0, ...associated.map(a => a.report_seq || 0)) + 1;
+            const nextSeq = getNextReportSequence(allAudits);
 
             if (associated.length > 0) {
                 setShowReportSelector(task);
@@ -408,9 +420,9 @@ export default function Tasks() {
             if (!task) return;
 
             // 1. Get existing audits to determine next sequence number
-            const existingAudits = await fetchAudits(effectiveUid || "", currentUser?.email || undefined);
+            const existingAudits = await fetchAudits(effectiveUid || "", currentUser?.email || undefined, true);
             const taskAudits = existingAudits.filter(a => String(a.task_id).trim() === String(taskId).trim());
-            const nextSeq = Math.max(0, ...taskAudits.map(a => a.report_seq || 0)) + 1;
+            const nextSeq = getNextReportSequence(existingAudits);
 
             const auditPayload: any = {
                 task_id: taskId,

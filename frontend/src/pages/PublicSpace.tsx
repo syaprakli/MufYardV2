@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { 
     Send, User, MessageSquare, Search,
     Loader2, Trash2,
@@ -19,7 +19,6 @@ import { fetchWithTimeout } from "../lib/api/utils";
 import toast from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNotifications } from "../lib/context/NotificationContext";
 
 interface Post {
     id: string;
@@ -113,11 +112,9 @@ const FAQ_DATA = [
 export default function PublicSpace() {
     const { user, loading: authLoading } = useAuth();
     const confirm = useConfirm();
-    const navigate = useNavigate();
-    const { notifications } = useNotifications();
 
     const location = useLocation();
-    const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage, wsConnected } = usePresence();
+    const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage } = usePresence();
     const [posts, setPosts] = useState<Post[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
     const [categories, setCategories] = useState<string[]>([]);
@@ -157,8 +154,8 @@ export default function PublicSpace() {
     const [editingPost, setEditingPost] = useState<Post | null>(null);
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [editCommentText, setEditCommentText] = useState("");
-    const unreadDirectMessages = notifications.filter((notif) => !notif.read && notif.type === 'collaboration').length;
-
+    const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+    const [editMessageText, setEditMessageText] = useState("");
     useEffect(() => {
         const handleStatus = () => setIsOnline(navigator.onLine);
         window.addEventListener('online', handleStatus);
@@ -196,16 +193,15 @@ export default function PublicSpace() {
         const loadInitialData = async () => {
             if (!user?.uid) return;
             try {
-                const [prof, cats, insps, messagesRes] = await Promise.all([
+                const [prof, cats, insps] = await Promise.all([
                     fetchWithTimeout(`${API_URL}/profiles/${user.uid}`).then(r => r.json()),
                     fetchWithTimeout(`${API_URL}/collaboration/categories`).then(r => r.json()),
-                    fetchWithTimeout(`${API_URL}/profiles/`).then(r => r.json()),
-                    fetchWithTimeout(`${API_URL}/collaboration/messages`).then(r => r.json())
+                    fetchWithTimeout(`${API_URL}/profiles/`).then(r => r.json())
                 ]);
                 setUserRole(prof.role || 'user');
                 setCategories(cats);
                 setAllInspectors(insps.filter((i: any) => i.uid !== user?.uid));
-                setMessages(messagesRes.map((m: any) => ({ ...m, isMine: m.author_id === user?.uid })));
+                setMessages([]);
             } catch (err: any) {
                 console.error("Initial load error", err);
             } finally {
@@ -224,24 +220,6 @@ export default function PublicSpace() {
             });
         }
     }, [globalMessages, user?.uid]);
-
-    // WS bağlı değilse polling ile yeni mesajları çek
-    useEffect(() => {
-        if (wsConnected || !user?.uid) return;
-        const poll = async () => {
-            try {
-                const res = await fetchWithTimeout(`${API_URL}/collaboration/messages`);
-                const data = await res.json();
-                setMessages(prev => {
-                    const newMsgs = data.filter((m: any) => !prev.some((pm: any) => pm.id === m.id));
-                    if (newMsgs.length === 0) return prev;
-                    return [...prev, ...newMsgs.map((m: any) => ({ ...m, isMine: m.author_id === user?.uid }))];
-                });
-            } catch {}
-        };
-        const timer = setInterval(poll, 1000);
-        return () => clearInterval(timer);
-    }, [wsConnected, user?.uid]);
 
     useEffect(() => {
         const loadPosts = async () => {
@@ -296,16 +274,93 @@ export default function PublicSpace() {
         });
         if (confirmed) {
             try {
-                const res = await fetchWithTimeout(`${API_URL}/collaboration/messages/${messageId}`, {
+                const roleParam = encodeURIComponent(userRole || 'user');
+                const uidParam = encodeURIComponent(user?.uid || '');
+                const res = await fetchWithTimeout(`${API_URL}/collaboration/messages/${messageId}?uid=${uidParam}&role=${roleParam}`, {
                     method: 'DELETE'
                 });
                 if (res.ok) {
                     setMessages(prev => prev.filter(m => m.id !== messageId));
+                    if (editingMessageId === messageId) {
+                        setEditingMessageId(null);
+                        setEditMessageText("");
+                    }
                     toast.success("Mesaj silindi.");
                 }
             } catch (err) {
                 toast.error("Hata oluştu.");
             }
+        }
+    };
+
+    const handleStartEditMessage = (msg: Message) => {
+        setEditingMessageId(msg.id);
+        setEditMessageText(msg.text || "");
+    };
+
+    const handleCancelEditMessage = () => {
+        setEditingMessageId(null);
+        setEditMessageText("");
+    };
+
+    const handleSaveEditMessage = async (messageId: string) => {
+        const nextText = editMessageText.trim();
+        if (!nextText || !user?.uid) return;
+
+        try {
+            const roleParam = encodeURIComponent(userRole || 'user');
+            const uidParam = encodeURIComponent(user.uid);
+            const res = await fetchWithTimeout(`${API_URL}/collaboration/messages/${messageId}?uid=${uidParam}&role=${roleParam}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: nextText })
+            });
+            if (!res.ok) {
+                throw new Error("Mesaj güncellenemedi.");
+            }
+            setMessages(prev => prev.map(m => m.id === messageId ? { ...m, text: nextText } : m));
+            setEditingMessageId(null);
+            setEditMessageText("");
+            toast.success("Mesaj güncellendi.");
+        } catch {
+            toast.error("Mesaj güncellenemedi.");
+        }
+    };
+
+    const handleClearChat = async () => {
+        const confirmed = await confirm({
+            title: userRole === 'admin' ? "Sohbet Alanını Temizle" : "Sohbeti Bende Temizle",
+            message: userRole === 'admin'
+                ? "Canlı müzakere alanındaki tüm mesajlar silinecek. Devam etmek istiyor musunuz?"
+                : "Bu işlem sadece sizin ekranınızdaki sohbet geçmişini temizler. Diğer kullanıcılar etkilenmez.",
+            confirmText: "Temizle",
+            variant: "danger"
+        });
+        if (!confirmed) return;
+
+        if (userRole !== 'admin') {
+            setMessages([]);
+            setEditingMessageId(null);
+            setEditMessageText("");
+            toast.success("Sohbet ekranınız temizlendi.");
+            return;
+        }
+
+        try {
+            const roleParam = encodeURIComponent(userRole || 'user');
+            const uidParam = encodeURIComponent(user?.uid || '');
+            const res = await fetchWithTimeout(`${API_URL}/collaboration/messages?uid=${uidParam}&role=${roleParam}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) {
+                throw new Error("Sohbet temizlenemedi.");
+            }
+            setMessages([]);
+            setEditingMessageId(null);
+            setEditMessageText("");
+            toast.success("Sohbet alanı temizlendi.");
+        } catch {
+            toast.error("Sohbet temizlenemedi.");
         }
     };
 
@@ -840,6 +895,14 @@ export default function PublicSpace() {
                                 <span>{onlineUsers.length} kişi online</span>
                                 {showOnlinePanel ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                             </button>
+                            <button
+                                type="button"
+                                onClick={handleClearChat}
+                                className="flex items-center gap-2 rounded-full bg-rose-500/20 px-3 py-2 text-[10px] font-black tracking-widest text-rose-100 transition-colors hover:bg-rose-500/30"
+                                title={userRole === 'admin' ? "Sohbet alanını temizle" : "Sadece kendi ekranını temizle"}
+                            >
+                                <Trash2 size={12} /> {userRole === 'admin' ? 'Sohbeti Temizle' : 'Bende Temizle'}
+                            </button>
                         </div>
                         <AnimatePresence>
                             {showOnlinePanel && (
@@ -867,28 +930,66 @@ export default function PublicSpace() {
                         <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
                             {messages.map((msg: any) => (
                                 <div key={msg.id} className={cn("flex flex-col", (msg.isMine || msg.author_id === user?.uid) ? "items-end" : "items-start")}>
-                                    <div className={cn(
-                                        "max-w-[85%] p-4 rounded-3xl text-sm font-medium shadow-sm space-y-2",
-                                        getMessagePalette(msg.author_id, msg.author_name).bubble,
-                                        (msg.isMine || msg.author_id === user?.uid) ? "rounded-tr-none" : "rounded-tl-none"
-                                    )}>
-                                        {msg.text !== "GIF" && msg.text}
-                                        {msg.attachments && msg.attachments.length > 0 && msg.attachments[0].url && (
-                                            <div className="rounded-2xl overflow-hidden shadow-md">
-                                                <img src={msg.attachments[0].url} className="max-w-full h-auto object-cover" />
+                                    {editingMessageId === msg.id ? (
+                                        <div className="max-w-[85%] space-y-2 rounded-3xl rounded-tr-none bg-card p-3 shadow-sm ring-1 ring-border">
+                                            <input
+                                                value={editMessageText}
+                                                onChange={(e) => setEditMessageText(e.target.value)}
+                                                className="w-full rounded-xl border border-border bg-muted/60 px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                                                autoFocus
+                                            />
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleCancelEditMessage}
+                                                    className="rounded-lg bg-muted px-2 py-1 text-[10px] font-black text-muted-foreground"
+                                                >
+                                                    Vazgeç
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleSaveEditMessage(msg.id)}
+                                                    className="rounded-lg bg-primary px-2 py-1 text-[10px] font-black text-white"
+                                                >
+                                                    Kaydet
+                                                </button>
                                             </div>
-                                        )}
-                                    </div>
+                                        </div>
+                                    ) : (
+                                        <div className={cn(
+                                            "max-w-[85%] p-4 rounded-3xl text-sm font-medium shadow-sm space-y-2",
+                                            getMessagePalette(msg.author_id, msg.author_name).bubble,
+                                            (msg.isMine || msg.author_id === user?.uid) ? "rounded-tr-none" : "rounded-tl-none"
+                                        )}>
+                                            {msg.text !== "GIF" && msg.text}
+                                            {msg.attachments && msg.attachments.length > 0 && msg.attachments[0].url && (
+                                                <div className="rounded-2xl overflow-hidden shadow-md">
+                                                    <img src={msg.attachments[0].url} className="max-w-full h-auto object-cover" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                     <div className="flex items-center gap-2 mt-1 px-2 group">
                                         <span className={cn("text-[10px] font-bold", getMessagePalette(msg.author_id, msg.author_name).meta)}>{msg.author_name} • {new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
                                         {(msg.author_id === user?.uid || userRole === 'admin') && (
-                                            <button 
-                                                onClick={() => handleDeleteMessage(msg.id)}
-                                                className="p-1 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
-                                                title="Sil"
-                                            >
-                                                <Trash size={10} />
-                                            </button>
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleStartEditMessage(msg)}
+                                                    className="p-1 text-slate-300 hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-all"
+                                                    title="Düzenle"
+                                                >
+                                                    <Edit3 size={10} />
+                                                </button>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => handleDeleteMessage(msg.id)}
+                                                    className="p-1 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                                                    title="Sil"
+                                                >
+                                                    <Trash size={10} />
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -952,17 +1053,6 @@ export default function PublicSpace() {
             </div>
 
             <div className="lg:hidden fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
-                <Button
-                    onClick={() => navigate('/messages')}
-                    className="w-14 h-14 rounded-full bg-indigo-600 text-white shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all relative"
-                >
-                    <Bell size={22} />
-                    {unreadDirectMessages > 0 && (
-                        <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-rose-500 border-2 border-indigo-600 rounded-full flex items-center justify-center text-[8px] font-black">
-                            {unreadDirectMessages > 9 ? '9+' : unreadDirectMessages}
-                        </span>
-                    )}
-                </Button>
                 <Button 
                     onClick={() => {
                         if (viewMode !== 'Sohbet') {

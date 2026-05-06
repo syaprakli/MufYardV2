@@ -62,6 +62,7 @@ export default function ReportEditor() {
     const [aiInstructions, setAiInstructions] = useState("");
     const [aiSection, setAiSection] = useState<string>("tamamini");
     const [aiInsertMode, setAiInsertMode] = useState<"replace" | "append">("append");
+    const AI_REPORT_ASSISTANT_ENABLED = false;
 
     const focusEditorToEnd = () => {
         if (!quillRef.current) return;
@@ -383,8 +384,8 @@ export default function ReportEditor() {
     return (
         <div className="h-screen flex flex-col bg-[#f3f4f6]">
             {/* Toolbar */}
-            <div className="bg-white border-b border-border px-6 py-2 flex items-center shadow-sm shrink-0 z-50 overflow-x-auto">
-                <div className="flex items-center gap-4 min-w-max">
+            <div className="bg-white border-b border-border px-3 md:px-6 py-2 flex flex-wrap items-center gap-2 md:gap-4 shadow-sm shrink-0 z-50">
+                <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1 flex-wrap">
                     <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="rounded-full w-8 h-8 p-0">
                         <ArrowLeft size={18} />
                     </Button>
@@ -407,7 +408,7 @@ export default function ReportEditor() {
                         </div>
                     </div>
 
-                    <div className="hidden lg:flex items-center gap-2 ml-2">
+                    <div className="hidden lg:flex items-center gap-2 ml-0 md:ml-2">
                         <div className="flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1 bg-slate-50/50">
                             <button type="button" onClick={() => setZoom((z) => Math.max(70, z - 10))} className="text-[10px] font-black text-slate-400 hover:text-slate-800 px-1">-</button>
                             <span className="text-[10px] font-black text-slate-600 min-w-[32px] text-center">{zoom}%</span>
@@ -415,7 +416,7 @@ export default function ReportEditor() {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         {providerStatus === 'connected' && onlineUsers.length > 0 && (
                             <div className="flex -space-x-1.5 mr-2">
                                 {onlineUsers.map((u, i) => (
@@ -431,7 +432,7 @@ export default function ReportEditor() {
                             </div>
                         )}
                         
-                        <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100">
+                        <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100 overflow-x-auto max-w-full">
                             <Button variant="ghost" onClick={() => setIsShareModalOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all">
                                 <Users size={14} className="mr-1.5" /> <span className="hidden xl:inline">Paylaşım</span>
                             </Button>
@@ -444,8 +445,14 @@ export default function ReportEditor() {
                         </div>
 
                         <div className="flex items-center gap-1">
-                            <Button variant="ghost" onClick={() => setIsAIPanelOpen(true)} className="h-8 px-3 text-[11px] font-black text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg">
-                                <Wand2 size={14} className="mr-1.5" /> AI
+                            <Button
+                                variant="ghost"
+                                disabled={!AI_REPORT_ASSISTANT_ENABLED}
+                                title={AI_REPORT_ASSISTANT_ENABLED ? "AI rapor asistanını aç" : "Yakında"}
+                                onClick={() => AI_REPORT_ASSISTANT_ENABLED && setIsAIPanelOpen(true)}
+                                className="h-8 px-3 text-[11px] font-black text-slate-500 bg-slate-100 hover:bg-slate-100 rounded-lg disabled:opacity-100 disabled:cursor-not-allowed"
+                            >
+                                <Wand2 size={14} className="mr-1.5" /> AI (Yakında)
                             </Button>
                             <Button variant="outline" onClick={handleSave} disabled={saving} className="h-8 px-3 text-[11px] font-bold border-primary/20 rounded-lg">
                                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="mr-1.5" />} Kaydet

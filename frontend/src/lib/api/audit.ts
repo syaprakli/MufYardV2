@@ -31,11 +31,11 @@ export interface AuditVersion {
 let auditCache: { [key: string]: { data: Audit[], timestamp: number } } = {};
 const CACHE_DURATION = 60 * 1000;
 
-export async function fetchAudits(userId?: string, userEmail?: string): Promise<Audit[]> {
+export async function fetchAudits(userId?: string, userEmail?: string, forceRefresh: boolean = false): Promise<Audit[]> {
     const key = `${userId || 'anon'}_${userEmail || 'anon'}`;
     const now = Date.now();
     
-    if (auditCache[key] && (now - auditCache[key].timestamp < CACHE_DURATION)) {
+    if (!forceRefresh && auditCache[key] && (now - auditCache[key].timestamp < CACHE_DURATION)) {
         return auditCache[key].data;
     }
 
@@ -50,6 +50,10 @@ export async function fetchAudits(userId?: string, userEmail?: string): Promise<
     const data = await response.json();
     auditCache[key] = { data, timestamp: now };
     return data;
+}
+
+export function invalidateAuditCache(): void {
+    auditCache = {};
 }
 
 export async function fetchAuditById(id: string): Promise<Audit> {

@@ -18,15 +18,27 @@ export default function ShareModal({ isOpen, onClose, sharedWith, onShare, title
 
     useEffect(() => {
         if (isOpen) {
+            setSelected(sharedWith || []);
+        }
+    }, [isOpen, sharedWith]);
+
+    useEffect(() => {
+        if (isOpen) {
             const loadUsers = async () => {
                 setLoading(true);
                 try {
                     const profiles = await fetchAllProfiles();
-                    setUsers(profiles.map((p: any) => ({
-                        id: p.uid || p.id,
-                        name: p.full_name || p.display_name || p.email,
-                        email: p.email
-                    })));
+                    setUsers(profiles.map((p: any) => {
+                        const uid = p.uid || p.id;
+                        const email = p.email;
+                        const identityKeys = [uid, email].filter(Boolean);
+                        return {
+                            id: uid || email,
+                            name: p.full_name || p.display_name || p.email,
+                            email,
+                            identityKeys
+                        };
+                    }));
                 } catch (e) {
                     console.error("User fetch failed:", e);
                 } finally {
@@ -52,7 +64,12 @@ export default function ShareModal({ isOpen, onClose, sharedWith, onShare, title
     };
 
     const handleSave = () => {
-        onShare(selected);
+        const expandedKeys = Array.from(new Set(
+            users
+                .filter((u) => selected.includes(u.id) || (u.email && selected.includes(u.email)))
+                .flatMap((u) => u.identityKeys || [u.id, u.email].filter(Boolean))
+        ));
+        onShare(expandedKeys);
         onClose();
     };
 
@@ -94,7 +111,7 @@ export default function ShareModal({ isOpen, onClose, sharedWith, onShare, title
                             Kullanıcı bulunamadı.
                         </div>
                     ) : filtered.map(user => {
-                        const isSelected = selected.includes(user.id);
+                        const isSelected = selected.includes(user.id) || (!!user.email && selected.includes(user.email));
                         return (
                             <div 
                                 key={user.id} 
