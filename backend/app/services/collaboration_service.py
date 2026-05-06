@@ -122,7 +122,7 @@ class CollaborationService:
             
         posts = []
         try:
-            docs = await asyncio.to_thread(lambda: query.stream())
+            docs = await asyncio.to_thread(lambda: query.limit(200).stream())
             for doc in docs:
                 item = doc.to_dict()
                 item['id'] = doc.id
@@ -196,7 +196,7 @@ class CollaborationService:
     async def get_comments(post_id: str) -> List[Dict[str, Any]]:
         comments_ref = db.collection('posts').document(post_id).collection('comments')
         # Order by creation date to show thread in sequence
-        docs = await asyncio.to_thread(lambda: comments_ref.order_by('created_at', direction='ASCENDING').stream())
+        docs = await asyncio.to_thread(lambda: comments_ref.order_by('created_at', direction='ASCENDING').limit(200).stream())
         
         comments = []
         for doc in docs:
@@ -232,14 +232,65 @@ class CollaborationService:
         return True
 
     @staticmethod
-    async def delete_message(message_id: str) -> bool:
+    async def delete_message(message_id: str, requester_uid: str, is_admin: bool = False) -> bool:
         doc_ref = db.collection('messages').document(message_id)
-        exists = await asyncio.to_thread(lambda: doc_ref.get().exists)
-        if not exists:
+        doc = await asyncio.to_thread(doc_ref.get)
+        if not doc.exists:
+            return False
+
+        data = doc.to_dict() or {}
+        if not is_admin and data.get('author_id') != requester_uid:
             return False
             
         await asyncio.to_thread(doc_ref.delete)
         return True
+
+    @staticmethod
+    async def update_message(message_id: str, text: str, requester_uid: str, is_admin: bool = False) -> Optional[Dict[str, Any]]:
+        doc_ref = db.collection('messages').document(message_id)
+        doc = await asyncio.to_thread(doc_ref.get)
+        if not doc.exists:
+            return None
+
+        existing = doc.to_dict() or {}
+        if not is_admin and existing.get('author_id') != requester_uid:
+            return None
+
+        update_data = {
+            'text': text,
+            'edited': True,
+            'updated_at': datetime.utcnow(),
+        }
+        await asyncio.to_thread(doc_ref.update, update_data)
+
+        updated_doc = await asyncio.to_thread(doc_ref.get)
+        updated = updated_doc.to_dict() or {}
+        updated['id'] = message_id
+        if 'timestamp' in updated and hasattr(updated['timestamp'], 'isoformat'):
+            updated['timestamp'] = updated['timestamp'].isoformat()
+        if 'updated_at' in updated and hasattr(updated['updated_at'], 'isoformat'):
+            updated['updated_at'] = updated['updated_at'].isoformat()
+        return updated
+
+    @staticmethod
+    async def clear_messages(requester_uid: str, is_admin: bool = False) -> int:
+        if is_admin:
+            query = db.collection('messages').limit(500)
+        else:
+            query = CollaborationService._where_eq(db.collection('messages'), 'author_id', requester_uid).limit(500)
+
+        docs = await asyncio.to_thread(lambda: list(query.stream()))
+        if not docs:
+            return 0
+
+        def _batch_delete() -> None:
+            batch = db.batch()
+            for doc in docs:
+                batch.delete(doc.reference)
+            batch.commit()
+
+        await asyncio.to_thread(_batch_delete)
+        return len(docs)
 
     @staticmethod
     async def update_post(post_id: str, post_update: PostUpdate) -> Optional[Dict[str, Any]]:

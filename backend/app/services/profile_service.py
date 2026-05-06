@@ -284,7 +284,8 @@ class ProfileService:
     @staticmethod
     async def get_all_profiles() -> List[Dict[str, Any]]:
         try:
-            docs = await asyncio.to_thread(db.collection('profiles').stream)
+            query = db.collection('profiles').limit(500)
+            docs = await asyncio.to_thread(lambda: list(query.stream()))
             profiles = []
             now = datetime.utcnow()
             for doc in docs:
@@ -295,8 +296,17 @@ class ProfileService:
                 
                 # Validation for schema
                 if 'full_name' not in p: p['full_name'] = "İsimsiz Kullanıcı"
+                if 'title' not in p: p['title'] = "Müfettiş"
+                if 'institution' not in p: p['institution'] = "Gençlik ve Spor Bakanlığı"
                 if 'email' not in p: p['email'] = ""
+                if 'emails' not in p: p['emails'] = ProfileService._merge_emails(p.get('email'))
+                if 'theme' not in p: p['theme'] = "navy"
+                if 'ai_enabled' not in p: p['ai_enabled'] = True
+                if 'has_premium_ai' not in p: p['has_premium_ai'] = False
+                if 'notifications_enabled' not in p: p['notifications_enabled'] = True
                 if 'role' not in p: p['role'] = "user"
+                if 'two_factor_enabled' not in p: p['two_factor_enabled'] = False
+                if 'verified' not in p: p['verified'] = False
                 if 'updated_at' not in p: p['updated_at'] = now
                 
                 profiles.append(p)

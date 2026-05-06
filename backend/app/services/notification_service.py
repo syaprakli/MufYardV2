@@ -71,9 +71,10 @@ class NotificationService:
     @staticmethod
     async def get_user_notifications(user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         notifs_ref = db.collection('notifications')
-        query = notifs_ref.where('user_id', '==', user_id)
+        # Fetch slightly more than limit so in-memory sort is still accurate
+        fetch_limit = min(limit * 3, 150)
+        query = notifs_ref.where('user_id', '==', user_id).limit(fetch_limit)
         
-        # We fetch without ordering to avoid requiring a composite index in development
         docs = await asyncio.to_thread(query.stream)
         
         notifications = []
@@ -99,14 +100,20 @@ class NotificationService:
     @staticmethod
     async def mark_all_as_read(user_id: str) -> int:
         notifs_ref = db.collection('notifications')
-        query = notifs_ref.where('user_id', '==', user_id).where('read', '==', False)
+        query = notifs_ref.where('user_id', '==', user_id).where('read', '==', False).limit(400)
         docs = await asyncio.to_thread(query.stream)
-        
-        count = 0
-        for doc in docs:
-            await asyncio.to_thread(doc.reference.update, {'read': True})
-            count += 1
-        return count
+        doc_list = list(docs)
+        if not doc_list:
+            return 0
+
+        def _batch_update():
+            batch = db.batch()
+            for doc in doc_list:
+                batch.update(doc.reference, {'read': True})
+            batch.commit()
+
+        await asyncio.to_thread(_batch_update)
+        return len(doc_list)
 
     @staticmethod
     async def delete_notification(notification_id: str) -> bool:
@@ -120,14 +127,20 @@ class NotificationService:
     @staticmethod
     async def delete_all(user_id: str) -> int:
         notifs_ref = db.collection('notifications')
-        query = notifs_ref.where('user_id', '==', user_id)
+        query = notifs_ref.where('user_id', '==', user_id).limit(400)
         docs = await asyncio.to_thread(query.stream)
-        
-        count = 0
-        for doc in docs:
-            await asyncio.to_thread(doc.reference.delete)
-            count += 1
-        return count
+        doc_list = list(docs)
+        if not doc_list:
+            return 0
+
+        def _batch_delete():
+            batch = db.batch()
+            for doc in doc_list:
+                batch.delete(doc.reference)
+            batch.commit()
+
+        await asyncio.to_thread(_batch_delete)
+        return len(doc_list)
 
 
     @staticmethod

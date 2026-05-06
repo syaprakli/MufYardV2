@@ -403,7 +403,7 @@ async def execute_action(
 
         elif function_name == "delete_calendar_note":
             note_text = args.get("note_text", "")
-            query = db.collection("calendar_notes").where("owner_id", "==", uid)
+            query = db.collection("calendar_notes").where("owner_id", "==", uid).limit(200)
             docs = await asyncio.to_thread(lambda: list(query.stream()))
             found = None
             for doc in docs:
@@ -423,7 +423,7 @@ async def execute_action(
             }
 
         elif function_name == "list_calendar_notes":
-            query = db.collection("calendar_notes").where("owner_id", "==", uid)
+            query = db.collection("calendar_notes").where("owner_id", "==", uid).limit(200)
             docs = await asyncio.to_thread(lambda: list(query.stream()))
             notes = []
             filter_date = args.get("date", "")

@@ -156,11 +156,20 @@ mount_static_dir("Raporlar", "/Raporlar")
 mount_static_dir("Mevzuat", "/Mevzuat")
 
 # Middleware
+_default_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "app://.",  # Electron
+]
+_env_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()] if settings.CORS_ORIGINS else []
+_allowed_origins = list(set(_default_origins + _env_origins))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 # app.add_middleware(CSPMiddleware) # Removed as it blocks local frontend connections

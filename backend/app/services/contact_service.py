@@ -35,12 +35,12 @@ class ContactService:
         
         if category == 'corporate':
             # Kurumsal rehber: Paylaşılan her şey
-            query = contacts_ref.where('is_shared', '==', True)
+            query = contacts_ref.where('is_shared', '==', True).limit(500)
         else:
             # Kişisel rehber: Sadece bana ait olan her şey
             if not user_id:
                 return []
-            query = contacts_ref.where('owner_id', '==', user_id)
+            query = contacts_ref.where('owner_id', '==', user_id).limit(300)
             
         docs = await asyncio.to_thread(query.stream)
         

@@ -10,20 +10,25 @@ class TaskService:
     async def _generate_rapor_kodu(year: Optional[int] = None) -> str:
         """Auto-generate S.Y.64/YYYY-N format rapor kodu.
         
-        Mevcut görevlerin max numarası + 1 kullanılır.
-        Görev silinince bir sonraki oluşturmada numara geri düşer.
+        Son oluşturulan görevin rapor_kodu'ndan N alınır, +1 yapılır.
         """
         if year is None:
             year = datetime.utcnow().year
 
         try:
+            # Tüm görevleri çekmek yerine sadece en son oluşturulanı çek
             docs = await asyncio.to_thread(
-                lambda: list(db.collection('tasks').select(['rapor_kodu']).stream())
+                lambda: list(
+                    db.collection('tasks')
+                    .order_by('created_at', direction='DESCENDING')
+                    .limit(50)
+                    .select(['rapor_kodu'])
+                    .stream()
+                )
             )
             max_num = 0
             for doc in docs:
                 kodu = (doc.to_dict() or {}).get('rapor_kodu', '')
-                # S.Y.64/YYYY-N formatından N'i çıkar
                 if kodu and '-' in kodu:
                     try:
                         max_num = max(max_num, int(kodu.split('-')[-1]))
@@ -46,7 +51,7 @@ class TaskService:
             # 1. Admin/Demo bypass
             admin_id = "sefa.yaprakli@gsb.gov.tr"
             if user_id == admin_id or user_email == admin_id or user_id == "admin":
-                docs = await asyncio.to_thread(lambda: tasks_ref.order_by('created_at', direction='DESCENDING').stream())
+                docs = await asyncio.to_thread(lambda: tasks_ref.order_by('created_at', direction='DESCENDING').limit(500).stream())
                 return [ {**doc.to_dict(), 'id': doc.id} for doc in docs ]
 
             # 2. Parallel Queries with asyncio.gather

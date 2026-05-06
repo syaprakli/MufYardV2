@@ -26,10 +26,29 @@ async def save_global_message(message: MessageCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/messages/{message_id}")
-async def delete_message(message_id: str):
-    if await CollaborationService.delete_message(message_id):
+async def delete_message(message_id: str, uid: str = Query(...), role: str = Query("user")):
+    is_admin = (role or "").strip().lower() == "admin"
+    if await CollaborationService.delete_message(message_id, uid, is_admin):
         return {"status": "success", "message": "Mesaj silindi."}
-    raise HTTPException(status_code=404, detail="Mesaj bulunamadı.")
+    raise HTTPException(status_code=403, detail="Mesaj silinemedi veya yetkiniz yok.")
+
+@router.patch("/messages/{message_id}")
+async def update_message(message_id: str, payload: Dict[str, Any], uid: str = Query(...), role: str = Query("user")):
+    text = (payload.get("text") or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Mesaj metni boş olamaz.")
+
+    is_admin = (role or "").strip().lower() == "admin"
+    updated = await CollaborationService.update_message(message_id, text, uid, is_admin)
+    if updated:
+        return updated
+    raise HTTPException(status_code=403, detail="Mesaj düzenlenemedi veya yetkiniz yok.")
+
+@router.delete("/messages")
+async def clear_messages(uid: str = Query(...), role: str = Query("user")):
+    is_admin = (role or "").strip().lower() == "admin"
+    deleted_count = await CollaborationService.clear_messages(uid, is_admin)
+    return {"status": "success", "deleted": deleted_count, "scope": "all" if is_admin else "mine"}
 
 # --- PRIVATE MESSAGING (DM) ---
 

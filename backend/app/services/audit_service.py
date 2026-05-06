@@ -13,7 +13,7 @@ class AuditService:
         if not user_id and not user_email:
             fields = ['title', 'date', 'status', 'inspector', 'location', 'owner_id', 
                       'assigned_to', 'shared_with', 'task_id', 'report_seq', 'is_public', 'created_at']
-            docs = await asyncio.to_thread(lambda: audits_ref.where('is_public', '==', True).select(fields).stream())
+            docs = await asyncio.to_thread(lambda: audits_ref.where('is_public', '==', True).limit(200).select(fields).stream())
             return [ {**doc.to_dict(), 'id': doc.id} for doc in docs]
 
         # 2. Admin/Demo bypass
@@ -21,7 +21,7 @@ class AuditService:
         if user_id == admin_id or user_email == admin_id or user_id == "admin":
             fields = ['title', 'date', 'status', 'inspector', 'location', 'owner_id', 
                       'assigned_to', 'shared_with', 'task_id', 'report_seq', 'is_public', 'created_at']
-            docs = await asyncio.to_thread(lambda: audits_ref.order_by('created_at', direction='DESCENDING').select(fields).stream())
+            docs = await asyncio.to_thread(lambda: audits_ref.order_by('created_at', direction='DESCENDING').limit(500).select(fields).stream())
             return [ {**doc.to_dict(), 'id': doc.id} for doc in docs]
 
         # 3. Parallel Queries with asyncio.gather
@@ -142,7 +142,7 @@ class AuditService:
     @staticmethod
     async def get_audit_versions(audit_id: str) -> List[Dict[str, Any]]:
         versions_ref = db.collection('audits').document(audit_id).collection('versions')
-        docs = await asyncio.to_thread(lambda: versions_ref.order_by('created_at', direction='DESCENDING').stream())
+        docs = await asyncio.to_thread(lambda: versions_ref.order_by('created_at', direction='DESCENDING').limit(50).stream())
         
         versions = []
         for doc in docs:

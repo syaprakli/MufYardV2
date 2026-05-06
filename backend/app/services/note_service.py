@@ -9,7 +9,7 @@ class NoteService:
     async def get_notes(user_id: str) -> List[Dict[str, Any]]:
         notes_ref = db.collection('notes')
         # Filter by owner_id
-        query = notes_ref.where('owner_id', '==', user_id)
+        query = notes_ref.where('owner_id', '==', user_id).limit(200)
         docs = await asyncio.to_thread(query.stream)
         
         notes = []

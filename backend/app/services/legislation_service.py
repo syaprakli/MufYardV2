@@ -18,7 +18,7 @@ class LegislationService:
         legislations_ref = db.collection('legislations')
         
         # Base query: Public items that are NOT archived
-        public_query = legislations_ref.where('is_public', '==', True).where('is_archived', '==', False)
+        public_query = legislations_ref.where('is_public', '==', True).where('is_archived', '==', False).limit(300)
         if category and category != 'All' and category != 'Tümü':
             public_query = public_query.where('category', '==', category)
             
@@ -26,7 +26,7 @@ class LegislationService:
         
         # Private items for specific user that are NOT archived
         if user_id:
-            private_query = legislations_ref.where('is_public', '==', False).where('owner_id', '==', user_id).where('is_archived', '==', False)
+            private_query = legislations_ref.where('is_public', '==', False).where('owner_id', '==', user_id).where('is_archived', '==', False).limit(100)
             if category and category != 'All' and category != 'Tümü':
                 private_query = private_query.where('category', '==', category)
             private_docs = await asyncio.to_thread(lambda: list(private_query.stream()))

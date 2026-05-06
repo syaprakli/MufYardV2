@@ -44,7 +44,7 @@ class InspectorService:
     @staticmethod
     async def get_inspectors() -> List[Dict[str, Any]]:
         try:
-            docs = await asyncio.to_thread(db.collection('inspectors').stream)
+            docs = await asyncio.to_thread(db.collection('inspectors').limit(300).stream)
             inspectors = []
             now = datetime.utcnow().isoformat()
             
@@ -56,16 +56,16 @@ class InspectorService:
                 if 'name' not in data: data['name'] = "İsimsiz"
                 if 'email' not in data: data['email'] = InspectorService._generate_email_from_name(data['name'])
                 if 'title' not in data: data['title'] = "Müfettiş"
-                if 'created_at' not in data: 
+                if 'created_at' not in data:
                     data['created_at'] = now
-                    # Update doc to include created_at for future
-                    await asyncio.to_thread(doc.reference.update, {'created_at': now})
+                    # Arka planda güncelle, isteği bloke etme
+                    asyncio.create_task(asyncio.to_thread(doc.reference.update, {'created_at': now}))
                 
                 if not str(data.get('email', '')).strip() and str(data.get('name', '')).strip():
                     fallback_email = InspectorService._generate_email_from_name(str(data.get('name', '')))
                     if fallback_email:
                         data['email'] = fallback_email
-                        await asyncio.to_thread(doc.reference.update, {'email': fallback_email})
+                        asyncio.create_task(asyncio.to_thread(doc.reference.update, {'email': fallback_email}))
                 
                 data['id'] = doc.id
                 inspectors.append(data)

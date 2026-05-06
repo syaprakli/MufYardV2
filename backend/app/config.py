@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     MAIL_FROM: str = "noreply@mufyard.com"
 
+    # CORS - Virgülle ayrılmış izinli originler. Boşsa sadece localhost izinli.
+    CORS_ORIGINS: str = ""
+
     # Path Helpers (Always in DATA_DIR)
     @property
     def REPORTS_DIR(self) -> str:

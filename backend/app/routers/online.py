@@ -16,8 +16,9 @@ class RemoveOnlineRequest(BaseModel):
 @router.post("/set")
 async def set_online(body: SetOnlineRequest):
     try:
+        import asyncio
         doc_ref = db.collection("online_users").document(body.uid)
-        doc_ref.set({
+        await asyncio.to_thread(doc_ref.set, {
             "uid": body.uid,
             "name": body.name,
             "last_active": datetime.now(timezone.utc).isoformat()
@@ -29,7 +30,8 @@ async def set_online(body: SetOnlineRequest):
 @router.post("/remove")
 async def remove_online(body: RemoveOnlineRequest):
     try:
-        db.collection("online_users").document(body.uid).delete()
+        import asyncio
+        await asyncio.to_thread(db.collection("online_users").document(body.uid).delete)
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -37,9 +39,11 @@ async def remove_online(body: RemoveOnlineRequest):
 @router.get("/list")
 async def list_online() -> List[dict]:
     try:
-        docs = db.collection("online_users").stream()
+        import asyncio
+        docs = await asyncio.to_thread(db.collection("online_users").stream)
         now = datetime.now(timezone.utc)
         fresh_users: List[dict] = []
+        stale_ids: List[str] = []
 
         for doc in docs:
             data = doc.to_dict() or {}
@@ -57,8 +61,14 @@ async def list_online() -> List[dict]:
             if is_fresh:
                 fresh_users.append(data)
             else:
-                # Sessizce stale kayıt temizliği
-                db.collection("online_users").document(doc.id).delete()
+                stale_ids.append(doc.id)
+
+        # Stale kayıtları toplu sil (event loop'u bloke etme)
+        async def _delete_stale():
+            for stale_id in stale_ids:
+                await asyncio.to_thread(db.collection("online_users").document(stale_id).delete)
+        if stale_ids:
+            asyncio.create_task(_delete_stale())
 
         return fresh_users
     except Exception as e:
