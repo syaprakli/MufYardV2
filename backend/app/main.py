@@ -161,6 +161,8 @@ _default_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:5173",
     "app://.",  # Electron
+    "https://mufyardv2.web.app",
+    "https://mufyardv2.firebaseapp.com",
 ]
 _env_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()] if settings.CORS_ORIGINS else []
 _allowed_origins = list(set(_default_origins + _env_origins))
