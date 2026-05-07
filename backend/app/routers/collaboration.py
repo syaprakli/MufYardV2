@@ -220,6 +220,12 @@ class ChatConnectionManager:
         self.rooms: Dict[str, Dict[WebSocket, Dict[str, str]]] = {}
         # Global presence: user_id -> set of active websockets (handling multiple tabs)
         self.global_online_users: Dict[str, set] = {}
+        self.radio_state = {
+            "url": "",
+            "title": "Yayında Kimse Yok",
+            "playing": False,
+            "dj_name": ""
+        }
 
     async def connect(self, websocket: WebSocket, room_id: str, user_id: str, user_name: str):
         await websocket.accept()
@@ -232,6 +238,12 @@ class ChatConnectionManager:
         if user_id not in self.global_online_users:
             self.global_online_users[user_id] = set()
         self.global_online_users[user_id].add(websocket)
+
+        # Send current radio state
+        await websocket.send_text(json.dumps({
+            "type": "radio_update",
+            **self.radio_state
+        }))
 
         await self.broadcast_presence(room_id)
 

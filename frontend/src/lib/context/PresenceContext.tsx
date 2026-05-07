@@ -54,6 +54,12 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
     const [wsConnected, setWsConnected] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
+    const [radioState, setRadioState] = useState<RadioState>({
+        url: "",
+        title: "Yayında Kimse Yok",
+        playing: false,
+        dj_name: ""
+    });
     const wsRef = useRef<WebSocket | null>(null);
     const retryTimer = useRef<any>(null);
     const pingTimer = useRef<any>(null);
@@ -168,6 +174,15 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                                 }];
                             });
                         }
+                        if (data.type === 'radio_update') {
+                            setRadioState({
+                                url: data.url || "",
+                                title: data.title || "MufYard Radyo",
+                                playing: data.playing ?? false,
+                                dj_name: data.dj_name || "Bilinmeyen DJ"
+                            });
+                            return;
+                        }
                     } catch (err) {
                         console.error('Presence message error:', err);
                     }
@@ -246,8 +261,21 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         return msgId;
     }, [user?.uid]);
 
+    const sendRadioCommand = useCallback((url: string, title: string = "MufYard Radyo", playing: boolean = true) => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({
+                type: 'radio_command',
+                url,
+                title,
+                playing,
+                dj_name: activeNameRef.current || resolvePresenceName(user),
+                timestamp: new Date().toISOString()
+            }));
+        }
+    }, [user?.uid]);
+
     return (
-        <PresenceContext.Provider value={{ onlineUsers, wsConnected, isUserOnline, messages, sendMessage }}>
+        <PresenceContext.Provider value={{ onlineUsers, wsConnected, isUserOnline, messages, radioState, sendMessage, sendRadioCommand }}>
             {children}
         </PresenceContext.Provider>
     );

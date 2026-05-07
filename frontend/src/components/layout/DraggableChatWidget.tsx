@@ -1,16 +1,38 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Send, X, GripHorizontal } from 'lucide-react';
+import { MessageSquare, Send, X, GripHorizontal, Music, Link as LinkIcon, Play, Pause, Disc } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../lib/hooks/useAuth';
 import { usePresence } from '../../lib/context/PresenceContext';
+import { toast } from 'react-hot-toast';
 
 export function DraggableChatWidget() {
     const { user, profile } = useAuth();
-    const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage } = usePresence();
+    const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage, radioState, sendRadioCommand } = usePresence();
     const [isMinimized, setIsMinimized] = useState(true);
     const [newMessage, setNewMessage] = useState("");
+    const [radioUrl, setRadioUrl] = useState("");
+    const [showDjPanel, setShowDjPanel] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
+
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    // Sync Audio with Radio State
+    useEffect(() => {
+        if (!audioRef.current) {
+            // Oracle IP from screenshot: 144.24.167.114
+            audioRef.current = new Audio("http://144.24.167.114:8000/live");
+            audioRef.current.crossOrigin = "anonymous";
+        }
+        
+        if (radioState.playing) {
+            audioRef.current.play().catch(() => {
+                console.log("Autoplay blocked - User interaction needed");
+            });
+        } else {
+            audioRef.current.pause();
+        }
+    }, [radioState.playing]);
 
     // Scroll to bottom
     useEffect(() => {
@@ -69,10 +91,87 @@ export function DraggableChatWidget() {
                                     </p>
                                 </div>
                             </div>
-                            <button onClick={() => setIsMinimized(true)} className="p-2 bg-black/10 rounded-full hover:bg-black/20 transition-all">
-                                <X size={16} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={() => setShowDjPanel(!showDjPanel)}
+                                    className={cn(
+                                        "p-2 rounded-full transition-all",
+                                        showDjPanel ? "bg-white/20 text-white" : "hover:bg-white/10 text-blue-100"
+                                    )}
+                                    title="DJ Kabini"
+                                >
+                                    <Music size={16} className={cn(radioState.playing && "animate-bounce")} />
+                                </button>
+                                <button onClick={() => setIsMinimized(true)} className="p-2 bg-black/10 rounded-full hover:bg-black/20 transition-all">
+                                    <X size={16} />
+                                </button>
+                            </div>
                         </div>
+
+                        {/* DJ Kabini Panel */}
+                        <AnimatePresence>
+                            {showDjPanel && (
+                                <motion.div 
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="bg-indigo-900/5 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-900/30 overflow-hidden"
+                                >
+                                    <div className="p-4 space-y-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className={cn("w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600", radioState.playing && "animate-spin-slow")}>
+                                                <Disc size={20} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Şu An Çalıyor</p>
+                                                <p className="text-xs font-bold text-indigo-900 dark:text-indigo-100 truncate">{radioState.title}</p>
+                                                {radioState.dj_name && <p className="text-[9px] text-slate-500">DJ: {radioState.dj_name}</p>}
+                                            </div>
+                                            <button 
+                                                onClick={() => sendRadioCommand(radioState.url, radioState.title, !radioState.playing)}
+                                                className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none hover:scale-105 transition-all"
+                                            >
+                                                {radioState.playing ? <Pause size={16} /> : <Play size={16} />}
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-2">
+                                            <div className="relative flex-1">
+                                                <LinkIcon size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                <input 
+                                                    type="text"
+                                                    placeholder="Şarkı/Video linki yapıştır..."
+                                                    className="w-full pl-8 pr-3 py-2 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/50 rounded-xl text-[11px] outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                                    value={radioUrl}
+                                                    onChange={(e) => setRadioUrl(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            if (radioUrl.trim()) {
+                                                                sendRadioCommand(radioUrl.trim(), "Yeni Şarkı Yükleniyor...", true);
+                                                                setRadioUrl("");
+                                                                toast.success("DJ Yayına Geçti!");
+                                                            }
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                            <button 
+                                                onClick={() => {
+                                                    if (radioUrl.trim()) {
+                                                        sendRadioCommand(radioUrl.trim(), "Yeni Şarkı Yükleniyor...", true);
+                                                        setRadioUrl("");
+                                                        toast.success("DJ Yayına Geçti!");
+                                                    }
+                                                }}
+                                                className="px-3 py-2 bg-white dark:bg-slate-800 border border-indigo-100 dark:border-indigo-900/50 rounded-xl text-[10px] font-black text-indigo-600 uppercase tracking-wider hover:bg-indigo-50 transition-all"
+                                            >
+                                                ÇAL
+                                            </button>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                         
                         {/* Messages */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 dark:bg-slate-950/50">
