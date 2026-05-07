@@ -302,8 +302,9 @@ class ChatConnectionManager:
                     pass
 
     async def broadcast(self, room_id: str, message: str):
-        # Eğer mesaj global odasındaysa, TÜM bağlı kullanıcılara gönder (Garantili Senkronizasyon)
+        """Mesajı ilgili odaya veya tüm sisteme yayınlar."""
         if room_id == "global":
+            # Global mesajlar HERKESE gider (Canlı Müzakere için)
             for rid in list(self.rooms.keys()):
                 for connection in list(self.rooms[rid].keys()):
                     try:
@@ -312,14 +313,13 @@ class ChatConnectionManager:
                         pass
             return
 
-        if room_id not in self.rooms:
-            return
-            
-        for connection in list(self.rooms[room_id].keys()):
-            try:
-                await connection.send_text(message)
-            except Exception:
-                pass
+        # Oda bazlı mesajlar (DM vb.) sadece o odadakilere gider
+        if room_id in self.rooms:
+            for connection in list(self.rooms[room_id].keys()):
+                try:
+                    await connection.send_text(message)
+                except:
+                    pass
 
     def get_online_uids(self) -> List[str]:
         return list(self.global_online_users.keys())

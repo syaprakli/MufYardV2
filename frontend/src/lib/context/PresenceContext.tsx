@@ -152,20 +152,20 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                         }
 
                         // Handle Messages (Universal Logic)
-                        const msgText = data.text || data.content;
-                        if (msgText) {
-                            const isDM = data.room_id?.startsWith('dm_');
-                            
-                            if (isDM) {
+                        const msgContent = data.content || data.text || data.message;
+                        const msgRoomId = data.room_id || 'global';
+                        
+                        if (msgContent && typeof msgContent === 'string') {
+                            if (msgRoomId.startsWith('dm_')) {
                                 // DM ise diğer bileşenlerin (FloatingChat gibi) yakalaması için bir event fırlat
                                 window.dispatchEvent(new CustomEvent('mufyard:new_message', { detail: data }));
                                 return;
                             }
 
-                            // Global mesaj ise listeye ekle
+                            // Global mesaj ise listeye ekle (Canlı Müzakere)
                             const newMsg: Message = {
                                 id: data.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-                                text: msgText,
+                                text: msgContent,
                                 author_id: data.author_id || data.sender_id,
                                 author_name: data.author_name || data.sender_name || 'Müfettiş',
                                 timestamp: data.timestamp || new Date().toISOString(),

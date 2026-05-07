@@ -212,6 +212,11 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
           }
 
           if (data.sender_id === user?.uid) return; // skip own echo
+          
+          // ODA FİLTRELEME: Eğer mesaj bu odaya ait değilse (veya global ise) DM penceresine ekleme
+          if (data.room_id && data.room_id !== normalizedRoomId) return;
+          if (!data.room_id && roomId !== 'global') return; // room_id yoksa ve biz global değilsek güvenli tarafta kal
+
           setMessages(prev => [...prev, {
             id: data.id || Math.random().toString(36).substr(2, 9),
             sender_id: data.sender_id,
@@ -233,6 +238,12 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
     const handleGlobalMessage = (e: any) => {
         const data = e.detail;
         if (data && data.room_id === normalizedRoomId) {
+            // Temizleme mesajı geldiyse ve bensem ekranı temizle
+            if (data.type === 'clear_messages' && data.uid === user?.uid) {
+                setMessages([]);
+                return;
+            }
+
             if (data.sender_id === user?.uid) return;
             
             setMessages(prev => {
@@ -405,8 +416,8 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
         toast.error('Sohbet temizlenemedi.');
         return;
       }
-      setMessages((prev) => prev.filter((m) => m.sender_id !== user.uid));
-      toast.success('Kendi mesajlarınız temizlendi.');
+      setMessages([]); // TÜMÜNÜ SİL (Backend benden temizle mantığı ile çalışıyor, sadece benim fetchlerimde gelmeyecek)
+      toast.success('Sohbet sizin için temizlendi.');
     } catch (e) {
       console.error('Sohbet temizleme hatası:', e);
       toast.error('Sohbet temizlenemedi.');
