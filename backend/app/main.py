@@ -275,11 +275,12 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                 data["room_id"] = room_id
                 raw_data = json.dumps(data)
                 
-                # SADECE DM ODASINA DEĞİL, KULLANICILARA DOĞRUDAN GÖNDER (Anlık Bildirim İçin)
-                await chat_manager.send_to_user(uid, raw_data) # Gönderene onayla
-                await chat_manager.send_to_user(recipient_id, raw_data) # Alıcıya anlık düşür
+                # DM: sadece oda bazlı broadcast (send_to_user + broadcast = çift mesaj)
+                await chat_manager.broadcast(room_id, raw_data)
+                logger.info(f"DM Broadcast tamamlandı: {room_id}")
+                continue
             
-            # Mesajı odaya yayınla (Global veya DM odasındakiler için)
+            # Global mesaj: odaya yayınla
             await chat_manager.broadcast(room_id, raw_data)
             logger.info(f"Broadcast tamamlandı: {room_id}")
     except WebSocketDisconnect:

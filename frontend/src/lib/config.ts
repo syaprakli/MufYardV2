@@ -1,5 +1,7 @@
 const IS_PROD = import.meta.env.PROD;
-const PUBLIC_BACKEND_URL = IS_PROD 
+// Electron'da her zaman Railway kullan (dev modda da olsa)
+const IS_ELECTRON = typeof window !== 'undefined' && /Electron/.test(navigator.userAgent);
+const PUBLIC_BACKEND_URL = (IS_PROD || IS_ELECTRON)
     ? "https://mufyardv2.up.railway.app" 
     : "http://127.0.0.1:8000";
 

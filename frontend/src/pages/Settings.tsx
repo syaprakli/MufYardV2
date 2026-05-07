@@ -492,7 +492,14 @@ export default function Settings() {
         if (!user?.uid || !profile) return;
         try {
             setSaving(true);
-            const updated = await updateProfile(user.uid, profile);
+            const {
+                uid: _uid,
+                role: _role,
+                verified: _verified,
+                ...savePayload
+            } = profile as any;
+
+            const updated = await updateProfile(user.uid, savePayload);
             setProfile(updated);
             localStorage.setItem(`profile_${user.uid}`, JSON.stringify(updated));
             
@@ -501,10 +508,14 @@ export default function Settings() {
 
             
             toast.success("Sistem ayarları başarıyla güncellendi.");
-        } catch (error) {
-            console.error(error);
-            // Fallback to local state update on frontend demo if backend not active
-            toast.success("Sistem ayarları yerel olarak güncellendi (Sunucu bağlantısı yok).");
+        } catch (error: any) {
+            console.error("Settings save error:", error);
+            const msg = error?.message || "Bilinmeyen hata";
+            if (msg.includes("bağlanılamadı") || msg.includes("Failed to fetch") || msg.includes("zaman aşımı")) {
+                toast.error(`Sunucuya bağlanılamadı: ${msg}`);
+            } else {
+                toast.error(`Ayarlar kaydedilemedi: ${msg}`);
+            }
         } finally {
             setSaving(false);
         }

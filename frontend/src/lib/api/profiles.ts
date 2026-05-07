@@ -71,7 +71,16 @@ export async function updateProfile(uid: string, update: Partial<Profile>): Prom
         body: JSON.stringify(update),
     });
     if (!response.ok) {
-        throw new Error("Profil güncellenemedi.");
+        let message = "Profil güncellenemedi.";
+        try {
+            const data = await response.json();
+            if (data?.detail && typeof data.detail === "string") {
+                message = data.detail;
+            }
+        } catch {
+            // Keep default message when response body is not JSON.
+        }
+        throw new Error(message);
     }
     return response.json();
 }

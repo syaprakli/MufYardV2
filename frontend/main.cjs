@@ -48,6 +48,25 @@ function waitForPort(port, retries = 8, delayMs = 2000) {
     });
 }
 
+function isPortReachable(port, host = '127.0.0.1', timeoutMs = 800) {
+    return new Promise((resolve) => {
+        const sock = net.createConnection({ port, host });
+        const finalize = (result) => {
+            try {
+                sock.destroy();
+            } catch {
+                // no-op
+            }
+            resolve(result);
+        };
+
+        sock.setTimeout(timeoutMs);
+        sock.on('connect', () => finalize(true));
+        sock.on('timeout', () => finalize(false));
+        sock.on('error', () => finalize(false));
+    });
+}
+
 function killPortProcess(port) {
     return new Promise((resolve) => {
         const { exec } = require('child_process');
@@ -59,7 +78,7 @@ function killPortProcess(port) {
     });
 }
 
-function startBackend() {
+async function startBackend() {
     const backendExe = getBackendPath();
     if (app.isPackaged) {
         app.setLoginItemSettings({ openAtLogin: true, path: process.execPath, args: [] });
@@ -111,6 +130,13 @@ function startBackend() {
         });
     } else {
         const backendPath = getBackendPath();
+        const backendAlreadyRunning = await isPortReachable(8000);
+
+        if (backendAlreadyRunning) {
+            console.log('[DEV] Port 8000 zaten aktif. Harici backend kullanılacak, yeni süreç başlatılmayacak.');
+            return;
+        }
+
         // Use venv python if available, fallback to system python
         const venvPython = path.join(backendPath, '.venv', 'Scripts', 'python.exe');
         const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python';
@@ -183,7 +209,7 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-    startBackend();
+    await startBackend();
     
     if (!app.isPackaged) {
         // Dev modda backend'in hazır olmasını bekle

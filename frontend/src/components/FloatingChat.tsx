@@ -69,11 +69,22 @@ function getDirectRoomUserIds(roomId: string, currentUid: string) {
   return [currentUid, otherUid || currentUid];
 }
 
+function normalizeRoomId(roomId: string, type: FloatingChatProps['type']) {
+  if (type !== 'dm') {
+    return roomId;
+  }
+
+  const normalized = roomId.startsWith('dm_') ? roomId.slice(3) : roomId;
+  const parts = normalized.split('_').filter(Boolean).sort();
+  return parts.length >= 2 ? `dm_${parts.join('_')}` : `dm_${normalized}`;
+}
+
 // ─── COMPONENT ──────────────────────────────────────────────────────────────
 export default function FloatingChat({ roomId, title, onClose, type = 'dm', inline = false, isOnline }: FloatingChatProps) {
   const { user, profile } = useAuth();
   const { theme } = useTheme();
   const isDark = (theme as string) === "dark";
+  const normalizedRoomId = normalizeRoomId(roomId, type);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -139,15 +150,6 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
       if (!user) return;
       const baseWs = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
       const senderName = profile?.full_name || user.displayName || user.email?.split('@')[0] || user.email || 'Kullanıcı';
-      
-      let normalizedRoomId = type === 'dm' && !roomId.startsWith('dm_') ? `dm_${roomId}` : roomId;
-      if (normalizedRoomId.startsWith('dm_')) {
-          const parts = normalizedRoomId.split('_');
-          if (parts.length >= 3) {
-              const uids = parts.slice(1).sort();
-              normalizedRoomId = `dm_${uids.join('_')}`;
-          }
-      }
 
       const socketUrl = `${baseWs}/ws?uid=${user.uid}&name=${encodeURIComponent(senderName)}&room_id=${normalizedRoomId}`;
       
@@ -274,7 +276,7 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
       }
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [roomId, user]);
+  }, [normalizedRoomId, roomId, user, profile?.full_name, type]);
 
   // ── auto-scroll ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -320,7 +322,7 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
         attachment: msg.attachment,
       }));
     }
-  }, []);
+  }, [normalizedRoomId]);
 
   const sendMessage = (e?: React.FormEvent) => {
     e?.preventDefault();

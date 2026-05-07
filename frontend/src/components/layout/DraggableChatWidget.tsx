@@ -4,7 +4,6 @@ import { MessageSquare, Send, X, GripHorizontal } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../lib/hooks/useAuth';
 import { usePresence } from '../../lib/context/PresenceContext';
-import { toast } from 'react-hot-toast';
 
 export function DraggableChatWidget() {
     const { user } = useAuth();
