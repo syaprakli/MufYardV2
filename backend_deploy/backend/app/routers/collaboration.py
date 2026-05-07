@@ -293,15 +293,33 @@ class ChatConnectionManager:
         if changed:
             await self.broadcast_presence()
 
+    async def send_to_user(self, user_id: str, message: str):
+        if user_id in self.global_online_users:
+            for connection in list(self.global_online_users[user_id]):
+                try:
+                    await connection.send_text(message)
+                except:
+                    pass
+
     async def broadcast(self, room_id: str, message: str):
-        if room_id not in self.rooms:
+        """Mesajı ilgili odaya veya tüm sisteme yayınlar."""
+        if room_id == "global":
+            # Global mesajlar HERKESE gider (Canlı Müzakere için)
+            for rid in list(self.rooms.keys()):
+                for connection in list(self.rooms[rid].keys()):
+                    try:
+                        await connection.send_text(message)
+                    except:
+                        pass
             return
-            
-        for connection in self.rooms[room_id].keys():
-            try:
-                await connection.send_text(message)
-            except Exception:
-                pass
+
+        # Oda bazlı mesajlar (DM vb.) sadece o odadakilere gider
+        if room_id in self.rooms:
+            for connection in list(self.rooms[room_id].keys()):
+                try:
+                    await connection.send_text(message)
+                except:
+                    pass
 
     def get_online_uids(self) -> List[str]:
         return list(self.global_online_users.keys())

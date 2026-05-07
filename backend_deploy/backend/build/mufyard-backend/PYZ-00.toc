@@ -26,6 +26,9 @@
   ('_ios_support',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\_ios_support.py',
    'PYMODULE'),
+  ('_markupbase',
+   'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\_markupbase.py',
+   'PYMODULE'),
   ('_opcode_metadata',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\_opcode_metadata.py',
    'PYMODULE'),
@@ -517,7 +520,10 @@
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\backend\\app\\config.py',
    'PYMODULE'),
-  ('app.lib', '-', 'PYMODULE'),
+  ('app.lib',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\backend\\app\\lib\\__init__.py',
+   'PYMODULE'),
   ('app.lib.auth',
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\backend\\app\\lib\\auth.py',
@@ -582,6 +588,10 @@
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\backend\\app\\routers\\dashboard.py',
    'PYMODULE'),
+  ('app.routers.feedback',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\backend\\app\\routers\\feedback.py',
+   'PYMODULE'),
   ('app.routers.files',
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\backend\\app\\routers\\files.py',
@@ -602,9 +612,17 @@
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\backend\\app\\routers\\notifications.py',
    'PYMODULE'),
+  ('app.routers.online',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\backend\\app\\routers\\online.py',
+   'PYMODULE'),
   ('app.routers.profiles',
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\backend\\app\\routers\\profiles.py',
+   'PYMODULE'),
+  ('app.routers.settings',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\backend\\app\\routers\\settings.py',
    'PYMODULE'),
   ('app.routers.tasks',
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
@@ -695,6 +713,10 @@
   ('app.services.inspector_service',
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\backend\\app\\services\\inspector_service.py',
+   'PYMODULE'),
+  ('app.services.legislation_crawler',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\backend\\app\\services\\legislation_crawler.py',
    'PYMODULE'),
   ('app.services.legislation_service',
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
@@ -889,6 +911,62 @@
    'PYMODULE'),
   ('bisect',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\bisect.py',
+   'PYMODULE'),
+  ('bs4',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\__init__.py',
+   'PYMODULE'),
+  ('bs4._deprecation',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\_deprecation.py',
+   'PYMODULE'),
+  ('bs4._typing',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\_typing.py',
+   'PYMODULE'),
+  ('bs4._warnings',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\_warnings.py',
+   'PYMODULE'),
+  ('bs4.builder',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\builder\\__init__.py',
+   'PYMODULE'),
+  ('bs4.builder._html5lib',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\builder\\_html5lib.py',
+   'PYMODULE'),
+  ('bs4.builder._htmlparser',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\builder\\_htmlparser.py',
+   'PYMODULE'),
+  ('bs4.builder._lxml',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\builder\\_lxml.py',
+   'PYMODULE'),
+  ('bs4.css',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\css.py',
+   'PYMODULE'),
+  ('bs4.dammit',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\dammit.py',
+   'PYMODULE'),
+  ('bs4.element',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\element.py',
+   'PYMODULE'),
+  ('bs4.exceptions',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\exceptions.py',
+   'PYMODULE'),
+  ('bs4.filter',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\filter.py',
+   'PYMODULE'),
+  ('bs4.formatter',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\formatter.py',
    'PYMODULE'),
   ('bz2',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\bz2.py',
@@ -4152,6 +4230,178 @@
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\grpc_status\\rpc_status.py',
    'PYMODULE'),
+  ('gunicorn',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\__init__.py',
+   'PYMODULE'),
+  ('gunicorn.arbiter',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\arbiter.py',
+   'PYMODULE'),
+  ('gunicorn.config',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\config.py',
+   'PYMODULE'),
+  ('gunicorn.ctl',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\ctl\\__init__.py',
+   'PYMODULE'),
+  ('gunicorn.ctl.client',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\ctl\\client.py',
+   'PYMODULE'),
+  ('gunicorn.ctl.handlers',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\ctl\\handlers.py',
+   'PYMODULE'),
+  ('gunicorn.ctl.protocol',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\ctl\\protocol.py',
+   'PYMODULE'),
+  ('gunicorn.ctl.server',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\ctl\\server.py',
+   'PYMODULE'),
+  ('gunicorn.dirty',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\dirty\\__init__.py',
+   'PYMODULE'),
+  ('gunicorn.dirty.app',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\dirty\\app.py',
+   'PYMODULE'),
+  ('gunicorn.dirty.arbiter',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\dirty\\arbiter.py',
+   'PYMODULE'),
+  ('gunicorn.dirty.client',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\dirty\\client.py',
+   'PYMODULE'),
+  ('gunicorn.dirty.errors',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\dirty\\errors.py',
+   'PYMODULE'),
+  ('gunicorn.dirty.protocol',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\dirty\\protocol.py',
+   'PYMODULE'),
+  ('gunicorn.dirty.stash',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\dirty\\stash.py',
+   'PYMODULE'),
+  ('gunicorn.dirty.tlv',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\dirty\\tlv.py',
+   'PYMODULE'),
+  ('gunicorn.dirty.worker',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\dirty\\worker.py',
+   'PYMODULE'),
+  ('gunicorn.errors',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\errors.py',
+   'PYMODULE'),
+  ('gunicorn.http',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\http\\__init__.py',
+   'PYMODULE'),
+  ('gunicorn.http.body',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\http\\body.py',
+   'PYMODULE'),
+  ('gunicorn.http.errors',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\http\\errors.py',
+   'PYMODULE'),
+  ('gunicorn.http.message',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\http\\message.py',
+   'PYMODULE'),
+  ('gunicorn.http.parser',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\http\\parser.py',
+   'PYMODULE'),
+  ('gunicorn.http.unreader',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\http\\unreader.py',
+   'PYMODULE'),
+  ('gunicorn.http.wsgi',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\http\\wsgi.py',
+   'PYMODULE'),
+  ('gunicorn.http2',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\http2\\__init__.py',
+   'PYMODULE'),
+  ('gunicorn.http2.async_connection',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\http2\\async_connection.py',
+   'PYMODULE'),
+  ('gunicorn.http2.connection',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\http2\\connection.py',
+   'PYMODULE'),
+  ('gunicorn.http2.errors',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\http2\\errors.py',
+   'PYMODULE'),
+  ('gunicorn.http2.request',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\http2\\request.py',
+   'PYMODULE'),
+  ('gunicorn.http2.stream',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\http2\\stream.py',
+   'PYMODULE'),
+  ('gunicorn.pidfile',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\pidfile.py',
+   'PYMODULE'),
+  ('gunicorn.reloader',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\reloader.py',
+   'PYMODULE'),
+  ('gunicorn.sock',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\sock.py',
+   'PYMODULE'),
+  ('gunicorn.systemd',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\systemd.py',
+   'PYMODULE'),
+  ('gunicorn.util',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\util.py',
+   'PYMODULE'),
+  ('gunicorn.uwsgi',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\uwsgi\\__init__.py',
+   'PYMODULE'),
+  ('gunicorn.uwsgi.errors',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\uwsgi\\errors.py',
+   'PYMODULE'),
+  ('gunicorn.uwsgi.message',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\uwsgi\\message.py',
+   'PYMODULE'),
+  ('gunicorn.uwsgi.parser',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\uwsgi\\parser.py',
+   'PYMODULE'),
+  ('gunicorn.workers',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\workers\\__init__.py',
+   'PYMODULE'),
+  ('gunicorn.workers.base',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\workers\\base.py',
+   'PYMODULE'),
+  ('gunicorn.workers.workertmp',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\gunicorn\\workers\\workertmp.py',
+   'PYMODULE'),
   ('gzip',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\gzip.py',
    'PYMODULE'),
@@ -4286,6 +4536,9 @@
    'PYMODULE'),
   ('html.entities',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\html\\entities.py',
+   'PYMODULE'),
+  ('html.parser',
+   'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\html\\parser.py',
    'PYMODULE'),
   ('http',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\http\\__init__.py',
@@ -4445,6 +4698,26 @@
   ('httplib2.iri2uri',
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\httplib2\\iri2uri.py',
+   'PYMODULE'),
+  ('httptools',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\httptools\\__init__.py',
+   'PYMODULE'),
+  ('httptools._version',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\httptools\\_version.py',
+   'PYMODULE'),
+  ('httptools.parser',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\httptools\\parser\\__init__.py',
+   'PYMODULE'),
+  ('httptools.parser.errors',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\httptools\\parser\\errors.py',
+   'PYMODULE'),
+  ('httptools.parser.protocol',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\httptools\\parser\\protocol.py',
    'PYMODULE'),
   ('httpx',
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
@@ -9496,6 +9769,34 @@
   ('socketserver',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\socketserver.py',
    'PYMODULE'),
+  ('soupsieve',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\soupsieve\\__init__.py',
+   'PYMODULE'),
+  ('soupsieve.__meta__',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\soupsieve\\__meta__.py',
+   'PYMODULE'),
+  ('soupsieve.css_match',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\soupsieve\\css_match.py',
+   'PYMODULE'),
+  ('soupsieve.css_parser',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\soupsieve\\css_parser.py',
+   'PYMODULE'),
+  ('soupsieve.css_types',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\soupsieve\\css_types.py',
+   'PYMODULE'),
+  ('soupsieve.pretty',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\soupsieve\\pretty.py',
+   'PYMODULE'),
+  ('soupsieve.util',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\soupsieve\\util.py',
+   'PYMODULE'),
   ('sqlalchemy',
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\sqlalchemy\\__init__.py',
@@ -10955,8 +11256,220 @@
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\uvicorn\\workers.py',
    'PYMODULE'),
+  ('watchfiles',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\watchfiles\\__init__.py',
+   'PYMODULE'),
+  ('watchfiles.filters',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\watchfiles\\filters.py',
+   'PYMODULE'),
+  ('watchfiles.main',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\watchfiles\\main.py',
+   'PYMODULE'),
+  ('watchfiles.run',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\watchfiles\\run.py',
+   'PYMODULE'),
+  ('watchfiles.version',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\watchfiles\\version.py',
+   'PYMODULE'),
   ('webbrowser',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\webbrowser.py',
+   'PYMODULE'),
+  ('websockets',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\__init__.py',
+   'PYMODULE'),
+  ('websockets.__main__',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\__main__.py',
+   'PYMODULE'),
+  ('websockets.asyncio',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\asyncio\\__init__.py',
+   'PYMODULE'),
+  ('websockets.asyncio.async_timeout',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\asyncio\\async_timeout.py',
+   'PYMODULE'),
+  ('websockets.asyncio.client',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\asyncio\\client.py',
+   'PYMODULE'),
+  ('websockets.asyncio.compatibility',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\asyncio\\compatibility.py',
+   'PYMODULE'),
+  ('websockets.asyncio.connection',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\asyncio\\connection.py',
+   'PYMODULE'),
+  ('websockets.asyncio.messages',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\asyncio\\messages.py',
+   'PYMODULE'),
+  ('websockets.asyncio.router',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\asyncio\\router.py',
+   'PYMODULE'),
+  ('websockets.asyncio.server',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\asyncio\\server.py',
+   'PYMODULE'),
+  ('websockets.auth',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\auth.py',
+   'PYMODULE'),
+  ('websockets.cli',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\cli.py',
+   'PYMODULE'),
+  ('websockets.client',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\client.py',
+   'PYMODULE'),
+  ('websockets.connection',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\connection.py',
+   'PYMODULE'),
+  ('websockets.datastructures',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\datastructures.py',
+   'PYMODULE'),
+  ('websockets.exceptions',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\exceptions.py',
+   'PYMODULE'),
+  ('websockets.extensions',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\extensions\\__init__.py',
+   'PYMODULE'),
+  ('websockets.extensions.base',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\extensions\\base.py',
+   'PYMODULE'),
+  ('websockets.extensions.permessage_deflate',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\extensions\\permessage_deflate.py',
+   'PYMODULE'),
+  ('websockets.frames',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\frames.py',
+   'PYMODULE'),
+  ('websockets.headers',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\headers.py',
+   'PYMODULE'),
+  ('websockets.http',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\http.py',
+   'PYMODULE'),
+  ('websockets.http11',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\http11.py',
+   'PYMODULE'),
+  ('websockets.imports',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\imports.py',
+   'PYMODULE'),
+  ('websockets.legacy',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\legacy\\__init__.py',
+   'PYMODULE'),
+  ('websockets.legacy.auth',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\legacy\\auth.py',
+   'PYMODULE'),
+  ('websockets.legacy.client',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\legacy\\client.py',
+   'PYMODULE'),
+  ('websockets.legacy.exceptions',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\legacy\\exceptions.py',
+   'PYMODULE'),
+  ('websockets.legacy.framing',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\legacy\\framing.py',
+   'PYMODULE'),
+  ('websockets.legacy.handshake',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\legacy\\handshake.py',
+   'PYMODULE'),
+  ('websockets.legacy.http',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\legacy\\http.py',
+   'PYMODULE'),
+  ('websockets.legacy.protocol',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\legacy\\protocol.py',
+   'PYMODULE'),
+  ('websockets.legacy.server',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\legacy\\server.py',
+   'PYMODULE'),
+  ('websockets.protocol',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\protocol.py',
+   'PYMODULE'),
+  ('websockets.proxy',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\proxy.py',
+   'PYMODULE'),
+  ('websockets.server',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\server.py',
+   'PYMODULE'),
+  ('websockets.streams',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\streams.py',
+   'PYMODULE'),
+  ('websockets.sync',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\sync\\__init__.py',
+   'PYMODULE'),
+  ('websockets.sync.client',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\sync\\client.py',
+   'PYMODULE'),
+  ('websockets.sync.connection',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\sync\\connection.py',
+   'PYMODULE'),
+  ('websockets.sync.messages',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\sync\\messages.py',
+   'PYMODULE'),
+  ('websockets.sync.router',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\sync\\router.py',
+   'PYMODULE'),
+  ('websockets.sync.server',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\sync\\server.py',
+   'PYMODULE'),
+  ('websockets.sync.utils',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\sync\\utils.py',
+   'PYMODULE'),
+  ('websockets.typing',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\typing.py',
+   'PYMODULE'),
+  ('websockets.uri',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\uri.py',
+   'PYMODULE'),
+  ('websockets.utils',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\utils.py',
+   'PYMODULE'),
+  ('websockets.version',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\websockets\\version.py',
    'PYMODULE'),
   ('wsgiref',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\wsgiref\\__init__.py',

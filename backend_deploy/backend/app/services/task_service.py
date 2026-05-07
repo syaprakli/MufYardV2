@@ -161,15 +161,21 @@ class TaskService:
 
                 try:
                     from app.services.notification_service import NotificationService
+                    from app.services.profile_service import ProfileService
+                    
+                    # Resolve owner name for notification
+                    owner_profile = await ProfileService.get_profile(task_data.get('owner_id'))
+                    owner_display = owner_profile.get('full_name') if owner_profile else task_data.get('owner_id')
+                    
                     for uid in pending_uids:
                         await NotificationService.notify_task_invitation(
                             task_id=task_id,
                             task_name=task_data.get('rapor_adi', 'Yeni Görev'),
-                            owner_name=task_data.get('owner_id'),
+                            owner_name=owner_display,
                             collaborator_id=uid
                         )
-                except Exception:
-                    pass
+                except Exception as ne:
+                    print(f"Notification failed: {ne}")
                 
                 doc = await asyncio.to_thread(result[1].get)
                 if doc and doc.exists:
