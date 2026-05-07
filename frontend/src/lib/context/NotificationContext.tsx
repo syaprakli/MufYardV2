@@ -71,15 +71,24 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                     const newNotif = JSON.parse(event.data);
                     setNotifications(prev => [newNotif, ...prev]);
                     
-                    // DM bildirimi → toast yerine chat balonu aç
+                    // DM bildirimi → günde 1 kez chat balonunu aç (throttle)
                     if (newNotif.type === 'dm' && newNotif.chat_room_id) {
-                        const senderName = newNotif.title?.replace('Yeni Mesaj: ', '') || 'Birileri';
-                        window.dispatchEvent(new CustomEvent('dm:open', {
-                            detail: {
-                                roomId: newNotif.chat_room_id,
-                                title: senderName,
-                            }
-                        }));
+                        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+                        // Sender uid'i room_id'den çıkar (dm_uid1_uid2 formatı)
+                        const roomParts = newNotif.chat_room_id.replace(/^dm_/, '').split('_');
+                        const senderUid = roomParts.find((p: string) => p !== user?.uid) || roomParts[0];
+                        const throttleKey = `dm_notif_${senderUid}_${today}`;
+
+                        if (!localStorage.getItem(throttleKey)) {
+                            localStorage.setItem(throttleKey, '1');
+                            const senderName = newNotif.title?.replace('Yeni Mesaj: ', '') || 'Birileri';
+                            window.dispatchEvent(new CustomEvent('dm:open', {
+                                detail: {
+                                    roomId: newNotif.chat_room_id,
+                                    title: senderName,
+                                }
+                            }));
+                        }
                         return;
                     }
                     

@@ -290,7 +290,9 @@ class ProfileService:
 
         update_data['updated_at'] = datetime.utcnow()
         
-        await asyncio.to_thread(doc_ref.update, update_data)
+        # set(merge=True) kullan: update() belge yoksa exception fırlatır,
+        # set(merge=True) hem yeni oluşturur hem günceller.
+        await asyncio.to_thread(lambda: doc_ref.set(update_data, merge=True))
         
         updated_doc_res = await asyncio.to_thread(doc_ref.get)
         updated_doc = updated_doc_res.to_dict()
