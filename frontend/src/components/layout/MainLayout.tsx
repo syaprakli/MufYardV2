@@ -3,7 +3,6 @@ import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { DraggableRadioWidget } from "./DraggableRadioWidget";
-import { DraggableChatWidget } from "./DraggableChatWidget";
 import { cn } from "../../lib/utils";
 
 export function MainLayout() {
@@ -44,7 +43,6 @@ export function MainLayout() {
                 </div>
                 
                 {/* Draggable Widgets */}
-                {!isFullScreen && <DraggableChatWidget />}
                 {!isFullScreen && <DraggableRadioWidget />}
             </main>
         </div>

@@ -13,6 +13,7 @@ import { cn } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { DraggableChatWidget } from "../components/layout/DraggableChatWidget";
 import { API_URL } from "../lib/config";
 import { fetchWithTimeout } from "../lib/api/utils";
 import toast from "react-hot-toast";
@@ -691,6 +692,8 @@ export default function PublicSpace() {
                 )}
                 {zoomedAttachment && <GalleryOverlay attachment={zoomedAttachment} onClose={() => setZoomedAttachment(null)} />}
             </AnimatePresence>
+
+            <DraggableChatWidget />
         </div>
     );
 }

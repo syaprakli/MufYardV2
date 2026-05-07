@@ -75,11 +75,12 @@ export default function Messages() {
       // Kayıtlı profilleri ekle ve rehber bilgisiyle zenginleştir.
       profiles.forEach(profile => {
         const isMe = profile.uid === user?.uid;
+        if (isMe) return;
         const dirEntry = directory.find(d => d.email?.toLowerCase() === profile.email?.toLowerCase());
         
         unified.push({
           uid: profile.uid,
-          full_name: profile.full_name + (isMe ? " (Siz)" : ""),
+          full_name: profile.full_name,
           title: profile.title || dirEntry?.title || 'Müfettiş',
           email: profile.email || '',
           avatar_url: profile.avatar_url || null,
@@ -114,7 +115,7 @@ export default function Messages() {
 
   const filteredContacts = (contacts.map(c => ({
     ...c,
-    isOnline: c.isMe ? true : (c.uid ? onlineUids.includes(c.uid) : false)
+    isOnline: c.uid ? onlineUids.includes(c.uid) : false
   }))).filter(c => {
     const matchesSearch = 
       c.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||

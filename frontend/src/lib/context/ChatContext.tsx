@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
 interface ChatWindow {
   roomId: string;
@@ -34,16 +34,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const closeChat = (roomId: string) => {
     setActiveChats(prev => prev.filter(c => c.roomId !== roomId));
   };
-
-  // dm:open custom event dinle → DM bildirimi gelince balonu aç
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { roomId, title } = (e as CustomEvent).detail;
-      openChat(roomId, title, 'dm');
-    };
-    window.addEventListener('dm:open', handler);
-    return () => window.removeEventListener('dm:open', handler);
-  }, [activeChats]);
 
   return (
     <ChatContext.Provider value={{ activeChats, openChat, closeChat }}>

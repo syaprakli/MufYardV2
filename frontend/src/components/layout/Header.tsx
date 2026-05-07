@@ -139,9 +139,13 @@ export function Header({ toggleSidebar }: HeaderProps) {
                     {presenceReady && onlineUsers.length > 0 && (
                         <div className="pointer-events-none absolute left-0 top-7 z-50 hidden group-hover:block bg-card border border-border rounded-xl shadow-xl p-2 min-w-[220px] max-w-[320px]">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Çevrimiçi ({onlineUsers.length})</p>
-                            <p className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed break-words">
-                                {onlineUsers.map((u: any) => u.name || u.uid).join(", ")}
-                            </p>
+                            <div className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed break-words max-h-44 overflow-y-auto pr-1">
+                                {onlineUsers.map((u: any) => (
+                                    <p key={u.uid} className="truncate">
+                                        {u.name || u.uid}
+                                    </p>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
