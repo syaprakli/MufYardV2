@@ -228,8 +228,33 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
     };
 
     connect();
+    
+    // Global socket'ten gelen DM mesajlarını yakala (Dispatcher Event)
+    const handleGlobalMessage = (e: any) => {
+        const data = e.detail;
+        if (data && data.room_id === normalizedRoomId) {
+            if (data.sender_id === user?.uid) return;
+            
+            setMessages(prev => {
+                if (prev.some(m => m.id === data.id)) return prev;
+                const newMsg: Message = {
+                    id: data.id || Math.random().toString(36).substr(2, 9),
+                    sender_id: data.sender_id,
+                    sender_name: data.sender_name,
+                    content: data.content || '',
+                    timestamp: data.timestamp || new Date().toISOString(),
+                    attachment: data.attachment,
+                };
+                return [...prev, newMsg];
+            });
+            audioRef.current?.play().catch(() => {});
+        }
+    };
+
+    window.addEventListener('mufyard:new_message', handleGlobalMessage as any);
 
     return () => { 
+      window.removeEventListener('mufyard:new_message', handleGlobalMessage as any);
       if (ws.current) {
         ws.current.onclose = null;
         ws.current.onerror = null;
@@ -276,6 +301,8 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
     setMessages(prev => [...prev, msg]);
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({
+        type: 'message',
+        room_id: normalizedRoomId,
         sender_id: msg.sender_id,
         sender_name: msg.sender_name,
         content: msg.content,

@@ -240,23 +240,11 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                 await websocket.send_text(json.dumps({"type": "pong"}))
                 continue
             
-            # Radyo Komutu (DJ Kabini)
-            if data.get("type") == "radio_command":
-                new_state = {
-                    "url": data.get("url", ""),
-                    "title": data.get("title", "MufYard Radyo"),
-                    "playing": data.get("playing", True),
-                    "dj_name": data.get("dj_name", name)
-                }
-                chat_manager.radio_state = new_state
-                radio_update = json.dumps({"type": "radio_update", **new_state})
-                # Tüm odalara duyur
-                for rid in list(chat_manager.rooms.keys()):
-                    await chat_manager.broadcast(rid, radio_update)
-                continue
-
             # Eğer DM odasıysa ve mesaj geliyorsa, veri tabanına kaydet
-            if room_id.startswith("dm_") and data.get("type", "message") == "message":
+            is_dm = room_id.startswith("dm_")
+            msg_type = data.get("type", "message")
+            
+            if is_dm and msg_type == "message":
                 logger.info(f"DM Mesajı alınıyor: {uid} -> {room_id}")
                 # Alıcıyı room_id'den bul (dm_uid1_uid2)
                 parts = room_id.split("_")
@@ -283,15 +271,22 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                 # Mesajın ID'sini geri dönen dataya ekle
                 data["id"] = new_db_msg["id"]
                 data["timestamp"] = new_db_msg["timestamp"]
+                # DM ise oda bilgisini de ekle (frontend'in yakalaması için)
+                data["room_id"] = room_id
                 raw_data = json.dumps(data)
-            else:
-                logger.info(f"WS Mesajı (Room: {room_id}): {data.get('type', 'msg')} from {name}")
-
+                
+                # SADECE DM ODASINA DEĞİL, KULLANICILARA DOĞRUDAN GÖNDER (Anlık Bildirim İçin)
+                await chat_manager.send_to_user(uid, raw_data) # Gönderene onayla
+                await chat_manager.send_to_user(recipient_id, raw_data) # Alıcıya anlık düşür
+            
+            # Mesajı odaya yayınla (Global veya DM odasındakiler için)
             await chat_manager.broadcast(room_id, raw_data)
+            logger.info(f"Broadcast tamamlandı: {room_id}")
     except WebSocketDisconnect:
+        logger.info(f"WS Bağlantısı kesildi: {name} (Oda: {room_id})")
         await chat_manager.disconnect(websocket, room_id)
     except Exception as e:
-        logger.error(f"Chat WS Error: {e}")
+        logger.error(f"Chat WS Hatası: {e}")
         await chat_manager.disconnect(websocket, room_id)
 
 # Health endpoints moved up for visibility

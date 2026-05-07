@@ -220,12 +220,6 @@ class ChatConnectionManager:
         self.rooms: Dict[str, Dict[WebSocket, Dict[str, str]]] = {}
         # Global presence: user_id -> set of active websockets (handling multiple tabs)
         self.global_online_users: Dict[str, set] = {}
-        self.radio_state = {
-            "url": "",
-            "title": "Yayında Kimse Yok",
-            "playing": False,
-            "dj_name": ""
-        }
 
     async def connect(self, websocket: WebSocket, room_id: str, user_id: str, user_name: str):
         await websocket.accept()
@@ -238,12 +232,6 @@ class ChatConnectionManager:
         if user_id not in self.global_online_users:
             self.global_online_users[user_id] = set()
         self.global_online_users[user_id].add(websocket)
-
-        # Send current radio state
-        await websocket.send_text(json.dumps({
-            "type": "radio_update",
-            **self.radio_state
-        }))
 
         await self.broadcast_presence(room_id)
 
@@ -305,11 +293,29 @@ class ChatConnectionManager:
         if changed:
             await self.broadcast_presence()
 
+    async def send_to_user(self, user_id: str, message: str):
+        if user_id in self.global_online_users:
+            for connection in list(self.global_online_users[user_id]):
+                try:
+                    await connection.send_text(message)
+                except:
+                    pass
+
     async def broadcast(self, room_id: str, message: str):
+        # Eğer mesaj global odasındaysa, TÜM bağlı kullanıcılara gönder (Garantili Senkronizasyon)
+        if room_id == "global":
+            for rid in list(self.rooms.keys()):
+                for connection in list(self.rooms[rid].keys()):
+                    try:
+                        await connection.send_text(message)
+                    except:
+                        pass
+            return
+
         if room_id not in self.rooms:
             return
             
-        for connection in self.rooms[room_id].keys():
+        for connection in list(self.rooms[room_id].keys()):
             try:
                 await connection.send_text(message)
             except Exception:

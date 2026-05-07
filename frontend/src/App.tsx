@@ -101,11 +101,11 @@ function App() {
   }
 
   return (
-    <ThemeProvider>
-      <ChatProvider>
-        <ConfirmProvider>
-          <NotificationProvider>
-            <PresenceProvider>
+    <PresenceProvider>
+      <ThemeProvider>
+        <ChatProvider>
+          <ConfirmProvider>
+            <NotificationProvider>
               <Toaster position="top-right" />
               {showUpdateModal && (
                 <UpdateModal 
@@ -146,11 +146,11 @@ function App() {
                 </Routes>
                 {user && <ChatContainer />}
               </Router>
-            </PresenceProvider>
-          </NotificationProvider>
-        </ConfirmProvider>
-      </ChatProvider>
-    </ThemeProvider>
+            </NotificationProvider>
+          </ConfirmProvider>
+        </ChatProvider>
+      </ThemeProvider>
+    </PresenceProvider>
   );
 }
 

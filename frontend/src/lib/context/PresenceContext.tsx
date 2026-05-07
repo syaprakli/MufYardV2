@@ -17,21 +17,12 @@ interface Message {
     attachments?: any[];
 }
 
-interface RadioState {
-    url: string;
-    title: string;
-    playing: boolean;
-    dj_name: string;
-}
-
 interface PresenceContextType {
     onlineUsers: OnlineUser[];
     wsConnected: boolean;
     isUserOnline: (uid: string) => boolean;
     messages: Message[];
-    radioState: RadioState;
     sendMessage: (text: string, attachments?: any[]) => string;
-    sendRadioCommand: (url: string, title?: string, playing?: boolean) => void;
 }
 
 const PresenceContext = createContext<PresenceContextType | undefined>(undefined);
@@ -63,22 +54,16 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
     const [wsConnected, setWsConnected] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
-    const [radioState, setRadioState] = useState<RadioState>({
-        url: "",
-        title: "Yayında Kimse Yok",
-        playing: false,
-        dj_name: ""
-    });
+    
     const wsRef = useRef<WebSocket | null>(null);
     const retryTimer = useRef<any>(null);
     const pingTimer = useRef<any>(null);
     const pongTimer = useRef<any>(null);
     const retryCountRef = useRef(0);
     const activeNameRef = useRef<string>('Kullanıcı');
-    const connectRef = useRef<(() => void) | null>(null);
 
+    // Reset messages when user changes to avoid ghost messages
     useEffect(() => {
-        // Kullanıcı değişiminde önceki oturum mesajlarını taşıma.
         setMessages([]);
     }, [user?.uid]);
 
@@ -88,6 +73,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         }
     }, [user, profile]);
 
+    // Sync Online Users via REST fallback
     useEffect(() => {
         if (!user?.uid) {
             setOnlineUsers([]);
@@ -95,7 +81,6 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         }
 
         let cancelled = false;
-
         const syncOnlineUsers = async () => {
             try {
                 const data = await fetchOnlineUsers();
@@ -103,12 +88,12 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                     setOnlineUsers(normalizeOnlineUsers(data));
                 }
             } catch {
-                // REST fallback sessiz çalışır; WS varsa zaten presence akacak.
+                // REST fallback silently fails
             }
         };
 
         syncOnlineUsers();
-        const timer = setInterval(syncOnlineUsers, 10000);
+        const timer = setInterval(syncOnlineUsers, 15000);
 
         return () => {
             cancelled = true;
@@ -116,10 +101,10 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         };
     }, [user?.uid]);
 
+    // WebSocket Connection Logic
     useEffect(() => {
         const connect = () => {
             if (!user?.uid) return;
-            // Zaten açık bağlantı varsa kapatma — sadece CLOSED ise aç
             if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) return;
 
             clearTimeout(retryTimer.current);
@@ -127,22 +112,24 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             try {
                 const activeName = activeNameRef.current || resolvePresenceName(user);
                 const baseWsUrl = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
+                // Force room_id=global for all users in the presence provider
                 const wsUrl = `${baseWsUrl}/ws?uid=${encodeURIComponent(user.uid)}&name=${encodeURIComponent(activeName)}&room_id=global`;
 
+                console.log("Connecting to WS:", wsUrl);
                 const ws = new WebSocket(wsUrl);
                 wsRef.current = ws;
 
                 ws.onopen = () => {
+                    console.log("WS Connected successfully");
                     setWsConnected(true);
                     retryCountRef.current = 0;
                     clearInterval(pingTimer.current);
-                    // Her 20sn ping gönder; 25sn içinde pong gelmezse zombie → kapat ve yeniden bağlan
                     pingTimer.current = setInterval(() => {
                         if (ws.readyState === WebSocket.OPEN) {
                             ws.send(JSON.stringify({ type: 'ping' }));
                             clearTimeout(pongTimer.current);
                             pongTimer.current = setTimeout(() => {
-                                // Pong gelmedi: Railway zombie bağlantı
+                                console.warn("Pong timeout, closing connection");
                                 ws.close();
                             }, 5000);
                         }
@@ -152,94 +139,83 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                 ws.onmessage = (event) => {
                     try {
                         const data = JSON.parse(event.data);
+                        
                         if (data.type === 'pong') {
                             clearTimeout(pongTimer.current);
                             return;
                         }
+
+                        // Handle Presence Updates
                         if (data.type === 'presence' && Array.isArray(data.users)) {
                             setOnlineUsers(normalizeOnlineUsers(data.users));
-                        } else if (data.text) {
-                            setMessages(prev => {
-                                if (prev.some(m => m.id === data.id)) return prev;
-                                return [...prev, {
-                                    id: data.id || Date.now().toString(),
-                                    text: data.text,
-                                    author_id: data.author_id,
-                                    author_name: data.author_name || 'Müfettiş',
-                                    timestamp: data.timestamp || new Date().toISOString(),
-                                    attachments: data.attachments || []
-                                }];
-                            });
-                        } else if (data.content || data.sender_name) {
-                            setMessages(prev => {
-                                if (prev.some(m => m.id === data.id)) return prev;
-                                return [...prev, {
-                                    id: data.id || Date.now().toString(),
-                                    text: data.content || '',
-                                    author_id: data.sender_id,
-                                    author_name: data.sender_name || 'Kullanıcı',
-                                    timestamp: data.timestamp || new Date().toISOString(),
-                                    attachments: data.attachment ? [data.attachment] : []
-                                }];
-                            });
-                        }
-                        if (data.type === 'radio_update') {
-                            setRadioState({
-                                url: data.url || "",
-                                title: data.title || "MufYard Radyo",
-                                playing: data.playing ?? false,
-                                dj_name: data.dj_name || "Bilinmeyen DJ"
-                            });
                             return;
                         }
+
+                        // Handle Messages (Universal Logic)
+                        const msgText = data.text || data.content;
+                        if (msgText) {
+                            const isDM = data.room_id?.startsWith('dm_');
+                            
+                            if (isDM) {
+                                // DM ise diğer bileşenlerin (FloatingChat gibi) yakalaması için bir event fırlat
+                                window.dispatchEvent(new CustomEvent('mufyard:new_message', { detail: data }));
+                                return;
+                            }
+
+                            // Global mesaj ise listeye ekle
+                            const newMsg: Message = {
+                                id: data.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+                                text: msgText,
+                                author_id: data.author_id || data.sender_id,
+                                author_name: data.author_name || data.sender_name || 'Müfettiş',
+                                timestamp: data.timestamp || new Date().toISOString(),
+                                attachments: data.attachments || (data.attachment ? [data.attachment] : [])
+                            };
+
+                            setMessages(prev => {
+                                if (prev.some(m => m.id === newMsg.id)) return prev;
+                                return [...prev, newMsg];
+                            });
+                        }
                     } catch (err) {
-                        console.error('Presence message error:', err);
+                        console.error('WS Message parsing error:', err);
                     }
                 };
 
                 ws.onclose = () => {
+                    console.log("WS Closed, retrying...");
                     setWsConnected(false);
                     clearInterval(pingTimer.current);
                     clearTimeout(pongTimer.current);
-                    // Max 5sn'de bir yeniden dene (30sn'den kısaltıldı)
                     const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 5000);
                     retryCountRef.current += 1;
                     retryTimer.current = setTimeout(connect, delay);
                 };
 
-                ws.onerror = () => {
+                ws.onerror = (err) => {
+                    console.error("WS Socket error:", err);
                     ws.close();
                 };
             } catch (err) {
+                console.error("WS Connection error:", err);
                 setWsConnected(false);
                 retryTimer.current = setTimeout(connect, 3000);
             }
         };
 
-        connectRef.current = connect;
-
         if (user?.uid) {
             connect();
         }
 
-        // Sekme/pencere aktif olunca anında yeniden bağlan
         const handleVisibility = () => {
             if (document.visibilityState === 'visible') {
-                retryCountRef.current = 0;
                 connect();
             }
         };
-        const handleFocus = () => {
-            retryCountRef.current = 0;
-            connect();
-        };
 
         document.addEventListener('visibilitychange', handleVisibility);
-        window.addEventListener('focus', handleFocus);
-
         return () => {
             document.removeEventListener('visibilitychange', handleVisibility);
-            window.removeEventListener('focus', handleFocus);
             if (wsRef.current) {
                 wsRef.current.onclose = null;
                 wsRef.current.close();
@@ -255,9 +231,9 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     }, [onlineUsers]);
 
     const sendMessage = useCallback((text: string, attachments: any[] = []): string => {
-        const msgId = `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+        const msgId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            wsRef.current.send(JSON.stringify({
+            const payload = {
                 type: 'message',
                 id: msgId,
                 text,
@@ -265,26 +241,16 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                 author_id: user?.uid,
                 author_name: activeNameRef.current || resolvePresenceName(user),
                 timestamp: new Date().toISOString()
-            }));
+            };
+            wsRef.current.send(JSON.stringify(payload));
+        } else {
+            console.warn("WS not open, message not sent");
         }
         return msgId;
     }, [user?.uid]);
 
-    const sendRadioCommand = useCallback((url: string, title: string = "MufYard Radyo", playing: boolean = true) => {
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            wsRef.current.send(JSON.stringify({
-                type: 'radio_command',
-                url,
-                title,
-                playing,
-                dj_name: activeNameRef.current || resolvePresenceName(user),
-                timestamp: new Date().toISOString()
-            }));
-        }
-    }, [user?.uid]);
-
     return (
-        <PresenceContext.Provider value={{ onlineUsers, wsConnected, isUserOnline, messages, radioState, sendMessage, sendRadioCommand }}>
+        <PresenceContext.Provider value={{ onlineUsers, wsConnected, isUserOnline, messages, sendMessage }}>
             {children}
         </PresenceContext.Provider>
     );
@@ -293,7 +259,13 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 export function usePresence() {
     const context = useContext(PresenceContext);
     if (context === undefined) {
-        throw new Error('usePresence must be used within a PresenceProvider');
+        return {
+            onlineUsers: [],
+            wsConnected: false,
+            isUserOnline: () => false,
+            messages: [],
+            sendMessage: () => ""
+        } as PresenceContextType;
     }
     return context;
 }

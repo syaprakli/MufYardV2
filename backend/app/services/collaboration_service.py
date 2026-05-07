@@ -55,10 +55,23 @@ class CollaborationService:
     # --- Private Messaging (DM) Service ---
     @staticmethod
     async def get_private_messages(uid1: str, uid2: str, limit: int = 50) -> List[Dict[str, Any]]:
-        """İki kullanıcı arasındaki özel mesaj geçmişini getirir."""
+        """İki kullanıcı arasındaki özel mesaj geçmişini getirir. Temizlenen mesajları filtreler."""
         room_id = "_".join(sorted([uid1, uid2]))
-        messages_ref = db.collection('private_messages').document(room_id).collection('chats')
         
+        # Kullanıcının en son ne zaman sohbeti temizlediğini kontrol et
+        room_ref = db.collection('private_messages').document(room_id)
+        room_doc = await asyncio.to_thread(room_ref.get)
+        
+        cleared_at = None
+        if room_doc.exists:
+            cleared_data = room_doc.to_dict().get('cleared_at', {})
+            cleared_at_str = cleared_data.get(uid1)
+            if cleared_at_str:
+                cleared_at = datetime.fromisoformat(cleared_at_str.replace('Z', '+00:00')).replace(tzinfo=None)
+
+        messages_ref = room_ref.collection('chats')
+        
+        # Mesajları çek
         docs = await asyncio.to_thread(
             lambda: messages_ref.order_by('timestamp', direction='DESCENDING').limit(limit).stream()
         )
@@ -67,8 +80,18 @@ class CollaborationService:
         for doc in docs:
             msg_data = doc.to_dict()
             msg_data['id'] = doc.id
-            if 'timestamp' in msg_data and hasattr(msg_data['timestamp'], 'isoformat'):
-                msg_data['timestamp'] = msg_data['timestamp'].isoformat()
+            
+            msg_ts = msg_data.get('timestamp')
+            if hasattr(msg_ts, 'isoformat'):
+                # Firestore datetime objesi ise tzsiz hale getir karşılaştırma için
+                ts_naive = msg_ts.replace(tzinfo=None)
+                
+                # Eğer kullanıcı bu tarihten önce sohbeti temizlediyse, bu mesajı ona gösterme
+                if cleared_at and ts_naive <= cleared_at:
+                    continue
+                    
+                msg_data['timestamp'] = msg_ts.isoformat()
+            
             messages.append(msg_data)
         
         messages.reverse()
@@ -143,23 +166,22 @@ class CollaborationService:
 
     @staticmethod
     async def clear_private_messages(room_id: str, requester_uid: str) -> int:
-        """Kullanıcının kendi gönderdiği özel mesajları temizler."""
+        """Kullanıcı için sohbeti temizler (Sadece onun ekranından gizler)."""
         normalized_room_id = CollaborationService._normalize_dm_room_id(room_id)
-        chats_ref = db.collection('private_messages').document(normalized_room_id).collection('chats')
-        docs = await asyncio.to_thread(
-            lambda: list(chats_ref.where('sender_id', '==', requester_uid).stream())
-        )
-        if not docs:
-            return 0
-
-        def _batch_delete() -> None:
-            batch = db.batch()
-            for doc in docs:
-                batch.delete(doc.reference)
-            batch.commit()
-
-        await asyncio.to_thread(_batch_delete)
-        return len(docs)
+        room_ref = db.collection('private_messages').document(normalized_room_id)
+        
+        now_str = datetime.utcnow().isoformat()
+        
+        # Room dokümanını güncelle (veya yoksa oluştur)
+        doc = await asyncio.to_thread(room_ref.get)
+        if doc.exists:
+            cleared_at = doc.to_dict().get('cleared_at', {})
+            cleared_at[requester_uid] = now_str
+            await asyncio.to_thread(room_ref.update, {'cleared_at': cleared_at})
+        else:
+            await asyncio.to_thread(room_ref.set, {'cleared_at': {requester_uid: now_str}})
+            
+        return 1 # Başarılı olduğunu belirtmek için 1 dönüyoruz
 
     # --- Forum/Post Service ---
     @staticmethod
