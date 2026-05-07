@@ -1,10 +1,10 @@
 # MufYard Backend - Production Dockerfile
-FROM python:3.11-slim
+FROM python:3.11
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (Full image has most, but we ensure essentials)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*

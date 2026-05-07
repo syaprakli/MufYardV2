@@ -641,7 +641,6 @@ export default function Settings() {
                                             setProfile(prev => prev ? {...prev, birthday: mmdd, birthday_full: val} : null);
                                         }}
                                     />
-                                    <p className="text-[10px] text-slate-400 ml-1 font-medium">🎂 Doğum gününüzde Dashboard'da kutlama mesajı gösterilecektir.</p>
                                 </div>
 
                             </div>

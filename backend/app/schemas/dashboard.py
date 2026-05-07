@@ -16,3 +16,4 @@ class NewsItem(BaseModel):
 class DashboardStats(BaseModel):
     stats: List[StatItem]
     news: List[NewsItem]
+    forum_posts: List[NewsItem] = []

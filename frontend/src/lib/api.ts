@@ -1,15 +1,16 @@
 import { API_URL } from "./config";
 import { fetchWithTimeout } from "./api/utils";
 
-export async function fetchStats() {
+export async function fetchStats(userId?: string) {
     try {
-        const response = await fetchWithTimeout(`${API_URL}/dashboard/stats`);
+        const url = userId ? `${API_URL}/dashboard/stats?user_id=${userId}` : `${API_URL}/dashboard/stats`;
+        const response = await fetchWithTimeout(url);
         if (!response.ok) {
-            return { stats: [] };
+            return { stats: [], news: [], forum_posts: [] };
         }
         return await response.json();
     } catch (error) {
         console.warn("Backend connection failed for fetchStats:", error);
-        return { stats: [] };
+        return { stats: [], news: [], forum_posts: [] };
     }
 }

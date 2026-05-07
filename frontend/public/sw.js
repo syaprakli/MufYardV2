@@ -39,6 +39,17 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET and cross-origin requests
   if (event.request.method !== 'GET') return;
 
+  // BYPASS: Skip Service Worker for Radio Streams and Audio
+  if (
+    url.pathname.includes('.mp3') || 
+    url.pathname.includes('.aac') || 
+    url.pathname.includes('icecast') || 
+    url.pathname.includes('radio') ||
+    url.port === '8000' || url.port === '8100' || url.port === '8200'
+  ) {
+    return;
+  }
+
   // Network-First Strategy
   event.respondWith(
     fetch(event.request)

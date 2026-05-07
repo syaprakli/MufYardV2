@@ -43,7 +43,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
                 .catch(err => console.error("Header profile load error:", err));
             
             // Bekleyen istekleri çek ve periyodik olarak güncelle (30 saniye)
-            const updateRequests = () => fetchPendingRequests(user.uid).then(setPendingRequests);
+            const updateRequests = () => fetchPendingRequests(user.uid, user.email || undefined).then(setPendingRequests);
             updateRequests();
             const interval = setInterval(updateRequests, 30000);
             return () => clearInterval(interval);
@@ -186,7 +186,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
                     </button>
 
                     {showCollaborationRequests && (
-                        <div className="absolute top-full right-[-50px] sm:right-0 mt-2 w-[280px] sm:w-80 bg-card border border-border rounded-[24px] shadow-2xl py-4 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300 z-[9999]">
+                        <div className="absolute top-full right-[-80px] sm:right-0 mt-2 w-[280px] sm:w-80 bg-card border border-border rounded-[24px] shadow-2xl py-4 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300 z-[9999]">
                             <div className="px-6 pb-3 border-b border-slate-50 flex items-center justify-between">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Paylaşım İstekleri</p>
                                 <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black">{pendingRequests.length} Yeni</span>

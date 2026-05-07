@@ -91,7 +91,7 @@ async def upload_file(
             }
         )
         return {
-            "url": f"/{relative_url}",
+            "url": relative_url,
             "name": os.path.basename(file_path),
             "type": media_type,
             "path": os.path.relpath(file_path, BASE_REPORTS_DIR).replace("\\", "/")

@@ -192,7 +192,8 @@ export async function fetchExternalLegislation(url: string): Promise<Partial<Leg
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ url })
+        body: JSON.stringify({ url }),
+        timeout: 45000
     });
     if (!response.ok) {
         const error = await response.json();

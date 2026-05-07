@@ -369,10 +369,10 @@ async def add_collaboration_category(payload: Dict[str, str]):
 # --- PENDING COLLABORATION REQUESTS ---
 
 @router.get("/pending-requests")
-async def get_pending_collaboration_requests(uid: str = Query(...)):
+async def get_pending_collaboration_requests(uid: str = Query(...), email: Optional[str] = Query(None)):
     """Kullanıcının onay bekleyen tüm paylaşım isteklerini (Görev, Not, Rehber) getirir."""
     try:
-        return await CollaborationService.get_pending_requests(uid)
+        return await CollaborationService.get_pending_requests(uid, email)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

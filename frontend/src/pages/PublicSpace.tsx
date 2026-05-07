@@ -1,17 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { 
-    Send, User, MessageSquare, Search,
+    User, MessageSquare, Search,
     Loader2, Trash2,
     ChevronDown, ChevronUp,
     Plus, Eye, Edit3,
     ArrowLeft, Image as ImageIcon, Paperclip, 
     Shield, Bell, HelpCircle, Check, X, Lock as LockIcon,
-    ChevronLeft, ChevronRight, FolderTree, Reply, Smile, Trash
+    ChevronRight, FolderTree, Reply
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
-import { usePresence } from "../lib/context/PresenceContext";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { API_URL } from "../lib/config";
@@ -20,19 +19,18 @@ import toast from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { motion, AnimatePresence } from "framer-motion";
 
-interface Post {
+export interface Post {
     id: string;
     title: string;
     content: string;
-    category: string;
+    author_id: string;
     author_name: string;
-    author_id?: string;
-    author_role?: string;
     created_at: string;
-    likes_count: number;
-    attachments?: Attachment[];
-    is_public?: boolean;
+    likes_count?: number;
+    category?: string;
     shared_with?: string[];
+    is_approved?: boolean;
+    attachments?: Attachment[];
 }
 
 interface Comment {
@@ -49,40 +47,6 @@ interface Attachment {
     url: string;
     type: 'image' | 'video' | 'audio' | 'file';
     name: string;
-}
-
-interface Message {
-    id: string;
-    text: string;
-    author_name: string;
-    author_id?: string;
-    author_avatar?: string;
-    timestamp: string;
-    isMine: boolean;
-    attachments?: Attachment[];
-}
-
-const CHAT_COLOR_PALETTES = [
-    { bubble: 'bg-sky-600 text-white', meta: 'text-sky-200' },
-    { bubble: 'bg-emerald-600 text-white', meta: 'text-emerald-200' },
-    { bubble: 'bg-violet-600 text-white', meta: 'text-violet-200' },
-    { bubble: 'bg-amber-500 text-slate-950', meta: 'text-amber-200' },
-    { bubble: 'bg-fuchsia-600 text-white', meta: 'text-fuchsia-200' },
-    { bubble: 'bg-cyan-600 text-white', meta: 'text-cyan-200' },
-];
-
-function getMessagePalette(authorId?: string, authorName?: string) {
-    const identity = `${authorId || ''}|${authorName || ''}`.toLowerCase();
-    if (identity.includes('sefa') || identity.includes('admin')) {
-        return { bubble: 'bg-rose-600 text-white', meta: 'text-rose-200' };
-    }
-
-    let hash = 0;
-    for (let i = 0; i < identity.length; i += 1) {
-        hash = (hash * 31 + identity.charCodeAt(i)) >>> 0;
-    }
-
-    return CHAT_COLOR_PALETTES[hash % CHAT_COLOR_PALETTES.length];
 }
 
 const FAQ_DATA = [
@@ -114,17 +78,14 @@ export default function PublicSpace() {
     const confirm = useConfirm();
 
     const location = useLocation();
-    const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage } = usePresence();
     const [posts, setPosts] = useState<Post[]>([]);
-    const [messages, setMessages] = useState<Message[]>([]);
     const [categories, setCategories] = useState<string[]>([]);
-    const [viewMode, setViewMode] = useState<'Forum' | 'SSS' | 'Duyurular' | 'Sohbet'>(localStorage.getItem('forum_view') as any || 'Forum');
+    const [viewMode, setViewMode] = useState<'Forum' | 'SSS' | 'Duyurular'>(localStorage.getItem('forum_view') as any || 'Forum');
+    const [userProfile, setUserProfile] = useState<any>(null);
     const [userRole, setUserRole] = useState('user');
     const [isAddingCategory, setIsAddingCategory] = useState(false);
-    const [isChatCollapsed, setIsChatCollapsed] = useState(window.innerWidth < 1024);
     const [selectedCategory, setSelectedCategory] = useState("Hepsi");
     const [loading, setLoading] = useState(true);
-    const [newMessage, setNewMessage] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [newPost, setNewPost] = useState({ title: "", content: "", category: "Genel", attachments: [] as Attachment[] });
     const [selectedPost, setSelectedPost] = useState<Post | null>(null);
@@ -132,7 +93,6 @@ export default function PublicSpace() {
     const [newComment, setNewComment] = useState("");
     const [isPosting, setIsPosting] = useState(false);
     const [isCommenting, setIsCommenting] = useState(false);
-    const [isSendingMsg, setIsSendingMsg] = useState(false);
     const [showPostCreator, setShowPostCreator] = useState(false);
     const [openFAQIndex, setOpenFAQIndex] = useState<number | null>(null);
     const [zoomedAttachment, setZoomedAttachment] = useState<Attachment | null>(null);
@@ -144,50 +104,9 @@ export default function PublicSpace() {
     const [allInspectors, setAllInspectors] = useState<any[]>([]);
     const [commentAttachments, setCommentAttachments] = useState<Attachment[]>([]);
     const [sortBy, setSortBy] = useState<'newest' | 'popular'>('newest');
-    const [showEmojiPicker, setShowEmojiPicker] = useState<'chat' | 'comment' | null>(null);
-    const [showGifPicker, setShowGifPicker] = useState<'chat' | 'comment' | null>(null);
-    const [showOnlinePanel, setShowOnlinePanel] = useState(false);
-    const [gifSearchQuery, setGifSearchQuery] = useState("");
-    const [onlineGifs, setOnlineGifs] = useState<any[]>([]);
-    const [isOnline, setIsOnline] = useState(navigator.onLine);
-
     const [editingPost, setEditingPost] = useState<Post | null>(null);
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [editCommentText, setEditCommentText] = useState("");
-    const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-    const [editMessageText, setEditMessageText] = useState("");
-    useEffect(() => {
-        const handleStatus = () => setIsOnline(navigator.onLine);
-        window.addEventListener('online', handleStatus);
-        window.addEventListener('offline', handleStatus);
-        return () => {
-            window.removeEventListener('online', handleStatus);
-            window.removeEventListener('offline', handleStatus);
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!gifSearchQuery.trim() || !isOnline) {
-            setOnlineGifs([]);
-            return;
-        }
-        const timer = setTimeout(async () => {
-            try {
-                const res = await fetchWithTimeout(`https://tenor.googleapis.com/v2/search?q=${gifSearchQuery}&key=LIVDSRZULEUB&limit=8`);
-                const data = await res.json();
-                setOnlineGifs(data.results.map((r: any) => r.media_formats.tinygif.url));
-            } catch (err) {}
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [gifSearchQuery, isOnline]);
-
-    const commonEmojis = ["😊", "👍", "🔥", "🚀", "❤️", "😂", "😮", "🙏", "👏", "✅", "😢", "🎉", "💯", "🤔", "👀", "✨"];
-    const offlineGifs = [
-        "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHp1eHhjZ3J4eHV4eHhjZ3J4eHV4eHhjZ3J4eHV4eHhjZ3J4ZSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKMGpxS7AEXM0Cs/giphy.gif",
-        "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHp1eHhjZ3J4eHV4eHhjZ3J4eHV4eHhjZ3J4eHV4eHhjZ3J4ZSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l0HlIDW6X6X8Z7M3O/giphy.gif"
-    ];
-
-    const chatEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -198,63 +117,16 @@ export default function PublicSpace() {
                     fetchWithTimeout(`${API_URL}/collaboration/categories`).then(r => r.json()),
                     fetchWithTimeout(`${API_URL}/profiles/`).then(r => r.json())
                 ]);
+                setUserProfile(prof);
                 setUserRole(prof.role || 'user');
                 setCategories(cats);
                 setAllInspectors(insps.filter((i: any) => i.uid !== user?.uid));
-                // Eski mesajları yükleme (Kullanıcı talebi #5)
-                setMessages([]); 
-                // Oturum başlama zamanını kaydet
-                (window as any).chatSessionStartTime = new Date().toISOString();
-            } catch (err: any) {
-                console.error("Initial load error", err);
             } finally {
                 setLoading(false);
             }
         };
         loadInitialData();
     }, [user]);
-
-    // 1 saniyede bir mesajları otomatik yenileme (Kullanıcı talebi #1)
-    useEffect(() => {
-        if (!user) return;
-        const interval = setInterval(async () => {
-            try {
-                const res = await fetchWithTimeout(`${API_URL}/collaboration/messages?limit=50`);
-                if (res.ok) {
-                    const data = await res.json();
-                    const startTime = (window as any).chatSessionStartTime;
-                    setMessages(prev => {
-                        const newMsgs = data.filter((m: any) => 
-                            !prev.some(pm => pm.id === m.id) && 
-                            (!startTime || new Date(m.timestamp) >= new Date(startTime))
-                        );
-                        if (newMsgs.length === 0) return prev;
-                        // Yeni gelenleri mevcut listeye ekle ve sırala
-                        const combined = [...prev, ...newMsgs.map((m: any) => ({ ...m, isMine: m.author_id === user?.uid }))];
-                        return combined.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-                    });
-                }
-            } catch (err) {
-                console.error("Message polling error:", err);
-            }
-        }, 1000);
-        return () => clearInterval(interval);
-    }, [user]);
-
-    useEffect(() => {
-        if (globalMessages.length > 0) {
-            const startTime = (window as any).chatSessionStartTime;
-            setMessages(prev => {
-                const newMsgs = globalMessages.filter(gm => 
-                    !prev.some(pm => pm.id === gm.id) &&
-                    (!startTime || new Date(gm.timestamp) >= new Date(startTime))
-                );
-                if (newMsgs.length === 0) return prev;
-                const combined = [...prev, ...newMsgs.map(m => ({ ...m, isMine: m.author_id === user?.uid }))];
-                return combined.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-            });
-        }
-    }, [globalMessages, user?.uid]);
 
     useEffect(() => {
         const loadPosts = async () => {
@@ -279,9 +151,6 @@ export default function PublicSpace() {
         if (user) loadPosts();
     }, [selectedCategory, user]);
 
-    useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
 
     useEffect(() => {
         if (location.state && posts.length > 0) {
@@ -300,133 +169,6 @@ export default function PublicSpace() {
         }
     }, [location.state, posts]);
 
-
-    const handleDeleteMessage = async (messageId: string) => {
-        const confirmed = await confirm({
-            title: "Mesajı Sil",
-            message: "Bu mesajı kalıcı olarak silmek istediğinize emin misiniz?",
-            confirmText: "Sil",
-            variant: "danger"
-        });
-        if (confirmed) {
-            try {
-                const roleParam = encodeURIComponent(userRole || 'user');
-                const uidParam = encodeURIComponent(user?.uid || '');
-                const res = await fetchWithTimeout(`${API_URL}/collaboration/messages/${messageId}?uid=${uidParam}&role=${roleParam}`, {
-                    method: 'DELETE'
-                });
-                if (res.ok) {
-                    setMessages(prev => prev.filter(m => m.id !== messageId));
-                    if (editingMessageId === messageId) {
-                        setEditingMessageId(null);
-                        setEditMessageText("");
-                    }
-                    toast.success("Mesaj silindi.");
-                }
-            } catch (err) {
-                toast.error("Hata oluştu.");
-            }
-        }
-    };
-
-    const handleStartEditMessage = (msg: Message) => {
-        setEditingMessageId(msg.id);
-        setEditMessageText(msg.text || "");
-    };
-
-    const handleCancelEditMessage = () => {
-        setEditingMessageId(null);
-        setEditMessageText("");
-    };
-
-    const handleSaveEditMessage = async (messageId: string) => {
-        const nextText = editMessageText.trim();
-        if (!nextText || !user?.uid) return;
-
-        try {
-            const roleParam = encodeURIComponent(userRole || 'user');
-            const uidParam = encodeURIComponent(user.uid);
-            const res = await fetchWithTimeout(`${API_URL}/collaboration/messages/${messageId}?uid=${uidParam}&role=${roleParam}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: nextText })
-            });
-            if (!res.ok) {
-                throw new Error("Mesaj güncellenemedi.");
-            }
-            setMessages(prev => prev.map(m => m.id === messageId ? { ...m, text: nextText } : m));
-            setEditingMessageId(null);
-            setEditMessageText("");
-            toast.success("Mesaj güncellendi.");
-        } catch {
-            toast.error("Mesaj güncellenemedi.");
-        }
-    };
-
-    const handleClearChat = async () => {
-        const confirmed = await confirm({
-            title: userRole === 'admin' ? "Sohbet Alanını Temizle" : "Sohbeti Bende Temizle",
-            message: userRole === 'admin'
-                ? "Canlı müzakere alanındaki tüm mesajlar silinecek. Devam etmek istiyor musunuz?"
-                : "Bu işlem sadece sizin ekranınızdaki sohbet geçmişini temizler. Diğer kullanıcılar etkilenmez.",
-            confirmText: "Temizle",
-            variant: "danger"
-        });
-        if (!confirmed) return;
-
-        if (userRole !== 'admin') {
-            setMessages([]);
-            setEditingMessageId(null);
-            setEditMessageText("");
-            toast.success("Sohbet ekranınız temizlendi.");
-            return;
-        }
-
-        try {
-            const roleParam = encodeURIComponent(userRole || 'user');
-            const uidParam = encodeURIComponent(user?.uid || '');
-            const res = await fetchWithTimeout(`${API_URL}/collaboration/messages?uid=${uidParam}&role=${roleParam}`, {
-                method: 'DELETE'
-            });
-            if (!res.ok) {
-                throw new Error("Sohbet temizlenemedi.");
-            }
-            setMessages([]);
-            setEditingMessageId(null);
-            setEditMessageText("");
-            toast.success("Sohbet alanı temizlendi.");
-        } catch {
-            toast.error("Sohbet temizlenemedi.");
-        }
-    };
-
-    const handleSendChat = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newMessage.trim() || !user) return;
-        const tempId = sendGlobalMessage(newMessage); // WS üzerinden gönder, ID al
-        const msgObj = {
-            id: tempId,
-            text: newMessage,
-            author_id: user.uid,
-            author_name: user.displayName || "Müfettiş",
-            timestamp: new Date().toISOString()
-        };
-        // Anlık göster (WS echo beklemeden)
-        setMessages(prev => prev.some(m => m.id === tempId) ? prev : [...prev, { ...msgObj, isMine: true }]);
-        setNewMessage("");
-        setIsSendingMsg(true);
-        try {
-            await fetchWithTimeout(`${API_URL}/collaboration/messages`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(msgObj)
-            });
-        } catch {
-            toast.error("Mesaj gönderilemedi");
-        } finally {
-            setIsSendingMsg(false);
-        }
-    };
 
     const handleReplyMention = (userName: string) => {
         setNewComment(prev => `@${userName} ${prev}`);
@@ -460,7 +202,7 @@ export default function PublicSpace() {
                 body: JSON.stringify({
                     content: newComment,
                     author_id: user.uid,
-                    author_name: user.displayName || "Müfettiş",
+                    author_name: userProfile?.full_name ? `${userProfile.full_name} (${userProfile.email})` : (user.displayName || user.email || "Müfettiş"),
                     author_role: userRole.toUpperCase(),
                     attachments: commentAttachments
                 })
@@ -505,7 +247,6 @@ export default function PublicSpace() {
                 ? `${API_URL}/collaboration/posts/${editingPost.id}` 
                 : `${API_URL}/collaboration/posts`;
             
-            // Onay mekanizması için rolü gönderiyoruz
             url += `?role=${encodeURIComponent(userRole)}`;
 
             const method = editingPost ? 'PATCH' : 'POST';
@@ -518,7 +259,7 @@ export default function PublicSpace() {
                 content: newPost.content,
                 category: newPost.category || "Genel",
                 author_id: user.uid,
-                author_name: user.displayName || "Müfettiş",
+                author_name: userProfile?.full_name ? `${userProfile.full_name} (${userProfile.email})` : (user.displayName || user.email || "Müfettiş"),
                 author_role: userRole.toUpperCase(),
                 is_public: sharedWith.length === 0,
                 shared_with: sharedWith,
@@ -676,61 +417,49 @@ export default function PublicSpace() {
                                 {selectedPost ? "Konu Detayı" : viewMode === 'SSS' ? "Yardım Rehberi" : "Müzakere Forumu"}
                             </h1>
                         </div>
-                        <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto">
-                            {(userRole === 'admin' || userRole === 'moderator') && !selectedPost && (
+                        <div className="flex flex-wrap items-center gap-2 md:gap-4 w-full md:w-auto">
+                            {(!selectedPost && (viewMode === 'Forum' || userRole === 'admin' || userRole === 'moderator')) && (
                                 <Button 
-                                    variant="outline" 
-                                    onClick={() => { setNewPost({ ...newPost, category: 'Duyurular' }); setShowPostCreator(true); }}
-                                    className="flex-1 md:flex-none border-primary/20 text-primary font-black text-[10px] uppercase tracking-widest bg-primary/5 rounded-2xl h-11 px-4 md:px-6"
+                                    onClick={() => {
+                                        setEditingPost(null);
+                                        let initialCategory = "Genel";
+                                        if (viewMode === 'SSS') initialCategory = "SSS";
+                                        if (viewMode === 'Duyurular') initialCategory = "Duyurular";
+                                        setNewPost({ title: "", content: "", category: initialCategory, attachments: [] });
+                                        setShowPostCreator(true);
+                                    }}
+                                    className="flex-1 md:flex-none bg-primary text-white rounded-2xl px-4 md:px-6 h-11 font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2 text-[10px] capitalize tracking-widest hover:scale-105 transition-all"
                                 >
-                                    <Bell size={16} className="hidden sm:inline mr-2" />
-                                    <span className="sm:hidden">Duyuru</span>
-                                    <span className="hidden sm:inline">Duyuru Ekle</span>
+                                    <Plus size={18} />
+                                    <span className="sm:hidden">Ekle</span>
+                                    <span className="hidden sm:inline">{viewMode === 'SSS' ? 'Soru Ekle' : viewMode === 'Duyurular' ? 'Yeni Duyuru' : 'Yeni Konu'}</span>
                                 </Button>
-                            )}
-                            {/* Forum: herkes konu açabilir. SSS/Duyurular: sadece admin/moderatör */}
-                            {(viewMode === 'Forum' || userRole === 'admin' || userRole === 'moderator') && (
-                            <Button 
-                                onClick={() => {
-                                    setEditingPost(null);
-                                    let initialCategory = "Genel";
-                                    if (viewMode === 'SSS') initialCategory = "SSS";
-                                    if (viewMode === 'Duyurular') initialCategory = "Duyurular";
-                                    setNewPost({ title: "", content: "", category: initialCategory, attachments: [] });
-                                    setShowPostCreator(true);
-                                }}
-                                className="flex-1 md:flex-none bg-primary text-white rounded-2xl px-4 md:px-6 h-11 font-bold shadow-lg shadow-primary/20 flex items-center justify-center gap-2 text-[10px] capitalize tracking-widest hover:scale-105 transition-all"
-                            >
-                                <Plus size={18} />
-                                <span className="sm:hidden">Ekle</span>
-                                <span className="hidden sm:inline">{viewMode === 'SSS' ? 'Soru Ekle' : viewMode === 'Duyurular' ? 'Yeni Duyuru' : 'Yeni Konu'}</span>
-                            </Button>
                             )}
                         </div>
                     </div>
+
                     <div className="flex items-center gap-4 md:gap-8 overflow-x-auto no-scrollbar pb-1">
                         <button 
-                            onClick={() => { setViewMode('Forum'); setSelectedPost(null); setIsChatCollapsed(true); }}
+                            onClick={() => { setViewMode('Forum'); setSelectedPost(null); setSelectedCategory("Hepsi"); }}
                             className={cn("pb-3 text-xs font-black tracking-widest transition-all relative", viewMode === 'Forum' ? "text-primary" : "text-slate-400 hover:text-slate-600")}
                         >
-                            Forum <span className="ml-1 px-1.5 py-0.5 bg-muted/80 text-[10px] rounded-md text-muted-foreground">{posts.length}</span>
+                            Forum <span className="ml-1 px-1.5 py-0.5 bg-muted/80 text-[10px] rounded-md text-muted-foreground">{posts.filter(p => p.category !== 'Duyurular' && p.category !== 'SSS').length}</span>
                             {viewMode === 'Forum' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-full" />}
                         </button>
                         <button 
-                            onClick={() => { setViewMode('SSS'); setSelectedPost(null); setIsChatCollapsed(true); }}
+                            onClick={() => { setViewMode('SSS'); setSelectedPost(null); setSelectedCategory("Hepsi"); }}
                             className={cn("pb-3 text-xs font-black tracking-widest transition-all relative", viewMode === 'SSS' ? "text-primary" : "text-slate-400 hover:text-slate-600")}
                         >
-                            Sss / Rehber
+                            Bilgi Bankası
                             {viewMode === 'SSS' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-full" />}
                         </button>
                         <button 
-                            onClick={() => { setViewMode('Duyurular'); setSelectedPost(null); setIsChatCollapsed(true); }}
+                            onClick={() => { setViewMode('Duyurular'); setSelectedPost(null); setSelectedCategory("Hepsi"); }}
                             className={cn("pb-3 text-xs font-black tracking-widest transition-all relative whitespace-nowrap", viewMode === 'Duyurular' ? "text-primary" : "text-slate-400 hover:text-slate-600")}
                         >
                             Duyurular
                             {viewMode === 'Duyurular' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-full" />}
                         </button>
-
                     </div>
                 </div>
 
@@ -756,7 +485,7 @@ export default function PublicSpace() {
                                     setEditCommentText={setEditCommentText}
                                     onEditPost={(p: Post) => {
                                         setEditingPost(p);
-                                        setNewPost({ title: p.title, content: p.content, category: p.category, attachments: p.attachments || [] });
+                                        setNewPost({ title: p.title, content: p.content, category: p.category || "Genel", attachments: p.attachments || [] });
                                         setShowPostCreator(true);
                                     }}
                                     onDeletePost={async (id: string) => {
@@ -768,17 +497,7 @@ export default function PublicSpace() {
                                     attachments={commentAttachments}
                                     setAttachments={setCommentAttachments}
                                     onZoom={setZoomedAttachment}
-                                    showEmojiPicker={showEmojiPicker}
-                                    setShowEmojiPicker={setShowEmojiPicker}
-                                    showGifPicker={showGifPicker}
-                                    setShowGifPicker={setShowGifPicker}
-                                    commonEmojis={commonEmojis}
-                                    offlineGifs={offlineGifs}
-                                    gifSearchQuery={gifSearchQuery}
-                                    setGifSearchQuery={setGifSearchQuery}
-                                    onlineGifs={onlineGifs}
-                                    isOnline={isOnline}
-                                    isStatic={viewMode === 'Duyurular'}
+                                    isStatic={false}
                                 />
                             </motion.div>
                         ) : (
@@ -807,7 +526,7 @@ export default function PublicSpace() {
                                                     onDelete={() => handleDeletePost(post.id)}
                                                     onEdit={() => {
                                                         setEditingPost(post);
-                                                        setNewPost({ title: post.title, content: post.content, category: post.category, attachments: post.attachments || [] });
+                                                        setNewPost({ title: post.title, content: post.content, category: post.category || "Duyurular", attachments: post.attachments || [] });
                                                         setShowPostCreator(true);
                                                     }}
                                                     onApprove={() => handleApprovePost(post.id)}
@@ -818,7 +537,7 @@ export default function PublicSpace() {
                                                 />
                                             ))}
                                     </motion.div>
-                                ) : viewMode === 'Sohbet' ? null : (
+                                ) : (
                                     <motion.div key="forum" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
                                         <div className="flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
                                             <div className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar pb-1">
@@ -933,7 +652,7 @@ export default function PublicSpace() {
                                                         onDelete={() => handleDeletePost(post.id)}
                                                         onEdit={() => {
                                                             setEditingPost(post);
-                                                            setNewPost({ title: post.title, content: post.content, category: post.category, attachments: post.attachments || [] });
+                                                            setNewPost({ title: post.title, content: post.content, category: post.category || "Genel", attachments: post.attachments || [] });
                                                             setShowPostCreator(true);
                                                         }}
                                                         onApprove={() => handleApprovePost(post.id)}
@@ -950,227 +669,6 @@ export default function PublicSpace() {
                         )}
                     </AnimatePresence>
                 </div>
-            </div>
-
-            {/* Desktop chat toggle butonu - container dışında, her zaman görünür */}
-            <button 
-                onClick={() => setIsChatCollapsed(!isChatCollapsed)}
-                className="hidden lg:flex fixed right-0 top-1/2 -translate-y-1/2 w-8 h-20 bg-[#002B4B] text-white items-center justify-center rounded-l-2xl shadow-xl z-50 border-r border-white/10 hover:w-10 transition-all"
-                style={{ right: isChatCollapsed ? 0 : 384 }}
-            >
-                {isChatCollapsed ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-            </button>
-
-            <div 
-                className={cn(
-                    "transition-all duration-300",
-                    // Mobile: viewMode Sohbet ise tam ekran overlay, değilse gizle
-                    viewMode === 'Sohbet'
-                        ? "fixed inset-0 z-[100] lg:static lg:inset-auto flex"
-                        : "hidden lg:flex",
-                    // Desktop genişlik
-                    isChatCollapsed ? "lg:w-0 lg:overflow-hidden lg:opacity-0" : "lg:w-[384px]",
-                )}
-            >
-                <div className="flex h-full relative w-full">
-                    <div className="w-full lg:w-[384px] h-full border-l border-border/50 bg-card flex flex-col shadow-2xl overflow-hidden">
-                        <div className="p-6 border-b border-white/10 bg-[#002B4B] text-white flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <button 
-                                    onClick={() => { setIsChatCollapsed(true); if (viewMode === 'Sohbet') setViewMode('Forum'); }}
-                                    className="lg:hidden p-2 -ml-2 hover:bg-white/10 rounded-full transition-colors"
-                                >
-                                    <ArrowLeft size={18} />
-                                </button>
-                                <h3 className="text-sm font-black capitalize tracking-widest flex items-center gap-2">
-                                    <MessageSquare size={16} className="text-blue-400" /> Canlı Müzakere
-                                </h3>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setShowOnlinePanel((prev) => !prev)}
-                                className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-[10px] font-black tracking-widest text-white/90 transition-colors hover:bg-white/15"
-                            >
-                                <span>{onlineUsers.length} kişi online</span>
-                                {showOnlinePanel ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleClearChat}
-                                className="flex items-center gap-2 rounded-full bg-rose-500/20 px-3 py-2 text-[10px] font-black tracking-widest text-rose-100 transition-colors hover:bg-rose-500/30"
-                                title={userRole === 'admin' ? "Sohbet alanını temizle" : "Sadece kendi ekranını temizle"}
-                            >
-                                <Trash2 size={12} /> {userRole === 'admin' ? 'Sohbeti Temizle' : 'Bende Temizle'}
-                            </button>
-                        </div>
-                        <AnimatePresence>
-                            {showOnlinePanel && (
-                                <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: 'auto', opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    className="overflow-hidden border-b border-border bg-[#0a385d]"
-                                >
-                                    <div className="max-h-40 overflow-y-auto px-6 py-4 space-y-2">
-                                        {onlineUsers.length === 0 ? (
-                                            <p className="text-[11px] font-bold text-white/60">Şu an çevrimiçi kullanıcı yok.</p>
-                                        ) : (
-                                            onlineUsers.map((u) => (
-                                                <div key={u.uid} className="flex items-center gap-2 rounded-2xl bg-white/5 px-3 py-2 text-white/90 ring-1 ring-white/10">
-                                                    <div className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                                                    <span className="truncate text-[11px] font-bold capitalize">{u.name || u.uid}</span>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
-                            {messages.map((msg: any) => (
-                                <div key={msg.id} className={cn("flex flex-col", (msg.isMine || msg.author_id === user?.uid) ? "items-end" : "items-start")}>
-                                    {editingMessageId === msg.id ? (
-                                        <div className="max-w-[85%] space-y-2 rounded-3xl rounded-tr-none bg-card p-3 shadow-sm ring-1 ring-border">
-                                            <input
-                                                value={editMessageText}
-                                                onChange={(e) => setEditMessageText(e.target.value)}
-                                                className="w-full rounded-xl border border-border bg-muted/60 px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20"
-                                                autoFocus
-                                            />
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={handleCancelEditMessage}
-                                                    className="rounded-lg bg-muted px-2 py-1 text-[10px] font-black text-muted-foreground"
-                                                >
-                                                    Vazgeç
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleSaveEditMessage(msg.id)}
-                                                    className="rounded-lg bg-primary px-2 py-1 text-[10px] font-black text-white"
-                                                >
-                                                    Kaydet
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className={cn(
-                                            "max-w-[85%] p-4 rounded-3xl text-sm font-medium shadow-sm space-y-2",
-                                            getMessagePalette(msg.author_id, msg.author_name).bubble,
-                                            (msg.isMine || msg.author_id === user?.uid) ? "rounded-tr-none" : "rounded-tl-none"
-                                        )}>
-                                            {msg.text !== "GIF" && msg.text}
-                                            {msg.attachments && msg.attachments.length > 0 && msg.attachments[0].url && (
-                                                <div className="rounded-2xl overflow-hidden shadow-md">
-                                                    <img src={msg.attachments[0].url} className="max-w-full h-auto object-cover" />
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                    <div className="flex items-center gap-2 mt-1 px-2 group">
-                                        <span className={cn("text-[10px] font-bold", getMessagePalette(msg.author_id, msg.author_name).meta)}>{msg.author_name} • {new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-                                        {(msg.author_id === user?.uid || userRole === 'admin') && (
-                                            <>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleStartEditMessage(msg)}
-                                                    className="p-1 text-slate-300 hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-all"
-                                                    title="Düzenle"
-                                                >
-                                                    <Edit3 size={10} />
-                                                </button>
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => handleDeleteMessage(msg.id)}
-                                                    className="p-1 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
-                                                    title="Sil"
-                                                >
-                                                    <Trash size={10} />
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                            <div ref={chatEndRef} />
-                        </div>
-                        <form onSubmit={handleSendChat} className="p-6 border-t border-border flex flex-col gap-3 relative">
-                            <AnimatePresence>
-                                {showEmojiPicker === 'chat' && (
-                                    <motion.div key="emoji-picker" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="absolute bottom-full left-6 mb-2 p-3 bg-card border border-border rounded-2xl shadow-2xl z-50 grid grid-cols-5 gap-2">
-                                        {commonEmojis.map(e => <button type="button" key={e} onClick={() => { setNewMessage(prev => prev + e); setShowEmojiPicker(null); }} className="p-2 hover:bg-muted rounded-lg text-xl">{e}</button>)}
-                                        <button type="button" onClick={() => { setShowEmojiPicker(null); setShowGifPicker('chat'); }} className="col-span-5 text-[10px] font-black text-primary py-2 capitalize tracking-widest border-t border-slate-50 mt-2">Gif Ara</button>
-                                    </motion.div>
-                                )}
-                                {showGifPicker === 'chat' && (
-                                    <motion.div key="gif-picker" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="absolute bottom-full left-6 mb-2 p-4 bg-card border border-border rounded-2xl shadow-2xl z-50 w-72 space-y-3">
-                                         <div className="flex items-center gap-2 px-2 bg-muted rounded-xl border border-border">
-                                             <Search size={14} className="text-slate-400" />
-                                             <input 
-                                                autoFocus 
-                                                placeholder={isOnline ? "Gif Ara..." : "Çevrimdışı (Hazır Gif'ler)"} 
-                                                value={gifSearchQuery} 
-                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGifSearchQuery(e.target.value)}
-                                                className="w-full py-2 bg-transparent text-[10px] font-bold outline-none" 
-                                             />
-                                         </div>
-                                         <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto no-scrollbar pt-1">
-                                            {(gifSearchQuery.trim() && isOnline ? onlineGifs : offlineGifs).map((gif, i) => <img key={i} src={gif} onClick={() => { 
-                                                const msgObj = { id: Date.now().toString(), text: "GIF", author_id: user?.uid, author_name: user?.displayName || "Müfettiş", timestamp: new Date().toISOString(), attachments: [{ url: gif, type: 'image', name: 'gif' }] };
-                                                setMessages((prev: any) => [...prev, { ...msgObj, isMine: true } as Message]);
-                                                sendGlobalMessage("GIF", [{ url: gif, type: 'image', name: 'gif' }]);
-                                                setShowGifPicker(null); 
-                                                setGifSearchQuery("");
-                                            }} className="w-full aspect-square object-cover rounded-xl cursor-pointer hover:scale-105 transition-transform" />)}
-                                         </div>
-                                         <button type="button" onClick={() => { setShowGifPicker(null); setGifSearchQuery(""); }} className="w-full text-[10px] font-black text-slate-400 py-2 capitalize tracking-widest border-t border-slate-50 mt-2">Kapat</button>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                            <div className="flex gap-3">
-                                <div className="flex-1 relative">
-                                    <input 
-                                        value={newMessage} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewMessage(e.target.value)}
-                                        placeholder="Mesajınızı yazın..." 
-                                        className="w-full bg-muted/80 rounded-2xl pl-4 pr-12 py-3 text-xs font-bold outline-none border-2 border-transparent focus:border-primary/20 transition-all"
-                                    />
-                                    <button type="button" onClick={() => setShowEmojiPicker(showEmojiPicker === 'chat' ? null : 'chat')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors">
-                                        <Smile size={20} />
-                                    </button>
-                                </div>
-                                <button 
-                                    disabled={isSendingMsg}
-                                    className="w-12 h-12 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all"
-                                >
-                                    {isSendingMsg ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <div className="lg:hidden fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
-                <Button 
-                    onClick={() => {
-                        if (viewMode !== 'Sohbet') {
-                            setViewMode('Sohbet');
-                            setIsChatCollapsed(false);
-                        } else {
-                            setIsChatCollapsed(true);
-                            setViewMode('Forum');
-                        }
-                    }}
-                    className="w-14 h-14 rounded-full bg-[#002B4B] text-white shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all relative"
-                >
-                    {viewMode === 'Sohbet' ? <X size={24} /> : <MessageSquare size={24} />}
-                    {onlineUsers.length > 0 && viewMode !== 'Sohbet' && (
-                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 border-2 border-[#002B4B] rounded-full flex items-center justify-center text-[8px] font-black">
-                            {onlineUsers.length}
-                        </span>
-                    )}
-                </Button>
             </div>
 
             <AnimatePresence>
@@ -1291,9 +789,7 @@ function FAQCard({ faq, isOpen, onToggle, onApprove, onReject, isAdmin }: any) {
 
 function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, isEdit, inspectors, sharedWith, onSharedWithChange, onUpload, uploading, isAdmin }: any) {
     const [step, setStep] = useState(1);
-    const isAnnouncement = post.category === 'Duyurular';
-    const isSSS = post.category === 'SSS';
-    const isForum = !isAnnouncement && !isSSS;
+    const isForum = post.category !== 'Duyurular' && post.category !== 'SSS';
 
     let headerTitle = "Yeni İçerik Oluştur";
     let headerDesc = "Fikrini Müzakereye Aç";

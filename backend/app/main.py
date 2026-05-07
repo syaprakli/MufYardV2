@@ -64,6 +64,19 @@ class CSPMiddleware(BaseHTTPMiddleware):
 settings = get_settings()
 app = FastAPI(title=settings.APP_NAME)
 
+@app.get("/")
+async def root():
+    return {
+        "message": "MufYARD API is running",
+        "status": "healthy",
+        "docs": "/docs",
+        "health": "/health"
+    }
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "version": "1.0.1-antigravity", "timestamp": asyncio.get_event_loop().time()}
+
 @app.on_event("startup")
 async def startup_event():
     try:
@@ -207,6 +220,15 @@ async def websocket_chat_endpoint(websocket: WebSocket):
     name = websocket.query_params.get("name", "Müfettiş")
     room_id = websocket.query_params.get("room_id", "global")
     
+    # DM Odası Normalizasyonu: dm_UID1_UID2 formatını alfabetik sırala
+    if room_id.startswith("dm_"):
+        parts = room_id.split("_")
+        if len(parts) >= 3:
+            # "dm" öneki dışındaki parçaları sırala
+            uids = sorted(parts[1:])
+            room_id = f"dm_{'_'.join(uids)}"
+            logger.info(f"DM Odası Normalize Edildi: {room_id}")
+
     await chat_manager.connect(websocket, room_id, uid, name)
     try:
         while True:
@@ -220,6 +242,7 @@ async def websocket_chat_endpoint(websocket: WebSocket):
 
             # Eğer DM odasıysa ve mesaj geliyorsa, veri tabanına kaydet
             if room_id.startswith("dm_") and data.get("type", "message") == "message":
+                logger.info(f"DM Mesajı alınıyor: {uid} -> {room_id}")
                 # Alıcıyı room_id'den bul (dm_uid1_uid2)
                 parts = room_id.split("_")
                 recipient_id = parts[1] if parts[2] == uid else parts[2]
@@ -246,6 +269,8 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                 data["id"] = new_db_msg["id"]
                 data["timestamp"] = new_db_msg["timestamp"]
                 raw_data = json.dumps(data)
+            else:
+                logger.info(f"WS Mesajı (Room: {room_id}): {data.get('type', 'msg')} from {name}")
 
             await chat_manager.broadcast(room_id, raw_data)
     except WebSocketDisconnect:
@@ -254,13 +279,7 @@ async def websocket_chat_endpoint(websocket: WebSocket):
         logger.error(f"Chat WS Error: {e}")
         await chat_manager.disconnect(websocket, room_id)
 
-@app.get("/")
-async def root():
-    return {"message": "MufYARD API is running"}
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "version": "1.0.1-antigravity"}
+# Health endpoints moved up for visibility
 
 @app.get("/health/detail")
 async def health_detail():

@@ -4,7 +4,7 @@ import { useConfirm } from "../lib/context/ConfirmContext";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { fetchContacts, createContact, shareContact, deleteContact, updateContact, acceptContact, type Contact } from "../lib/api/contacts";
 import { MessageSquare } from "lucide-react";
 import { useChat } from "../lib/context/ChatContext";
@@ -225,59 +225,67 @@ export default function Contacts() {
 
 
 
-    const filteredContacts = contacts.filter(c => {
-        const normalize = (s: string) => s.toLowerCase()
-            .replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g')
-            .replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c')
-            .replace(/i̇/g, 'i'); // handle combining dot
+    const filteredContacts = useMemo(() => {
+        return contacts.filter(c => {
+            const normalize = (s: string) => s.toLowerCase()
+                .replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g')
+                .replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c')
+                .replace(/i̇/g, 'i'); // handle combining dot
 
-        const normSearch = normalize(searchQuery);
-        const normName = normalize(c.name);
-        const normUnit = normalize(c.unit || "");
-        const normTitle = normalize(c.title || "");
-        
-        const matchesSearch = normName.includes(normSearch) || 
-            normUnit.includes(normSearch) || 
-            normTitle.includes(normSearch) || 
-            c.tags?.some(t => normalize(t).includes(normSearch));
-        
-        const normCategory = normalize(c.category || c.tags?.[0] || "");
-        
-        let matchesRole = false;
-        if (selectedRole === "Tümü") matchesRole = true;
-        else if (selectedRole === "Favoriler") matchesRole = favorites.includes(c.id);
-        else matchesRole = normCategory === normalize(selectedRole);
-             
-        return matchesSearch && matchesRole;
-    });
+            const normSearch = normalize(searchQuery);
+            const normName = normalize(c.name);
+            const normUnit = normalize(c.unit || "");
+            const normTitle = normalize(c.title || "");
+            
+            const matchesSearch = normName.includes(normSearch) || 
+                normUnit.includes(normSearch) || 
+                normTitle.includes(normSearch) || 
+                c.tags?.some(t => normalize(t).includes(normSearch));
+            
+            const normCategory = normalize(c.category || c.tags?.[0] || "");
+            
+            let matchesRole = false;
+            if (selectedRole === "Tümü") matchesRole = true;
+            else if (selectedRole === "Favoriler") matchesRole = favorites.includes(c.id);
+            else matchesRole = normCategory === normalize(selectedRole);
+                 
+            return matchesSearch && matchesRole;
+        });
+    }, [contacts, searchQuery, selectedRole, favorites]);
 
-    const sortedContacts = [...filteredContacts].sort((a, b) => {
-        const aOrder = a.sort_order ?? Number.MAX_SAFE_INTEGER;
-        const bOrder = b.sort_order ?? Number.MAX_SAFE_INTEGER;
+    const sortedContacts = useMemo(() => {
+        return [...filteredContacts].sort((a, b) => {
+            const aOrder = a.sort_order ?? Number.MAX_SAFE_INTEGER;
+            const bOrder = b.sort_order ?? Number.MAX_SAFE_INTEGER;
 
-        if (aOrder !== bOrder) {
-            return aOrder - bOrder;
-        }
+            if (aOrder !== bOrder) {
+                return aOrder - bOrder;
+            }
 
-        return a.name.localeCompare(b.name, 'tr', { sensitivity: 'base' });
-    });
+            return a.name.localeCompare(b.name, 'tr', { sensitivity: 'base' });
+        });
+    }, [filteredContacts]);
 
-    const roleOptions = [
+    const roleOptions = useMemo(() => [
         "Tümü",
         "Favoriler",
         ...Array.from(new Set(contacts.map(contact => contact.category).filter((value): value is string => Boolean(value))))
-    ];
+    ], [contacts]);
 
-    const groupedContacts = sortedContacts.reduce<Record<string, Contact[]>>((groups, contact) => {
-        const groupKey = contact.category || "Diğer";
-        if (!groups[groupKey]) {
-            groups[groupKey] = [];
-        }
-        groups[groupKey].push(contact);
-        return groups;
-    }, {});
+    const groupedContacts = useMemo(() => {
+        return sortedContacts.reduce<Record<string, Contact[]>>((groups, contact) => {
+            const groupKey = contact.category || "Diğer";
+            if (!groups[groupKey]) {
+                groups[groupKey] = [];
+            }
+            groups[groupKey].push(contact);
+            return groups;
+        }, {});
+    }, [sortedContacts]);
 
-    const orderedGroupNames = Array.from(new Set(sortedContacts.map(contact => contact.category || "Diğer")));
+    const orderedGroupNames = useMemo(() => {
+        return Array.from(new Set(sortedContacts.map(contact => contact.category || "Diğer")));
+    }, [sortedContacts]);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">

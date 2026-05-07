@@ -155,7 +155,8 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
-            webSecurity: true, // Güvenliği etkinleştir, CORS backend tarafından yönetilecek
+            webSecurity: false, // Radyo yayınları ve CORS sorunlarını aşmak için geçici olarak kapatıldı
+            allowRunningInsecureContent: true, // HTTP radyo akışlarına izin ver
         }
     });
 

@@ -548,51 +548,59 @@ class CollaborationService:
             return False
 
     @staticmethod
-    async def get_pending_requests(user_id: str) -> List[Dict[str, Any]]:
+    async def get_pending_requests(user_id: str, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
         """Kullanıcının onay bekleyen tüm paylaşım isteklerini getirir."""
         results = []
+        user_keys = [user_id]
+        if user_email:
+            user_keys.append(user_email.lower())
         
         # 1. Bekleyen Görevler/Raporlar
-        tasks = await asyncio.to_thread(
-            lambda: list(db.collection('tasks').where('pending_collaborators', 'array_contains', user_id).stream())
-        )
-        for t in tasks:
-            td = t.to_dict()
-            results.append({
-                'id': t.id,
-                'type': 'TASK',
-                'title': td.get('rapor_adi') or td.get('title') or 'İsimsiz Görev',
-                'sender_name': td.get('owner_name') or 'Bir Müfettiş',
-                'created_at': td.get('created_at')
-            })
+        # Firestore where array_contains multiple criteria workaround: fetch for each key
+        for key in user_keys:
+            tasks = await asyncio.to_thread(
+                lambda k=key: list(db.collection('tasks').where('pending_collaborators', 'array_contains', k).stream())
+            )
+            for t in tasks:
+                td = t.to_dict()
+                if not any(r['id'] == t.id for r in results):
+                    results.append({
+                        'id': t.id,
+                        'type': 'TASK',
+                        'title': td.get('rapor_adi') or td.get('title') or 'İsimsiz Görev',
+                        'sender_name': td.get('owner_name') or 'Bir Müfettiş',
+                        'created_at': td.get('created_at')
+                    })
 
-        # 2. Bekleyen Notlar
-        notes = await asyncio.to_thread(
-            lambda: list(db.collection('notes').where('pending_collaborators', 'array_contains', user_id).stream())
-        )
-        for n in notes:
-            nd = n.to_dict()
-            results.append({
-                'id': n.id,
-                'type': 'NOTE',
-                'title': nd.get('title') or 'İsimsiz Not',
-                'sender_name': nd.get('owner_name') or 'Bir Müfettiş',
-                'created_at': nd.get('created_at')
-            })
+            # 2. Bekleyen Notlar
+            notes = await asyncio.to_thread(
+                lambda k=key: list(db.collection('notes').where('pending_collaborators', 'array_contains', k).stream())
+            )
+            for n in notes:
+                nd = n.to_dict()
+                if not any(r['id'] == n.id for r in results):
+                    results.append({
+                        'id': n.id,
+                        'type': 'NOTE',
+                        'title': nd.get('title') or 'İsimsiz Not',
+                        'sender_name': nd.get('owner_name') or 'Bir Müfettiş',
+                        'created_at': nd.get('created_at')
+                    })
 
-        # 3. Bekleyen Rehber Kayıtları
-        contacts = await asyncio.to_thread(
-            lambda: list(db.collection('contacts').where('pending_collaborators', 'array_contains', user_id).stream())
-        )
-        for c in contacts:
-            cd = c.to_dict()
-            results.append({
-                'id': c.id,
-                'type': 'CONTACT',
-                'title': cd.get('name') or 'İsimsiz Kişi',
-                'sender_name': cd.get('owner_name') or 'Bir Müfettiş',
-                'created_at': cd.get('created_at')
-            })
+            # 3. Bekleyen Rehber Kayıtları
+            contacts = await asyncio.to_thread(
+                lambda k=key: list(db.collection('contacts').where('pending_collaborators', 'array_contains', k).stream())
+            )
+            for c in contacts:
+                cd = c.to_dict()
+                if not any(r['id'] == c.id for r in results):
+                    results.append({
+                        'id': c.id,
+                        'type': 'CONTACT',
+                        'title': cd.get('name') or 'İsimsiz Kişi',
+                        'sender_name': cd.get('owner_name') or 'Bir Müfettiş',
+                        'created_at': cd.get('created_at')
+                    })
 
         return results
 

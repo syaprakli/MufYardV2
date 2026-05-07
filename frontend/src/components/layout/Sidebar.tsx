@@ -61,7 +61,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     user?.email === "sefayaprakli@hotmail.com" || 
                     user?.email === "sefa.yaprakli@gsb.gov.tr";
     
-    // A moderator could have a specific role
     const isModerator = profile?.role === 'moderator' || isAdmin;
     
     const [modPermissions, setModPermissions] = useState<string[]>([]);

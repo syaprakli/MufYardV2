@@ -95,6 +95,7 @@ class ProfileService:
             # Doğrulanmamışsa veya ismi genel ise aşağıda 'Discovery' mantığına devam et
 
         # Discovery logic
+        inspector_match = None
         search_email = (email or (uid if "@" in uid else None))
         if search_email:
             search_email = search_email.lower().strip()

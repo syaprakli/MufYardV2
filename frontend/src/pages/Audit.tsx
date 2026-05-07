@@ -721,8 +721,12 @@ function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect
                         <span className="flex items-center gap-1.5"><Clock size={12} className="text-primary/60" /> {date}</span>
                         <span className="hidden md:block w-1.5 h-1.5 rounded-full bg-border" />
                         <span className="flex items-center gap-1.5"><Shield size={12} className="text-primary/60" /> {inspector}</span>
-                        <span className="hidden md:block w-1.5 h-1.5 rounded-full bg-border" />
-                        <span className="flex items-center gap-1.5"><MapPin size={12} className="text-primary/60" /> {location}</span>
+                        {(location && location !== "Merkez / Yerinde" && location !== "Merkez / Yerinde ") && (
+                            <>
+                                <span className="hidden md:block w-1.5 h-1.5 rounded-full bg-border" />
+                                <span className="flex items-center gap-1.5"><MapPin size={12} className="text-primary/60" /> {location}</span>
+                            </>
+                        )}
                     </div>
                 </div>
 

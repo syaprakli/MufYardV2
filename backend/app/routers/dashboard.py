@@ -49,9 +49,9 @@ def format_relative_time(dt):
         return str(dt)
 
 @router.get("/stats", response_model=DashboardStats)
-async def get_dashboard_stats():
+async def get_dashboard_stats(user_id: str = None):
     try:
-        duyurular = await CollaborationService.get_posts(category="Duyurular", limit=3)
+        duyurular = await CollaborationService.get_posts(category="Duyurular", user_uid=user_id, limit=5)
         news_items = []
         for d in duyurular:
             news_items.append({
@@ -60,9 +60,24 @@ async def get_dashboard_stats():
                 "date": format_relative_time(d.get('created_at')),
                 "category": d.get('category', 'Duyuru')
             })
+            
+        all_posts_raw = await CollaborationService.get_posts(user_uid=user_id, limit=20)
+        forum_items = []
+        for f in all_posts_raw:
+            cat = f.get('category', 'Genel')
+            if cat != "SSS":
+                forum_items.append({
+                    "id": f.get('id', ''),
+                    "title": f.get('title', ''),
+                    "date": format_relative_time(f.get('created_at')),
+                    "category": cat
+                })
+                if len(forum_items) >= 5:
+                    break
     except Exception as e:
         print(f"Dashboard news fetch error: {e}")
         news_items = []
+        forum_items = []
 
     return {
         "stats": [
@@ -73,5 +88,8 @@ async def get_dashboard_stats():
         ],
         "news": news_items if news_items else [
             {"id": "0", "title": "Henüz duyuru bulunmamaktadır.", "date": "-", "category": "Bilgi"}
+        ],
+        "forum_posts": forum_items if forum_items else [
+            {"id": "0", "title": "Henüz forum gönderisi bulunmamaktadır.", "date": "-", "category": "Bilgi"}
         ]
     }

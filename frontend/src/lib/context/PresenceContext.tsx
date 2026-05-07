@@ -50,7 +50,7 @@ function resolvePresenceName(user: any, profileName?: string) {
 }
 
 export function PresenceProvider({ children }: { children: React.ReactNode }) {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
     const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
     const [wsConnected, setWsConnected] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -69,14 +69,9 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (user?.uid) {
-            activeNameRef.current = resolvePresenceName(user);
-            import('../api/profiles').then(api => {
-                api.fetchProfile(user.uid, user.email || undefined).then(p => {
-                    activeNameRef.current = resolvePresenceName(user, p.full_name);
-                }).catch(() => {});
-            });
+            activeNameRef.current = profile?.full_name || resolvePresenceName(user);
         }
-    }, [user]);
+    }, [user, profile]);
 
     useEffect(() => {
         if (!user?.uid) {

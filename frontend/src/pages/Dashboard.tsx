@@ -1,4 +1,4 @@
-import { FileText, Loader2, AlertCircle, Clock, CheckCircle2, TrendingUp, Filter, FileSpreadsheet, Zap, Bell, ArrowUpRight, BarChart3, PieChart as PieIcon, Shield, ChevronRight, X, Download, Bot, Sparkles, ExternalLink, Globe, BookOpen, Cake } from "lucide-react";
+import { FileText, Loader2, AlertCircle, Clock, CheckCircle2, TrendingUp, Filter, FileSpreadsheet, Zap, Bell, ArrowUpRight, BarChart3, PieChart as PieIcon, Shield, ChevronRight, X, Download, Bot, Sparkles, Globe, BookOpen, Cake, Megaphone, Plus, Landmark, MessageSquare, MessageCircle } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -54,6 +54,8 @@ const getKalanColor = (diff: number, total: number = 30) => {
     return "#ef4444";                      // Kırmızı
 };
 
+
+
 export default function Dashboard() {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -63,7 +65,11 @@ export default function Dashboard() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [showIdentityModal, setShowIdentityModal] = useState(false);
+    const [showAnalysis, setShowAnalysis] = useState(false);
+    const [analysisLoading, setAnalysisLoading] = useState(false);
+    const [analysisText, setAnalysisText] = useState("");
     const [birthdayUsers, setBirthdayUsers] = useState<any[]>([]);
+    const [showBirthdayModal, setShowBirthdayModal] = useState(false);
 
     // ─── Filtre State ───
     const [showFilters, setShowFilters] = useState(false);
@@ -71,11 +77,6 @@ export default function Dashboard() {
     const [filterStatus, setFilterStatus] = useState<string>("Tümü");
     const [filterPeriod, setFilterPeriod] = useState<string>("Tümü");
     const filterRef = useRef<HTMLDivElement>(null);
-
-    // ─── Analiz Raporu State ───
-    const [showAnalysis, setShowAnalysis] = useState(false);
-    const [analysisText, setAnalysisText] = useState("");
-    const [analysisLoading, setAnalysisLoading] = useState(false);
     
     // Get identity once from useAuth or fallback (same as Tasks.tsx)
     const currentUser = user;
@@ -97,7 +98,7 @@ export default function Dashboard() {
             if (!effectiveUid) return;
             try {
                 const [statsResult, tasksResult, profileResult] = await Promise.allSettled([
-                    fetchStats(),
+                    fetchStats(effectiveUid),
                     fetchTasks(effectiveUid),
                     fetchProfile(effectiveUid, currentUser.email || undefined, currentUser.displayName || undefined)
                 ]);
@@ -105,7 +106,7 @@ export default function Dashboard() {
                 const stats =
                     statsResult.status === "fulfilled"
                         ? statsResult.value
-                        : { stats: [], news: [] };
+                        : { stats: [], news: [], forum_posts: [] };
                 const taskList =
                     tasksResult.status === "fulfilled"
                         ? tasksResult.value
@@ -181,16 +182,23 @@ export default function Dashboard() {
                 setTasks(myTasks);
                 setProfile(profileData);
                 
-                // Doğum günü kontrolü - tüm profilleri çek
+                // Doğum günü kontrolü
                 try {
                     const profilesRes = await fetchWithTimeout(`${API_URL}/profiles/`);
                     const allProfiles = await profilesRes.json();
                     const today = new Date();
                     const todayMD = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                    
                     const bdayUsers = (Array.isArray(allProfiles) ? allProfiles : []).filter(
                         (p: any) => p.birthday && p.birthday === todayMD && p.uid !== effectiveUid
                     );
                     setBirthdayUsers(bdayUsers);
+
+                    // Mevcut kullanıcı doğum günü mü?
+                    if ((profileData as any)?.birthday === todayMD && !sessionStorage.getItem('celebrated')) {
+                        setShowBirthdayModal(true);
+                        sessionStorage.setItem('celebrated', 'true');
+                    }
                 } catch { /* sessizce geç */ }
             } catch (err) {
                 console.error("Dashboard yüklenirken hata:", err);
@@ -531,7 +539,6 @@ Lütfen şunları analiz et:
                     icon={FileText} 
                     style={COLORS.blue}
                 />
-                {/* 2. Tamamlanan Raporlar (Dinamik) */}
                 <StatCard 
                     title="Tamamlanan Raporlar" 
                     value={completedTasksCount.toString()} 
@@ -539,7 +546,6 @@ Lütfen şunları analiz et:
                     icon={CheckCircle2} 
                     style={COLORS.green}
                 />
-                {/* 3. ACİL GÖREVLER (Süresi Geçenler) */}
                 <StatCard 
                     title="Acil Görevler" 
                     value={urgentTasksCount.toString()} 
@@ -548,7 +554,6 @@ Lütfen şunları analiz et:
                     style={COLORS.rose}
                     isAlert={urgentTasksCount > 0}
                 />
-                {/* 4. Performans Skoru */}
                 <StatCard 
                     title="Performans Skoru" 
                     value={completedTasksCount > 0 ? `%${Math.min(100, Math.round((completedTasksCount / (tasks.length || 1)) * 100))}` : "%0"} 
@@ -557,28 +562,6 @@ Lütfen şunları analiz et:
                     style={COLORS.amber}
                 />
             </div>
-
-            {/* Doğum Günü Kutlaması */}
-            {birthdayUsers.length > 0 && (
-                <Card className="relative overflow-hidden border-amber-200 dark:border-amber-900/30 bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 dark:from-amber-950/20 dark:via-orange-950/20 dark:to-rose-950/20 p-5 shadow-sm">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-200/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-                    <div className="relative z-10 flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 animate-bounce">
-                            <Cake size={28} />
-                        </div>
-                        <div>
-                            <h3 className="font-black text-lg text-amber-800 dark:text-amber-300 tracking-tight">
-                                🎂 Doğum Günü Kutlu Olsun!
-                            </h3>
-                            <p className="text-sm font-semibold text-amber-700/80 dark:text-amber-400/80 mt-0.5">
-                                Bugün <span className="font-black text-amber-900 dark:text-amber-200">
-                                    {birthdayUsers.map(u => u.full_name || 'Bir arkadaşınız').join(', ')}
-                                </span>'ın doğum günü! 🎉
-                            </p>
-                        </div>
-                    </div>
-                </Card>
-            )}
 
             {/* Charts Section: Pastel & Integrated Layout */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -689,106 +672,148 @@ Lütfen şunları analiz et:
                 </Card>
             </div>
 
-            {/* Duyurular + Hızlı Erişim yan yana */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Alt Bölüm: 4'lü Kutu Yapısı (Duyurular, Forum, Hızlı Erişim, Bugün Doğanlar) */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:gap-6">
                 {/* Sistem Duyuruları */}
-                <Card className="p-6 border border-slate-200 dark:border-slate-800 shadow-sm bg-card xl:col-span-2">
-                    <div className="flex items-center justify-between mb-6">
+                <Card className="md:col-span-6 xl:col-span-3 p-4 lg:p-5 border border-slate-200 dark:border-slate-800 shadow-sm bg-card flex flex-col h-[200px] overflow-hidden">
+                    <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                            <Bell size={16} className="text-primary" />
-                            <h3 className="font-black text-[11px] text-slate-800 dark:text-slate-200 uppercase tracking-widest">Sistem Duyuruları</h3>
+                            <Megaphone size={16} className="text-primary shrink-0" />
+                            <h3 className="font-black text-xs text-slate-800 dark:text-slate-200 uppercase tracking-widest truncate">Duyurular</h3>
                         </div>
                         <Button 
-                            variant="link" 
-                            className="text-[10px] font-black uppercase text-primary tracking-[0.2em] group hover:no-underline font-outfit"
-                            onClick={() => navigate('/public-space', { state: { category: 'Duyurular' } })}
+                            variant="ghost" 
+                            size="icon"
+                            className="w-7 h-7 rounded-lg text-primary hover:bg-primary/5 shrink-0"
+                            title="Yeni Duyuru Ekle"
+                            onClick={() => navigate('/public-space', { state: { category: 'Duyurular', openCreate: true } })}
                         >
-                            Tümünü Gör <TrendingUp size={14} className="ml-2 group-hover:translate-x-1 transition-transform opacity-60" />
+                            <Plus size={14} />
                         </Button>
                     </div>
-                    <div className="flex flex-col gap-6">
-                        {/* İlk 2 Sabit Haber */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {(data?.news || []).slice(0, 2).map((news: any, index: number) => (
-                                <div 
-                                    key={index} 
-                                    onClick={() => navigate('/public-space', { state: { category: 'Duyurular', postId: news.id } })}
-                                    className="bg-white dark:bg-slate-950 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-primary/30 transition-all cursor-pointer group shadow-sm flex flex-col gap-3"
-                                >
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-primary/10 text-primary rounded-md tracking-widest">{news.category}</span>
-                                        <div className="flex items-center gap-1 text-slate-400">
-                                            <Clock size={10} />
-                                            <span className="text-[9px] font-bold">{news.date}</span>
+                    
+                    <div className="relative flex-1 overflow-hidden mt-1 mask-linear-y">
+                        {data?.news && data.news.length > 0 ? (
+                            <div className="absolute top-0 left-0 w-full h-full">
+                                <div className="animate-marquee-vertical flex flex-col gap-3 group hover:[animation-play-state:paused]">
+                                    {[...(data.news || []), ...(data.news || [])].map((news: any, index: number) => (
+                                        <div 
+                                            key={`news-${index}`} 
+                                            onClick={() => navigate('/public-space', { state: { category: 'Duyurular', postId: news.id } })}
+                                            className="p-3 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-primary/20 transition-all cursor-pointer w-full"
+                                        >
+                                            <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 line-clamp-2 group-hover:text-primary transition-colors leading-relaxed">{news.title}</p>
+                                            <span className="text-[9px] font-bold text-slate-400 mt-1.5 block">{news.date}</span>
                                         </div>
-                                    </div>
-                                    <p className="text-xs font-black text-slate-800 dark:text-slate-200 leading-relaxed group-hover:text-primary transition-colors line-clamp-2">{news.title}</p>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
+                            </div>
+                        ) : (
+                            <div className="h-full flex items-center justify-center">
+                                <p className="text-[10px] font-bold text-slate-400 italic">Henüz duyuru bulunmuyor.</p>
+                            </div>
+                        )}
+                    </div>
+                </Card>
 
-                        {/* Diğerleri Kayan Yazı (Marquee) */}
-                        {(data?.news || []).length > 2 && (
-                            <div className="relative overflow-hidden bg-slate-50 dark:bg-slate-900/50 h-10 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 flex items-center">
-                                <div className="absolute left-0 top-0 bottom-0 px-4 bg-primary text-white text-[10px] font-black flex items-center z-10 shadow-lg">
-                                    DİĞER DUYURULAR
-                                </div>
-                                <div className="animate-marquee whitespace-nowrap flex items-center gap-12 pl-40">
-                                    {(data?.news || []).slice(2).map((news: any, index: number) => (
-                                        <button 
-                                            key={index}
-                                            onClick={() => navigate('/public-space', { state: { category: 'Duyurular', postId: news.id } })}
-                                            className="text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-primary transition-colors flex items-center gap-2"
+                {/* Forum Gönderileri */}
+                <Card className="md:col-span-6 xl:col-span-3 p-4 lg:p-5 border border-slate-200 dark:border-slate-800 shadow-sm bg-card flex flex-col h-[200px] overflow-hidden">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <MessageCircle size={16} className="text-info shrink-0" />
+                            <h3 className="font-black text-xs text-slate-800 dark:text-slate-200 uppercase tracking-widest truncate">Forum</h3>
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="w-7 h-7 rounded-lg text-info hover:bg-info/5 shrink-0"
+                            title="Yeni Konu Ekle"
+                            onClick={() => navigate('/public-space', { state: { category: 'Forum', openCreate: true } })}
+                        >
+                            <Plus size={14} />
+                        </Button>
+                    </div>
+                    
+                    <div className="relative flex-1 overflow-hidden mt-1 mask-linear-y">
+                        {data?.forum_posts && data.forum_posts.length > 0 ? (
+                            <div className="absolute top-0 left-0 w-full h-full">
+                                <div className="animate-marquee-vertical flex flex-col gap-3 group hover:[animation-play-state:paused]">
+                                    {[...(data.forum_posts || []), ...(data.forum_posts || [])].map((post: any, index: number) => (
+                                        <div 
+                                            key={`forum-${index}`} 
+                                            onClick={() => navigate('/public-space', { state: { category: 'Forum', postId: post.id } })}
+                                            className="p-3 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-info/20 transition-all cursor-pointer w-full"
                                         >
-                                            <span className="w-1.5 h-1.5 bg-primary rounded-full" />
-                                            {news.title}
-                                            <span className="text-[9px] opacity-50 font-medium">({news.date})</span>
-                                        </button>
-                                    ))}
-                                    {/* Loop for seamless scroll */}
-                                    {(data?.news || []).slice(2).map((news: any, index: number) => (
-                                        <button 
-                                            key={`loop-${index}`}
-                                            onClick={() => navigate('/public-space', { state: { category: 'Duyurular', postId: news.id } })}
-                                            className="text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-primary transition-colors flex items-center gap-2"
-                                        >
-                                            <span className="w-1.5 h-1.5 bg-primary rounded-full" />
-                                            {news.title}
-                                            <span className="text-[9px] opacity-50 font-medium">({news.date})</span>
-                                        </button>
+                                            <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 line-clamp-2 group-hover:text-info transition-colors leading-relaxed">{post.title}</p>
+                                            <span className="text-[9px] font-bold text-slate-400 mt-1.5 block">{post.date}</span>
+                                        </div>
                                     ))}
                                 </div>
+                            </div>
+                        ) : (
+                            <div className="h-full flex items-center justify-center">
+                                <p className="text-[10px] font-bold text-slate-400 italic">Henüz forum gönderisi bulunmuyor.</p>
                             </div>
                         )}
                     </div>
                 </Card>
 
                 {/* Hızlı Erişim */}
-                <Card className="p-5 border border-slate-200 dark:border-slate-800 shadow-sm bg-card">
-                    <div className="flex items-center gap-2 mb-4">
-                        <Globe size={14} className="text-primary" />
-                        <h3 className="font-black text-[10px] text-slate-800 dark:text-slate-200 uppercase tracking-widest">Hızlı Erişim</h3>
+                <Card className="md:col-span-7 xl:col-span-4 p-5 border border-slate-200 dark:border-slate-800 shadow-sm bg-card flex flex-col h-[200px]">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <Globe size={16} className="text-primary" />
+                            <h3 className="font-black text-xs text-slate-800 dark:text-slate-200 uppercase tracking-widest">Hızlı Erişim</h3>
+                        </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3 flex-1 mt-2">
                         {[
                             { name: "BelgeNET", url: "https://belgenet.gsb.gov.tr/", icon: FileText, color: "#3b82f6" },
                             { name: "Mevzuat", url: "https://www.mevzuat.gov.tr/", icon: BookOpen, color: "#8b5cf6" },
-                            { name: "GSB Mevzuat", url: "https://gsb.gov.tr/tr/sayfa/36-mevzuat", icon: Shield, color: "#059669" },
                             { name: "Resmi Gazete", url: "https://www.resmigazete.gov.tr/", icon: FileSpreadsheet, color: "#dc2626" },
-                            { name: "E-Posta", url: "https://eposta.gsb.gov.tr/my.policy", icon: Bell, color: "#f59e0b" },
-                            { name: "Kurumsal", url: "https://kurumsal.gsb.gov.tr/login", icon: ExternalLink, color: "#0ea5e9" },
+                            { name: "E-Posta", url: "https://eposta.gsb.gov.tr/", icon: Bell, color: "#f59e0b" },
+                            { name: "e-Devlet", url: "https://www.turkiye.gov.tr/", icon: Landmark, color: "#10b981" },
+                            { name: "CİMER", url: "https://www.cimer.gov.tr/", icon: MessageSquare, color: "#ef4444" },
                         ].map((link) => (
                             <a
                                 key={link.name}
                                 href={link.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-2.5 bg-white dark:bg-slate-950 px-3 py-2.5 rounded-lg border border-slate-100 dark:border-slate-800 hover:border-primary/30 transition-all group"
+                                className="flex items-center justify-center sm:justify-start gap-2 bg-slate-50 dark:bg-slate-950/50 px-3 py-2 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-primary/20 hover:bg-slate-100 dark:hover:bg-slate-900 transition-all group h-full"
                             >
-                                <link.icon size={14} style={{ color: link.color }} className="flex-shrink-0" />
-                                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 group-hover:text-primary transition-colors truncate">{link.name}</span>
+                                <link.icon size={16} style={{ color: link.color }} className="shrink-0" />
+                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 group-hover:text-primary transition-colors truncate hidden sm:block">{link.name}</span>
                             </a>
                         ))}
+                    </div>
+                </Card>
+
+                {/* Bugün Doğanlar */}
+                <Card className="md:col-span-5 xl:col-span-2 p-4 lg:p-5 border border-slate-200 dark:border-slate-800 shadow-sm bg-card bg-gradient-to-br from-card to-amber-50/30 dark:to-amber-950/10 flex flex-col h-[200px]">
+                    <div className="flex items-start gap-2 mb-3 justify-center md:justify-start pt-1">
+                        <Cake size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                        <h3 className="font-black text-[10px] lg:text-[11px] text-slate-800 dark:text-slate-200 uppercase tracking-widest leading-tight">
+                            Bugün<br/>Doğanlar
+                        </h3>
+                    </div>
+                    <div className="space-y-2 flex-1 overflow-y-auto scrollbar-thin mt-2 pr-1">
+                        {birthdayUsers.length > 0 ? (
+                            birthdayUsers.map((u, i) => (
+                                <div key={i} className="flex items-center justify-center md:justify-start gap-2.5 p-2 rounded-xl bg-white/50 dark:bg-slate-950/30 border border-amber-100/50 dark:border-amber-900/20">
+                                    <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 font-black text-[11px] shrink-0">
+                                        {u.full_name?.charAt(0) || '?'}
+                                    </div>
+                                    <div className="min-w-0 hidden md:block">
+                                        <p className="text-[10px] font-black text-slate-800 dark:text-slate-200 truncate">{u.full_name}</p>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center opacity-40">
+                                <Cake size={28} className="text-slate-300 mb-2" />
+                            </div>
+                        )}
                     </div>
                 </Card>
             </div>
@@ -974,6 +999,55 @@ Lütfen şunları analiz et:
                                 </Button>
                             </div>
                         )}
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* ─── Sürpriz Doğum Günü Kutlaması ─── */}
+            {showBirthdayModal && createPortal(
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
+                    <div 
+                        className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm animate-in fade-in duration-500"
+                        onClick={() => setShowBirthdayModal(false)}
+                    />
+                    <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-500 text-center overflow-hidden border border-amber-100 dark:border-amber-900/20">
+                        {/* Konfeti Parçacıkları (CSS ile) */}
+                        <div className="absolute inset-0 pointer-events-none opacity-50">
+                            {[...Array(12)].map((_, i) => (
+                                <div 
+                                    key={i} 
+                                    className="absolute animate-bounce" 
+                                    style={{ 
+                                        left: `${Math.random()*100}%`, 
+                                        top: `${Math.random()*100}%`,
+                                        animationDelay: `${i*0.2}s`,
+                                        color: ['#f59e0b', '#3b82f6', '#10b981', '#ec4899'][i%4]
+                                    }}
+                                >
+                                    ✨
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="relative z-10">
+                            <div className="w-24 h-24 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl animate-bounce">
+                                🎂
+                            </div>
+                            <h2 className="text-3xl font-black text-slate-900 dark:text-slate-100 font-outfit mb-2">Mutlu Yıllar!</h2>
+                            <p className="text-lg font-bold text-primary dark:text-primary-light mb-6">{profile?.full_name}</p>
+                            <div className="space-y-4 mb-8">
+                                <p className="text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
+                                    Yeni yaşınızın size sağlık, mutluluk ve başarı getirmesini dileriz. MufYard ailesi olarak doğum gününüzü en içten dileklerimizle kutlarız!
+                                </p>
+                            </div>
+                            <Button 
+                                onClick={() => setShowBirthdayModal(false)}
+                                className="w-full h-14 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-amber-200/50 dark:shadow-amber-950/20"
+                            >
+                                Teşekkürler! 🎉
+                            </Button>
+                        </div>
                     </div>
                 </div>,
                 document.body

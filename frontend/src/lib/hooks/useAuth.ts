@@ -4,7 +4,8 @@ import type { User } from "firebase/auth";
 import { auth } from "../firebase";
 import { setOnline, removeOnline, removeOnlineBeacon } from "../api/online";
 
-function resolveUserName(user: User | null) {
+function resolveUserName(user: User | null, profile?: Profile | null) {
+    if (profile?.full_name) return profile.full_name;
     if (!user) return "Kullanıcı";
     const displayName = (user.displayName || "").trim();
     if (displayName && displayName !== "Müfettiş" && displayName !== "Kullanıcı") {
@@ -42,14 +43,14 @@ export function useAuth() {
     useEffect(() => {
         if (!user?.uid) return;
 
-        const name = resolveUserName(user);
+        const name = resolveUserName(user, profile);
 
         // İlk girişte online yaz
         setOnline(user.uid, name).catch(() => undefined);
 
         // Periyodik heartbeat: stale kayıt birikmesini engeller
         const heartbeat = setInterval(() => {
-            setOnline(user.uid, name).catch(() => undefined);
+            setOnline(user.uid, resolveUserName(user, profile)).catch(() => undefined);
         }, 30000);
 
         // Sekme kapanmasında mümkünse beacon ile sil
@@ -63,7 +64,7 @@ export function useAuth() {
             window.removeEventListener("beforeunload", handleBeforeUnload);
             removeOnline(user.uid).catch(() => undefined);
         };
-    }, [user]);
+    }, [user, profile]);
 
     const logout = async () => {
         try {

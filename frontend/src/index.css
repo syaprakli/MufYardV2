@@ -132,3 +132,18 @@ button {
 .animate-marquee:hover {
   animation-play-state: paused;
 }
+
+@keyframes marquee-vertical {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+
+.animate-marquee-vertical {
+  display: flex;
+  flex-direction: column;
+  animation: marquee-vertical 30s linear infinite;
+}
+
+.animate-marquee-vertical:hover {
+  animation-play-state: paused;
+}

@@ -9,8 +9,10 @@ export type PendingRequest = {
     created_at: string;
 };
 
-export async function fetchPendingRequests(uid: string): Promise<PendingRequest[]> {
-    const res = await fetchWithTimeout(`${API_URL}/collaboration/pending-requests?uid=${uid}`);
+export async function fetchPendingRequests(uid: string, email?: string): Promise<PendingRequest[]> {
+    let url = `${API_URL}/collaboration/pending-requests?uid=${uid}`;
+    if (email) url += `&email=${encodeURIComponent(email)}`;
+    const res = await fetchWithTimeout(url);
     if (!res.ok) return [];
     return await res.json();
 }

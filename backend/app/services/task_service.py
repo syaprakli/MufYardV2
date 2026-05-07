@@ -161,15 +161,21 @@ class TaskService:
 
                 try:
                     from app.services.notification_service import NotificationService
+                    from app.services.profile_service import ProfileService
+                    
+                    # Resolve owner name for notification
+                    owner_profile = await ProfileService.get_profile(task_data.get('owner_id'))
+                    owner_display = owner_profile.get('full_name') if owner_profile else task_data.get('owner_id')
+                    
                     for uid in pending_uids:
                         await NotificationService.notify_task_invitation(
                             task_id=task_id,
                             task_name=task_data.get('rapor_adi', 'Yeni Görev'),
-                            owner_name=task_data.get('owner_id'),
+                            owner_name=owner_display,
                             collaborator_id=uid
                         )
-                except Exception:
-                    pass
+                except Exception as ne:
+                    print(f"Notification failed: {ne}")
                 
                 doc = await asyncio.to_thread(result[1].get)
                 if doc and doc.exists:
@@ -224,6 +230,28 @@ class TaskService:
                     'pending_collaborators': pending,
                     'accepted_collaborators': accepted
                 })
+
+                # --- Auto Folder Creation Hook (On Acceptance) ---
+                try:
+                    from app.lib.folder_manager import FolderManager
+                    bt = task_data.get('baslama_tarihi')
+                    year = datetime.now().year
+                    if bt:
+                        try:
+                            if '-' in bt and len(bt) >= 10:
+                                year = int(bt.split('-')[0])
+                        except Exception:
+                            pass
+                    
+                    await asyncio.to_thread(FolderManager.ensure_audit_folders,
+                        year=str(year),
+                        audit_type=task_data.get('rapor_turu', 'Diger'),
+                        audit_code=task_data.get('rapor_kodu', 'Kodsuz'),
+                        audit_title=task_data.get('rapor_adi', 'Basliksiz')
+                    )
+                except Exception as ef:
+                    print(f"Folder creation failed on acceptance: {ef}")
+
                 return True
             return False
         except Exception:

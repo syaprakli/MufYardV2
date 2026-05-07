@@ -71,7 +71,7 @@ function getDirectRoomUserIds(roomId: string, currentUid: string) {
 
 // ─── COMPONENT ──────────────────────────────────────────────────────────────
 export default function FloatingChat({ roomId, title, onClose, type = 'dm', inline = false, isOnline }: FloatingChatProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { theme } = useTheme();
   const isDark = (theme as string) === "dark";
 
@@ -138,19 +138,39 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
     const connect = () => {
       if (!user) return;
       const baseWs = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
-      const senderName = user.displayName || user.email?.split('@')[0] || user.email || 'Kullanıcı';
-      const normalizedRoomId = type === 'dm' && !roomId.startsWith('dm_') ? `dm_${roomId}` : roomId;
+      const senderName = profile?.full_name || user.displayName || user.email?.split('@')[0] || user.email || 'Kullanıcı';
+      
+      let normalizedRoomId = type === 'dm' && !roomId.startsWith('dm_') ? `dm_${roomId}` : roomId;
+      if (normalizedRoomId.startsWith('dm_')) {
+          const parts = normalizedRoomId.split('_');
+          if (parts.length >= 3) {
+              const uids = parts.slice(1).sort();
+              normalizedRoomId = `dm_${uids.join('_')}`;
+          }
+      }
+
       const socketUrl = `${baseWs}/ws?uid=${user.uid}&name=${encodeURIComponent(senderName)}&room_id=${normalizedRoomId}`;
       
       ws.current = new WebSocket(socketUrl);
 
+      // Heartbeat interval
+      let pingInterval: any = null;
+
       ws.current.onopen = () => {
         setIsConnected(true);
         retryCount = 0;
+        
+        // Start heartbeat
+        pingInterval = setInterval(() => {
+          if (ws.current?.readyState === WebSocket.OPEN) {
+            ws.current.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 30000);
       };
 
       ws.current.onclose = () => {
         setIsConnected(false);
+        if (pingInterval) clearInterval(pingInterval);
         const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
         console.log(`Chat WS [${roomId}]: Disconnected, retrying in ${delay/1000}s...`);
         retryTimer = setTimeout(connect, delay);
@@ -267,7 +287,7 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
   const sendMessage = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!input.trim()) return;
-    const senderName = user?.displayName || user?.email?.split('@')[0] || 'Müfettiş';
+    const senderName = profile?.full_name || user?.displayName || user?.email?.split('@')[0] || 'Müfettiş';
     pushMessage({ id: `local_${Date.now()}`, sender_id: user?.uid || '', sender_name: senderName, content: input.trim(), timestamp: new Date().toISOString() });
     setInput('');
     setShowEmoji(false);
