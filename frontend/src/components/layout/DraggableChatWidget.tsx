@@ -7,7 +7,7 @@ import { usePresence } from '../../lib/context/PresenceContext';
 import { toast } from 'react-hot-toast';
 
 export function DraggableChatWidget() {
-    const { user, profile } = useAuth();
+    const { user } = useAuth();
     const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage, radioState, sendRadioCommand } = usePresence();
     const [isMinimized, setIsMinimized] = useState(true);
     const [newMessage, setNewMessage] = useState("");

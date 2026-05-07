@@ -91,7 +91,7 @@ export default function Tasks() {
     const modalBoxStyle: React.CSSProperties = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: "1.5rem", boxShadow: "var(--shadow-lg)", width: "100%", maxWidth: "550px", padding: "2rem" };
 
     const [tasks, setTasks] = useState<Task[]>([]);
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
     
     const currentUser = user;
     const effectiveUid = currentUser?.uid;

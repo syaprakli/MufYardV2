@@ -17,12 +17,21 @@ interface Message {
     attachments?: any[];
 }
 
+interface RadioState {
+    url: string;
+    title: string;
+    playing: boolean;
+    dj_name: string;
+}
+
 interface PresenceContextType {
     onlineUsers: OnlineUser[];
     wsConnected: boolean;
     isUserOnline: (uid: string) => boolean;
     messages: Message[];
+    radioState: RadioState;
     sendMessage: (text: string, attachments?: any[]) => string;
+    sendRadioCommand: (url: string, title?: string, playing?: boolean) => void;
 }
 
 const PresenceContext = createContext<PresenceContextType | undefined>(undefined);
