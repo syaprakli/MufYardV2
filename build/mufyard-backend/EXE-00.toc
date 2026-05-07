@@ -89,7 +89,7 @@
  [],
  False,
  False,
- 1778056960,
+ 1778142795,
  [('run.exe',
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\run.exe',

@@ -116,7 +116,7 @@ export default function Tasks() {
         title: "",
         location: "",
         date: new Date().toLocaleDateString("tr-TR"),
-        inspector: currentUser?.displayName || currentUser?.email?.split('@')[0] || "Sefa YAPRAKLI",
+        inspector: profile?.full_name || currentUser?.displayName || currentUser?.email?.split('@')[0] || "Müfettiş",
         status: "Devam Ediyor",
         template: "Boş Rapor",
         report_seq: 1
@@ -748,7 +748,7 @@ export default function Tasks() {
                                     </div>
                                     <h4 className="font-bold text-foreground dark:text-slate-100 text-sm mb-1">{inv.rapor_adi}</h4>
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-4 italic flex items-center gap-1">
-                                        <UserPlus size={10} /> Gönderen: {inv.owner_id}
+                                        <UserPlus size={10} /> Gönderen: {inspectors.find(i => i.id === inv.owner_id || i.email === inv.owner_id)?.name || inv.owner_id}
                                     </p>
                                 </div>
                                 <button 

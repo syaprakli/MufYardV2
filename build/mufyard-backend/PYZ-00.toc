@@ -26,6 +26,9 @@
   ('_ios_support',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\_ios_support.py',
    'PYMODULE'),
+  ('_markupbase',
+   'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\_markupbase.py',
+   'PYMODULE'),
   ('_opcode_metadata',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\_opcode_metadata.py',
    'PYMODULE'),
@@ -617,6 +620,10 @@
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\backend\\app\\routers\\profiles.py',
    'PYMODULE'),
+  ('app.routers.settings',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\backend\\app\\routers\\settings.py',
+   'PYMODULE'),
   ('app.routers.tasks',
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\backend\\app\\routers\\tasks.py',
@@ -706,6 +713,10 @@
   ('app.services.inspector_service',
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
    'YARD\\MufYardV2\\backend\\app\\services\\inspector_service.py',
+   'PYMODULE'),
+  ('app.services.legislation_crawler',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\backend\\app\\services\\legislation_crawler.py',
    'PYMODULE'),
   ('app.services.legislation_service',
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
@@ -900,6 +911,62 @@
    'PYMODULE'),
   ('bisect',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\bisect.py',
+   'PYMODULE'),
+  ('bs4',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\__init__.py',
+   'PYMODULE'),
+  ('bs4._deprecation',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\_deprecation.py',
+   'PYMODULE'),
+  ('bs4._typing',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\_typing.py',
+   'PYMODULE'),
+  ('bs4._warnings',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\_warnings.py',
+   'PYMODULE'),
+  ('bs4.builder',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\builder\\__init__.py',
+   'PYMODULE'),
+  ('bs4.builder._html5lib',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\builder\\_html5lib.py',
+   'PYMODULE'),
+  ('bs4.builder._htmlparser',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\builder\\_htmlparser.py',
+   'PYMODULE'),
+  ('bs4.builder._lxml',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\builder\\_lxml.py',
+   'PYMODULE'),
+  ('bs4.css',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\css.py',
+   'PYMODULE'),
+  ('bs4.dammit',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\dammit.py',
+   'PYMODULE'),
+  ('bs4.element',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\element.py',
+   'PYMODULE'),
+  ('bs4.exceptions',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\exceptions.py',
+   'PYMODULE'),
+  ('bs4.filter',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\filter.py',
+   'PYMODULE'),
+  ('bs4.formatter',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\bs4\\formatter.py',
    'PYMODULE'),
   ('bz2',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\bz2.py',
@@ -4469,6 +4536,9 @@
    'PYMODULE'),
   ('html.entities',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\html\\entities.py',
+   'PYMODULE'),
+  ('html.parser',
+   'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\html\\parser.py',
    'PYMODULE'),
   ('http',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\http\\__init__.py',
@@ -9698,6 +9768,34 @@
    'PYMODULE'),
   ('socketserver',
    'C:\\Users\\sefa\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\socketserver.py',
+   'PYMODULE'),
+  ('soupsieve',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\soupsieve\\__init__.py',
+   'PYMODULE'),
+  ('soupsieve.__meta__',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\soupsieve\\__meta__.py',
+   'PYMODULE'),
+  ('soupsieve.css_match',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\soupsieve\\css_match.py',
+   'PYMODULE'),
+  ('soupsieve.css_parser',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\soupsieve\\css_parser.py',
+   'PYMODULE'),
+  ('soupsieve.css_types',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\soupsieve\\css_types.py',
+   'PYMODULE'),
+  ('soupsieve.pretty',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\soupsieve\\pretty.py',
+   'PYMODULE'),
+  ('soupsieve.util',
+   'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '
+   'YARD\\MufYardV2\\.venv\\Lib\\site-packages\\soupsieve\\util.py',
    'PYMODULE'),
   ('sqlalchemy',
    'C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF '

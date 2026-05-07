@@ -6,25 +6,11 @@ import { useAuth } from '../../lib/hooks/useAuth';
 import { usePresence } from '../../lib/context/PresenceContext';
 
 export function DraggableChatWidget() {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
     const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage } = usePresence();
     const [isMinimized, setIsMinimized] = useState(true);
     const [newMessage, setNewMessage] = useState("");
-    const [messages, setMessages] = useState<any[]>([]);
     const chatEndRef = useRef<HTMLDivElement>(null);
-
-    // Sync global messages
-    useEffect(() => {
-        if (globalMessages.length > 0) {
-            const latest = globalMessages[globalMessages.length - 1];
-            if (latest.author_id !== user?.uid) {
-                setMessages(prev => {
-                    if (prev.find(m => m.id === latest.id)) return prev;
-                    return [...prev, { ...latest, isMine: false }];
-                });
-            }
-        }
-    }, [globalMessages, user?.uid]);
 
     // Scroll to bottom
     useEffect(() => {
@@ -33,21 +19,12 @@ export function DraggableChatWidget() {
                 chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
             }, 100);
         }
-    }, [messages, isMinimized]);
+    }, [globalMessages, isMinimized]);
 
     const handleSendChat = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if (!newMessage.trim() || !user) return;
 
-        const msgObj = {
-            id: Date.now().toString(),
-            text: newMessage,
-            author_id: user.uid,
-            author_name: user.displayName || "Müfettiş",
-            timestamp: new Date().toISOString()
-        };
-
-        setMessages(prev => [...prev, { ...msgObj, isMine: true }]);
         sendGlobalMessage(newMessage);
         setNewMessage("");
     };
@@ -105,28 +82,31 @@ export function DraggableChatWidget() {
                                 </span>
                             </div>
 
-                            {messages.length === 0 ? (
+                            {globalMessages.length === 0 ? (
                                 <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-3">
                                     <MessageSquare size={40} className="opacity-20" />
                                     <p className="text-xs font-bold">Müzakereye ilk mesajı siz yazın.</p>
                                 </div>
                             ) : (
-                                messages.map((msg, idx) => (
-                                    <div key={idx} className={cn("flex flex-col max-w-[85%]", msg.isMine ? "items-end ml-auto" : "items-start")}>
-                                        <span className="text-[9px] font-bold text-slate-400 mb-1 px-1">{msg.author_name}</span>
-                                        <div className={cn(
-                                            "px-4 py-2.5 text-[13px] font-medium shadow-sm",
-                                            msg.isMine 
-                                                ? "bg-blue-600 text-white rounded-2xl rounded-br-sm" 
-                                                : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-100 dark:border-slate-700 rounded-2xl rounded-bl-sm"
-                                        )}>
-                                            {msg.text}
-                                            {msg.attachments?.map((at:any, i:number) => (
-                                                <img key={i} src={at.url} className="mt-2 rounded-xl w-full" alt="attachment" />
-                                            ))}
+                                globalMessages.map((msg, idx) => {
+                                    const isMine = msg.author_id === user?.uid;
+                                    return (
+                                        <div key={msg.id || idx} className={cn("flex flex-col max-w-[85%]", isMine ? "items-end ml-auto" : "items-start")}>
+                                            <span className="text-[9px] font-bold text-slate-400 mb-1 px-1">{msg.author_name}</span>
+                                            <div className={cn(
+                                                "px-4 py-2.5 text-[13px] font-medium shadow-sm",
+                                                isMine 
+                                                    ? "bg-blue-600 text-white rounded-2xl rounded-br-sm" 
+                                                    : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-100 dark:border-slate-700 rounded-2xl rounded-bl-sm"
+                                            )}>
+                                                {msg.text}
+                                                {msg.attachments?.map((at:any, i:number) => (
+                                                    <img key={i} src={at.url} className="mt-2 rounded-xl w-full" alt="attachment" />
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))
+                                    );
+                                })
                             )}
                             <div ref={chatEndRef} />
                         </div>
