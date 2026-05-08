@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, CheckCheck, Trash2, Calendar, FileText, UserPlus, Info, CheckCircle2 } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, Calendar, FileText, UserPlus, Info, CheckCircle2, X as XIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../lib/context/NotificationContext';
 import { useChat } from '../../lib/context/ChatContext';
@@ -15,7 +15,8 @@ export function NotificationDropdown() {
         unreadCount, 
         markAsRead, 
         markAllAsRead, 
-        clearAll
+        clearAll,
+        deleteNotification
     } = useNotifications();
     const { openChat } = useChat();
 
@@ -122,8 +123,15 @@ const getIcon = (type: string) => {
                             className={`px-4 py-4 flex gap-4 hover:bg-slate-50/80 transition-all cursor-pointer relative group ${
                                 !notif.read ? 'bg-primary/[0.02]' : ''
                             }`}
-
                         >
+                            {/* Delete button */}
+                            <button
+                                onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}
+                                className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 w-6 h-6 rounded-full bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-500 flex items-center justify-center transition-all z-10"
+                                title="Bildirimi Sil"
+                            >
+                                <XIcon size={12} />
+                            </button>
                             <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
                                 !notif.read ? 'bg-white' : 'bg-slate-100 opacity-60'
                             }`}>

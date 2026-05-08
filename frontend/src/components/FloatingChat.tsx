@@ -341,6 +341,7 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
 
   const onEmojiClick = (emojiData: EmojiClickData) => {
     setInput(prev => prev + emojiData.emoji);
+    setShowEmoji(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -484,7 +485,7 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
   // ── full window ───────────────────────────────────────────────────────
   return (
     <div className={inline
-      ? "w-full h-full bg-card border border-slate-200 dark:border-slate-800 rounded-3xl flex flex-col overflow-hidden"
+      ? "relative w-full h-full bg-card border border-slate-200 dark:border-slate-800 rounded-3xl flex flex-col overflow-hidden"
       : "relative w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-t-2xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5 duration-300"
     } style={inline ? undefined : { height: 420 }}>
 
@@ -585,14 +586,14 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
 
       {/* Emoji Picker */}
       {showEmoji && (
-        <div className="absolute bottom-[72px] right-0 z-[9999]" style={{ width: 320 }}>
+        <div className="absolute bottom-[72px] right-2 z-30" style={{ width: 320, maxWidth: "calc(100% - 16px)" }}>
           <EmojiPicker onEmojiClick={onEmojiClick} theme={isDark ? EmojiTheme.DARK : EmojiTheme.LIGHT} width={320} height={360} searchPlaceholder="Emoji ara..." />
         </div>
       )}
 
       {/* GIF Picker */}
       {showGif && (
-        <div className="absolute bottom-[72px] right-0 z-[9999] w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="absolute bottom-[72px] right-2 z-30 w-80 max-w-[calc(100%-16px)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
           <div className="p-2 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
             <Search size={14} className="text-slate-400" />
             <input

@@ -405,7 +405,10 @@ export default function Calendar() {
                 {/* Sidebar */}
                 <div className="space-y-6">
                     <Card className="p-6">
-                        <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-4">Yaklaşan Denetimler</h3>
+                        <div className="flex items-center gap-2 mb-4">
+                            <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground">Yaklaşan Denetimler</h3>
+                            <span title="Önümüzdeki 14 gün içinde başlayacak görev/denetimlerinizi gösterir. Görevler sayfasından yeni denetim ekleyebilirsiniz." className="cursor-help text-[9px] font-black text-primary/60 bg-primary/10 rounded-full px-2 py-0.5">?</span>
+                        </div>
                         <div className="space-y-3">
                             {upcoming.length > 0 ? upcoming.map(t => (
                                 <div key={t.id} className="flex items-start gap-3 p-2 bg-muted rounded-lg hover:bg-muted/80 transition-all">

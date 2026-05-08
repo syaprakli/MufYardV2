@@ -14,7 +14,7 @@ MEVZUAT_DIR = settings.MEVZUAT_DIR
 
 class LegislationService:
     @staticmethod
-    async def get_legislations(user_id: Optional[str] = None, category: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_legislations(user_id: Optional[str] = None, category: Optional[str] = None, is_admin: bool = False) -> List[Dict[str, Any]]:
         legislations_ref = db.collection('legislations')
         
         # Base query: Public items that are NOT archived
@@ -76,8 +76,12 @@ class LegislationService:
                     blob.make_public()
                     return blob.public_url
                 except Exception as e:
-                    if "does not exist" in str(e).lower() or "404" in str(e):
-                        raise Exception("Firebase Storage bucket başlatılmamış. Lütfen Firebase Console'dan Storage bölümüne gidip 'Get Started' butonuna tıklayarak Storage'ı aktif hale getirin.")
+                    err = str(e).lower()
+                    if "does not exist" in err or "404" in err or "bucket" in err:
+                        raise Exception(
+                            "Firebase Storage bucket erişilemiyor. Storage aktif olsa bile bucket adı yanlış olabilir. "
+                            "Backend ortam değişkeninde FIREBASE_STORAGE_BUCKET değerini kontrol edin (örnek: proje-id.appspot.com)."
+                        )
                     raise e
 
             public_url = await asyncio.to_thread(_upload)

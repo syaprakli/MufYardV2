@@ -1,3 +1,40 @@
+// ── post content markdown renderer ────────────────────────────────────────────
+function renderPostContent(raw: string) {
+    // Escape HTML first
+    let safe = raw
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    // Bold / italic
+    safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    safe = safe.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    // Horizontal rule
+    safe = safe.replace(/---/g, '<hr class="my-3 border-border"/>');
+    // Process lines → paragraphs / lists
+    const lines = safe.split('\n');
+    let html = '';
+    let ulOpen = false;
+    let olOpen = false;
+    for (const line of lines) {
+        if (/^- /.test(line)) {
+            if (olOpen) { html += '</ol>'; olOpen = false; }
+            if (!ulOpen) { html += '<ul class="list-disc pl-5 my-2 space-y-0.5">'; ulOpen = true; }
+            html += `<li>${line.slice(2)}</li>`;
+        } else if (/^\d+\. /.test(line)) {
+            if (ulOpen) { html += '</ul>'; ulOpen = false; }
+            if (!olOpen) { html += '<ol class="list-decimal pl-5 my-2 space-y-0.5">'; olOpen = true; }
+            html += `<li>${line.replace(/^\d+\. /, '')}</li>`;
+        } else {
+            if (ulOpen) { html += '</ul>'; ulOpen = false; }
+            if (olOpen) { html += '</ol>'; olOpen = false; }
+            html += line === '' ? '<br/>' : `<p class="mb-1.5">${line}</p>`;
+        }
+    }
+    if (ulOpen) html += '</ul>';
+    if (olOpen) html += '</ol>';
+    return html;
+}
+
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { 
@@ -7,7 +44,8 @@ import {
     Plus, Eye, Edit3,
     ArrowLeft, Image as ImageIcon, Paperclip, 
     Shield, Bell, HelpCircle, Check, X, Lock as LockIcon,
-    ChevronRight, FolderTree, Reply
+    ChevronRight, ChevronLeft, FolderTree, Reply,
+    Bold, Italic, List, ListOrdered, AlignJustify, Minus as HR
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
@@ -80,6 +118,7 @@ export default function PublicSpace() {
     const confirm = useConfirm();
     const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage } = usePresence();
     const [chatInput, setChatInput] = useState("");
+    const [desktopChatOpen, setDesktopChatOpen] = useState(true);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     const location = useLocation();
@@ -714,19 +753,27 @@ export default function PublicSpace() {
             </AnimatePresence>
 
             {/* Desktop only: pinned right live chat panel */}
-            <div className="hidden md:flex flex-col w-80 shrink-0 border-l border-border bg-card">
-                <div className="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center gap-3">
-                    <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
-                        <MessageSquare size={18} />
-                    </div>
-                    <div>
-                        <h3 className="font-black text-sm uppercase tracking-wider">Canlı Müzakere</h3>
-                        <p className="text-[10px] font-bold text-blue-100 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                            {onlineUsers.length} kişi aktif
-                        </p>
-                    </div>
+            <div className={`hidden md:flex flex-col shrink-0 border-l border-border bg-card transition-all duration-300 ${desktopChatOpen ? 'w-80' : 'w-14'}`}>
+                <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center gap-3">
+                    <button
+                        onClick={() => setDesktopChatOpen(v => !v)}
+                        className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center hover:bg-white/30 transition-all shrink-0"
+                        title={desktopChatOpen ? 'Gizle' : 'Canlı Müzakereyi Göster'}
+                    >
+                        {desktopChatOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                    </button>
+                    {desktopChatOpen && (
+                        <div>
+                            <h3 className="font-black text-sm uppercase tracking-wider">Canlı Müzakere</h3>
+                            <p className="text-[10px] font-bold text-blue-100 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                                {onlineUsers.length} kişi aktif
+                            </p>
+                        </div>
+                    )}
                 </div>
+                {desktopChatOpen && (
+                <>
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-slate-950/50">
                     <div className="text-center pb-3 border-b border-slate-200 dark:border-slate-800">
                         <span className="inline-block px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 text-[10px] font-black rounded-lg">
@@ -772,6 +819,8 @@ export default function PublicSpace() {
                         <Send size={16} className="ml-0.5" />
                     </button>
                 </form>
+                </>
+                )}
             </div>
         </div>
     );
@@ -871,7 +920,24 @@ function FAQCard({ faq, isOpen, onToggle, onApprove, onReject, isAdmin }: any) {
 
 function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, isEdit, inspectors, sharedWith, onSharedWithChange, onUpload, uploading, isAdmin }: any) {
     const [step, setStep] = useState(1);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const isForum = post.category !== 'Duyurular' && post.category !== 'SSS';
+
+    const insertFormat = (before: string, after: string = '', newline = false) => {
+        const ta = textareaRef.current;
+        if (!ta) return;
+        const start = ta.selectionStart;
+        const end = ta.selectionEnd;
+        const selected = post.content.slice(start, end);
+        const prefix = newline ? (start > 0 ? '\n' : '') : '';
+        const newContent = post.content.slice(0, start) + prefix + before + selected + after + post.content.slice(end);
+        setPost({ ...post, content: newContent });
+        setTimeout(() => {
+            ta.focus();
+            const cur = start + prefix.length + before.length;
+            ta.setSelectionRange(cur, cur + selected.length);
+        }, 0);
+    };
 
     let headerTitle = "Yeni İçerik Oluştur";
     let headerDesc = "Fikrini Müzakereye Aç";
@@ -943,7 +1009,27 @@ function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, 
                             </div>
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black capitalize text-slate-400 tracking-widest ml-1">{contentLabel}</label>
-                                <textarea value={post.content} onChange={(e) => setPost({ ...post, content: e.target.value })} placeholder={contentPlaceholder} className="w-full p-5 bg-muted rounded-3xl border-2 border-transparent focus:border-primary/10 focus:bg-card outline-none font-bold text-sm transition-all min-h-[150px] resize-none" />
+                                <div className="bg-muted rounded-3xl border-2 border-transparent focus-within:border-primary/10 focus-within:bg-card overflow-hidden transition-all">
+                                    {/* Formatting Toolbar */}
+                                    <div className="flex items-center gap-1 px-4 pt-3 pb-2 border-b border-border/50 flex-wrap">
+                                        <button type="button" onMouseDown={(e)=>{e.preventDefault(); insertFormat('**','**');}} title="Kalın" className="p-1.5 rounded-lg hover:bg-primary/10 text-slate-400 hover:text-primary transition-all"><Bold size={14}/></button>
+                                        <button type="button" onMouseDown={(e)=>{e.preventDefault(); insertFormat('*','*');}} title="İtalik" className="p-1.5 rounded-lg hover:bg-primary/10 text-slate-400 hover:text-primary transition-all"><Italic size={14}/></button>
+                                        <div className="w-px h-4 bg-border mx-1"/>
+                                        <button type="button" onMouseDown={(e)=>{e.preventDefault(); insertFormat('- ','',true);}} title="Madde İşareti" className="p-1.5 rounded-lg hover:bg-primary/10 text-slate-400 hover:text-primary transition-all"><List size={14}/></button>
+                                        <button type="button" onMouseDown={(e)=>{e.preventDefault(); insertFormat('1. ','',true);}} title="Numaralı Liste" className="p-1.5 rounded-lg hover:bg-primary/10 text-slate-400 hover:text-primary transition-all"><ListOrdered size={14}/></button>
+                                        <div className="w-px h-4 bg-border mx-1"/>
+                                        <button type="button" onMouseDown={(e)=>{e.preventDefault(); insertFormat('\n\n');}} title="Paragraf Boşluğu" className="p-1.5 rounded-lg hover:bg-primary/10 text-slate-400 hover:text-primary transition-all"><AlignJustify size={14}/></button>
+                                        <button type="button" onMouseDown={(e)=>{e.preventDefault(); insertFormat('\n---\n');}} title="Yatay Çizgi" className="p-1.5 rounded-lg hover:bg-primary/10 text-slate-400 hover:text-primary transition-all"><HR size={14}/></button>
+                                        <span className="ml-auto text-[9px] text-slate-400 font-bold">**kalın** *italik* - liste</span>
+                                    </div>
+                                    <textarea
+                                        ref={textareaRef}
+                                        value={post.content}
+                                        onChange={(e) => setPost({ ...post, content: e.target.value })}
+                                        placeholder={contentPlaceholder}
+                                        className="w-full p-5 bg-transparent outline-none font-medium text-sm min-h-[160px] resize-y"
+                                    />
+                                </div>
                             </div>
                         </>
                     ) : (
@@ -1052,7 +1138,10 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                     </div>
                     <div className="space-y-4">
                         <h1 className="text-xl font-black text-foreground leading-tight tracking-tight">{post.title}</h1>
-                        <p className="text-slate-600 font-medium leading-relaxed text-sm">{post.content}</p>
+                        <div
+                            className="text-slate-600 font-medium leading-relaxed text-sm [&_strong]:font-black [&_strong]:text-foreground [&_em]:italic [&_ul]:list-disc [&_ol]:list-decimal [&_li]:ml-2"
+                            dangerouslySetInnerHTML={{ __html: renderPostContent(post.content) }}
+                        />
                     </div>
                     {post.attachments && post.attachments.length > 0 && (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4">

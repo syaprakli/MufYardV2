@@ -16,11 +16,13 @@ is_mock = True
 
 try:
     cred = None
+    _cred_dict: dict = {}
     
     # 1. Try from Environment Variable (JSON String) - Best for Railway/Cloud
     if settings.FIREBASE_SERVICE_ACCOUNT_JSON:
         try:
             cred_dict = json.loads(settings.FIREBASE_SERVICE_ACCOUNT_JSON)
+            _cred_dict = cred_dict
             cred = credentials.Certificate(cred_dict)
             logger.info("Firebase: Using credentials from Environment Variable.")
         except Exception as json_err:
@@ -51,6 +53,10 @@ try:
             init_kwargs = {}
             if settings.FIREBASE_STORAGE_BUCKET:
                 init_kwargs["storageBucket"] = settings.FIREBASE_STORAGE_BUCKET
+            elif _cred_dict.get('project_id'):
+                auto_bucket = f"{_cred_dict['project_id']}.appspot.com"
+                init_kwargs["storageBucket"] = auto_bucket
+                logger.info(f"Firebase: Auto-derived storageBucket = {auto_bucket}")
             firebase_admin.initialize_app(cred, init_kwargs)
             
             try:
@@ -64,9 +70,15 @@ try:
 
             if not is_mock:
                 try:
-                    bucket_name = settings.FIREBASE_STORAGE_BUCKET or "mufyardv2.appspot.com"
-                    _bucket = storage.bucket(bucket_name)
-                    logger.info(f"Firebase Storage initialized with bucket: {bucket_name}")
+                    app = firebase_admin.get_app()
+                    bucket_name = settings.FIREBASE_STORAGE_BUCKET or app.options.get("storageBucket")
+                    if not bucket_name:
+                        project_id = getattr(app, "project_id", None)
+                        if project_id:
+                            bucket_name = f"{project_id}.appspot.com"
+
+                    _bucket = storage.bucket(bucket_name) if bucket_name else storage.bucket()
+                    logger.info(f"Firebase Storage initialized with bucket: {bucket_name or 'default'}")
                 except Exception as bucket_err:
                     logger.warning(f"Storage bucket could not be initialized: {bucket_err}")
     else:

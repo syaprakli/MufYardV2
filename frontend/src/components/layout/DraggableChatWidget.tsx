@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Send, X, GripHorizontal } from 'lucide-react';
+import { MessageSquare, Send, X, GripHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../lib/hooks/useAuth';
 import { usePresence } from '../../lib/context/PresenceContext';
@@ -70,6 +70,9 @@ export function DraggableChatWidget() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
+                                <button onClick={() => setIsMinimized(true)} className="p-2 bg-black/10 rounded-full hover:bg-black/20 transition-all" title="Gizle">
+                                    <ChevronDown size={16} />
+                                </button>
                                 <button onClick={() => setIsMinimized(true)} className="p-2 bg-black/10 rounded-full hover:bg-black/20 transition-all">
                                     <X size={16} />
                                 </button>
@@ -142,7 +145,7 @@ export function DraggableChatWidget() {
                 onPointerDown={(e) => e.stopPropagation()} // Butona tıklarken sürüklenmeyi engelle
                 className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-full flex items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.3)] transition-all hover:scale-105 active:scale-95 relative"
             >
-                {isMinimized ? <MessageSquare size={24} className={onlineUsers.length > 0 ? "animate-pulse" : ""} /> : <X size={24} />}
+                {isMinimized ? <ChevronUp size={26} /> : <X size={24} />}
                 {isMinimized && onlineUsers.length > 0 && (
                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 border-2 border-slate-900 rounded-full flex items-center justify-center text-[10px] font-black">
                         {onlineUsers.length}

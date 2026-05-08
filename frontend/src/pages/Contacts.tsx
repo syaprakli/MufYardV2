@@ -10,10 +10,12 @@ import { MessageSquare } from "lucide-react";
 import { useChat } from "../lib/context/ChatContext";
 import { useAuth } from "../lib/hooks/useAuth";
 import ShareModal from "../components/ShareModal";
+import { useLocation } from "react-router-dom";
 
 
 export default function Contacts() {
     const { user } = useAuth();
+    const location = useLocation();
     const confirm = useConfirm();
     const [activeTab, setActiveTab] = useState<"corporate" | "personal">("personal");
     const [contacts, setContacts] = useState<Contact[]>([]);
@@ -53,13 +55,40 @@ export default function Contacts() {
     });
 
     useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        if (params.get("view") === "pending") {
+            setActiveTab("personal");
+        }
+    }, [location.search]);
+
+    useEffect(() => {
         loadContacts();
-    }, [activeTab]);
+    }, [activeTab, user?.uid]);
 
     const loadContacts = async () => {
         if (!user) return;
+        const cacheKey = `contacts_cache_${user.uid}_${activeTab}`;
+        let hasCache = false;
+
         try {
-            setLoading(true);
+            const rawCache = localStorage.getItem(cacheKey);
+            if (rawCache) {
+                const cached = JSON.parse(rawCache);
+                if (Array.isArray(cached?.contacts)) {
+                    setContacts(cached.contacts);
+                    setInvitations(Array.isArray(cached?.invitations) ? cached.invitations : []);
+                    setLoading(false);
+                    hasCache = true;
+                }
+            }
+        } catch {
+            // Ignore malformed cache and continue with network fetch.
+        }
+
+        try {
+            if (!hasCache) {
+                setLoading(true);
+            }
             const userEmail = user.email?.toLowerCase();
             const data = await fetchContacts(activeTab, user.uid, userEmail);
             
@@ -80,16 +109,22 @@ export default function Contacts() {
                     return !isOwner && isPendingCollab;
                 });
 
-                setContacts(accepted.length > 0 ? accepted : (data.length > 0 && activeTab === "personal" ? data.filter(c => c.owner_id === user.uid) : []));
+                const acceptedContacts = accepted.length > 0 ? accepted : (data.length > 0 && activeTab === "personal" ? data.filter(c => c.owner_id === user.uid) : []);
+                setContacts(acceptedContacts);
                 setInvitations(pending);
+                localStorage.setItem(cacheKey, JSON.stringify({ contacts: acceptedContacts, invitations: pending, ts: Date.now() }));
             } else {
-                setContacts(Array.isArray(data) ? data : []);
+                const corporateContacts = Array.isArray(data) ? data : [];
+                setContacts(corporateContacts);
                 setInvitations([]);
+                localStorage.setItem(cacheKey, JSON.stringify({ contacts: corporateContacts, invitations: [], ts: Date.now() }));
             }
         } catch (error) {
             console.error("Rehber yüklenemedi:", error);
-            setContacts([]);
-            toast.error("İletişim bilgileri şu an yüklenemiyor.");
+            if (!hasCache) {
+                setContacts([]);
+                toast.error("İletişim bilgileri şu an yüklenemiyor.");
+            }
         } finally {
             setLoading(false);
         }
@@ -501,7 +536,6 @@ export default function Contacts() {
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-secondary uppercase tracking-widest">Ünvan</label>
                             <input 
-                                required
                                 className="w-full px-4 py-3 rounded-xl border border-border focus:ring-2 focus:ring-primary/20 outline-none font-outfit"
                                 placeholder="Örn: Başmüfettiş"
                                 value={newContact.title}
@@ -511,7 +545,6 @@ export default function Contacts() {
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-secondary uppercase tracking-widest">Birim</label>
                             <input 
-                                required
                                 className="w-full px-4 py-3 rounded-xl border border-border focus:ring-2 focus:ring-primary/20 outline-none font-outfit"
                                 placeholder="Örn: Denetim Bşk."
                                 value={newContact.unit}

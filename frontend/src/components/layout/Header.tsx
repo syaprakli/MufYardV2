@@ -10,7 +10,7 @@ import { cn } from "../../lib/utils";
 import { usePresence } from "../../lib/context/PresenceContext";
 import { fetchPendingRequests } from "../../lib/api/collaboration";
 import type { PendingRequest } from "../../lib/api/collaboration";
-import { UserPlus, Check, X as CloseIcon } from "lucide-react";
+import { UserPlus } from "lucide-react";
 
 interface HeaderProps {
     toggleSidebar: () => void;
@@ -21,7 +21,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
     const { onlineUsers, wsConnected } = usePresence();
     const navigate = useNavigate();
     const confirm = useConfirm();
-    const { unreadCount } = useNotifications();
+    const { unreadCount, markAllAsRead } = useNotifications();
     const [showNotifications, setShowNotifications] = useState(false);
     const [showCollaborationRequests, setShowCollaborationRequests] = useState(false);
     const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
@@ -95,6 +95,18 @@ export function Header({ toggleSidebar }: HeaderProps) {
             await logout();
             navigate("/login");
         }
+    };
+
+    const getRequestRoute = (type: PendingRequest["type"]) => {
+        if (type === "CONTACT") return "/contacts?view=pending";
+        if (type === "NOTE") return "/notes";
+        return "/tasks";
+    };
+
+    const getRequestTypeText = (type: PendingRequest["type"]) => {
+        if (type === "CONTACT") return "Rehber paylaşımı";
+        if (type === "NOTE") return "Not paylaşımı";
+        return "Görev paylaşımı";
     };
 
 
@@ -173,7 +185,13 @@ export function Header({ toggleSidebar }: HeaderProps) {
 
                 <div className="relative" ref={collaborationRef}>
                     <button 
-                        onClick={() => setShowCollaborationRequests(!showCollaborationRequests)}
+                        onClick={() => {
+                            const next = !showCollaborationRequests;
+                            setShowCollaborationRequests(next);
+                            if (next) {
+                                markAllAsRead();
+                            }
+                        }}
                         className={`relative p-2 rounded-xl transition-all ${
                             showCollaborationRequests 
                             ? 'text-primary bg-primary/5 shadow-inner' 
@@ -212,25 +230,16 @@ export function Header({ toggleSidebar }: HeaderProps) {
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-xs font-black text-slate-800 truncate mb-0.5">{req.title}</p>
-                                                    <p className="text-[10px] font-bold text-slate-400 truncate">{req.sender_name} paylaştı</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 truncate">{req.sender_name} • {getRequestTypeText(req.type)}</p>
                                                     <div className="flex items-center gap-2 mt-3">
                                                         <button 
-                                                            onClick={async () => {
-                                                                const ok = await (await import("../../lib/api/collaboration")).acceptRequest(req.type, req.id, user!.uid);
-                                                                if (ok) setPendingRequests(prev => prev.filter(r => r.id !== req.id));
+                                                            onClick={() => {
+                                                                navigate(getRequestRoute(req.type));
+                                                                setShowCollaborationRequests(false);
                                                             }}
                                                             className="flex-1 h-8 bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1"
                                                         >
-                                                            <Check size={12} /> Kabul Et
-                                                        </button>
-                                                        <button 
-                                                            onClick={async () => {
-                                                                const ok = await (await import("../../lib/api/collaboration")).rejectRequest(req.type, req.id, user!.uid);
-                                                                if (ok) setPendingRequests(prev => prev.filter(r => r.id !== req.id));
-                                                            }}
-                                                            className="w-8 h-8 bg-muted text-slate-400 rounded-lg flex items-center justify-center hover:bg-rose-50 hover:text-rose-500 transition-all"
-                                                        >
-                                                            <CloseIcon size={14} />
+                                                            Paylaşımı Gör
                                                         </button>
                                                     </div>
                                                 </div>

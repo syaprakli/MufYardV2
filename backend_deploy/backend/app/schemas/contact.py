@@ -4,8 +4,8 @@ from datetime import datetime
 
 class ContactBase(BaseModel):
     name: str = Field(..., example="Ahmet Yılmaz")
-    title: str = Field(..., example="Başmüfettiş")
-    unit: str = Field(..., example="Rehberlik ve Denetim Başkanlığı")
+    title: str = Field(default="", example="Başmüfettiş")
+    unit: str = Field(default="", example="Rehberlik ve Denetim Başkanlığı")
     phone: str = Field(..., example="05xx xxx xx xx")
     email: Optional[str] = Field(default="", example="eposta@gsb.gov.tr")
     tags: List[str] = Field(default_factory=list, example=["Müfettiş", "Birim Amiri"])
