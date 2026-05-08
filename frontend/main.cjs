@@ -198,7 +198,7 @@ function createWindow() {
     }
 
     // Geliştirici araçlarını aç (Sorunu anlamak için geçici olarak aktif)
-    win.webContents.openDevTools();
+    // win.webContents.openDevTools();
 
     // Vite sunucusuna hem localhost hem 127.0.0.1 üzerinden erişimi dene
     win.loadURL('http://localhost:5173').catch(() => {
