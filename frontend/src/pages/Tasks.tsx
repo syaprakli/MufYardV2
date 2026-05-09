@@ -247,11 +247,10 @@ export default function Tasks() {
         if (!form.rapor_adi.trim()) return;
         try {
             setSaving(true);
-            const kodToUse = form.rapor_kodu.trim() || autoKodu;
             const payload = {
                 ...form,
                 owner_id: effectiveUid,
-                assigned_to: [effectiveUid, ...(form.assigned_to || [])],
+                assigned_to: [effectiveUid, ...(form.assigned_to || [])].filter((id): id is string => !!id),
                 rapor_kodu: form.rapor_kodu || autoKodu,
                 rapor_durumu: isLegacyMode ? "Tamamlandı" : "Devam Ediyor",
                 is_public: false,

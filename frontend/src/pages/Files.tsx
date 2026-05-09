@@ -2,7 +2,7 @@ import {
     Folder, File as FileIcon, Plus, Search, ChevronRight, ChevronDown, 
     Download, Trash2, Shield, FolderOpen,
     FileText, Image as ImageIcon, Video, Music, 
-    Upload, X, Grid, List as ListIcon, RefreshCw, Send, Share2
+    Upload, X, Grid, List as ListIcon, RefreshCw, Share2
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
