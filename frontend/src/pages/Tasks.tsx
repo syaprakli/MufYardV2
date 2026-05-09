@@ -643,6 +643,23 @@ export default function Tasks() {
                 </div>
             </div>
 
+            {!isElectron && (
+                <Card className="p-6 border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-900/30 mb-8 animate-in slide-in-from-top-4 duration-500">
+                    <div className="flex items-center gap-4 text-amber-700 dark:text-amber-500">
+                        <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-2xl">
+                            <Shield size={24} />
+                        </div>
+                        <div>
+                            <h4 className="font-black text-sm uppercase tracking-widest font-outfit">Web Sürümü Kısıtlaması</h4>
+                            <p className="text-xs font-bold mt-1 opacity-80">
+                                Güvenlik ve yerel dosya entegrasyonu nedeniyle web sürümünde görev oluşturulamaz. 
+                                Yeni görev oluşturmak için lütfen **MufYard Masaüstü** uygulamasını kullanın.
+                            </p>
+                        </div>
+                    </div>
+                </Card>
+            )}
+
             {isElectron && (
                 <Card className={cn(
                     "p-4 md:p-8 bg-card border shadow-sm mb-6 transition-all",
