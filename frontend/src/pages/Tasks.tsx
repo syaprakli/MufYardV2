@@ -2,22 +2,21 @@ import * as React from "react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield
+    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
-
-import { fetchTasks, createTask, updateTask, deleteTask, acceptTask, type Task, type TaskStep } from "../lib/api/tasks";
-import { fetchInspectors, type Inspector } from "../lib/api/inspectors";
-import { fetchAudits, createAudit, deleteAudit, invalidateAuditCache } from "../lib/api/audit";
-import { fetchAllProfiles, type Profile } from "../lib/api/profiles";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useTheme } from "../lib/context/ThemeContext";
 import { isElectron } from "../lib/firebase";
-import ShareModal from "../components/ShareModal";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { cn } from "../lib/utils";
+import { fetchTasks, createTask, updateTask, deleteTask, acceptTask, importTasksFromExcel, type Task, type TaskStep } from "../lib/api/tasks";
+import { fetchInspectors, type Inspector } from "../lib/api/inspectors";
+import { fetchAudits, createAudit, deleteAudit, invalidateAuditCache } from "../lib/api/audit";
+import { fetchAllProfiles, type Profile } from "../lib/api/profiles";
+import ShareModal from "../components/ShareModal";
 
 // Shared styles and sub-components
 function ActionBtn({ children, title, color, onClick }: { children: React.ReactNode; title: string; color: string; onClick: () => void }) {
@@ -110,6 +109,10 @@ export default function Tasks() {
     const [saving, setSaving] = useState(false);
     const [activeTab, setActiveTab] = useState("kisisel");
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+    const [importLoading, setImportLoading] = useState(false);
+    const importInputRef = useRef<HTMLInputElement>(null);
+    const legacyReportInputRef = useRef<HTMLInputElement>(null);
+    const [isLegacyMode, setIsLegacyMode] = useState(false);
 
     const [isNewAuditModalOpen, setIsNewAuditModalOpen] = useState<Task | null>(null);
     const [newAudit, setNewAudit] = useState({
@@ -245,25 +248,26 @@ export default function Tasks() {
         try {
             setSaving(true);
             const kodToUse = form.rapor_kodu.trim() || autoKodu;
-            await createTask({ 
-                ...form, 
-                rapor_kodu: kodToUse, 
-                rapor_durumu: "Başlanmadı", 
-                steps: [],
-                is_public: activeTab === 'ortak',
-                owner_id: currentUser?.uid || "",
-                assigned_to: form.assigned_to.length > 0 ? form.assigned_to : [currentUser?.uid || currentUser?.email || ""]
-            });
-            setForm({ 
-                rapor_kodu: "", 
-                rapor_adi: "", 
-                rapor_turu: "Genel Denetim", 
-                baslama_tarihi: new Date().toISOString().split("T")[0], 
+            const payload = {
+                ...form,
+                owner_id: effectiveUid,
+                assigned_to: [effectiveUid, ...(form.assigned_to || [])],
+                rapor_kodu: form.rapor_kodu || autoKodu,
+                rapor_durumu: isLegacyMode ? "Tamamlandı" : "Devam Ediyor",
+                is_public: false,
+                steps: []
+            };
+            await createTask(payload);
+            toast.success(isLegacyMode ? "Eski kayıt arşive eklendi." : "Yeni görev oluşturuldu.");
+            setForm({
+                rapor_kodu: "",
+                rapor_adi: "",
+                rapor_turu: "Genel Denetim",
+                baslama_tarihi: new Date().toISOString().split("T")[0],
                 sure_gun: 30,
                 assigned_to: []
             });
-            toast.success("Görev başarıyla oluşturuldu.");
-            await loadTasks();
+            loadTasks();
         } catch { toast.error("Görev oluşturulamadı."); }
         finally { setSaving(false); }
     };
@@ -315,6 +319,64 @@ export default function Tasks() {
             toast.error("Silme işlemi başarısız.");
         } finally {
             setDeleteConfirmId(null);
+        }
+    };
+
+    const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !effectiveUid) return;
+
+        setImportLoading(true);
+        const loadingToast = toast.loading("Excel dosyası işleniyor...");
+        try {
+            const result = await importTasksFromExcel(effectiveUid, file);
+            toast.success(`${result.imported} görev başarıyla içe aktarıldı.`, { id: loadingToast });
+            loadTasks();
+        } catch (error: any) {
+            toast.error(error.message || "İçe aktarma hatası.", { id: loadingToast });
+        } finally {
+            setImportLoading(false);
+            if (e.target) e.target.value = "";
+        }
+    };
+
+    const handleUploadLegacyReport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !showReportSelector || !effectiveUid) return;
+
+        const loadingToast = toast.loading(`${file.name} yükleniyor...`);
+        try {
+            // 1. Dosyayı yükle
+            const { uploadFile } = await import("../lib/api/files");
+            const uploadResult = await uploadFile(file, `raporlar/${showReportSelector.rapor_kodu}`);
+            
+            // 2. Audit kaydı oluştur
+            const nextSeq = Math.max(0, ...taskAudits.map(a => a.report_seq || 0)) + 1;
+            const auditPayload: any = {
+                task_id: showReportSelector.id,
+                title: file.name,
+                location: "Geçmiş Kayıt",
+                date: new Date().toLocaleDateString("tr-TR"),
+                inspector: profile?.full_name || currentUser?.displayName || "Müfettiş",
+                status: "Tamamlandı",
+                report_content: `<p>Bu rapor bir dosya ekidir: <a href="${uploadResult.url}">${file.name}</a></p>`,
+                attachment_url: uploadResult.url,
+                file_name: file.name,
+                owner_id: effectiveUid,
+                assigned_to: Array.from(new Set([...(showReportSelector.assigned_to || []), effectiveUid])),
+                report_seq: nextSeq
+            };
+
+            await createAudit(auditPayload);
+            toast.success("Eski rapor dosyası başarıyla eklendi.", { id: loadingToast });
+            
+            // Raporları tazele
+            handleOpenReportSelector(showReportSelector);
+        } catch (error) {
+            console.error("Yükleme hatası:", error);
+            toast.error("Rapor dosyası eklenemedi.", { id: loadingToast });
+        } finally {
+            if (e.target) e.target.value = "";
         }
     };
 
@@ -514,8 +576,16 @@ export default function Tasks() {
     const filtered = tasks.filter(t => {
         const matchesSearch = t.rapor_adi?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                t.rapor_kodu?.toLowerCase().includes(searchQuery.toLowerCase());
-        const isPublic = (t as any).is_public === true;
-        const matchesTab = activeTab === 'ortak' ? isPublic : !isPublic;
+        
+        // 2 yıl (730 gün) kuralı
+        const isOld = t.baslama_tarihi ? (Date.now() - new Date(t.baslama_tarihi).getTime() > 730 * 24 * 60 * 60 * 1000) : false;
+        
+        // Arşiv Şartı: 1. Görev Tamamlanmış Olacak VE 2. Üzerinden 2 yıl geçmiş olacak.
+        const isArchived = (t.rapor_durumu === "Tamamlandı") && isOld;
+        
+        // Sekme mantığı: 'ortak' sekmesi artık 'Arşiv' sekmesi oldu.
+        const matchesTab = activeTab === 'ortak' ? isArchived : !isArchived;
+        
         return matchesSearch && matchesTab;
     });
 
@@ -560,31 +630,35 @@ export default function Tasks() {
 
                 <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-xl w-full lg:w-auto h-11 shrink-0">
                     <button 
-                        onClick={() => setActiveTab("kisisel")}
+                        onClick={() => { setActiveTab("kisisel"); setIsLegacyMode(false); }}
                         className={`flex-1 lg:flex-none px-4 md:px-6 rounded-lg font-black text-[10px] uppercase transition-all tracking-widest whitespace-nowrap ${activeTab === 'kisisel' ? 'bg-card text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
-                        Özel Kayıtlarım
+                        Mevcut Görevler
                     </button>
                     <button 
-                        onClick={() => setActiveTab("ortak")}
+                        onClick={() => { setActiveTab("ortak"); setIsLegacyMode(true); }}
                         className={`flex-1 lg:flex-none px-4 md:px-6 rounded-lg font-black text-[10px] uppercase transition-all tracking-widest whitespace-nowrap ${activeTab === 'ortak' ? 'bg-card text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
-                        Kurumsal Arşiv
+                        Arşiv Görevler
                     </button>
                 </div>
             </div>
 
-            {/* Görev Oluşturma Formu */}
-            {!isElectron && activeTab === 'kisisel' && (
-                <Card className="p-4 md:p-5 bg-amber-50 border border-amber-200 shadow-sm mb-6">
-                    <p className="text-amber-700 text-sm font-bold">
-                        Web sürümünde görev oluşturma kapalıdır. Lütfen masaüstü programından açınız.
-                    </p>
-                </Card>
-            )}
-
-            {activeTab === 'kisisel' && isElectron && (
-                <Card className="p-4 md:p-8 bg-card border border-border shadow-sm mb-6">
+            {isElectron && (
+                <Card className={cn(
+                    "p-4 md:p-8 bg-card border shadow-sm mb-6 transition-all",
+                    activeTab === 'ortak' ? "border-amber-200 ring-4 ring-amber-500/5" : "border-border"
+                )}>
+                    <div className="flex items-center justify-between mb-6 border-b border-border pb-4">
+                        <div className="flex items-center gap-3">
+                            <div className={cn("p-2 rounded-xl transition-colors", activeTab === 'ortak' ? "bg-amber-100 text-amber-600" : "bg-primary/10 text-primary")}>
+                                {activeTab === 'ortak' ? <History size={20} /> : <FileText size={20} />}
+                            </div>
+                            <h2 className="text-lg font-black font-outfit">
+                                {activeTab === 'ortak' ? "Arşive Eski Görev Kaydı Ekle" : "Yeni Görev Oluştur"}
+                            </h2>
+                        </div>
+                    </div>
                     <form onSubmit={handleCreate} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
                             <div className="md:col-span-3 lg:col-span-2 space-y-1.5">
@@ -722,10 +796,13 @@ export default function Tasks() {
                         <Button
                             type="submit"
                             disabled={saving}
-                            className="w-full h-12 rounded-xl bg-primary text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-lg shadow-primary/20"
+                            className={cn(
+                                "w-full h-12 rounded-xl text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-lg",
+                                isLegacyMode ? "bg-amber-500 shadow-amber-200/50" : "bg-primary shadow-primary/20"
+                            )}
                         >
-                            {saving ? <Loader2 size={18} className="animate-spin mr-2" /> : <FileText size={18} className="mr-2" />}
-                            {saving ? "Oluşturuluyor..." : (!isElectron ? "Masaüstünden Oluştur" : "Yeni Görev Oluştur")}
+                            {saving ? <Loader2 size={18} className="animate-spin mr-2" /> : (isLegacyMode ? <History size={18} className="mr-2" /> : <FileText size={18} className="mr-2" />)}
+                            {saving ? "İşleniyor..." : (isLegacyMode ? "Eski Görevi Kaydet" : "Yeni Görev Oluştur")}
                         </Button>
                     </form>
                 </Card>
@@ -766,15 +843,36 @@ export default function Tasks() {
             {/* Görev Listesi */}
             <Card className="overflow-hidden border border-border shadow-sm">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:p-6 border-b border-border bg-muted/20">
-                    <h3 className="text-xl font-black font-outfit text-slate-900 dark:text-slate-100 tracking-tight">Aktif Görev Listesi</h3>
-                    <div className="relative w-full md:w-[320px]">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <h3 className="text-xl font-black font-outfit text-slate-900 dark:text-slate-100 tracking-tight">
+                        {activeTab === 'ortak' ? "Arşiv Görev Listesi" : "Aktif Görev Listesi"}
+                    </h3>
+                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
                         <input
-                            placeholder="Dosya no veya görev adı ile ara..."
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            className="w-full h-11 pl-10 pr-4 rounded-xl border border-border bg-card text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                            type="file"
+                            ref={importInputRef}
+                            onChange={handleImportExcel}
+                            accept=".xlsx, .xls"
+                            className="hidden"
                         />
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={importLoading}
+                            onClick={() => importInputRef.current?.click()}
+                            className="w-full sm:w-auto h-11 px-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 hover:text-primary hover:border-primary transition-all font-black text-[10px] uppercase tracking-widest"
+                        >
+                            {importLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : <FileDigit size={14} className="mr-2" />}
+                            Excel'den İçe Aktar
+                        </Button>
+                        <div className="relative w-full md:w-[320px]">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            <input
+                                placeholder="Dosya no veya görev adı ile ara..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="w-full h-11 pl-10 pr-4 rounded-xl border border-border bg-card text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -1032,35 +1130,64 @@ export default function Tasks() {
                             </button>
                         </div>
 
-                        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar mb-6">
+                        <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar mb-6">
                             {taskAudits.sort((a,b) => (a.report_seq || 0) - (b.report_seq || 0)).map(audit => (
                                 <div 
                                     key={audit.id}
-                                    onClick={() => navigate(`/audit/${audit.id}/report`)}
+                                    onClick={() => {
+                                        if (audit.attachment_url) {
+                                            window.open(audit.attachment_url, '_blank');
+                                        } else {
+                                            navigate(`/audit/${audit.id}/report`);
+                                        }
+                                    }}
                                     className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-muted/50 dark:bg-slate-900/50 hover:bg-muted dark:hover:bg-slate-800 hover:border-border dark:hover:border-slate-700 cursor-pointer transition-all group"
                                 >
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-muted shadow-sm flex items-center justify-center text-primary/40 group-hover:bg-primary group-hover:text-white transition-all">
-                                                <FileText size={20} />
+                                            <div className={cn(
+                                                "w-10 h-10 rounded-xl shadow-sm flex items-center justify-center transition-all",
+                                                audit.attachment_url ? "bg-amber-50 text-amber-500 group-hover:bg-amber-500 group-hover:text-white" : "bg-muted text-primary/40 group-hover:bg-primary group-hover:text-white"
+                                            )}>
+                                                {audit.attachment_url ? <Download size={20} /> : <FileText size={20} />}
                                             </div>
                                             <div>
-                                                <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest mb-0.5">
-                                                    {showReportSelector.rapor_kodu}{audit.report_seq && audit.report_seq > 1 ? `/${audit.report_seq}` : ''}
-                                                </p>
-                                                <h4 className="font-bold text-muted-foreground dark:text-slate-300 leading-none">{audit.title}</h4>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest">
+                                                        {showReportSelector.rapor_kodu}{audit.report_seq && audit.report_seq > 1 ? `/${audit.report_seq}` : ''}
+                                                    </p>
+                                                    {audit.attachment_url && (
+                                                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded uppercase tracking-widest">DOSYA EKİ</span>
+                                                    )}
+                                                </div>
+                                                <h4 className="font-bold text-muted-foreground dark:text-slate-300 leading-none mt-0.5">{audit.title}</h4>
                                             </div>
                                         </div>
-                                        <ChevronRight size={18} className="text-slate-300 group-hover:text-primary transition-colors" />
+                                        {audit.attachment_url ? <Download size={18} className="text-slate-300 group-hover:text-amber-500 transition-colors" /> : <ChevronRight size={18} className="text-slate-300 group-hover:text-primary transition-colors" />}
                                     </div>
                                 </div>
                             ))}
                         </div>
 
                         {isElectron && (
-                            <button 
-                                onClick={() => {
-                                    const nextSeq = Math.max(0, ...taskAudits.map(a => a.report_seq || 0)) + 1;
+                            <div className="grid grid-cols-2 gap-3">
+                                <input 
+                                    type="file"
+                                    ref={legacyReportInputRef}
+                                    onChange={handleUploadLegacyReport}
+                                    accept=".doc,.docx,.pdf,.pdfx"
+                                    className="hidden"
+                                />
+                                <button 
+                                    onClick={() => legacyReportInputRef.current?.click()}
+                                    className="flex items-center justify-center gap-2 h-12 rounded-xl bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white transition-all font-black text-[10px] uppercase tracking-widest border border-amber-500/20"
+                                >
+                                    <Upload size={16} />
+                                    Eski Rapor Dosyası Yükle
+                                </button>
+                                <button 
+                                    onClick={() => {
+                                        const nextSeq = Math.max(0, ...taskAudits.map(a => a.report_seq || 0)) + 1;
                                     setNewAudit({
                                         ...newAudit,
                                         title: `${showReportSelector.rapor_adi} - Ek Rapor`,
@@ -1076,7 +1203,8 @@ export default function Tasks() {
                                 <FileText size={18} />
                                 YENİ RAPOR EKLE (/{Math.max(0, ...taskAudits.map(a => a.report_seq || 0)) + 1})
                             </button>
-                        )}
+                        </div>
+                    )}
                         {!isElectron && (
                             <p className="text-xs font-bold text-amber-600 text-center">
                                 Web sürümünde rapor oluşturma kapalıdır. Sadece mevcut raporlar görüntülenebilir.

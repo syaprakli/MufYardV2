@@ -105,3 +105,21 @@ export async function acceptTask(id: string, userId: string, userEmail?: string)
     taskCache = {}; // Invalidate
     return response.json();
 }
+
+export async function importTasksFromExcel(userId: string, file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/import?uid=${userId}`, {
+        method: "POST",
+        body: formData
+    });
+    
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "İçe aktarma başarısız oldu.");
+    }
+    
+    taskCache = {}; // Invalidate
+    return response.json();
+}

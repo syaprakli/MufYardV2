@@ -5,6 +5,7 @@ import { useAuth } from '../lib/hooks/useAuth';
 import { useTheme } from "../lib/context/ThemeContext";
 import EmojiPicker, { type EmojiClickData, Theme as EmojiTheme } from 'emoji-picker-react';
 import { toast } from 'react-hot-toast';
+import { uploadFile } from '../lib/api/files';
 
 // ─── TENOR GIF API v1 (resmi demo key, kayıt gerektirmez) ───────────────────
 const TENOR_KEY = 'LIVDSRZULELA';
@@ -344,23 +345,37 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
     setShowEmoji(false);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const senderName = user?.displayName || user?.email?.split('@')[0] || 'Müfettiş';
+
+    const loadingToast = toast.loading(`${file.name} yükleniyor...`);
+    try {
+      // Chat için özel bir klasöre yükle
+      const result = await uploadFile(file, "chats");
+      
+      const senderName = profile?.full_name || user?.displayName || user?.email?.split('@')[0] || 'Müfettiş';
       pushMessage({
         id: `local_${Date.now()}`,
         sender_id: user?.uid || '',
         sender_name: senderName,
         content: '',
         timestamp: new Date().toISOString(),
-        attachment: { type: 'file', name: file.name, url: reader.result as string, mime: file.type, size: file.size },
+        attachment: { 
+          type: 'file', 
+          name: file.name, 
+          url: result.url, // Backend'den dönen gerçek URL (/Raporlar/chats/...)
+          mime: file.type, 
+          size: file.size 
+        },
       });
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+      toast.success("Dosya gönderildi", { id: loadingToast });
+    } catch (err) {
+      console.error("Dosya yükleme hatası:", err);
+      toast.error("Dosya gönderilemedi.", { id: loadingToast });
+    } finally {
+      e.target.value = '';
+    }
   };
 
   const deleteMessage = async (messageId: string) => {

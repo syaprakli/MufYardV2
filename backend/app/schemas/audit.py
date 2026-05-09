@@ -19,6 +19,8 @@ class AuditBase(BaseModel):
     accepted_collaborators: List[str] = Field(default_factory=list)
     is_public: bool = False
     report_seq: Optional[int] = 1
+    attachment_url: Optional[str] = None
+    file_name: Optional[str] = None
 
 class AuditCreate(AuditBase):
     pass
@@ -38,6 +40,8 @@ class AuditUpdate(BaseModel):
     pending_collaborators: Optional[List[str]] = None
     accepted_collaborators: Optional[List[str]] = None
     is_public: Optional[bool] = None
+    attachment_url: Optional[str] = None
+    file_name: Optional[str] = None
 
 
 class AuditResponse(AuditBase):

@@ -1,4 +1,4 @@
-import { Plus, Search, Filter, FileText, Download, Loader2, FileSpreadsheet, Edit3, Shield, MapPin, Clock, Trash2, MoreVertical, ChevronRight, Share2, UserPlus } from "lucide-react";
+import { Plus, Search, Filter, FileText, Download, Loader2, FileSpreadsheet, Edit3, Shield, MapPin, Clock, Trash2, MoreVertical, ChevronRight, Share2, UserPlus, Upload } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { useEffect, useState, useMemo, useRef } from "react";
@@ -39,6 +39,8 @@ export default function Audit() {
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [invitations, setInvitations] = useState<AuditType[]>([]);
     const [shareAudit, setShareAudit] = useState<AuditType | null>(null);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
     
     // Simple local cache for the session
     const cacheRef = useRef<{audits?: AuditType[], tasks?: Task[]}>({});
@@ -124,8 +126,15 @@ export default function Audit() {
             toast.error("Lütfen önce bu denetimle ilişkili bir Görev seçiniz.");
             return;
         }
+
+        if (activeTab === 'ortak' && !selectedFile) {
+            toast.error("Lütfen bir arşiv rapor dosyası (PDF/Word) seçiniz.");
+            return;
+        }
+
         try {
             if (!user) return;
+            setUploading(true);
             const currentUser = user;
             const selectedTask = tasks.find(t => t.id === newAudit.task_id);
             const taskAssigned = selectedTask?.assigned_to || [];
@@ -134,14 +143,23 @@ export default function Audit() {
             
             const combinedAssigned = Array.from(new Set([...taskAssigned, currentUser.uid]));
 
+            let fileUrl = "";
+            if (activeTab === 'ortak' && selectedFile) {
+                const { uploadFile } = await import("../lib/api/files");
+                const path = `audits/${newAudit.task_id}`;
+                const uploaded = await uploadFile(selectedFile, path);
+                fileUrl = uploaded.url;
+            }
+
             const auditPayload: any = {
                 task_id: newAudit.task_id,
                 title: newAudit.title,
                 location: newAudit.location,
                 date: newAudit.date,
                 inspector: newAudit.inspector,
-                status: newAudit.status,
-                report_content: RAPOR_SABLONLARI[newAudit.template] || "",
+                status: activeTab === 'ortak' ? "Tamamlandı" : newAudit.status,
+                report_content: activeTab === 'ortak' ? "" : (RAPOR_SABLONLARI[newAudit.template] || ""),
+                file_url: fileUrl,
                 owner_id: currentUser.uid,
                 assigned_to: combinedAssigned,
                 shared_with: taskShared,
@@ -153,7 +171,7 @@ export default function Audit() {
             
             // Görev durumunu güncelle
             if (selectedTask && selectedTask.rapor_durumu === "Başlanmadı") {
-                await updateTask(selectedTask.id, { rapor_durumu: "Devam Ediyor" });
+                await updateTask(selectedTask.id, { rapor_durumu: activeTab === 'ortak' ? "Tamamlandı" : "Devam Ediyor" });
             }
 
             setIsModalOpen(false);
@@ -167,11 +185,19 @@ export default function Audit() {
                 template: "Boş Rapor",
                 report_seq: 1
             });
-            toast.success("Denetim başarıyla oluşturuldu.");
-            navigate(`/audit/${created.id}/report`);
+            setSelectedFile(null);
+            toast.success(activeTab === 'ortak' ? "Arşiv raporu başarıyla yüklendi." : "Denetim başarıyla oluşturuldu.");
+            
+            if (activeTab !== 'ortak') {
+                navigate(`/audit/${created.id}/report`);
+            } else {
+                loadData(true);
+            }
         } catch (error) {
             console.error(error);
             toast.error("Denetim oluşturulurken hata oluştu.");
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -296,10 +322,16 @@ export default function Audit() {
             const matchesSearch = !debouncedSearch || 
                                   a.title.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
                                   a.location.toLowerCase().includes(debouncedSearch.toLowerCase());
-            const isPublic = (a as any).is_public === true;
-            const matchesTab = activeTab === 'ortak' ? isPublic : !isPublic;
-
             const relatedTask = tasks.find(t => String(t.id).trim() === String(a.task_id).trim());
+            
+            // 2 yıl kuralı (İlişkili görev üzerinden)
+            const isOld = relatedTask?.baslama_tarihi ? (Date.now() - new Date(relatedTask.baslama_tarihi).getTime() > 730 * 24 * 60 * 60 * 1000) : false;
+            
+            // Arşiv Şartı: Görev Tamamlandı VE 2 yıl geçmiş
+            const isArchived = (relatedTask?.rapor_durumu === "Tamamlandı") && isOld;
+            
+            const matchesTab = activeTab === 'ortak' ? isArchived : !isArchived;
+
             const effectiveStatus = relatedTask?.rapor_durumu || a.status;
             const matchesStatus = filterStatus === "Tümü" || effectiveStatus === filterStatus;
             const matchesInspector = filterInspector === "Tümü" || a.inspector === filterInspector;
@@ -341,8 +373,13 @@ export default function Audit() {
                         <span className="text-primary opacity-80 uppercase tracking-widest">Rapor Yönetimi</span>
                     </div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-                        Rapor Yönetimi
+                        {activeTab === 'ortak' ? "Arşiv Raporlar" : "Rapor Yönetimi"}
                     </h1>
+                    <p className="text-slate-500 text-sm font-medium mt-1">
+                        {activeTab === 'ortak' 
+                            ? "2 yılı doldurmuş ve tamamlanmış eski raporlarınızın arşivi." 
+                            : "Şu an üzerinde çalıştığınız veya güncel denetim raporları."}
+                    </p>
                     <p className="text-slate-500 text-sm font-medium mt-1">
                         {isElectron
                             ? "Denetim formlarını doldurun ve raporlarınızı oluşturun."
@@ -355,13 +392,13 @@ export default function Audit() {
                         onClick={() => setActiveTab("kisisel")}
                         className={`px-5 py-2 rounded-lg font-bold text-xs transition-all uppercase tracking-widest ${activeTab === 'kisisel' ? 'bg-card text-primary shadow-sm' : 'text-slate-500 hover:text-muted-foreground'}`}
                     >
-                        Özel Kayıtlarım
+                        Aktif Raporlar
                     </button>
                     <button 
                         onClick={() => setActiveTab("ortak")}
                         className={`px-5 py-2 rounded-lg font-bold text-xs transition-all uppercase tracking-widest ${activeTab === 'ortak' ? 'bg-card text-primary shadow-sm' : 'text-slate-500 hover:text-muted-foreground'}`}
                     >
-                        Kurumsal Arşiv
+                        Arşiv Raporlar
                     </button>
                 </div>
 
@@ -371,7 +408,7 @@ export default function Audit() {
                     </Button>
                     {isElectron && (
                         <Button className="h-12 px-6 shadow-lg shadow-primary/20 rounded-xl" onClick={() => setIsModalOpen(true)}>
-                            <Plus className="mr-2" size={20} /> Yeni Rapor Başlat
+                            <Plus className="mr-2" size={20} /> {activeTab === 'ortak' ? "Arşiv Rapor Ekle" : "Yeni Rapor Başlat"}
                         </Button>
                     )}
                 </div>
@@ -561,7 +598,7 @@ export default function Audit() {
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                title="Yeni Rapor Başlat"
+                title={activeTab === 'ortak' ? "Arşiv Rapor Ekle (Dosya Yükle)" : "Yeni Rapor Başlat"}
             >
                 <form onSubmit={handleCreateAudit} className="space-y-5">
                     <div className="space-y-2">
@@ -598,35 +635,66 @@ export default function Audit() {
                                 onChange={(e) => setNewAudit({...newAudit, date: e.target.value})}
                             />
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Taslak Şablon</label>
-                            <select 
-                                className="w-full p-4 bg-muted border border-border rounded-2xl text-sm font-bold text-foreground outline-none focus:ring-4 focus:ring-primary/10 transition-all cursor-pointer"
-                                value={newAudit.template}
-                                onChange={(e) => setNewAudit({...newAudit, template: e.target.value})}
-                            >
-                                <option value="Boş Rapor" className="bg-card">Boş Rapor</option>
-                                <option value="Genel Teftiş" className="bg-card">Genel Teftiş</option>
-                                <option value="İnceleme-Soruşturma" className="bg-card">İnceleme-Soruşturma</option>
-                                <option value="Ön İnceleme" className="bg-card">Ön İnceleme</option>
-                                <option value="Spor Kulüpleri" className="bg-card">Spor Kulüpleri</option>
-                            </select>
-                        </div>
+                        {activeTab === 'ortak' ? (
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Arşiv Rapor Dosyası (PDF/DOCX)</label>
+                                <div className="relative group">
+                                    <input 
+                                        type="file" 
+                                        accept=".pdf,.doc,.docx"
+                                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                                        className="hidden" 
+                                        id="archive-file-upload"
+                                    />
+                                    <label 
+                                        htmlFor="archive-file-upload"
+                                        className={cn(
+                                            "flex flex-col items-center justify-center w-full p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all",
+                                            selectedFile ? "border-emerald-500 bg-emerald-50 text-emerald-600" : "border-slate-200 hover:border-primary hover:bg-slate-50 text-slate-400"
+                                        )}
+                                    >
+                                        <Upload size={32} className="mb-2" />
+                                        <span className="text-sm font-bold">{selectedFile ? selectedFile.name : "Dosya Seçin veya Sürükleyin"}</span>
+                                        <span className="text-[10px] mt-1 opacity-60">Sadece PDF ve Word dökümanları</span>
+                                    </label>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Taslak Şablon</label>
+                                <select 
+                                    className="w-full p-4 bg-muted border border-border rounded-2xl text-sm font-bold text-foreground outline-none focus:ring-4 focus:ring-primary/10 transition-all cursor-pointer"
+                                    value={newAudit.template}
+                                    onChange={(e) => setNewAudit({...newAudit, template: e.target.value})}
+                                >
+                                    <option value="Boş Rapor" className="bg-card">Boş Rapor</option>
+                                    <option value="Genel Teftiş" className="bg-card">Genel Teftiş</option>
+                                    <option value="İnceleme-Soruşturma" className="bg-card">İnceleme-Soruşturma</option>
+                                    <option value="Ön İnceleme" className="bg-card">Ön İnceleme</option>
+                                    <option value="Spor Kulüpleri" className="bg-card">Spor Kulüpleri</option>
+                                </select>
+                            </div>
+                        )}
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-4 pt-2">
+                    <div className="flex flex-col sm:flex-row gap-4 pt-4">
                         <Button 
                             type="button"
                             variant="outline"
                             onClick={() => setIsModalOpen(false)}
-                            className="flex-1 h-12 rounded-xl font-bold"
+                            className="flex-1 h-14 rounded-2xl font-bold"
                         >
                             İptal
                         </Button>
                         <Button 
                             type="submit"
-                            className="flex-1 h-12 rounded-xl font-bold shadow-lg shadow-primary/20"
+                            disabled={uploading}
+                            className="flex-1 h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:-translate-y-1 transition-all"
                         >
-                            Başlat
+                            {uploading ? (
+                                <><Loader2 size={20} className="animate-spin mr-2" /> Yükleniyor...</>
+                            ) : (
+                                activeTab === 'ortak' ? "Arşiv Raporu Yükle" : "Raporu Başlat"
+                            )}
                         </Button>
                     </div>
                 </form>
@@ -744,10 +812,16 @@ function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect
                             <Button 
                                 variant="outline" 
                                 size="sm" 
-                                onClick={onEdit}
-                                className="flex-1 md:flex-none h-11 md:h-12 px-3 md:px-6 rounded-xl md:rounded-2xl font-bold text-primary hover:bg-primary hover:text-white border-primary/20 shadow-sm transition-all flex items-center justify-center gap-1.5 md:gap-2 text-[10px] md:text-xs uppercase tracking-widest"
+                                onClick={(audit as any).file_url ? () => window.open((audit as any).file_url, '_blank') : onEdit}
+                                className={cn(
+                                    "flex-1 md:flex-none h-11 md:h-12 px-3 md:px-6 rounded-xl md:rounded-2xl font-bold transition-all flex items-center justify-center gap-1.5 md:gap-2 text-[10px] md:text-xs uppercase tracking-widest",
+                                    (audit as any).file_url 
+                                        ? "text-emerald-600 border-emerald-200 hover:bg-emerald-600 hover:text-white"
+                                        : "text-primary border-primary/20 hover:bg-primary hover:text-white shadow-sm"
+                                )}
                             >
-                                <Edit3 size={16} /> <span className="inline">Düzenle</span>
+                                {(audit as any).file_url ? <Download size={16} /> : <Edit3 size={16} />}
+                                <span className="inline">{(audit as any).file_url ? "Dosyayı Aç" : "Düzenle"}</span>
                             </Button>
                         )}
                         

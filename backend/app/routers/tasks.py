@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query
 from typing import List, Optional
 from app.services.task_service import TaskService
 from app.schemas.task import TaskCreate, TaskUpdate, TaskResponse
@@ -66,5 +66,19 @@ async def delete_task(task_id: str):
     try:
         await TaskService.delete_task(task_id)
         return {"status": "success", "message": "Görev silindi."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/import")
+async def import_tasks(uid: str = Query(...), file: UploadFile = File(...)):
+    """Excel'den görev içe aktarır."""
+    try:
+        content = await file.read()
+        result = await TaskService.import_tasks_from_excel(content, uid)
+        if result["status"] == "error":
+            raise HTTPException(status_code=400, detail=result["message"])
+        return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

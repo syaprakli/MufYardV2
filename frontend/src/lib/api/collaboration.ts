@@ -30,3 +30,17 @@ export async function rejectRequest(type: string, id: string, uid: string) {
     });
     return res.ok;
 }
+
+export async function sendDirectMessage(recipientId: string, content: string, attachment: any, senderUid: string, senderName: string) {
+    const url = `${API_URL}/collaboration/dm/send?uid=${senderUid}&name=${encodeURIComponent(senderName)}`;
+    const res = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            recipient_id: recipientId,
+            content: content,
+            attachment: attachment
+        })
+    });
+    return res.ok;
+}

@@ -1,4 +1,4 @@
-import { FileText, Loader2, AlertCircle, Clock, CheckCircle2, TrendingUp, Filter, FileSpreadsheet, Zap, Bell, ArrowUpRight, BarChart3, PieChart as PieIcon, Shield, ChevronRight, X, Download, Bot, Sparkles, Globe, BookOpen, Cake, Megaphone, Plus, Landmark, MessageSquare, MessageCircle } from "lucide-react";
+import { FileText, Loader2, AlertCircle, Clock, CheckCircle2, TrendingUp, Filter, FileSpreadsheet, Zap, Bell, ArrowUpRight, BarChart3, PieChart as PieIcon, Shield, ChevronRight, X, Download, Bot, Sparkles, Globe, BookOpen, Cake, Megaphone, Plus, MessageCircle, ExternalLink } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -63,7 +63,8 @@ export default function Dashboard() {
     const [data, setData] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
     const [tasks, setTasks] = useState<Task[]>([]);
-    const [loading, setLoading] = useState(true);
+
+
     const [showIdentityModal, setShowIdentityModal] = useState(false);
     const [showAnalysis, setShowAnalysis] = useState(false);
     const [analysisLoading, setAnalysisLoading] = useState(false);
@@ -203,20 +204,15 @@ export default function Dashboard() {
             } catch (err) {
                 console.error("Dashboard yüklenirken hata:", err);
             } finally {
-                setLoading(false);
+
+
             }
         };
         loadData();
     }, [effectiveUid]);
 
-    if (loading) {
-        return (
-            <div className="flex flex-col items-center justify-center h-screen space-y-4">
-                <Loader2 className="animate-spin text-primary" size={40} />
-                <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Sistem Yükleniyor...</p>
-            </div>
-        );
-    }
+    // Removed full-screen loading screen to allow instant shell rendering
+
 
     const todayStr = new Intl.DateTimeFormat('tr-TR', { 
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
@@ -768,19 +764,19 @@ Lütfen şunları analiz et:
                     </div>
                     <div className="grid grid-cols-2 gap-3 flex-1 mt-2">
                         {[
-                            { name: "BelgeNET", url: "https://belgenet.gsb.gov.tr/", icon: FileText, color: "#3b82f6" },
+                            { name: "EBYS (BelgeNET)", url: "https://belgenet.gsb.gov.tr/", icon: FileText, color: "#3b82f6" },
                             { name: "Mevzuat", url: "https://www.mevzuat.gov.tr/", icon: BookOpen, color: "#8b5cf6" },
-                            { name: "Resmi Gazete", url: "https://www.resmigazete.gov.tr/", icon: FileSpreadsheet, color: "#dc2626" },
+                            { name: "GSB Mevzuat", url: "https://gsb.gov.tr/tr/sayfa/36-mevzuat", icon: Shield, color: "#059669" },
                             { name: "E-Posta", url: "https://eposta.gsb.gov.tr/", icon: Bell, color: "#f59e0b" },
-                            { name: "e-Devlet", url: "https://www.turkiye.gov.tr/", icon: Landmark, color: "#10b981" },
-                            { name: "CİMER", url: "https://www.cimer.gov.tr/", icon: MessageSquare, color: "#ef4444" },
+                            { name: "Kurumsal", url: "https://kurumsal.gsb.gov.tr/login", icon: ExternalLink, color: "#0ea5e9" },
+                            { name: "Resmi Gazete", url: "https://www.resmigazete.gov.tr/", icon: FileSpreadsheet, color: "#dc2626" },
                         ].map((link) => (
                             <a
                                 key={link.name}
                                 href={link.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center justify-center sm:justify-start gap-2 bg-slate-50 dark:bg-slate-950/50 px-3 py-2 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-primary/20 hover:bg-slate-100 dark:hover:bg-slate-900 transition-all group h-full"
+                                className="flex items-center justify-center sm:justify-start gap-2 bg-slate-50 dark:bg-slate-950/50 px-3 py-2 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-primary/20 hover:bg-slate-100 dark:hover:bg-slate-900 transition-all group h-full overflow-hidden"
                             >
                                 <link.icon size={16} style={{ color: link.color }} className="shrink-0" />
                                 <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 group-hover:text-primary transition-colors truncate hidden sm:block">{link.name}</span>

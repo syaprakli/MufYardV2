@@ -2,7 +2,7 @@ import {
     Folder, File as FileIcon, Plus, Search, ChevronRight, ChevronDown, 
     Download, Trash2, Shield, FolderOpen,
     FileText, Image as ImageIcon, Video, Music, 
-    Upload, X, Grid, List as ListIcon, RefreshCw
+    Upload, X, Grid, List as ListIcon, RefreshCw, Send, Share2
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -14,6 +14,9 @@ import { fetchFileTree, uploadFile, createFolder, deleteItem, openFolder, type F
 import { aiSearch } from "../lib/api/ai";
 import { cn } from "../lib/utils";
 import { isElectron } from "../lib/firebase";
+import { useAuth } from "../lib/hooks/useAuth";
+import { fetchAllProfiles, type Profile } from "../lib/api/profiles";
+import { sendDirectMessage } from "../lib/api/collaboration";
 
 
 export default function Files() {
@@ -31,6 +34,17 @@ export default function Files() {
     const [isUploading, setIsUploading] = useState(false);
     const [isDragActive, setIsDragActive] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { user, profile } = useAuth();
+    
+    // Sharing state
+    const [sharingFile, setSharingFile] = useState<FileItem | null>(null);
+    const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
+    const [sharingLoading, setSharingLoading] = useState(false);
+    
+    // New Folder Modal
+    const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+    const [newFolderName, setNewFolderName] = useState("");
+    const [creatingFolder, setCreatingFolder] = useState(false);
 
     // AI arama fonksiyonu
     useEffect(() => {
@@ -81,7 +95,17 @@ export default function Files() {
 
     useEffect(() => {
         loadData();
+        loadProfiles();
     }, []);
+
+    const loadProfiles = async () => {
+        try {
+            const data = await fetchAllProfiles();
+            setAllProfiles(data.filter(p => p.uid !== user?.uid));
+        } catch (error) {
+            console.error("Profiller yüklenemedi", error);
+        }
+    };
 
     const loadData = async () => {
         setLoading(true);
@@ -155,15 +179,26 @@ export default function Files() {
         }
     };
 
-    const handleCreateFolder = async () => {
-        const name = prompt("Klasör adı:");
-        if (!name) return;
+    const handleCreateFolder = () => {
+        setNewFolderName("");
+        setIsFolderModalOpen(true);
+    };
+
+    const handleFolderSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newFolderName.trim()) return;
+        
+        setCreatingFolder(true);
         try {
-            await createFolder(name, currentPath);
+            await createFolder(newFolderName.trim(), currentPath);
             await loadData();
+            setIsFolderModalOpen(false);
+            setNewFolderName("");
             toast.success("Klasör oluşturuldu");
         } catch (error) {
             toast.error("Klasör oluşturulamadı");
+        } finally {
+            setCreatingFolder(false);
         }
     };
 
@@ -195,6 +230,40 @@ export default function Files() {
         document.body.removeChild(link);
     };
 
+    const handleShareToInspector = async (recipient: Profile) => {
+        if (!sharingFile || !user) return;
+        
+        setSharingLoading(true);
+        const loadingToast = toast.loading(`${sharingFile.name} gönderiliyor...`);
+        
+        try {
+            const senderName = profile?.full_name || user.displayName || user.email?.split('@')[0] || "Müfettiş";
+            const success = await sendDirectMessage(
+                recipient.uid,
+                `📁 Dosya paylaşıldı: ${sharingFile.name}`,
+                {
+                    type: 'file',
+                    name: sharingFile.name,
+                    url: sharingFile.url,
+                    size: 0 // Size already formatted in name or can be parsed
+                },
+                user.uid,
+                senderName
+            );
+
+            if (success) {
+                toast.success(`${recipient.full_name} kişisine gönderildi`, { id: loadingToast });
+                setSharingFile(null);
+            } else {
+                toast.error("Gönderilemedi", { id: loadingToast });
+            }
+        } catch (error) {
+            toast.error("Bir hata oluştu", { id: loadingToast });
+        } finally {
+            setSharingLoading(false);
+        }
+    };
+
     const getFileIcon = (item: FileItem) => {
         if (item.type === 'folder') return <Folder size={20} className="text-primary fill-primary/10" />;
         if (item.type === 'image') return <ImageIcon size={20} className="text-rose-500" />;
@@ -224,20 +293,21 @@ export default function Files() {
                     </h1>
                     <p className="text-slate-500 text-sm font-medium mt-1">Denetim klasörlerinizi ve belgelerinizi organize edin.</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-2 p-1.5 bg-card/40 dark:bg-slate-900/40 rounded-3xl border border-white/60 dark:border-slate-800 backdrop-blur-sm shadow-sm">
                     <Button 
-                        variant="outline" 
+                        variant="ghost" 
                         onClick={loadData}
-                        className="h-12 w-12 rounded-2xl border-white dark:border-slate-800 bg-card/50 dark:bg-slate-900/50 backdrop-blur-sm p-0 shadow-sm hover:rotate-180 transition-transform duration-500"
+                        className="h-10 w-10 rounded-2xl p-0 hover:rotate-180 transition-transform duration-500"
+                        title="Yenile"
                     >
-                        <RefreshCw size={18} className="text-slate-600 dark:text-slate-400" />
+                        <RefreshCw size={16} className="text-slate-600 dark:text-slate-400" />
                     </Button>
                     <Button 
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isUploading}
-                        className="h-12 px-8 shadow-xl shadow-primary/20 rounded-2xl bg-primary text-white font-black uppercase text-[11px] tracking-widest hover:-translate-y-1 transition-all active:scale-95"
+                        className="h-10 px-6 shadow-lg shadow-primary/20 rounded-2xl bg-primary text-white font-black uppercase text-[10px] tracking-widest hover:-translate-y-0.5 transition-all active:scale-95"
                     >
-                        {isUploading ? <RefreshCw className="mr-2 animate-spin" size={18} /> : <Upload className="mr-2" size={18} />}
+                        {isUploading ? <RefreshCw className="mr-2 animate-spin" size={16} /> : <Upload className="mr-2" size={16} />}
                         Dosya Yükle
                     </Button>
                     <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" />
@@ -245,19 +315,27 @@ export default function Files() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div className="lg:col-span-3">
-                    <Card className="p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm h-[700px] overflow-y-auto custom-scrollbar border-none">
+                <div className="lg:col-span-3 order-2 lg:order-1">
+                    <Card className="p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm h-fit lg:h-[700px] overflow-y-auto custom-scrollbar border-none">
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="font-black text-[11px] uppercase tracking-[0.2em] text-slate-500">Klasör Ağacı</h3>
-                            <Button variant="ghost" size="sm" onClick={handleCreateFolder} className="h-8 w-8 rounded-xl"><Plus size={16} /></Button>
                         </div>
                         <div className="space-y-1">
-                            <Tree items={items} expandedFolders={expandedFolders} onToggle={toggleFolder} onSelect={setCurrentPath} selectedId={currentPath} />
+                            <Tree 
+                                items={items} 
+                                expandedFolders={expandedFolders} 
+                                onToggle={toggleFolder} 
+                                onSelect={setCurrentPath} 
+                                selectedId={currentPath} 
+                                onAddFolder={handleCreateFolder}
+                                onShare={setSharingFile}
+                                onDelete={handleDelete}
+                            />
                         </div>
                     </Card>
                 </div>
 
-                <div className="lg:col-span-9 space-y-6">
+                <div className="lg:col-span-9 order-1 lg:order-2 space-y-6">
                     <div className="flex flex-col md:flex-row items-center gap-4">
                         <div className="flex-1 w-full bg-card/60 border border-white/80 rounded-2xl px-5 py-3 flex items-center shadow-inner-sm focus-within:ring-2 ring-primary/10 transition-all backdrop-blur-sm">
                             <Search size={18} className="text-slate-400 mr-3" />
@@ -289,25 +367,27 @@ export default function Files() {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 px-2 overflow-x-auto no-scrollbar">
-                        <button 
-                            onClick={() => setCurrentPath('')}
-                            className={cn("text-[11px] font-black uppercase tracking-widest transition-colors", !currentPath ? "text-primary" : "text-slate-400 hover:text-slate-600")}
-                        >
-                            ROOT
-                        </button>
-                        {breadcrumbs.map((part, idx) => (
-                            <div key={idx} className="flex items-center gap-2">
-                                <ChevronRight size={12} className="text-slate-300" />
+                        <div className="flex items-center justify-between px-2">
+                            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
                                 <button 
-                                    onClick={() => setCurrentPath(breadcrumbs.slice(0, idx + 1).join('/'))}
-                                    className={cn("text-[11px] font-black uppercase tracking-widest transition-colors truncate max-w-[150px]", idx === breadcrumbs.length - 1 ? "text-primary" : "text-slate-400 hover:text-slate-600")}
+                                    onClick={() => setCurrentPath('')}
+                                    className={cn("text-[11px] font-black uppercase tracking-widest transition-colors", !currentPath ? "text-primary" : "text-slate-400 hover:text-slate-600")}
                                 >
-                                    {part}
+                                    ROOT
                                 </button>
+                                {breadcrumbs.map((crumb, i) => (
+                                    <div key={i} className="flex items-center gap-2 shrink-0">
+                                        <ChevronRight size={12} className="text-slate-300" />
+                                        <button 
+                                            onClick={() => setCurrentPath(breadcrumbs.slice(0, i + 1).join('/'))}
+                                            className={cn("text-[11px] font-black uppercase tracking-widest transition-colors", i === breadcrumbs.length - 1 ? "text-primary" : "text-slate-400 hover:text-slate-600")}
+                                        >
+                                            {crumb}
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
+                        </div>
 
                     {/* File List/Grid */}
                     <Card className={cn(
@@ -356,13 +436,23 @@ export default function Files() {
                                                 )}>
                                                     {getFileIcon(item)}
                                                 </div>
-                                                <div className={viewMode === 'list' ? "" : "px-2"}>
-                                                    <p className={cn("font-bold text-foreground dark:text-slate-200 transition-colors group-hover:text-primary", viewMode === 'list' ? "text-sm" : "text-xs line-clamp-2 uppercase tracking-wide")}>{item.name}</p>
-                                                    <p className="text-[10px] text-slate-400 font-medium">{item.size || 'Klasör'} {item.date && `• ${item.date}`}</p>
+                                                <div className={cn("min-w-0", viewMode === 'list' ? "flex-1" : "px-2")}>
+                                                    <p className={cn("font-bold text-foreground dark:text-slate-200 transition-colors group-hover:text-primary", viewMode === 'list' ? "text-sm truncate" : "text-xs line-clamp-2 uppercase tracking-wide")}>{item.name}</p>
+                                                    <p className="text-[10px] text-slate-400 font-medium truncate">{item.size || 'Klasör'} {item.date && `• ${item.date}`}</p>
                                                 </div>
                                             </div>
                                             
-                                            <div className={cn("flex items-center gap-1", viewMode === 'list' ? "opacity-0 group-hover:opacity-100 transition-opacity" : "absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity")}>
+                                            <div className={cn("flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0 z-20", viewMode === 'list' ? "ml-2" : "absolute top-4 right-4")}>
+                                                <Button 
+                                                    size="icon" 
+                                                    variant="ghost" 
+                                                    onClick={(e) => { e.stopPropagation(); handleCreateFolder(); }}
+                                                    className="h-8 w-8 rounded-xl text-primary hover:bg-primary hover:text-white"
+                                                    title="Buraya Klasör Ekle"
+                                                >
+                                                    <Plus size={14} />
+                                                </Button>
+
                                                 {isElectron && (
                                                 <Button 
                                                     size="icon" 
@@ -382,6 +472,15 @@ export default function Files() {
                                                     title="İndir"
                                                 >
                                                     <Download size={14} />
+                                                </Button>
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    onClick={(e) => { e.stopPropagation(); setSharingFile(item); }}
+                                                    className="h-8 w-8 rounded-xl text-slate-400 hover:text-emerald-500"
+                                                    title="Paylaş"
+                                                >
+                                                    <Share2 size={14} />
                                                 </Button>
                                                 <Button 
                                                     size="icon" 
@@ -481,11 +580,116 @@ export default function Files() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Share Modal */}
+            <AnimatePresence>
+                {sharingFile && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
+                        onClick={() => !sharingLoading && setSharingFile(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            className="bg-card w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl border border-white/20 dark:border-slate-800"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="p-6 bg-primary text-white">
+                                <h3 className="text-xl font-black tracking-tight">Dosyayı Paylaş</h3>
+                                <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mt-1">"{sharingFile.name}"</p>
+                            </div>
+                            <div className="p-4 max-h-[400px] overflow-y-auto custom-scrollbar space-y-2">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-2 py-2">Müfettiş Seçin</p>
+                                {allProfiles.length > 0 ? (
+                                    allProfiles.map(p => (
+                                        <button
+                                            key={p.uid}
+                                            disabled={sharingLoading}
+                                            onClick={() => handleShareToInspector(p)}
+                                            className="w-full flex items-center gap-4 p-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-left group"
+                                        >
+                                            <div className="w-10 h-10 rounded-xl bg-primary/5 dark:bg-primary/20 flex items-center justify-center text-primary font-black uppercase text-sm group-hover:scale-110 transition-transform">
+                                                {p.full_name.charAt(0)}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-sm truncate">{p.full_name}</p>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">{p.title || "Müfettiş"}</p>
+                                            </div>
+                                            <Share2 size={14} className="text-slate-300 group-hover:text-primary transition-colors" />
+                                        </button>
+                                    ))
+                                ) : (
+                                    <p className="p-8 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">Kayıtlı müfettiş bulunamadı.</p>
+                                )}
+                            </div>
+                            <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => setSharingFile(null)}
+                                    disabled={sharingLoading}
+                                    className="rounded-xl font-bold"
+                                >
+                                    İptal
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Yeni Klasör Modalı */}
+            {isFolderModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm animate-in fade-in duration-300">
+                    <Card className="w-full max-w-md p-8 rounded-3xl shadow-2xl border-white/60 bg-card/90 backdrop-blur-xl animate-in zoom-in-95 duration-300">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-3 bg-primary/10 text-primary rounded-2xl">
+                                <Plus size={24} />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black font-outfit text-slate-900">Yeni Klasör Oluştur</h3>
+                                <p className="text-xs text-slate-500 font-medium">Lütfen klasör adını giriniz.</p>
+                            </div>
+                        </div>
+                        <form onSubmit={handleFolderSubmit} className="space-y-6">
+                            <input
+                                autoFocus
+                                required
+                                type="text"
+                                value={newFolderName}
+                                onChange={(e) => setNewFolderName(e.target.value)}
+                                placeholder="Klasör Adı (Örn: 2024 Denetimleri)"
+                                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                            />
+                            <div className="flex gap-3 pt-2">
+                                <Button 
+                                    type="button"
+                                    variant="ghost" 
+                                    onClick={() => setIsFolderModalOpen(false)}
+                                    className="flex-1 h-14 rounded-2xl font-bold text-slate-500"
+                                >
+                                    İptal
+                                </Button>
+                                <Button 
+                                    type="submit"
+                                    disabled={creatingFolder || !newFolderName.trim()}
+                                    className="flex-1 h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:-translate-y-1 transition-all"
+                                >
+                                    {creatingFolder ? <RefreshCw className="animate-spin" size={18} /> : "Oluştur"}
+                                </Button>
+                            </div>
+                        </form>
+                    </Card>
+                </div>
+            )}
         </div>
     );
 }
 
-function Tree({ items, expandedFolders, onToggle, onSelect, selectedId, parentId = null }: any) {
+function Tree({ items, expandedFolders, onToggle, onSelect, selectedId, onAddFolder, onShare, onDelete, parentId = null }: any) {
     const children = items.filter((item: any) => {
         // If parentId is null, we look for items without parentId or root items
         if (parentId === null) return !item.parentId;
@@ -515,10 +719,43 @@ function Tree({ items, expandedFolders, onToggle, onSelect, selectedId, parentId
                                 {expandedFolders.has(child.id) ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronRight size={14} className="text-slate-400 group-hover:translate-x-0.5" />}
                             </span>
                             <Folder size={18} className={cn("shrink-0 transition-all", expandedFolders.has(child.id) ? "text-primary fill-primary/10" : "text-slate-400 group-hover:text-primary")} />
-                            <span className={cn("text-[13px] truncate font-semibold", selectedId === child.id ? "font-bold" : "")}>{child.name}</span>
+                            <span className={cn("text-[13px] truncate font-semibold flex-1", selectedId === child.id ? "font-bold" : "")}>{child.name}</span>
+                            
+                            <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); onAddFolder(); }}
+                                    className="p-1 hover:bg-primary/10 rounded-lg text-slate-400 hover:text-primary transition-colors"
+                                    title="Buraya Klasör Ekle"
+                                >
+                                    <Plus size={12} />
+                                </button>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); onShare(child); }}
+                                    className="p-1 hover:bg-emerald-500/10 rounded-lg text-slate-400 hover:text-emerald-500 transition-colors"
+                                    title="Paylaş"
+                                >
+                                    <Share2 size={12} />
+                                </button>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); onDelete(child.id); }}
+                                    className="p-1 hover:bg-rose-500/10 rounded-lg text-slate-400 hover:text-rose-500 transition-colors"
+                                >
+                                    <Trash2 size={12} />
+                                </button>
+                            </div>
                         </div>
                         {expandedFolders.has(child.id) && (
-                            <Tree items={items} expandedFolders={expandedFolders} onToggle={onToggle} onSelect={onSelect} selectedId={selectedId} parentId={child.id} />
+                            <Tree 
+                                items={items} 
+                                expandedFolders={expandedFolders} 
+                                onToggle={onToggle} 
+                                onSelect={onSelect} 
+                                selectedId={selectedId} 
+                                parentId={child.id}
+                                onAddFolder={onAddFolder}
+                                onShare={onShare}
+                                onDelete={onDelete}
+                            />
                         )}
                     </div>
                 );

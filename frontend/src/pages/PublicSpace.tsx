@@ -114,7 +114,8 @@ const FAQ_DATA = [
 ];
 
 export default function PublicSpace() {
-    const { user, loading: authLoading } = useAuth();
+    const { user } = useAuth();
+
     const confirm = useConfirm();
     const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage } = usePresence();
     const [chatInput, setChatInput] = useState("");
@@ -129,7 +130,8 @@ export default function PublicSpace() {
     const [userRole, setUserRole] = useState('user');
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState("Hepsi");
-    const [loading, setLoading] = useState(true);
+
+
     const [searchQuery, setSearchQuery] = useState("");
     const [newPost, setNewPost] = useState({ title: "", content: "", category: "Genel", attachments: [] as Attachment[] });
     const [selectedPost, setSelectedPost] = useState<Post | null>(null);
@@ -166,7 +168,8 @@ export default function PublicSpace() {
                 setCategories(cats);
                 setAllInspectors(insps.filter((i: any) => i.uid !== user?.uid));
             } finally {
-                setLoading(false);
+
+
             }
         };
         loadInitialData();
@@ -174,7 +177,8 @@ export default function PublicSpace() {
 
     useEffect(() => {
         const loadPosts = async () => {
-            setLoading(true);
+
+
             try {
                 const url = new URL(`${API_URL}/collaboration/posts`);
                 if (selectedCategory !== 'Hepsi') url.searchParams.append('category', selectedCategory);
@@ -188,7 +192,8 @@ export default function PublicSpace() {
             } catch (err: any) {
                 console.error("Data load error", err);
             } finally {
-                setLoading(false);
+
+
             }
         };
 
@@ -455,7 +460,8 @@ export default function PublicSpace() {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [globalMessages]);
 
-    if (authLoading || loading) return <LoadingScreen />;
+    // Removed full-screen loading screen to allow instant shell rendering
+
 
     return (
         <div className="flex h-full w-full bg-card relative font-outfit overflow-hidden flex-col md:flex-row">
@@ -752,76 +758,104 @@ export default function PublicSpace() {
                 {zoomedAttachment && <GalleryOverlay attachment={zoomedAttachment} onClose={() => setZoomedAttachment(null)} />}
             </AnimatePresence>
 
-            {/* Desktop only: pinned right live chat panel */}
-            <div className={`hidden md:flex flex-col shrink-0 border-l border-border bg-card transition-all duration-300 ${desktopChatOpen ? 'w-80' : 'w-14'}`}>
-                <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center gap-3">
-                    <button
-                        onClick={() => setDesktopChatOpen(v => !v)}
-                        className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center hover:bg-white/30 transition-all shrink-0"
-                        title={desktopChatOpen ? 'Gizle' : 'Canlı Müzakereyi Göster'}
-                    >
-                        {desktopChatOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-                    </button>
-                    {desktopChatOpen && (
-                        <div>
-                            <h3 className="font-black text-sm uppercase tracking-wider">Canlı Müzakere</h3>
-                            <p className="text-[10px] font-bold text-blue-100 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                                {onlineUsers.length} kişi aktif
-                            </p>
-                        </div>
-                    )}
-                </div>
-                {desktopChatOpen && (
-                <>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-slate-950/50">
-                    <div className="text-center pb-3 border-b border-slate-200 dark:border-slate-800">
-                        <span className="inline-block px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 text-[10px] font-black rounded-lg">
-                            Geçici · Kayıt Edilmez
-                        </span>
+            {/* Desktop only: pinned right live chat panel with sliding animation */}
+            <motion.div 
+                initial={false}
+                animate={{ width: desktopChatOpen ? 384 : 0 }}
+                className="hidden md:flex flex-col shrink-0 border-l border-slate-200 bg-white relative"
+            >
+                {/* Floating Toggle Button */}
+                <button 
+                    onClick={() => setDesktopChatOpen(!desktopChatOpen)}
+                    className="absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-20 bg-[#002B4B] text-white flex items-center justify-center rounded-l-2xl shadow-2xl z-50 border-r border-white/10 hover:w-10 transition-all group"
+                    title={desktopChatOpen ? 'Sohbeti Gizle' : 'Canlı Müzakereyi Göster'}
+                >
+                    <div className="flex flex-col items-center gap-2">
+                        {desktopChatOpen ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
                     </div>
-                    {globalMessages.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-3 py-16">
-                            <MessageSquare size={36} className="opacity-20" />
-                            <p className="text-xs font-bold">Müzakereye ilk mesajı siz yazın.</p>
-                        </div>
-                    ) : (
-                        globalMessages.map((msg, idx) => {
-                            const isMine = msg.author_id === user?.uid;
-                            return (
-                                <div key={msg.id || idx} className={`flex flex-col max-w-[85%] ${isMine ? 'items-end ml-auto' : 'items-start'}`}>
-                                    <span className="text-[9px] font-bold text-slate-400 mb-1 px-1">{msg.author_name}</span>
-                                    <div className={`px-3 py-2 text-[12px] font-medium shadow-sm rounded-2xl ${
-                                        isMine
-                                            ? 'bg-blue-600 text-white rounded-br-sm'
-                                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-100 dark:border-slate-700 rounded-bl-sm'
-                                    }`}>
-                                        {msg.text}
+                </button>
+
+                <div className={cn("w-[384px] h-full flex flex-col transition-opacity duration-300", !desktopChatOpen && "opacity-0 invisible")}>
+                    <div className="p-6 border-b border-white/10 bg-[#002B4B] text-white">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-black capitalize tracking-widest flex items-center gap-2">
+                                <MessageSquare size={16} className="text-blue-400" /> Canlı Müzakere
+                            </h3>
+                            {/* Compact Online Indicator */}
+                            {onlineUsers.length > 0 && (
+                                <div className="group relative">
+                                    <div className="flex items-center gap-2 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10 transition-all cursor-help">
+                                        <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+                                        <span className="text-[10px] font-black">{onlineUsers.length}</span>
+                                    </div>
+                                    
+                                    {/* Hover Avatars Tooltip */}
+                                    <div className="absolute top-full right-0 mt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-[100] translate-y-2 group-hover:translate-y-0">
+                                        <div className="bg-white p-3 rounded-[20px] shadow-2xl border border-slate-100 min-w-[180px]">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 px-2 border-b border-slate-50 pb-2">Aktif Müfettişler</p>
+                                            <div className="space-y-1 max-h-60 overflow-y-auto no-scrollbar">
+                                                {onlineUsers.map((u: any) => (
+                                                    <div key={u.uid} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl transition-colors">
+                                                        <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-[10px] font-black text-white capitalize shadow-sm shrink-0">
+                                                            {u.name ? u.name.charAt(0) : '?'}
+                                                        </div>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className="text-[11px] font-black text-slate-700 truncate">{u.name}</span>
+                                                            <span className="text-[8px] font-bold text-emerald-500 uppercase tracking-tighter">Çevrimiçi</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            );
-                        })
-                    )}
-                    <div ref={chatEndRef} />
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar bg-white">
+                        {globalMessages.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-3 py-16">
+                                <MessageSquare size={36} className="opacity-20" />
+                                <p className="text-xs font-bold">Müzakereye ilk mesajı siz yazın.</p>
+                            </div>
+                        ) : (
+                            globalMessages.map((msg, idx) => {
+                                const isMine = msg.author_id === user?.uid;
+                                return (
+                                    <div key={msg.id || idx} className={cn("flex flex-col", isMine ? "items-end" : "items-start")}>
+                                        <div className={cn("max-w-[85%] p-4 rounded-3xl text-[13px] font-medium shadow-sm space-y-2", isMine ? "bg-primary text-white rounded-tr-none" : "bg-slate-100 text-slate-800 rounded-tl-none")}>
+                                            {msg.text}
+                                        </div>
+                                        <span className="text-[10px] font-bold text-slate-400 mt-1 px-2">{msg.author_name} • {new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                    </div>
+                                );
+                            })
+                        )}
+                        <div ref={chatEndRef} />
+                    </div>
+
+                    <form onSubmit={handleSendChat} className="p-6 border-t border-slate-100 bg-white flex flex-col gap-3 relative">
+                        <div className="flex gap-3">
+                            <div className="flex-1 relative">
+                                <input 
+                                    value={chatInput} 
+                                    onChange={e => setChatInput(e.target.value)}
+                                    placeholder="Mesajınızı yazın..." 
+                                    className="w-full bg-slate-100 rounded-2xl px-4 py-3 text-xs font-bold outline-none border-2 border-transparent focus:border-primary/20 transition-all"
+                                />
+                            </div>
+                            <button 
+                                type="submit"
+                                disabled={!chatInput.trim()}
+                                className="w-12 h-12 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all"
+                            >
+                                <Send size={18} />
+                            </button>
+                        </div>
+                    </form>
                 </div>
-                <form onSubmit={handleSendChat} className="p-3 bg-card border-t border-border flex gap-2">
-                    <input
-                        value={chatInput}
-                        onChange={e => setChatInput(e.target.value)}
-                        placeholder="Mesaj yazın..."
-                        className="flex-1 bg-muted rounded-xl px-3 py-2 text-xs font-bold outline-none border border-transparent focus:border-blue-500/30 transition-all"
-                    />
-                    <button
-                        type="submit"
-                        disabled={!chatInput.trim()}
-                        className="w-10 h-10 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20 transition-all active:scale-95"
-                    >
-                        <Send size={16} className="ml-0.5" />
-                    </button>
-                </form>
-                </>
-                )}
-            </div>
+            </motion.div>
         </div>
     );
 }
@@ -1270,11 +1304,5 @@ function GalleryOverlay({ attachment, onClose }: any) {
     );
 }
 
-function LoadingScreen() {
-    return (
-        <div className="flex h-screen w-full items-center justify-center bg-card flex-col gap-6">
-            <Loader2 className="animate-spin text-primary" size={64} />
-            <span className="text-[10px] font-black capitalize tracking-[0.4em] text-slate-400">Yükleniyor...</span>
-        </div>
-    );
-}
+
+

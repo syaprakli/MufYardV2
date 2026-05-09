@@ -4,6 +4,8 @@ from typing import List, Optional, Dict, Any
 import uuid
 from app.lib.firebase_admin import db
 from app.schemas.task import TaskCreate, TaskUpdate
+import pandas as pd
+import io
 
 _task_creation_lock = asyncio.Lock()
 
@@ -288,3 +290,50 @@ class TaskService:
             return True
         except Exception:
             return False
+
+    @staticmethod
+    async def import_tasks_from_excel(file_content: bytes, owner_id: str) -> Dict[str, Any]:
+        """Excel dosyasından görevleri içe aktarır."""
+        try:
+            df = await asyncio.to_thread(pd.read_excel, io.BytesIO(file_content))
+            
+            # Kolon isimlerini normalize et (küçük harf ve boşluksuz)
+            df.columns = [str(c).strip().lower().replace(' ', '_').replace('ı', 'i').replace('ş', 's').replace('ç', 'c').replace('ö', 'o').replace('ü', 'u').replace('ğ', 'g') for c in df.columns]
+            
+            # Zorunlu kolonlar: rapor_adi
+            if 'rapor_adi' not in df.columns:
+                # Alternatif isimleri dene
+                for alt in ['rapor_adi', 'konu', 'baslik', 'rapor_ismi']:
+                    if alt in df.columns:
+                        df.rename(columns={alt: 'rapor_adi'}, inplace=True)
+                        break
+            
+            if 'rapor_adi' not in df.columns:
+                return {"status": "error", "message": "Excel'de 'Rapor Adı' kolonu bulunamadı."}
+
+            imported_count = 0
+            for _, row in df.iterrows():
+                if pd.isna(row['rapor_adi']): continue
+                
+                # TaskCreate şemasına uygun veri hazırla
+                task_data = {
+                    "rapor_adi": str(row['rapor_adi']),
+                    "rapor_kodu": str(row.get('rapor_kodu')) if not pd.isna(row.get('rapor_kodu')) else None,
+                    "rapor_turu": str(row.get('rapor_turu', 'Genel Denetim')),
+                    "baslama_tarihi": str(row.get('baslama_tarihi')) if not pd.isna(row.get('baslama_tarihi')) else datetime.utcnow().isoformat().split('T')[0],
+                    "sure_gun": int(row.get('sure_gun', 30)),
+                    "rapor_durumu": str(row.get('durum', 'Tamamlandı')), # İçe aktarılanlar genelde tamamlanmıştır
+                    "owner_id": owner_id,
+                    "assigned_to": [owner_id],
+                    "steps": []
+                }
+                
+                # TaskCreate nesnesi oluştur ve kaydet
+                task_obj = TaskCreate(**task_data)
+                await TaskService.create_task(task_obj)
+                imported_count += 1
+                
+            return {"status": "success", "imported": imported_count}
+        except Exception as e:
+            print(f"Excel import error: {e}")
+            return {"status": "error", "message": str(e)}
