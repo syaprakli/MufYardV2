@@ -154,6 +154,27 @@ export default function Tasks() {
         }
     }, [effectiveUid]);
 
+    // Web sürümü uyarısı
+    useEffect(() => {
+        if (!isElectron) {
+            const hasShownToast = sessionStorage.getItem('tasks_web_warning_shown');
+            if (!hasShownToast) {
+                toast("Web sürümünde görev oluşturma kısıtlıdır. Tam erişim için masaüstü uygulamasını kullanın.", {
+                    icon: '🚀',
+                    duration: 5000,
+                    style: {
+                        borderRadius: '12px',
+                        background: '#333',
+                        color: '#fff',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                    }
+                });
+                sessionStorage.setItem('tasks_web_warning_shown', 'true');
+            }
+        }
+    }, []);
+
     // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -643,21 +664,39 @@ export default function Tasks() {
                 </div>
             </div>
 
+            {/* Web Sürümü Kısıtlama Uyarısı - Daha Belirgin */}
             {!isElectron && (
-                <Card className="p-6 border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-900/30 mb-8 animate-in slide-in-from-top-4 duration-500">
-                    <div className="flex items-center gap-4 text-amber-700 dark:text-amber-500">
-                        <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-2xl">
-                            <Shield size={24} />
+                <div className="mb-8 animate-in slide-in-from-top-4 duration-700">
+                    <Card className="p-6 border-l-4 border-l-amber-500 border-amber-200 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-900/30">
+                        <div className="flex items-center gap-5 text-amber-800 dark:text-amber-400">
+                            <div className="p-3.5 bg-amber-500/20 rounded-2xl shadow-inner">
+                                <Shield size={28} className="animate-pulse" />
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="font-black text-sm uppercase tracking-widest font-outfit flex items-center gap-2">
+                                    Web Sürümü Kısıtlaması
+                                    <span className="px-2 py-0.5 bg-amber-500 text-white text-[8px] rounded-full">BİLGİ</span>
+                                </h4>
+                                <p className="text-xs font-bold mt-1.5 leading-relaxed opacity-90">
+                                    Güvenlik politikaları ve yerel dosya sistemi (Excel/Rapor) entegrasyonu nedeniyle **web sürümünde yeni görev oluşturulamaz.** 
+                                    Mevcut görevlerinizi görüntüleyebilir ve durumlarını güncelleyebilirsiniz. 
+                                    <br className="hidden md:block" />
+                                    Yeni kayıtlar eklemek için lütfen <span className="underline decoration-2 underline-offset-4">MufYard Masaüstü</span> uygulamasını kullanın.
+                                </p>
+                            </div>
+                            <div className="hidden sm:block">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500 hover:text-white"
+                                    onClick={() => navigate('/about')}
+                                >
+                                    Uygulamayı İndir
+                                </Button>
+                            </div>
                         </div>
-                        <div>
-                            <h4 className="font-black text-sm uppercase tracking-widest font-outfit">Web Sürümü Kısıtlaması</h4>
-                            <p className="text-xs font-bold mt-1 opacity-80">
-                                Güvenlik ve yerel dosya entegrasyonu nedeniyle web sürümünde görev oluşturulamaz. 
-                                Yeni görev oluşturmak için lütfen **MufYard Masaüstü** uygulamasını kullanın.
-                            </p>
-                        </div>
-                    </div>
-                </Card>
+                    </Card>
+                </div>
             )}
 
             {isElectron && (

@@ -380,14 +380,6 @@ export default function Audit() {
                             ? "2 yılı doldurmuş ve tamamlanmış eski raporlarınızın arşivi." 
                             : "Şu an üzerinde çalıştığınız veya güncel denetim raporları."}
                     </p>
-                    {!isElectron && (
-                        <div className="mt-4 p-4 border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-900/30 rounded-2xl flex items-center gap-3 animate-in fade-in duration-500">
-                            <Shield size={18} className="text-amber-600 shrink-0" />
-                            <p className="text-xs font-bold text-amber-700 dark:text-amber-500">
-                                Web sürümünde raporlar sadece izlenebilir; yeni rapor oluşturmak ve düzenlemek için masaüstü uygulamasını kullanın.
-                            </p>
-                        </div>
-                    )}
                 </div>
                 
                 <div className="flex bg-muted p-1.5 rounded-xl ml-auto mr-6">
