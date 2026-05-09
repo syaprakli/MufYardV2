@@ -912,7 +912,7 @@ export default function Tasks() {
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-3">
                                                 <div className="flex flex-col">
-                                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Kalan Süre</span>
+                                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Süre</span>
                                                     <span className="text-xs font-black" style={{ color: timeColor }}>{sureInfo ? `${sureInfo.diff} Gün` : '—'}</span>
                                                 </div>
                                                 <div className="w-px h-6 bg-slate-200" />
@@ -997,7 +997,7 @@ export default function Tasks() {
                     <table className="hidden md:table w-full border-collapse">
                         <thead>
                             <tr className="bg-muted/30">
-                                {["Rapor No", "Görev Adı", "Tür", "Kalan", "Durum", "İşlemler"].map(col => (
+                                {["Rapor No", "Görev Adı", "Tür", "Süre", "Durum", "İşlemler"].map(col => (
                                     <th key={col} className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
                                         {col}
                                     </th>
