@@ -1,9 +1,8 @@
 import { FileText, Loader2, AlertCircle, Clock, CheckCircle2, TrendingUp, Filter, FileSpreadsheet, Zap, Bell, ArrowUpRight, BarChart3, PieChart as PieIcon, Shield, ChevronRight, X, Download, Bot, Sparkles, Globe, BookOpen, Cake, Megaphone, Plus, MessageCircle, ExternalLink } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { API_URL } from "../lib/config";
-import { type Task } from "../lib/api/tasks";
 import { cn } from "../lib/utils";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
 import { useAuth } from "../lib/hooks/useAuth";
@@ -61,9 +60,20 @@ export default function Dashboard() {
     const { theme } = useTheme();
     const { data: cachedData, refreshAll } = useGlobalData();
     
-    const [data, setData] = useState<any>(cachedData.stats);
-    const [profile, setProfile] = useState<any>(cachedData.profile);
-    const [tasks, setTasks] = useState<Task[]>([]);
+    const currentUser = user;
+    const effectiveUid = currentUser?.uid;
+
+    // Memoized derived data from global cache
+    const data = cachedData.stats || { stats: [], news: [], forum_posts: [] };
+    const profile = cachedData.profile;
+    const tasks = useMemo(() => {
+        if (!cachedData.tasks || !effectiveUid) return [];
+        return cachedData.tasks.filter((t: any) => 
+            t.owner_id === effectiveUid || 
+            t.accepted_collaborators?.includes(effectiveUid)
+        );
+    }, [cachedData.tasks, effectiveUid]);
+
     const [birthdayUsers, setBirthdayUsers] = useState<any[]>([]);
 
     const [showIdentityModal, setShowIdentityModal] = useState(false);
@@ -78,23 +88,6 @@ export default function Dashboard() {
     const [filterStatus, setFilterStatus] = useState<string>("Tümü");
     const [filterPeriod, setFilterPeriod] = useState<string>("Tümü");
     const filterRef = useRef<HTMLDivElement>(null);
-    
-    // Get identity once from useAuth or fallback
-    const currentUser = user;
-    const effectiveUid = currentUser?.uid;
-
-    // Sync local state with cached data
-    useEffect(() => {
-        if (cachedData.stats) setData(cachedData.stats);
-        if (cachedData.profile) setProfile(cachedData.profile);
-        if (cachedData.tasks && effectiveUid) {
-            const myTasks = cachedData.tasks.filter((t: any) => 
-                t.owner_id === effectiveUid || 
-                t.accepted_collaborators?.includes(effectiveUid)
-            );
-            setTasks(myTasks);
-        }
-    }, [cachedData, effectiveUid]);
 
     // Initial load and background refresh
     useEffect(() => {
@@ -163,7 +156,7 @@ export default function Dashboard() {
     }).format(new Date());
 
     // ─── Filtreleme Mantığı ───
-    const filteredTasks = tasks.filter(task => {
+    const filteredTasks = tasks.filter((task: any) => {
         // Tür filtresi
         if (filterType !== "Tümü" && task.rapor_turu !== filterType) return false;
         // Durum filtresi
@@ -197,7 +190,7 @@ export default function Dashboard() {
     const clearFilters = () => { setFilterType("Tümü"); setFilterStatus("Tümü"); setFilterPeriod("Tümü"); };
 
     // ─── Türleri topla (filtre dropdown için) ───
-    const uniqueTypes = [...new Set(tasks.map(t => t.rapor_turu))];
+    const uniqueTypes = [...new Set(tasks.map((t: any) => t.rapor_turu as string))];
 
     // ─── Excel'e Aktar ───
     const handleExportExcel = () => {
@@ -215,7 +208,7 @@ export default function Dashboard() {
                         "Başlama Tarihi": task.baslama_tarihi,
                         "Süre (Gün)": task.sure_gun,
                         "Kalan Gün": diff,
-                        "Durum": task.rapor_durumu,
+                        "Durum": (task as any).rapor_durumu,
                     };
                 });
                 const ws = XLSX.utils.json_to_sheet(exportData);
@@ -246,8 +239,8 @@ export default function Dashboard() {
                     const e = new Date(s); e.setDate(e.getDate() + t.sure_gun);
                     return Math.ceil((e.getTime() - Date.now()) / (1000 * 3600 * 24)) < 0 && t.rapor_durumu !== "Tamamlandı";
                 }).length,
-                turler: Object.entries(tasks.reduce((acc: Record<string, number>, t) => { acc[t.rapor_turu] = (acc[t.rapor_turu] || 0) + 1; return acc; }, {})),
-                durumlar: Object.entries(tasks.reduce((acc: Record<string, number>, t) => { acc[t.rapor_durumu] = (acc[t.rapor_durumu] || 0) + 1; return acc; }, {})),
+                turler: Object.entries(tasks.reduce((acc: Record<string, number>, t: any) => { acc[t.rapor_turu] = (acc[t.rapor_turu] || 0) + 1; return acc; }, {})),
+                durumlar: Object.entries(tasks.reduce((acc: Record<string, number>, t: any) => { acc[t.rapor_durumu] = (acc[t.rapor_durumu] || 0) + 1; return acc; }, {})),
                 gorevler: tasks.map(t => {
                     const s = new Date(t.baslama_tarihi);
                     const e = new Date(s); e.setDate(e.getDate() + t.sure_gun);
@@ -302,7 +295,7 @@ Lütfen şunları analiz et:
     // Process Task Status Data (filtrelenmiş veriye göre)
     const statusCounts = RAPOR_DURUMLARI.map(status => ({
         name: status,
-        value: filteredTasks.filter(t => t.rapor_durumu === status).length,
+        value: filteredTasks.filter((t: any) => t.rapor_durumu === status).length,
         color: getDurumColor(status)
     })).filter(s => s.value > 0);
 
@@ -314,7 +307,7 @@ Lütfen şunları analiz et:
         { name: '3 Ay+ Gecikti', value: 0, color: '#ef4444' },
     ];
 
-    filteredTasks.forEach(task => {
+    filteredTasks.forEach((task: any) => {
         const start = new Date(task.baslama_tarihi);
         const end = new Date(start);
         end.setDate(end.getDate() + task.sure_gun);
@@ -327,11 +320,11 @@ Lütfen şunları analiz et:
     });
 
     // Calculations for Summary StatCards
-    const activeTasksCount = filteredTasks.filter(t => t.rapor_durumu !== "Tamamlandı" && t.rapor_durumu !== "Askıya Alındı").length;
-    const completedTasksCount = filteredTasks.filter(t => t.rapor_durumu === "Tamamlandı").length;
+    const activeTasksCount = filteredTasks.filter((t: any) => t.rapor_durumu !== "Tamamlandı" && t.rapor_durumu !== "Askıya Alındı").length;
+    const completedTasksCount = filteredTasks.filter((t: any) => t.rapor_durumu === "Tamamlandı").length;
     
     // Calculate "Acil" (Urgent) tasks: e.g., less than 0 days (overdue) or in critique status
-    const urgentTasksCount = filteredTasks.filter(task => {
+    const urgentTasksCount = filteredTasks.filter((task: any) => {
         const start = new Date(task.baslama_tarihi);
         const end = new Date(start);
         end.setDate(end.getDate() + task.sure_gun);
@@ -341,7 +334,7 @@ Lütfen şunları analiz et:
 
     // Process Type Data
     const typesMap: Record<string, number> = {};
-    filteredTasks.forEach(t => {
+    filteredTasks.forEach((t: any) => {
         typesMap[t.rapor_turu] = (typesMap[t.rapor_turu] || 0) + 1;
     });
     const typeData = Object.entries(typesMap).map(([name, value], idx) => ({
@@ -357,8 +350,8 @@ Lütfen şunları analiz et:
             {showIdentityModal && effectiveUid && (
                 <IdentitySelectionModal 
                     uid={effectiveUid} 
-                    onComplete={(name) => {
-                        setProfile((p: any) => ({ ...p, full_name: name }));
+                    onComplete={(_name) => {
+                        if (effectiveUid) refreshAll(effectiveUid, currentUser?.email || undefined, currentUser?.displayName || undefined, true);
                         setShowIdentityModal(false);
                     }} 
                 />
@@ -421,7 +414,7 @@ Lütfen şunları analiz et:
                                         className="w-full rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-sm font-semibold text-slate-700 dark:text-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
                                     >
                                         <option value="Tümü">Tümü</option>
-                                        {uniqueTypes.map(t => <option key={t} value={t} className="dark:bg-slate-900">{t}</option>)}
+                                        {uniqueTypes.map((t: any) => <option key={t as string} value={t as string} className="dark:bg-slate-900">{t as string}</option>)}
                                     </select>
                                 </div>
 
@@ -607,7 +600,7 @@ Lütfen şunları analiz et:
                                     cx="50%" cy="50%" innerRadius={60} outerRadius={85}
                                     paddingAngle={5} dataKey="value" strokeWidth={0}
                                 >
-                                    {statusCounts.map((entry, index) => (
+                                    {statusCounts.map((entry: any, index: number) => (
                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                     ))}
                                 </Pie>
@@ -782,7 +775,7 @@ Lütfen şunları analiz et:
                 
                 {/* Mobile List View (Hidden on Desktop) */}
                 <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
-                    {filteredTasks.slice(0, 5).map(task => {
+                    {filteredTasks.slice(0, 5).map((task: any) => {
                          const start = new Date(task.baslama_tarihi);
                          const end = new Date(start);
                          end.setDate(end.getDate() + task.sure_gun);
@@ -829,7 +822,7 @@ Lütfen şunları analiz et:
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                            {filteredTasks.slice(0, 5).map(task => {
+                            {filteredTasks.slice(0, 5).map((task: any) => {
                                 const start = new Date(task.baslama_tarihi);
                                 const end = new Date(start);
                                 end.setDate(end.getDate() + task.sure_gun);

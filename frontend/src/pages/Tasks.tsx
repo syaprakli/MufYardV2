@@ -13,7 +13,6 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { cn } from "../lib/utils";
 import { createTask, updateTask, deleteTask, acceptTask, importTasksFromExcel, type Task, type TaskStep } from "../lib/api/tasks";
-import { type Inspector } from "../lib/api/inspectors";
 import { fetchAudits, createAudit, deleteAudit, invalidateAuditCache } from "../lib/api/audit";
 import ShareModal from "../components/ShareModal";
 
@@ -93,13 +92,16 @@ export default function Tasks() {
     const { user, profile } = useAuth();
     const { data: cachedData, refreshAll, refreshTasks } = useGlobalData();
     
-    const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(false);
     
     const currentUser = user;
     const effectiveUid = currentUser?.uid;
     const effectiveEmail = currentUser?.email?.toLowerCase();
-    const userKeys = [effectiveUid, effectiveEmail].filter(Boolean) as string[];
+    
+    const userKeys = useMemo(() => 
+        [effectiveUid, effectiveEmail].filter(Boolean) as string[],
+        [effectiveUid, effectiveEmail]
+    );
 
     const [searchQuery, setSearchQuery] = useState("");
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -127,42 +129,36 @@ export default function Tasks() {
         template: "Boş Rapor",
         report_seq: 1
     });
-    const [inspectors, setInspectors] = useState<Inspector[]>([]);
-    const [invitations, setInvitations] = useState<Task[]>([]);
     const [showInspectorDropdown, setShowInspectorDropdown] = useState(false);
     const [inspectorSearch, setInspectorSearch] = useState("");
     const inspectorDropdownRef = useRef<HTMLDivElement>(null);
 
-    // Sync tasks and invitations from cache
-    useEffect(() => {
-        if (cachedData.tasks) {
-            const accepted = cachedData.tasks.filter(t => 
-                userKeys.includes(t.owner_id || '') || 
-                (t.accepted_collaborators || []).some((value: string) => userKeys.includes(value))
-            );
-            
-            const pending = cachedData.tasks.filter(t => 
-                (t.pending_collaborators || []).some((value: string) => userKeys.includes(value)) &&
-                !userKeys.includes(t.owner_id || '')
-            );
+    // Memoized derived data from global cache
+    const { tasks, invitations } = useMemo(() => {
+        if (!cachedData.tasks) return { tasks: [], invitations: [] };
+        
+        const accepted = cachedData.tasks.filter(t => 
+            userKeys.includes(t.owner_id || '') || 
+            (t.accepted_collaborators || []).some((value: string) => userKeys.includes(value))
+        );
+        
+        const pending = cachedData.tasks.filter(t => 
+            (t.pending_collaborators || []).some((value: string) => userKeys.includes(value)) &&
+            !userKeys.includes(t.owner_id || '')
+        );
 
-            setTasks(accepted);
-            setInvitations(pending);
-        }
+        return { tasks: accepted, invitations: pending };
     }, [cachedData.tasks, userKeys]);
 
-    // Sync inspectors from cache
-    useEffect(() => {
-        if (cachedData.contactsCorporate) {
-            const combined: Inspector[] = cachedData.contactsCorporate.map((p: any) => ({
-                id: p.uid || p.id,
-                name: p.full_name || p.display_name || p.email || p.name,
-                email: p.email,
-                title: p.title || "Müfettiş",
-                created_at: new Date().toISOString()
-            }));
-            setInspectors(combined);
-        }
+    const inspectors = useMemo(() => {
+        if (!cachedData.contactsCorporate) return [];
+        return cachedData.contactsCorporate.map((p: any) => ({
+            id: p.uid || p.id,
+            name: p.full_name || p.display_name || p.email || p.name,
+            email: p.email,
+            title: p.title || "Müfettiş",
+            created_at: new Date().toISOString()
+        }));
     }, [cachedData.contactsCorporate]);
 
     const raporOnek = localStorage.getItem('raporKoduOnek') || 'S.Y.64';
@@ -544,7 +540,7 @@ export default function Tasks() {
         if (!shareTask) return;
         try {
             await updateTask(shareTask.id, { pending_collaborators: newSharedWith });
-            setTasks(prev => prev.map(t => t.id === shareTask.id ? { ...t, pending_collaborators: newSharedWith } : t));
+            if (effectiveUid) refreshTasks(effectiveUid);
             toast.success("Görev paylaşım davetleri gönderildi.");
         } catch { toast.error("Paylaşım güncellenemedi."); }
     };
@@ -935,7 +931,7 @@ export default function Tasks() {
                                                             const newStatus = e.target.value;
                                                             try {
                                                                 await updateTask(task.id, { rapor_durumu: newStatus });
-                                                                setTasks(prev => prev.map(t => t.id === task.id ? { ...t, rapor_durumu: newStatus } : t));
+                                                                if (effectiveUid) refreshTasks(effectiveUid);
                                                                 toast.success("Durum güncellendi.");
                                                             } catch { toast.error("Hata oluştu."); }
                                                         }}
@@ -975,7 +971,7 @@ export default function Tasks() {
                                                 <div className="space-y-3">
                                                     <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alt Görevler / Adımlar</h5>
                                                     <div className="space-y-2">
-                                                        {(task.steps || []).map((step, idx) => (
+                                                        {(task.steps || []).map((step: any, idx: number) => (
                                                             <div key={idx} className="flex items-center justify-between gap-3 p-2 bg-muted/50 rounded-lg">
                                                                 <div className="flex items-center gap-2 min-w-0">
                                                                     <input type="checkbox" checked={step.done} onChange={() => handleToggleStep(task, idx)} className="w-4 h-4 rounded border-border" />
@@ -1053,7 +1049,7 @@ export default function Tasks() {
                                                             const newStatus = e.target.value;
                                                             try {
                                                                 await updateTask(task.id, { rapor_durumu: newStatus });
-                                                                setTasks(prev => prev.map(t => t.id === task.id ? { ...t, rapor_durumu: newStatus } : t));
+                                                                if (effectiveUid) refreshTasks(effectiveUid);
                                                                 toast.success("Durum güncellendi.");
                                                             } catch { toast.error("Hata oluştu."); }
                                                         }}
@@ -1093,7 +1089,7 @@ export default function Tasks() {
                                                         <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
                                                             <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">ALT GÖREVLER / ADIMLAR</h5>
                                                             <div className="space-y-2">
-                                                                {(task.steps || []).map((step, idx) => (
+                                                                {(task.steps || []).map((step: TaskStep, idx: number) => (
                                                                     <div key={idx} className="flex items-center justify-between gap-3 p-3 bg-muted/50 rounded-xl">
                                                                         <div className="flex items-center gap-3">
                                                                             <input type="checkbox" checked={step.done} onChange={() => handleToggleStep(task, idx)} className="w-5 h-5 rounded border-border" />

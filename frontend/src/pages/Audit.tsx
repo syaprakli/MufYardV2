@@ -29,8 +29,6 @@ export default function Audit() {
     const navigate = useNavigate();
     const { data: cachedData, refreshAll, refreshAudits, refreshTasks } = useGlobalData();
     
-    const [audits, setAudits] = useState<AuditType[]>([]);
-    const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
@@ -41,7 +39,6 @@ export default function Audit() {
     const [filterInspector, setFilterInspector] = useState("Tümü");
     const [filterTaskType, setFilterTaskType] = useState("Tümü");
     const [debouncedSearch, setDebouncedSearch] = useState("");
-    const [invitations, setInvitations] = useState<AuditType[]>([]);
     const [shareAudit, setShareAudit] = useState<AuditType | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
@@ -65,22 +62,23 @@ export default function Audit() {
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    // Sync from cache
-    useEffect(() => {
-        if (!user) return;
+    // Memoized derived data from global cache
+    const { audits, tasks, invitations } = useMemo(() => {
+        if (!user) return { audits: [], tasks: [], invitations: [] };
         const uid = user.uid;
         const email = (user.email || '').toLowerCase();
         const userKeys = [uid, email].filter(Boolean) as string[];
 
-        setAudits(cachedData.audits || []);
-        setTasks(cachedData.tasks || []);
+        const allAudits = cachedData.audits || [];
+        const allTasks = cachedData.tasks || [];
 
-        const pending = (cachedData.audits || []).filter((a: any) =>
+        const pending = allAudits.filter((a: any) =>
             (a.pending_collaborators || []).some((v: string) => userKeys.includes(v)) &&
             !userKeys.includes(a.owner_id || '')
         );
-        setInvitations(pending);
-    }, [cachedData, user]);
+
+        return { audits: allAudits, tasks: allTasks, invitations: pending };
+    }, [cachedData.audits, cachedData.tasks, user]);
 
     useEffect(() => {
         if (user?.uid) {

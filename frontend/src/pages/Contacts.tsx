@@ -22,12 +22,10 @@ export default function Contacts() {
     const { data: cachedData, refreshAll, refreshContactsPersonal, refreshContactsCorporate, loading: globalLoading } = useGlobalData();
     
     const [activeTab, setActiveTab] = useState<"corporate" | "personal">("personal");
-    const [contacts, setContacts] = useState<Contact[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedRole, setSelectedRole] = useState("Tümü");
     const [favorites, setFavorites] = useState<string[]>([]);
-    const [invitations, setInvitations] = useState<Contact[]>([]);
     const [shareContactItem, setShareContactItem] = useState<Contact | null>(null);
     const [editingContact, setEditingContact] = useState<Contact | null>(null);
 
@@ -64,9 +62,9 @@ export default function Contacts() {
         }
     }, [location.search]);
 
-    // Sync from cache
-    useEffect(() => {
-        if (!user) return;
+    // Memoized derived data from global cache
+    const { contacts, invitations } = useMemo(() => {
+        if (!user) return { contacts: [], invitations: [] };
         const userEmail = user.email?.toLowerCase();
         const userKeys = [user.uid, userEmail].filter(Boolean) as string[];
 
@@ -87,13 +85,11 @@ export default function Contacts() {
             });
 
             const acceptedContacts = accepted.length > 0 ? accepted : (data.length > 0 ? data.filter(c => c.owner_id === user.uid) : []);
-            setContacts(acceptedContacts);
-            setInvitations(pending);
+            return { contacts: acceptedContacts, invitations: pending };
         } else {
-            setContacts(cachedData.contactsCorporate || []);
-            setInvitations([]);
+            return { contacts: cachedData.contactsCorporate || [], invitations: [] };
         }
-    }, [activeTab, cachedData, user]);
+    }, [activeTab, cachedData.contactsPersonal, cachedData.contactsCorporate, user]);
 
     useEffect(() => {
         if (user?.uid) {
@@ -255,7 +251,7 @@ export default function Contacts() {
             const matchesSearch = normName.includes(normSearch) || 
                 normUnit.includes(normSearch) || 
                 normTitle.includes(normSearch) || 
-                c.tags?.some(t => normalize(t).includes(normSearch));
+                c.tags?.some((t: string) => normalize(t).includes(normSearch));
             
             const normCategory = normalize(c.category || c.tags?.[0] || "");
             
