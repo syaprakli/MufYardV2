@@ -5,7 +5,7 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
 import { useState, useEffect, useMemo } from "react";
-import { fetchContacts, createContact, shareContact, deleteContact, updateContact, acceptContact, type Contact } from "../lib/api/contacts";
+import { createContact, shareContact, deleteContact, updateContact, acceptContact, type Contact } from "../lib/api/contacts";
 import { MessageSquare } from "lucide-react";
 import { useChat } from "../lib/context/ChatContext";
 import { useAuth } from "../lib/hooks/useAuth";
@@ -19,11 +19,10 @@ export default function Contacts() {
     const { user } = useAuth();
     const location = useLocation();
     const confirm = useConfirm();
-    const { data: cachedData, refreshAll, refreshContactsPersonal, refreshContactsCorporate } = useGlobalData();
+    const { data: cachedData, refreshAll, refreshContactsPersonal, refreshContactsCorporate, loading: globalLoading } = useGlobalData();
     
     const [activeTab, setActiveTab] = useState<"corporate" | "personal">("personal");
     const [contacts, setContacts] = useState<Contact[]>([]);
-    const [loading, setLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedRole, setSelectedRole] = useState("Tümü");
@@ -416,7 +415,7 @@ export default function Contacts() {
                 </div>
             )}
 
-            {loading ? (
+            {globalLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 space-y-4">
                     <Loader2 className="w-10 h-10 text-primary animate-spin" />
                     <p className="text-muted-foreground font-medium">Rehber yükleniyor...</p>

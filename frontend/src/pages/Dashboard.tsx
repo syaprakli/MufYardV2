@@ -2,15 +2,12 @@ import { FileText, Loader2, AlertCircle, Clock, CheckCircle2, TrendingUp, Filter
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { fetchStats } from "../lib/api";
 import { API_URL } from "../lib/config";
-import { fetchTasks, type Task } from "../lib/api/tasks";
-import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
+import { type Task } from "../lib/api/tasks";
 import { cn } from "../lib/utils";
+import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useTheme } from "../lib/context/ThemeContext";
-import { fetchProfile, updateProfile } from "../lib/api/profiles";
-import { fetchInspectors } from "../lib/api/inspectors";
 import { toast } from "react-hot-toast";
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,

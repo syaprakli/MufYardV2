@@ -12,10 +12,9 @@ import { isElectron } from "../lib/firebase";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { cn } from "../lib/utils";
-import { fetchTasks, createTask, updateTask, deleteTask, acceptTask, importTasksFromExcel, type Task, type TaskStep } from "../lib/api/tasks";
-import { fetchInspectors, type Inspector } from "../lib/api/inspectors";
+import { createTask, updateTask, deleteTask, acceptTask, importTasksFromExcel, type Task, type TaskStep } from "../lib/api/tasks";
+import { type Inspector } from "../lib/api/inspectors";
 import { fetchAudits, createAudit, deleteAudit, invalidateAuditCache } from "../lib/api/audit";
-import { fetchAllProfiles, type Profile } from "../lib/api/profiles";
 import ShareModal from "../components/ShareModal";
 
 // Shared styles and sub-components
@@ -139,11 +138,11 @@ export default function Tasks() {
         if (cachedData.tasks) {
             const accepted = cachedData.tasks.filter(t => 
                 userKeys.includes(t.owner_id || '') || 
-                (t.accepted_collaborators || []).some(value => userKeys.includes(value))
+                (t.accepted_collaborators || []).some((value: string) => userKeys.includes(value))
             );
             
             const pending = cachedData.tasks.filter(t => 
-                (t.pending_collaborators || []).some(value => userKeys.includes(value)) &&
+                (t.pending_collaborators || []).some((value: string) => userKeys.includes(value)) &&
                 !userKeys.includes(t.owner_id || '')
             );
 
@@ -154,8 +153,8 @@ export default function Tasks() {
 
     // Sync inspectors from cache
     useEffect(() => {
-        if (cachedData.contacts) {
-            const combined: Inspector[] = cachedData.contacts.map((p: any) => ({
+        if (cachedData.contactsCorporate) {
+            const combined: Inspector[] = cachedData.contactsCorporate.map((p: any) => ({
                 id: p.uid || p.id,
                 name: p.full_name || p.display_name || p.email || p.name,
                 email: p.email,
@@ -164,7 +163,7 @@ export default function Tasks() {
             }));
             setInspectors(combined);
         }
-    }, [cachedData.contacts]);
+    }, [cachedData.contactsCorporate]);
 
     const raporOnek = localStorage.getItem('raporKoduOnek') || 'S.Y.64';
     const currentYear = new Date().getFullYear();
@@ -272,7 +271,7 @@ export default function Tasks() {
             setSaving(true);
             await acceptTask(taskId, effectiveUid || "", effectiveEmail);
             toast.success("Görev kabul edildi ve listenize eklendi.");
-            await loadTasks();
+            if (effectiveUid) refreshTasks(effectiveUid);
         } catch (error) {
             toast.error("Görev kabul edilemedi.");
         } finally {
@@ -535,7 +534,7 @@ export default function Tasks() {
                 baslama_tarihi: editingTask.baslama_tarihi,
                 sure_gun: editingTask.sure_gun,
             });
-            await loadTasks();
+            if (effectiveUid) refreshTasks(effectiveUid);
             toast.success("Görev güncellendi.");
             setEditingTask(null);
         } catch { toast.error("Kaydedilemedi."); }

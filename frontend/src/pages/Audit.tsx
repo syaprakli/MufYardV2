@@ -1,13 +1,13 @@
 import { Plus, Search, Filter, FileText, Download, Loader2, FileSpreadsheet, Edit3, Shield, MapPin, Clock, Trash2, MoreVertical, ChevronRight, Share2, UserPlus, Upload } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
-import { fetchAudits, createAudit, deleteAudit, updateAudit, exportAuditsToExcel, exportAuditToWord, acceptAudit, type Audit as AuditType } from "../lib/api/audit";
-import { fetchTasks, updateTask, type Task } from "../lib/api/tasks";
+import { createAudit, deleteAudit, updateAudit, exportAuditsToExcel, exportAuditToWord, acceptAudit, type Audit as AuditType } from "../lib/api/audit";
+import { updateTask, type Task } from "../lib/api/tasks";
 import { useAuth } from "../lib/hooks/useAuth";
 import { isElectron } from "../lib/firebase";
 import { cn } from "../lib/utils";
@@ -24,7 +24,7 @@ const RAPOR_SABLONLARI: Record<string, string> = {
 import { useGlobalData } from "../lib/context/GlobalDataContext";
 
 export default function Audit() {
-    const { user, loading: authLoading } = useAuth();
+    const { user } = useAuth();
     const confirm = useConfirm();
     const navigate = useNavigate();
     const { data: cachedData, refreshAll, refreshAudits, refreshTasks } = useGlobalData();
