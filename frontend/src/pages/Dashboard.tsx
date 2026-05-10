@@ -517,6 +517,14 @@ Lütfen şunları analiz et:
                         )}
                     </div>
                     <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1 lg:flex-none rounded-xl font-bold text-[11px] px-4 h-11 border-slate-100 dark:border-slate-800"
+                        onClick={() => window.dispatchEvent(new CustomEvent('trigger-mufyard-intro'))}
+                    >
+                        <BookOpen size={14} className="mr-2 text-primary" /> Tanıtım
+                    </Button>
+                    <Button 
                         size="sm" 
                         className="flex-1 lg:flex-none rounded-xl font-bold text-[11px] px-5 shadow-lg shadow-primary/20 h-11"
                         onClick={handleAnalysis}

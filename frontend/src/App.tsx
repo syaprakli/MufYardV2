@@ -34,6 +34,7 @@ import Notifications from "./pages/Notifications";
 import Messages from "./pages/Messages";
 import Feedback from "./pages/Feedback";
 import ChatContainer from "./components/ChatContainer";
+import IntroPresentation from "./components/IntroPresentation";
 
 import { useVersionCheck } from "./lib/hooks/useVersionCheck";
 import { UpdateModal } from "./components/ui/UpdateModal";
@@ -42,6 +43,32 @@ function App() {
   const { updateAvailable, currentVersion } = useVersionCheck();
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [showIntro, setShowIntro] = useState(false);
+
+  useEffect(() => {
+    // Sadece giriş yapmış kullanıcılar için intro göster
+    if (user) {
+      const hasSeenIntro = localStorage.getItem(`mufyard_intro_seen_${user.uid}`);
+      if (!hasSeenIntro) {
+        // Küçük bir gecikme ile göster
+        const timer = setTimeout(() => setShowIntro(true), 1500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [user]);
+
+  const handleCloseIntro = () => {
+    if (user) {
+      localStorage.setItem(`mufyard_intro_seen_${user.uid}`, "true");
+    }
+    setShowIntro(false);
+  };
+
+  useEffect(() => {
+    const handleTriggerIntro = () => setShowIntro(true);
+    window.addEventListener('trigger-mufyard-intro', handleTriggerIntro);
+    return () => window.removeEventListener('trigger-mufyard-intro', handleTriggerIntro);
+  }, []);
 
   useEffect(() => {
     if (updateAvailable && isElectron) {
@@ -115,6 +142,7 @@ function App() {
                   currentVersion={currentVersion}
                 />
               )}
+              {showIntro && <IntroPresentation onClose={handleCloseIntro} />}
               <Router>
                 <Routes>
                   <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
