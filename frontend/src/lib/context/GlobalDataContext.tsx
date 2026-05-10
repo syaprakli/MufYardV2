@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { fetchStats } from '../api';
 import { fetchTasks } from '../api/tasks';
 import { fetchProfile } from '../api/profiles';
@@ -40,10 +40,17 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         lastFetched: null,
     });
     const [loading, setLoading] = useState(false);
+    const lastFetchedRef = useRef<number | null>(null);
+    const currentUidRef = useRef<string | null>(null);
 
     const refreshAll = useCallback(async (uid: string, email?: string, displayName?: string, force = false) => {
         const CACHE_TIME = 5 * 60 * 1000;
-        if (!force && data.lastFetched && Date.now() - data.lastFetched < CACHE_TIME && data.profile?.uid === uid) {
+        
+        if (!force && 
+            lastFetchedRef.current && 
+            (Date.now() - lastFetchedRef.current < CACHE_TIME) && 
+            currentUidRef.current === uid
+        ) {
             return;
         }
 
@@ -58,6 +65,7 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 fetchContacts('personal', uid, email)
             ]);
 
+            const now = Date.now();
             setData({
                 stats: statsRes.status === 'fulfilled' ? statsRes.value : { stats: [], news: [], forum_posts: [] },
                 tasks: tasksRes.status === 'fulfilled' ? tasksRes.value : [],
@@ -65,14 +73,16 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 audits: auditsRes.status === 'fulfilled' ? auditsRes.value : [],
                 contactsCorporate: contactsCorpRes.status === 'fulfilled' ? contactsCorpRes.value : [],
                 contactsPersonal: contactsPersRes.status === 'fulfilled' ? contactsPersRes.value : [],
-                lastFetched: Date.now(),
+                lastFetched: now,
             });
+            lastFetchedRef.current = now;
+            currentUidRef.current = uid;
         } catch (error) {
             console.error("Global data fetch error:", error);
         } finally {
             setLoading(false);
         }
-    }, [data.lastFetched, data.profile?.uid]);
+    }, []); 
 
     const refreshTasks = useCallback(async (uid: string) => {
         try {
