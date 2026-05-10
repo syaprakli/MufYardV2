@@ -94,7 +94,7 @@ export default function Dashboard() {
         if (effectiveUid) {
             refreshAll(effectiveUid, currentUser?.email || undefined, currentUser?.displayName || undefined);
         }
-    }, [effectiveUid, refreshAll, currentUser]);
+    }, [effectiveUid, refreshAll, currentUser?.email, currentUser?.displayName]);
 
     // Extra logic (Birthday, Identity)
     useEffect(() => {
@@ -501,6 +501,19 @@ Lütfen şunları analiz et:
                     trend="Başarı Oranı"
                     icon={Zap} 
                     style={COLORS.amber}
+                    onIconClick={() => {
+                        toast("Performans skoru, toplam görevleriniz içerisindeki tamamlanma oranına (Tamamlanan / Toplam) göre hesaplanır.", {
+                            icon: '💡',
+                            duration: 4000,
+                            style: {
+                                borderRadius: '12px',
+                                background: '#333',
+                                color: '#fff',
+                                fontSize: '11px',
+                                fontWeight: 'bold'
+                            }
+                        });
+                    }}
                 />
             </div>
 
@@ -1036,7 +1049,7 @@ function TableRow({ code, title, type, status, diff, rawColor, rawStatusColor }:
 }
 
 
-function StatCard({ title, value, trend, icon: Icon, isAlert, style }: any) {
+function StatCard({ title, value, trend, icon: Icon, isAlert, style, onIconClick }: any) {
     return (
         <Card 
             className={cn(
@@ -1054,7 +1067,19 @@ function StatCard({ title, value, trend, icon: Icon, isAlert, style }: any) {
                         {isAlert ? <AlertCircle size={10} /> : <ArrowUpRight size={10} />} {trend}
                     </p>
                 </div>
-                <div className={cn("p-3 rounded-xl transition-all", isAlert ? "bg-rose-100 dark:bg-rose-900/30" : "bg-slate-50 dark:bg-slate-800 group-hover:bg-primary/5 dark:group-hover:bg-primary/20")}>
+                <div 
+                    onClick={(e) => {
+                        if (onIconClick) {
+                            e.stopPropagation();
+                            onIconClick();
+                        }
+                    }}
+                    className={cn(
+                        "p-3 rounded-xl transition-all", 
+                        onIconClick ? "cursor-help hover:scale-110 active:scale-95" : "",
+                        isAlert ? "bg-rose-100 dark:bg-rose-950/20" : "bg-slate-50 dark:bg-slate-800 group-hover:bg-primary/5 dark:group-hover:bg-primary/20"
+                    )}
+                >
                     <Icon size={20} className={cn(isAlert ? "text-rose-500 dark:text-rose-400" : "text-slate-400 dark:text-slate-500 group-hover:text-primary dark:group-hover:text-primary-light")} />
                 </div>
             </div>
