@@ -56,20 +56,23 @@ const getKalanColor = (diff: number, total: number = 30) => {
 
 
 
+import { useGlobalData } from "../lib/context/GlobalDataContext";
+
 export default function Dashboard() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { theme } = useTheme();
-    const [data, setData] = useState<any>(null);
-    const [profile, setProfile] = useState<any>(null);
+    const { data: cachedData, refreshAll } = useGlobalData();
+    
+    const [data, setData] = useState<any>(cachedData.stats);
+    const [profile, setProfile] = useState<any>(cachedData.profile);
     const [tasks, setTasks] = useState<Task[]>([]);
-
+    const [birthdayUsers, setBirthdayUsers] = useState<any[]>([]);
 
     const [showIdentityModal, setShowIdentityModal] = useState(false);
     const [showAnalysis, setShowAnalysis] = useState(false);
     const [analysisLoading, setAnalysisLoading] = useState(false);
     const [analysisText, setAnalysisText] = useState("");
-    const [birthdayUsers, setBirthdayUsers] = useState<any[]>([]);
     const [showBirthdayModal, setShowBirthdayModal] = useState(false);
 
     // ─── Filtre State ───
@@ -79,9 +82,70 @@ export default function Dashboard() {
     const [filterPeriod, setFilterPeriod] = useState<string>("Tümü");
     const filterRef = useRef<HTMLDivElement>(null);
     
-    // Get identity once from useAuth or fallback (same as Tasks.tsx)
+    // Get identity once from useAuth or fallback
     const currentUser = user;
     const effectiveUid = currentUser?.uid;
+
+    // Sync local state with cached data
+    useEffect(() => {
+        if (cachedData.stats) setData(cachedData.stats);
+        if (cachedData.profile) setProfile(cachedData.profile);
+        if (cachedData.tasks && effectiveUid) {
+            const myTasks = cachedData.tasks.filter((t: any) => 
+                t.owner_id === effectiveUid || 
+                t.accepted_collaborators?.includes(effectiveUid)
+            );
+            setTasks(myTasks);
+        }
+    }, [cachedData, effectiveUid]);
+
+    // Initial load and background refresh
+    useEffect(() => {
+        if (effectiveUid) {
+            refreshAll(effectiveUid, currentUser?.email || undefined, currentUser?.displayName || undefined);
+        }
+    }, [effectiveUid, refreshAll, currentUser]);
+
+    // Extra logic (Birthday, Identity)
+    useEffect(() => {
+        const runExtraLogic = async () => {
+            if (!effectiveUid || !profile) return;
+
+            // Identity check
+            const isVerified = profile?.verified === true;
+            const isGeneric = !profile?.full_name || 
+                             ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz"].includes(profile.full_name);
+            const isSpecialUser = currentUser?.email === "sefayaprakli@hotmail.com" || 
+                                currentUser?.email === "sefa.yaprakli@gsb.gov.tr" ||
+                                effectiveUid === "sefa-yaprakli-gsb-unique-id";
+
+            if (!isSpecialUser && !isVerified && isGeneric && !localStorage.getItem(`id_skip_${effectiveUid}`)) {
+                setShowIdentityModal(true);
+            }
+
+            // Birthday logic
+            try {
+                const today = new Date();
+                const todayMD = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                
+                if (profile?.birthday === todayMD && !sessionStorage.getItem('celebrated')) {
+                    setShowBirthdayModal(true);
+                    sessionStorage.setItem('celebrated', 'true');
+                }
+
+                // Check other birthdays once per session or if not fetched
+                if (birthdayUsers.length === 0) {
+                    const profilesRes = await fetchWithTimeout(`${API_URL}/profiles/`);
+                    const allProfiles = await profilesRes.json();
+                    const bdayUsers = (Array.isArray(allProfiles) ? allProfiles : []).filter(
+                        (p: any) => p.birthday && p.birthday === todayMD && p.uid !== effectiveUid
+                    );
+                    setBirthdayUsers(bdayUsers);
+                }
+            } catch { /* silent */ }
+        };
+        runExtraLogic();
+    }, [effectiveUid, profile]);
 
     // Filtre dışı tıklama
     useEffect(() => {
@@ -93,123 +157,6 @@ export default function Dashboard() {
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
-
-    useEffect(() => {
-        const loadData = async () => {
-            if (!effectiveUid) return;
-            try {
-                const [statsResult, tasksResult, profileResult] = await Promise.allSettled([
-                    fetchStats(effectiveUid),
-                    fetchTasks(effectiveUid),
-                    fetchProfile(effectiveUid, currentUser.email || undefined, currentUser.displayName || undefined)
-                ]);
-
-                const stats =
-                    statsResult.status === "fulfilled"
-                        ? statsResult.value
-                        : { stats: [], news: [], forum_posts: [] };
-                const taskList =
-                    tasksResult.status === "fulfilled"
-                        ? tasksResult.value
-                        : [];
-                
-                const myTasks = taskList.filter((t: any) => 
-                    t.owner_id === effectiveUid || 
-                    t.accepted_collaborators?.includes(effectiveUid)
-                );
-
-                let profileData = 
-                    profileResult.status === "fulfilled"
-                        ? profileResult.value
-                        : null;
-
-                // Otomatik kurumsal eşleştirme (eğer verified değilse ve generic ise)
-                const isVerified = profileData?.verified === true;
-                const isGeneric = !profileData?.full_name || 
-                                 ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz"].includes(profileData.full_name);
-                const isSpecialUser = currentUser?.email === "sefayaprakli@hotmail.com" || 
-                                    currentUser?.email === "sefa.yaprakli@gsb.gov.tr" ||
-                                    effectiveUid === "sefa-yaprakli-gsb-unique-id";
-
-                if (!isSpecialUser && !isVerified && isGeneric && !localStorage.getItem(`id_skip_${effectiveUid}`)) {
-                    try {
-                        const inspectors = await fetchInspectors();
-                        const normalizeName = (s: string) =>
-                            (s || "")
-                                .toLowerCase()
-                                .replace(/[.\-]/g, " ")
-                                .replace(/\s+/g, " ")
-                                .trim();
-
-                        const expectedName = normalizeName(currentUser.displayName || profileData?.full_name || "");
-                        const loginEmail = (currentUser.email || "").trim().toLowerCase();
-
-                        // Önce email ile tam eşleşme
-                        let match = inspectors.find(c => (c.email || "").trim().toLowerCase() === loginEmail);
-                        // Yoksa ad-soyad ile eşleştir
-                        if (!match && expectedName) {
-                            match = inspectors.find(c => normalizeName(c.name) === expectedName);
-                        }
-
-                        if (match) {
-                            const mergedEmails = Array.from(
-                                new Set([
-                                    ...(Array.isArray(profileData?.emails) ? profileData.emails : []),
-                                    profileData?.email,
-                                    currentUser.email,
-                                    match.email,
-                                ].filter(Boolean).map((v: any) => String(v).trim().toLowerCase()))
-                            );
-
-                            await updateProfile(effectiveUid, {
-                                full_name: match.name,
-                                title: match.title,
-                                institution: "Gençlik ve Spor Bakanlığı",
-                                email: match.email,
-                                emails: mergedEmails,
-                                verified: true
-                            });
-                            localStorage.setItem(`id_skip_${effectiveUid}`, "true");
-                            profileData = { ...profileData, ...match, verified: true, uid: effectiveUid } as any;
-                        } else {
-                            setShowIdentityModal(true);
-                        }
-                    } catch (e) {
-                        setShowIdentityModal(true);
-                    }
-                }
-
-                setData(stats);
-                setTasks(myTasks);
-                setProfile(profileData);
-                
-                // Doğum günü kontrolü
-                try {
-                    const profilesRes = await fetchWithTimeout(`${API_URL}/profiles/`);
-                    const allProfiles = await profilesRes.json();
-                    const today = new Date();
-                    const todayMD = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-                    
-                    const bdayUsers = (Array.isArray(allProfiles) ? allProfiles : []).filter(
-                        (p: any) => p.birthday && p.birthday === todayMD && p.uid !== effectiveUid
-                    );
-                    setBirthdayUsers(bdayUsers);
-
-                    // Mevcut kullanıcı doğum günü mü?
-                    if ((profileData as any)?.birthday === todayMD && !sessionStorage.getItem('celebrated')) {
-                        setShowBirthdayModal(true);
-                        sessionStorage.setItem('celebrated', 'true');
-                    }
-                } catch { /* sessizce geç */ }
-            } catch (err) {
-                console.error("Dashboard yüklenirken hata:", err);
-            } finally {
-
-
-            }
-        };
-        loadData();
-    }, [effectiveUid]);
 
     // Removed full-screen loading screen to allow instant shell rendering
 
@@ -551,7 +498,7 @@ Lütfen şunları analiz et:
                     style={COLORS.green}
                 />
                 <StatCard 
-                    title="Acil Görevler" 
+                    title="Acil Notlar" 
                     value={urgentTasksCount.toString()} 
                     trend={urgentTasksCount > 0 ? "İvedi Müdahale" : "Her Şey Yolunda"}
                     icon={AlertCircle} 

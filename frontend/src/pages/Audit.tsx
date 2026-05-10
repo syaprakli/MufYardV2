@@ -21,13 +21,17 @@ const RAPOR_SABLONLARI: Record<string, string> = {
     "Spor Kulüpleri": "<h1 style=\"text-align: center;\">SPOR KULÜBÜ DENETİM RAPORU</h1><p><br></p><p><strong>1. GİRİŞ</strong></p><p>7405 sayılı Spor Kulüpleri ve Spor Federasyonları Kanunu kapsamında ....... Spor Kulübü'nün idari ve mali denetimi hakkındadır.</p><p><br></p><p><strong>2. İDARİ YAPI VE İŞLEYİŞ</strong></p><p>Tüzük uygunluğu, üye kayıt defteri, yönetim kurulu karar defterinin incelenmesi.</p><p><br></p><p><strong>3. MALİ İNCELEME</strong></p><p>Gelir-gider tabloları, bağış makbuzları ve bilanço değerleri.</p><p><br></p><p><strong>4. SONUÇ</strong></p><p>İyileştirilmesi gereken alanlar ve mevzuata aykırı eylemlere ilişkin bildirimler.</p>"
 };
 
+import { useGlobalData } from "../lib/context/GlobalDataContext";
+
 export default function Audit() {
     const { user, loading: authLoading } = useAuth();
     const confirm = useConfirm();
     const navigate = useNavigate();
+    const { data: cachedData, refreshAll, refreshAudits, refreshTasks } = useGlobalData();
+    
     const [audits, setAudits] = useState<AuditType[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -42,8 +46,6 @@ export default function Audit() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
     
-    // Simple local cache for the session
-    const cacheRef = useRef<{audits?: AuditType[], tasks?: Task[]}>({});
     const [newAudit, setNewAudit] = useState({
         task_id: "",
         title: "",
@@ -63,62 +65,41 @@ export default function Audit() {
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    const loadData = async (silent = false) => {
-        if (authLoading) return;
-        
-        const localUserRaw = localStorage.getItem('demo_user');
-        const localUser = localUserRaw ? JSON.parse(localUserRaw) : null;
-        
-        const effectiveId = user?.uid || localUser?.uid;
-        const effectiveEmail = user?.email || localUser?.email;
+    // Sync from cache
+    useEffect(() => {
+        if (!user) return;
+        const uid = user.uid;
+        const email = (user.email || '').toLowerCase();
+        const userKeys = [uid, email].filter(Boolean) as string[];
 
-        if (!effectiveId && !effectiveEmail) {
-            setLoading(false);
-            return;
+        setAudits(cachedData.audits || []);
+        setTasks(cachedData.tasks || []);
+
+        const pending = (cachedData.audits || []).filter((a: any) =>
+            (a.pending_collaborators || []).some((v: string) => userKeys.includes(v)) &&
+            !userKeys.includes(a.owner_id || '')
+        );
+        setInvitations(pending);
+    }, [cachedData, user]);
+
+    useEffect(() => {
+        if (user?.uid) {
+            refreshAll(user.uid, user.email || undefined, user.displayName || undefined);
         }
-        
+    }, [user, refreshAll]);
+
+    const loadData = async (silent = false) => {
+        if (!user) return;
+        if (!silent) setLoading(true);
         try {
-            if (!silent) setLoading(true);
-            const [auditsData, tasksData] = await Promise.all([
-                fetchAudits(effectiveId, effectiveEmail).catch(() => []),
-                fetchTasks(effectiveId, effectiveEmail).catch(() => []) 
+            await Promise.all([
+                refreshAudits(user.uid, user.email || undefined),
+                refreshTasks(user.uid)
             ]);
-            
-            setAudits(auditsData);
-            setTasks(tasksData);
-            
-            // Separate pending invitations
-            const uid = user?.uid || localUser?.uid;
-            const email = (user?.email || localUser?.email || '').toLowerCase();
-            const userKeys = [uid, email].filter(Boolean) as string[];
-            
-            const pending = auditsData.filter((a: any) =>
-                (a.pending_collaborators || []).some((v: string) => userKeys.includes(v)) &&
-                !userKeys.includes(a.owner_id || '')
-            );
-            setInvitations(pending);
-            
-            // Update cache
-            cacheRef.current = { audits: auditsData, tasks: tasksData };
-        } catch (error) {
-            console.error("Veriler yüklenemedi:", error);
-            setAudits([]);
-            setTasks([]);
         } finally {
             setLoading(false);
         }
     };
-    
-    useEffect(() => {
-        if (cacheRef.current.audits && cacheRef.current.tasks) {
-            setAudits(cacheRef.current.audits);
-            setTasks(cacheRef.current.tasks);
-            setLoading(false);
-            loadData(true);
-        } else {
-            loadData();
-        }
-    }, [user, authLoading]);
 
     const handleCreateAudit = async (e: React.FormEvent) => {
         e.preventDefault();

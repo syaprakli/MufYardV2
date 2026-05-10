@@ -38,6 +38,7 @@ import IntroPresentation from "./components/IntroPresentation";
 
 import { useVersionCheck } from "./lib/hooks/useVersionCheck";
 import { UpdateModal } from "./components/ui/UpdateModal";
+import { GlobalDataProvider } from "./lib/context/GlobalDataContext";
 
 function App() {
   const { updateAvailable, currentVersion } = useVersionCheck();
@@ -128,57 +129,59 @@ function App() {
   }
 
   return (
-    <PresenceProvider>
-      <ThemeProvider>
-        <ChatProvider>
-          <ConfirmProvider>
-            <NotificationProvider>
-              <Toaster position="top-right" />
-              {showUpdateModal && (
-                <UpdateModal 
-                  isOpen={showUpdateModal}
-                  onClose={() => setShowUpdateModal(false)}
-                  latestVersion={updateAvailable || ""}
-                  currentVersion={currentVersion}
-                />
-              )}
-              {showIntro && <IntroPresentation onClose={handleCloseIntro} />}
-              <Router>
-                <Routes>
-                  <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
+    <GlobalDataProvider>
+      <PresenceProvider>
+        <ThemeProvider>
+          <ChatProvider>
+            <ConfirmProvider>
+              <NotificationProvider>
+                <Toaster position="top-right" />
+                {showUpdateModal && (
+                  <UpdateModal 
+                    isOpen={showUpdateModal}
+                    onClose={() => setShowUpdateModal(false)}
+                    latestVersion={updateAvailable || ""}
+                    currentVersion={currentVersion}
+                  />
+                )}
+                {showIntro && <IntroPresentation onClose={handleCloseIntro} />}
+                <Router>
+                  <Routes>
+                    <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
 
-                  <Route element={user ? <MainLayout /> : <Navigate to="/login" />}>
-                    <Route index element={<Dashboard />} />
-                    <Route path="dashboard" element={<Dashboard />} />
-                    <Route path="audit" element={<Audit />} />
-                    <Route path="tasks" element={<Tasks />} />
-                    <Route path="contacts" element={<Contacts />} />
-                    <Route path="assistant" element={<Assistant />} />
-                    <Route path="ai-knowledge" element={<AIKnowledge />} />
-                    <Route path="legislation" element={<Legislation />} />
-                    <Route path="notes" element={<Notes />} />
-                    <Route path="files" element={<Files />} />
-                    <Route path="settings" element={<Settings />} />
-                    <Route path="calendar" element={<Calendar />} />
-                    <Route path="audit/:id/report" element={<ReportEditor />} />
-                    <Route path="public-space" element={<PublicSpace />} />
-                    <Route path="about" element={<About />} />
-                    <Route path="notifications" element={<Notifications />} />
-                    <Route path="messages" element={<Messages />} />
-                    <Route path="feedback" element={<Feedback />} />
-                    <Route path="admin/feedback" element={<AdminFeedback />} />
-                    <Route path="admin/inspectors" element={<AdminInspectors />} />
-                    <Route path="admin/roles" element={<AdminRoleSettings />} />
-                  </Route>
-                  <Route path="*" element={<Navigate to="/" />} />
-                </Routes>
-                {user && <ChatContainer />}
-              </Router>
-            </NotificationProvider>
-          </ConfirmProvider>
-        </ChatProvider>
-      </ThemeProvider>
-    </PresenceProvider>
+                    <Route element={user ? <MainLayout /> : <Navigate to="/login" />}>
+                      <Route index element={<Dashboard />} />
+                      <Route path="dashboard" element={<Dashboard />} />
+                      <Route path="audit" element={<Audit />} />
+                      <Route path="tasks" element={<Tasks />} />
+                      <Route path="contacts" element={<Contacts />} />
+                      <Route path="assistant" element={<Assistant />} />
+                      <Route path="ai-knowledge" element={<AIKnowledge />} />
+                      <Route path="legislation" element={<Legislation />} />
+                      <Route path="notes" element={<Notes />} />
+                      <Route path="files" element={<Files />} />
+                      <Route path="settings" element={<Settings />} />
+                      <Route path="calendar" element={<Calendar />} />
+                      <Route path="audit/:id/report" element={<ReportEditor />} />
+                      <Route path="public-space" element={<PublicSpace />} />
+                      <Route path="about" element={<About />} />
+                      <Route path="notifications" element={<Notifications />} />
+                      <Route path="messages" element={<Messages />} />
+                      <Route path="feedback" element={<Feedback />} />
+                      <Route path="admin/feedback" element={<AdminFeedback />} />
+                      <Route path="admin/inspectors" element={<AdminInspectors />} />
+                      <Route path="admin/roles" element={<AdminRoleSettings />} />
+                    </Route>
+                    <Route path="*" element={<Navigate to="/" />} />
+                  </Routes>
+                  {user && <ChatContainer />}
+                </Router>
+              </NotificationProvider>
+            </ConfirmProvider>
+          </ChatProvider>
+        </ThemeProvider>
+      </PresenceProvider>
+    </GlobalDataProvider>
   );
 }
 

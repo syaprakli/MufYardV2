@@ -13,13 +13,17 @@ import ShareModal from "../components/ShareModal";
 import { useLocation } from "react-router-dom";
 
 
+import { useGlobalData } from "../lib/context/GlobalDataContext";
+
 export default function Contacts() {
     const { user } = useAuth();
     const location = useLocation();
     const confirm = useConfirm();
+    const { data: cachedData, refreshAll, refreshContactsPersonal, refreshContactsCorporate } = useGlobalData();
+    
     const [activeTab, setActiveTab] = useState<"corporate" | "personal">("personal");
     const [contacts, setContacts] = useState<Contact[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedRole, setSelectedRole] = useState("Tümü");
@@ -61,72 +65,49 @@ export default function Contacts() {
         }
     }, [location.search]);
 
+    // Sync from cache
     useEffect(() => {
-        loadContacts();
-    }, [activeTab, user?.uid]);
+        if (!user) return;
+        const userEmail = user.email?.toLowerCase();
+        const userKeys = [user.uid, userEmail].filter(Boolean) as string[];
+
+        if (activeTab === "personal") {
+            const data = cachedData.contactsPersonal || [];
+            // Kendi eklediklerim + kabul ettiklerim
+            const accepted = data.filter(c => {
+                const isOwner = c.owner_id === user.uid || (userEmail && c.owner_id === userEmail);
+                const isAcceptedCollab = (c as any).accepted_collaborators?.some((v: string) => userKeys.includes(v.toLowerCase()));
+                return isOwner || isAcceptedCollab;
+            });
+
+            // Henüz bekleyen davetler
+            const pending = data.filter(c => {
+                const isOwner = c.owner_id === user.uid || (userEmail && c.owner_id === userEmail);
+                const isPendingCollab = (c as any).pending_collaborators?.some((v: string) => userKeys.includes(v.toLowerCase()));
+                return !isOwner && isPendingCollab;
+            });
+
+            const acceptedContacts = accepted.length > 0 ? accepted : (data.length > 0 ? data.filter(c => c.owner_id === user.uid) : []);
+            setContacts(acceptedContacts);
+            setInvitations(pending);
+        } else {
+            setContacts(cachedData.contactsCorporate || []);
+            setInvitations([]);
+        }
+    }, [activeTab, cachedData, user]);
+
+    useEffect(() => {
+        if (user?.uid) {
+            refreshAll(user.uid, user.email || undefined, user.displayName || undefined);
+        }
+    }, [user, refreshAll]);
 
     const loadContacts = async () => {
         if (!user) return;
-        const cacheKey = `contacts_cache_${user.uid}_${activeTab}`;
-        let hasCache = false;
-
-        try {
-            const rawCache = localStorage.getItem(cacheKey);
-            if (rawCache) {
-                const cached = JSON.parse(rawCache);
-                if (Array.isArray(cached?.contacts)) {
-                    setContacts(cached.contacts);
-                    setInvitations(Array.isArray(cached?.invitations) ? cached.invitations : []);
-                    setLoading(false);
-                    hasCache = true;
-                }
-            }
-        } catch {
-            // Ignore malformed cache and continue with network fetch.
-        }
-
-        try {
-            if (!hasCache) {
-                setLoading(true);
-            }
-            const userEmail = user.email?.toLowerCase();
-            const data = await fetchContacts(activeTab, user.uid, userEmail);
-            
-            if (activeTab === "personal") {
-                const userKeys = [user.uid, userEmail].filter(Boolean) as string[];
-                
-                // Kendi eklediklerim + kabul ettiklerim
-                const accepted = data.filter(c => {
-                    const isOwner = c.owner_id === user.uid || (userEmail && c.owner_id === userEmail);
-                    const isAcceptedCollab = (c as any).accepted_collaborators?.some((v: string) => userKeys.includes(v.toLowerCase()));
-                    return isOwner || isAcceptedCollab;
-                });
-
-                // Henüz bekleyen davetler
-                const pending = data.filter(c => {
-                    const isOwner = c.owner_id === user.uid || (userEmail && c.owner_id === userEmail);
-                    const isPendingCollab = (c as any).pending_collaborators?.some((v: string) => userKeys.includes(v.toLowerCase()));
-                    return !isOwner && isPendingCollab;
-                });
-
-                const acceptedContacts = accepted.length > 0 ? accepted : (data.length > 0 && activeTab === "personal" ? data.filter(c => c.owner_id === user.uid) : []);
-                setContacts(acceptedContacts);
-                setInvitations(pending);
-                localStorage.setItem(cacheKey, JSON.stringify({ contacts: acceptedContacts, invitations: pending, ts: Date.now() }));
-            } else {
-                const corporateContacts = Array.isArray(data) ? data : [];
-                setContacts(corporateContacts);
-                setInvitations([]);
-                localStorage.setItem(cacheKey, JSON.stringify({ contacts: corporateContacts, invitations: [], ts: Date.now() }));
-            }
-        } catch (error) {
-            console.error("Rehber yüklenemedi:", error);
-            if (!hasCache) {
-                setContacts([]);
-                toast.error("İletişim bilgileri şu an yüklenemiyor.");
-            }
-        } finally {
-            setLoading(false);
+        if (activeTab === "personal") {
+            await refreshContactsPersonal(user.uid, user.email || undefined);
+        } else {
+            await refreshContactsCorporate();
         }
     };
 

@@ -79,6 +79,8 @@ function getNextReportSequence(audits: Array<{ report_seq?: number }>): number {
     return seq;
 }
 
+import { useGlobalData } from "../lib/context/GlobalDataContext";
+
 export default function Tasks() {
     const navigate = useNavigate();
     const { theme } = useTheme();
@@ -89,15 +91,17 @@ export default function Tasks() {
     const overlayStyle: React.CSSProperties = { position: "fixed", inset: 0, zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" };
     const modalBoxStyle: React.CSSProperties = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: "1.5rem", boxShadow: "var(--shadow-lg)", width: "100%", maxWidth: "550px", padding: "2rem" };
 
-    const [tasks, setTasks] = useState<Task[]>([]);
     const { user, profile } = useAuth();
+    const { data: cachedData, refreshAll, refreshTasks } = useGlobalData();
+    
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [loading, setLoading] = useState(false);
     
     const currentUser = user;
     const effectiveUid = currentUser?.uid;
     const effectiveEmail = currentUser?.email?.toLowerCase();
     const userKeys = [effectiveUid, effectiveEmail].filter(Boolean) as string[];
 
-    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -130,6 +134,38 @@ export default function Tasks() {
     const [inspectorSearch, setInspectorSearch] = useState("");
     const inspectorDropdownRef = useRef<HTMLDivElement>(null);
 
+    // Sync tasks and invitations from cache
+    useEffect(() => {
+        if (cachedData.tasks) {
+            const accepted = cachedData.tasks.filter(t => 
+                userKeys.includes(t.owner_id || '') || 
+                (t.accepted_collaborators || []).some(value => userKeys.includes(value))
+            );
+            
+            const pending = cachedData.tasks.filter(t => 
+                (t.pending_collaborators || []).some(value => userKeys.includes(value)) &&
+                !userKeys.includes(t.owner_id || '')
+            );
+
+            setTasks(accepted);
+            setInvitations(pending);
+        }
+    }, [cachedData.tasks, userKeys]);
+
+    // Sync inspectors from cache
+    useEffect(() => {
+        if (cachedData.contacts) {
+            const combined: Inspector[] = cachedData.contacts.map((p: any) => ({
+                id: p.uid || p.id,
+                name: p.full_name || p.display_name || p.email || p.name,
+                email: p.email,
+                title: p.title || "Müfettiş",
+                created_at: new Date().toISOString()
+            }));
+            setInspectors(combined);
+        }
+    }, [cachedData.contacts]);
+
     const raporOnek = localStorage.getItem('raporKoduOnek') || 'S.Y.64';
     const currentYear = new Date().getFullYear();
     const autoKodu = useMemo(() => {
@@ -149,10 +185,10 @@ export default function Tasks() {
 
     useEffect(() => { 
         if (effectiveUid) {
-            loadTasks(); 
-            loadInspectors();
+            refreshAll(effectiveUid, currentUser?.email || undefined, currentUser?.displayName || undefined);
         }
-    }, [effectiveUid]);
+    }, [effectiveUid, refreshAll, currentUser]);
+
 
     // Web sürümü uyarısı
     useEffect(() => {
@@ -186,76 +222,6 @@ export default function Tasks() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const loadInspectors = async () => {
-        try {
-            let profiles: Profile[] = [];
-            let directory: any[] = [];
-
-            try {
-                profiles = await fetchAllProfiles();
-            } catch (err) {
-                console.error("Profiller yüklenemedi:", err);
-                return;
-            }
-
-            try {
-                directory = await fetchInspectors();
-            } catch (err) {
-                console.warn("Rehber verisi alınamadı.");
-            }
-            
-            const combined: Inspector[] = profiles.map((p: any) => {
-                const dirEntry = directory.find(d => d.email?.toLowerCase() === p.email?.toLowerCase());
-                return {
-                    id: p.uid || p.id,
-                    name: p.full_name || p.display_name || p.email,
-                    email: p.email,
-                    title: p.title || dirEntry?.title || "Müfettiş",
-                    created_at: new Date().toISOString()
-                };
-            });
-
-            setInspectors(combined);
-        } catch (error) {
-            console.error("Kullanıcılar yüklenemedi:", error);
-        }
-    };
-
-
-
-    if (!user) {
-        return (
-            <div className="min-h-[400px] flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-            </div>
-        );
-    }
-
-    const loadTasks = async () => {
-        if (!effectiveUid) return;
-        try {
-            setLoading(true);
-            const data = await fetchTasks(effectiveUid, effectiveEmail);
-            
-            const accepted = data.filter(t => 
-                userKeys.includes(t.owner_id || '') || 
-                (t.accepted_collaborators || []).some(value => userKeys.includes(value))
-            );
-            
-            const pending = data.filter(t => 
-                (t.pending_collaborators || []).some(value => userKeys.includes(value)) &&
-                !userKeys.includes(t.owner_id || '')
-            );
-
-            setTasks(accepted);
-            setInvitations(pending);
-        } catch { 
-            setTasks([]); 
-            setInvitations([]);
-        } finally { 
-            setLoading(false); 
-        }
-    };
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -287,7 +253,7 @@ export default function Tasks() {
                 sure_gun: 30,
                 assigned_to: []
             });
-            loadTasks();
+            if (effectiveUid) refreshTasks(effectiveUid);
         } catch { toast.error("Görev oluşturulamadı."); }
         finally { setSaving(false); }
     };
@@ -332,8 +298,8 @@ export default function Tasks() {
 
             // 2. Delete the task itself
             await deleteTask(deleteConfirmId);
-            setTasks(prev => prev.filter(t => t.id !== deleteConfirmId));
             toast.success("Görev ve ilişkili tüm raporlar başarıyla silindi.");
+            if (effectiveUid) refreshTasks(effectiveUid);
         } catch (error) { 
             console.error("Silme hatası:", error);
             toast.error("Silme işlemi başarısız.");
@@ -351,7 +317,7 @@ export default function Tasks() {
         try {
             const result = await importTasksFromExcel(effectiveUid, file);
             toast.success(`${result.imported} görev başarıyla içe aktarıldı.`, { id: loadingToast });
-            loadTasks();
+            if (effectiveUid) refreshTasks(effectiveUid);
         } catch (error: any) {
             toast.error(error.message || "İçe aktarma hatası.", { id: loadingToast });
         } finally {
@@ -406,7 +372,7 @@ export default function Tasks() {
         const updatedSteps: TaskStep[] = [...(task.steps || []), { text, done: false }];
         try {
             await updateTask(task.id, { steps: updatedSteps });
-            setTasks(prev => prev.map(t => t.id === task.id ? { ...t, steps: updatedSteps } : t));
+            if (effectiveUid) refreshTasks(effectiveUid);
             setNewStepText(prev => ({ ...prev, [task.id]: "" }));
         } catch { /* silent */ }
     };
@@ -415,7 +381,7 @@ export default function Tasks() {
         const updatedSteps = (task.steps || []).map((s, i) => i === index ? { ...s, done: !s.done } : s);
         try {
             await updateTask(task.id, { steps: updatedSteps });
-            setTasks(prev => prev.map(t => t.id === task.id ? { ...t, steps: updatedSteps } : t));
+            if (effectiveUid) refreshTasks(effectiveUid);
         } catch { /* silent */ }
     };
 
@@ -423,7 +389,7 @@ export default function Tasks() {
         const updatedSteps = (task.steps || []).filter((_, i) => i !== index);
         try {
             await updateTask(task.id, { steps: updatedSteps });
-            setTasks(prev => prev.map(t => t.id === task.id ? { ...t, steps: updatedSteps } : t));
+            if (effectiveUid) refreshTasks(effectiveUid);
         } catch { /* silent */ }
     };
 
@@ -683,16 +649,6 @@ export default function Tasks() {
                                     <br className="hidden md:block" />
                                     Yeni kayıtlar eklemek için lütfen <span className="underline decoration-2 underline-offset-4">MufYard Masaüstü</span> uygulamasını kullanın.
                                 </p>
-                            </div>
-                            <div className="hidden sm:block">
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500 hover:text-white"
-                                    onClick={() => navigate('/about')}
-                                >
-                                    Uygulamayı İndir
-                                </Button>
                             </div>
                         </div>
                     </Card>
