@@ -211,9 +211,16 @@ export default function ReportAnalytics() {
         }
 
         return Array.from(uniqueMap.values()).sort((a: any, b: any) => {
-            const aTime = new Date(a?.created_at || 0).getTime();
-            const bTime = new Date(b?.created_at || 0).getTime();
-            return bTime - aTime;
+            const isArchivedA = isArchivedTask(a) ? 1 : 0;
+            const isArchivedB = isArchivedTask(b) ? 1 : 0;
+
+            if (isArchivedA !== isArchivedB) {
+                return isArchivedA - isArchivedB; // Arşivlenmiş olanlar (1) sona gitsin
+            }
+
+            const aTime = new Date(a?.baslama_tarihi || a?.created_at || 0).getTime();
+            const bTime = new Date(b?.baslama_tarihi || b?.created_at || 0).getTime();
+            return bTime - aTime; // En yeni tarihli olanlar en üstte
         });
     }, [liveTasks, cachedData.tasks, effectiveUid, user?.email]);
 
