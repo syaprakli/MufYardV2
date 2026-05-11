@@ -22,6 +22,7 @@ import {
 import { cn } from "../../lib/utils";
 import { isElectron } from "../../lib/firebase";
 import { useAuth } from "../../lib/hooks/useAuth";
+import { usePresence } from "../../lib/context/PresenceContext";
 
 interface SidebarProps {
     isOpen: boolean;
@@ -57,6 +58,9 @@ const bottomNavItems = [
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
     const { user, profile } = useAuth();
+    const { unreadMessages } = usePresence();
+    
+    const totalUnread = Object.values(unreadMessages).reduce((a, b) => a + b, 0);
     
     // Check role from profile, or fallback to hardcoded emails for initial setup
     const isAdmin = profile?.role === 'admin' || 
@@ -157,7 +161,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         )}
                     >
                         <item.icon size={18} />
-                        <span className="font-semibold text-sm">{item.label}</span>
+                        <span className="font-semibold text-sm flex-1">{item.label}</span>
+                        {item.href === "/messages" && totalUnread > 0 && (
+                            <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-bounce shadow-lg shadow-red-500/20">
+                                {totalUnread}
+                            </span>
+                        )}
                     </NavLink>
                 ))}
 

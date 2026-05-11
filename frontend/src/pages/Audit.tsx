@@ -124,6 +124,12 @@ export default function Audit() {
 
     const handleCreateAudit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (!isElectron) {
+            toast.error("Rapor oluşturma işlemi sadece masaüstü uygulamasında tam fonksiyonel olarak gerçekleştirilebilir.");
+            return;
+        }
+
         if (!newAudit.task_id) {
             toast.error("Lütfen önce bu denetimle ilişkili bir Görev seçiniz.");
             return;
@@ -301,10 +307,10 @@ export default function Audit() {
     const handleAcceptInvitation = async (auditId: string) => {
         if (!user?.uid) return;
 
-        /* 
-           Rapor kabul işlemi veri tabanı üzerinden yürütülür, 
-           bu nedenle Web sürümünde de aktiftir.
-        */
+        if (!isElectron) {
+            toast.error("Rapor daveti kabul etme işlemi sadece masaüstü uygulamasında güvenli protokol ile gerçekleştirilebilir.");
+            return;
+        }
 
         try {
             await acceptAudit(auditId, user.uid, user.email || undefined);
@@ -568,9 +574,15 @@ export default function Audit() {
                                 </div>
                                 <button 
                                     onClick={() => handleAcceptInvitation(inv.id)} 
-                                    className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl h-10 font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-blue-200/50 transition-all active:scale-95"
+                                    className={cn(
+                                        "w-full rounded-xl h-10 font-bold text-[10px] uppercase tracking-widest shadow-lg transition-all active:scale-95",
+                                        isElectron 
+                                            ? "bg-blue-500 hover:bg-blue-600 text-white shadow-blue-200/50" 
+                                            : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+                                    )}
+                                    title={!isElectron ? "Sadece Masaüstü Uygulamasında" : ""}
                                 >
-                                    Raporu Kabul Et ve Listeye Ekle
+                                    {isElectron ? "Raporu Kabul Et ve Listeye Ekle" : "Kabul İçin Masaüstü Uygulamasını Açın"}
                                 </button>
                             </div>
                         ))}

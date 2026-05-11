@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { useAuth } from '../hooks/useAuth';
 import { WS_URL } from '../config';
 import { fetchOnlineUsers } from '../api/online';
+import { toast } from 'react-hot-toast';
+import { useChat } from './ChatContext';
 
 interface OnlineUser {
     uid: string;
@@ -22,6 +24,8 @@ interface PresenceContextType {
     wsConnected: boolean;
     isUserOnline: (uid: string) => boolean;
     messages: Message[];
+    unreadMessages: Record<string, number>;
+    markAsRead: (roomId: string) => void;
     sendMessage: (text: string, attachments?: any[]) => string;
 }
 
@@ -51,9 +55,11 @@ function resolvePresenceName(user: any, profileName?: string) {
 
 export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const { user, profile } = useAuth();
+    const { openChat } = useChat();
     const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
     const [wsConnected, setWsConnected] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
+    const [unreadMessages, setUnreadMessages] = useState<Record<string, number>>({});
     
     const wsRef = useRef<WebSocket | null>(null);
     const retryTimer = useRef<any>(null);
@@ -152,13 +158,33 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                         }
 
                         // Handle Messages (Universal Logic)
-                        const msgContent = data.content || data.text || data.message;
+                        const msgContent = data.content || data.text || data.message || "";
+                        const msgAttachments = data.attachments || (data.attachment ? [data.attachment] : []);
                         const msgRoomId = data.room_id || 'global';
                         
-                        if (msgContent && typeof msgContent === 'string') {
+                        // Metin VEYA ek varsa işle
+                        if ((msgContent && typeof msgContent === 'string') || msgAttachments.length > 0) {
                             if (msgRoomId.startsWith('dm_')) {
                                 // DM ise diğer bileşenlerin (FloatingChat gibi) yakalaması için bir event fırlat
                                 window.dispatchEvent(new CustomEvent('mufyard:new_message', { detail: data }));
+                                
+                                // Okunmamış mesaj sayısını artır (Eğer gönderen ben değilsem)
+                                if (data.sender_id !== user?.uid) {
+                                    setUnreadMessages(prev => ({
+                                        ...prev,
+                                        [msgRoomId]: (prev[msgRoomId] || 0) + 1
+                                    }));
+
+                                    // Toast bildirimi göster
+                                    toast.success(`${data.sender_name}: ${msgContent || 'Bir dosya gönderdi'}`, {
+                                        icon: '💬',
+                                        duration: 4000,
+                                        position: 'top-center'
+                                    });
+
+                                    // SOHBET KUTUSUNU OTOMATİK AÇ (Kullanıcının isteği üzerine)
+                                    openChat(msgRoomId, data.sender_name, 'dm');
+                                }
                                 return;
                             }
 
@@ -169,7 +195,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                                 author_id: data.author_id || data.sender_id,
                                 author_name: data.author_name || data.sender_name || 'Müfettiş',
                                 timestamp: data.timestamp || new Date().toISOString(),
-                                attachments: data.attachments || (data.attachment ? [data.attachment] : [])
+                                attachments: msgAttachments
                             };
 
                             setMessages(prev => {
@@ -230,11 +256,21 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         return onlineUsers.some(u => u.uid === uid);
     }, [onlineUsers]);
 
+    const markAsRead = useCallback((roomId: string) => {
+        setUnreadMessages(prev => {
+            if (!prev[roomId]) return prev;
+            const next = { ...prev };
+            delete next[roomId];
+            return next;
+        });
+    }, []);
+
     const sendMessage = useCallback((text: string, attachments: any[] = []): string => {
         const msgId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             const payload = {
                 type: 'message',
+                room_id: 'global', // Explicitly set for public space
                 id: msgId,
                 text,
                 attachments,
@@ -250,7 +286,10 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     }, [user?.uid]);
 
     return (
-        <PresenceContext.Provider value={{ onlineUsers, wsConnected, isUserOnline, messages, sendMessage }}>
+        <PresenceContext.Provider value={{ 
+            onlineUsers, wsConnected, isUserOnline, messages, unreadMessages, markAsRead, 
+            sendMessage 
+        }}>
             {children}
         </PresenceContext.Provider>
     );
@@ -264,6 +303,8 @@ export function usePresence() {
             wsConnected: false,
             isUserOnline: () => false,
             messages: [],
+            unreadMessages: {},
+            markAsRead: () => {},
             sendMessage: () => ""
         } as PresenceContextType;
     }

@@ -154,6 +154,7 @@ export default function PublicSpace() {
     const [editingPost, setEditingPost] = useState<Post | null>(null);
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [editCommentText, setEditCommentText] = useState("");
+    const [chatAttachments, setChatAttachments] = useState<Attachment[]>([]);
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -449,11 +450,30 @@ export default function PublicSpace() {
         }
     };
 
+    const handleChatFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setFileUploading(true);
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const res = await fetchWithTimeout(`${API_URL}/files/upload`, { method: 'POST', body: formData });
+            const data = await res.json();
+            setChatAttachments(p => [...p, data]);
+            toast.success("Dosya hazır");
+        } catch {
+            toast.error("Dosya yüklenemedi");
+        } finally {
+            setFileUploading(false);
+        }
+    };
+
     const handleSendChat = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
-        if (!chatInput.trim() || !user) return;
-        sendGlobalMessage(chatInput);
+        if ((!chatInput.trim() && chatAttachments.length === 0) || !user) return;
+        sendGlobalMessage(chatInput, chatAttachments);
         setChatInput("");
+        setChatAttachments([]);
     };
 
     // Scroll to bottom when new messages arrive
@@ -826,7 +846,41 @@ export default function PublicSpace() {
                                 return (
                                     <div key={msg.id || idx} className={cn("flex flex-col", isMine ? "items-end" : "items-start")}>
                                         <div className={cn("max-w-[85%] p-4 rounded-3xl text-[13px] font-medium shadow-sm space-y-2", isMine ? "bg-primary text-white rounded-tr-none" : "bg-slate-100 text-slate-800 rounded-tl-none")}>
-                                            {msg.text}
+                                            {msg.text && <div>{msg.text}</div>}
+                                            {msg.attachments && msg.attachments.length > 0 && (
+                                                <div className="flex flex-wrap gap-2 mt-2">
+                                                    {msg.attachments.map((at, i) => (
+                                                        <div 
+                                                            key={i} 
+                                                            className={cn(
+                                                                "relative rounded-xl overflow-hidden border",
+                                                                at.type === 'image' ? "w-32 h-32 cursor-pointer" : "p-3 bg-white/10 backdrop-blur-sm border-white/20 min-w-[120px]"
+                                                            )}
+                                                            onClick={() => at.type === 'image' && setZoomedAttachment(at)}
+                                                        >
+                                                            {at.type === 'image' ? (
+                                                                <img src={at.url} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <a 
+                                                                    href={at.url} 
+                                                                    target="_blank" 
+                                                                    rel="noopener noreferrer"
+                                                                    className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    <div className={cn("p-1.5 rounded-lg", isMine ? "bg-white/20" : "bg-slate-200")}>
+                                                                        <Paperclip size={14} className={isMine ? "text-white" : "text-slate-500"} />
+                                                                    </div>
+                                                                    <div className="flex flex-col min-w-0">
+                                                                        <span className={cn("text-[9px] font-black truncate", isMine ? "text-white" : "text-slate-700")}>{at.name || "Dosya"}</span>
+                                                                        <span className={cn("text-[7px] font-bold uppercase tracking-tighter opacity-60", isMine ? "text-white" : "text-slate-500")}>Görüntüle</span>
+                                                                    </div>
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                         <span className="text-[10px] font-bold text-slate-400 mt-1 px-2">{msg.author_name} • {new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
                                     </div>
@@ -837,18 +891,48 @@ export default function PublicSpace() {
                     </div>
 
                     <form onSubmit={handleSendChat} className="p-6 border-t border-slate-100 bg-white flex flex-col gap-3 relative">
+                        {chatAttachments.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-2 p-2 bg-slate-50 rounded-2xl border border-dashed border-slate-200 overflow-x-auto no-scrollbar">
+                                {chatAttachments.map((at, i) => (
+                                    <div key={i} className="relative group/chatat w-16 h-16 rounded-xl overflow-hidden border border-slate-200 bg-white flex items-center justify-center shrink-0">
+                                        {at.type === 'image' ? <img src={at.url} className="w-full h-full object-cover" /> : <Paperclip size={18} className="text-slate-300" />}
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setChatAttachments(prev => prev.filter((_, idx) => idx !== i))}
+                                            className="absolute top-1 right-1 bg-rose-500 text-white rounded-full p-0.5 shadow-lg z-10"
+                                        >
+                                            <X size={8} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <div className="flex gap-3">
-                            <div className="flex-1 relative">
+                            <input 
+                                id="chat-file-input" 
+                                type="file" 
+                                hidden 
+                                onChange={handleChatFileUpload} 
+                            />
+                            <div className="flex-1 relative flex items-center gap-2">
+                                <button 
+                                    type="button"
+                                    disabled={fileUploading}
+                                    onClick={() => document.getElementById('chat-file-input')?.click()}
+                                    className="p-3 text-slate-400 hover:text-primary transition-all shrink-0"
+                                >
+                                    {fileUploading ? <Loader2 className="animate-spin" size={20} /> : <Paperclip size={20} />}
+                                </button>
                                 <input 
                                     value={chatInput} 
                                     onChange={e => setChatInput(e.target.value)}
                                     placeholder="Mesajınızı yazın..." 
-                                    className="w-full bg-slate-100 rounded-2xl px-4 py-3 text-xs font-bold outline-none border-2 border-transparent focus:border-primary/20 transition-all"
+                                    className="flex-1 bg-slate-100 rounded-2xl px-4 py-3 text-xs font-bold outline-none border-2 border-transparent focus:border-primary/20 transition-all"
                                 />
                             </div>
                             <button 
                                 type="submit"
-                                disabled={!chatInput.trim()}
+                                disabled={!chatInput.trim() && chatAttachments.length === 0}
                                 className="w-12 h-12 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 disabled:opacity-50 transition-all"
                             >
                                 <Send size={18} />

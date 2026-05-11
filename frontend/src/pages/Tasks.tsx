@@ -204,7 +204,7 @@ export default function Tasks() {
         if (!isElectron) {
             const hasShownToast = sessionStorage.getItem('tasks_web_warning_shown');
             if (!hasShownToast) {
-                toast("Web sürümünde görev oluşturma kısıtlıdır. Tam erişim için masaüstü uygulamasını kullanın.", {
+                toast("Web sürümünde görev yönetimi kısıtlıdır. Tam erişim için masaüstü uygulamasını kullanın.", {
                     icon: '🚀',
                     duration: 5000,
                     style: {
@@ -790,8 +790,7 @@ export default function Tasks() {
                 </div>
             </div>
 
-            {/* Web Sürümü Kısıtlama Uyarısı - Daha Belirgin */}
-            {false && (
+            {!isElectron && (
                 <div className="mb-8 animate-in slide-in-from-top-4 duration-700">
                     <Card className="p-6 border-l-4 border-l-amber-500 border-amber-200 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-900/30">
                         <div className="flex items-center gap-5 text-amber-800 dark:text-amber-400">
@@ -799,25 +798,23 @@ export default function Tasks() {
                                 <Shield size={28} className="animate-pulse" />
                             </div>
                             <div className="flex-1">
-                                <h4 className="font-black text-sm uppercase tracking-widest font-outfit flex items-center gap-2">
-                                    Web Sürümü Kısıtlaması
-                                    <span className="px-2 py-0.5 bg-amber-500 text-white text-[8px] rounded-full">BİLGİ</span>
-                                </h4>
-                                <p className="text-xs font-bold mt-1.5 leading-relaxed opacity-90">
-                                    {/* 
-                                        Yeni Görev Oluşturma formu artık her iki ortamda da aktiftir.
-                                        Ancak Rapor oluşturma ve Excel entegrasyonu gibi yerel dosya işlemleri 
-                                        yalnızca masaüstü sürümünde mevcuttur.
-                                    */}                           <br className="hidden md:block" />
-                                    Yeni kayıtlar eklemek için lütfen <span className="underline decoration-2 underline-offset-4">MufYard Masaüstü</span> uygulamasını kullanın.
+                                <h3 className="font-black text-sm uppercase tracking-widest mb-1">Web Sürümü Kısıtlıdır</h3>
+                                <p className="text-xs font-bold leading-relaxed opacity-80">
+                                    Görev oluşturma, Excel'den aktarma ve ekip yönetimi gibi kritik işlemler sadece <strong>MufYard Masaüstü Uygulaması</strong> üzerinden gerçekleştirilebilir.
                                 </p>
                             </div>
+                            <Button 
+                                onClick={() => window.open('https://github.com/syaprakli/MufYardV2/releases', '_blank')}
+                                className="bg-amber-500 hover:bg-amber-600 text-white border-none rounded-xl font-black text-[10px] px-6 h-10 shadow-lg shadow-amber-500/20"
+                            >
+                                UYGULAMAYI İNDİR
+                            </Button>
                         </div>
                     </Card>
                 </div>
             )}
 
-            {true && (
+            {isElectron && (
                 <Card className={cn(
                     "p-4 md:p-8 bg-card border shadow-sm mb-6 transition-all",
                     activeTab === 'ortak' ? "border-amber-200 ring-4 ring-amber-500/5" : "border-border"
@@ -1003,9 +1000,15 @@ export default function Tasks() {
                                 </div>
                                 <button 
                                     onClick={() => handleAcceptInvitation(inv.id)} 
-                                    className="w-full bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-10 font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-amber-200/50 transition-all active:scale-95"
+                                    className={cn(
+                                        "w-full rounded-xl h-10 font-bold text-[10px] uppercase tracking-widest shadow-lg transition-all active:scale-95",
+                                        isElectron 
+                                            ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200/50" 
+                                            : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+                                    )}
+                                    title={!isElectron ? "Sadece Masaüstü Uygulamasında" : ""}
                                 >
-                                    Görevi Kabul Et ve Listeye Ekle
+                                    {isElectron ? "Görevi Kabul Et ve Listeye Ekle" : "Kabul İçin Masaüstü Uygulamasını Açın"}
                                 </button>
                             </div>
                         ))}
@@ -1027,16 +1030,18 @@ export default function Tasks() {
                             accept=".xlsx, .xls"
                             className="hidden"
                         />
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={importLoading}
-                            onClick={() => importInputRef.current?.click()}
-                            className="w-full sm:w-auto h-11 px-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 hover:text-primary hover:border-primary transition-all font-black text-[10px] uppercase tracking-widest"
-                        >
-                            {importLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : <FileDigit size={14} className="mr-2" />}
-                            Excel'den İçe Aktar
-                        </Button>
+                        {isElectron && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={importLoading}
+                                onClick={() => importInputRef.current?.click()}
+                                className="w-full sm:w-auto h-11 px-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 hover:text-primary hover:border-primary transition-all font-black text-[10px] uppercase tracking-widest"
+                            >
+                                {importLoading ? <Loader2 size={14} className="animate-spin mr-2" /> : <FileDigit size={14} className="mr-2" />}
+                                Excel'den İçe Aktar
+                            </Button>
+                        )}
                         <div className="relative w-full md:w-[320px]">
                             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                             <input
@@ -1111,6 +1116,7 @@ export default function Tasks() {
                                                 <div className="flex flex-col">
                                                     <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Durum</span>
                                                     <select
+                                                        disabled={!isElectron}
                                                         value={task.rapor_durumu}
                                                         onChange={async (e) => {
                                                             const newStatus = e.target.value;
@@ -1120,7 +1126,7 @@ export default function Tasks() {
                                                                 toast.success("Durum güncellendi.");
                                                             } catch { toast.error("Hata oluştu."); }
                                                         }}
-                                                        className="text-[10px] font-black uppercase tracking-tight bg-transparent border-none p-0 outline-none cursor-pointer"
+                                                        className={cn("text-[10px] font-black uppercase tracking-tight bg-transparent border-none p-0 outline-none cursor-pointer", !isElectron && "opacity-50 cursor-not-allowed")}
                                                         style={{ color: statusColor }}
                                                     >
                                                         {RAPOR_DURUMLARI.map(d => <option key={d} value={d} className="text-slate-900">{d}</option>)}
@@ -1135,16 +1141,16 @@ export default function Tasks() {
                                                 <ActionBtn title="Raporları Gör" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
                                                     <FileText size={14} />
                                                 </ActionBtn>
-                                                <ActionBtn title="Düzenle" color="#f59e0b" onClick={() => setEditingTask(task)}>
+                                                <ActionBtn title="Düzenle" color="#f59e0b" onClick={() => isElectron ? setEditingTask(task) : toast.error("Düzenleme sadece masaüstü uygulamasında aktiftir.")}>
                                                     <Edit3 size={14} />
                                                 </ActionBtn>
-                                                <ActionBtn title="Paylaş" color="#8b5cf6" onClick={() => setShareTask(task)}>
+                                                <ActionBtn title="Paylaş" color="#8b5cf6" onClick={() => isElectron ? setShareTask(task) : toast.error("Paylaşım sadece masaüstü uygulamasında aktiftir.")}>
                                                     <UserPlus size={14} />
                                                 </ActionBtn>
-                                                <ActionBtn title="Sil" color="#ef4444" onClick={() => handleDelete(task.id)}>
+                                                <ActionBtn title="Sil" color="#ef4444" onClick={() => isElectron ? handleDelete(task.id) : toast.error("Silme işlemi sadece masaüstü uygulamasında aktiftir.")}>
                                                     <Trash2 size={14} />
                                                 </ActionBtn>
-                                                <ActionBtn title="Analiz Et" color="#0ea5e9" onClick={() => setAnalysisTask(task)}>
+                                                <ActionBtn title="Analiz Et" color="#0ea5e9" onClick={() => isElectron ? setAnalysisTask(task) : toast.error("Analiz sadece masaüstü uygulamasında aktiftir.")}>
                                                     <FileDigit size={14} />
                                                 </ActionBtn>
                                             </div>
@@ -1164,16 +1170,18 @@ export default function Tasks() {
                                                                 <button onClick={() => handleDeleteStep(task, idx)} className="text-rose-400 p-1"><X size={14} /></button>
                                                             </div>
                                                         ))}
-                                                        <div className="flex gap-2">
-                                                            <input
-                                                                placeholder="Yeni adım ekle..."
-                                                                value={newStepText[task.id] || ""}
-                                                                onChange={e => setNewStepText({ ...newStepText, [task.id]: e.target.value })}
-                                                                onKeyDown={e => e.key === 'Enter' && handleAddStep(task)}
-                                                                className="flex-1 h-9 px-3 rounded-lg border border-border bg-card text-xs font-medium outline-none"
-                                                            />
-                                                            <Button onClick={() => handleAddStep(task)} size="sm" className="h-9 px-3 text-[10px] font-black uppercase">EKLE</Button>
-                                                        </div>
+                                                        {isElectron && (
+                                                            <div className="flex gap-2">
+                                                                <input
+                                                                    placeholder="Yeni adım ekle..."
+                                                                    value={newStepText[task.id] || ""}
+                                                                    onChange={e => setNewStepText({ ...newStepText, [task.id]: e.target.value })}
+                                                                    onKeyDown={e => e.key === 'Enter' && handleAddStep(task)}
+                                                                    className="flex-1 h-9 px-3 rounded-lg border border-border bg-card text-xs font-medium outline-none"
+                                                                />
+                                                                <Button onClick={() => handleAddStep(task)} size="sm" className="h-9 px-3 text-[10px] font-black uppercase">EKLE</Button>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -1249,6 +1257,7 @@ export default function Tasks() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <select
+                                                        disabled={!isElectron}
                                                         value={task.rapor_durumu}
                                                         onChange={async (e) => {
                                                             const newStatus = e.target.value;
@@ -1258,7 +1267,7 @@ export default function Tasks() {
                                                                 toast.success("Durum güncellendi.");
                                                             } catch { toast.error("Hata oluştu."); }
                                                         }}
-                                                        className="bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer p-1 rounded-lg hover:bg-slate-100"
+                                                        className={cn("bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer p-1 rounded-lg hover:bg-slate-100", !isElectron && "opacity-50 cursor-not-allowed")}
                                                         style={{ color: getDurumColor(task.rapor_durumu) }}
                                                     >
                                                         {RAPOR_DURUMLARI.map(d => <option key={d} value={d} className="text-slate-900">{d}</option>)}
@@ -1266,26 +1275,22 @@ export default function Tasks() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-2">
-                                                        {isElectron && (
-                                                            <ActionBtn title="Rapor Başlat" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
-                                                                <FileText size={16} />
-                                                            </ActionBtn>
-                                                        )}
-                                                        {isElectron && (
-                                                            <ActionBtn title="Görevi Düzenle" color="#f59e0b" onClick={() => setEditingTask(task)}>
-                                                                <Edit3 size={16} />
-                                                            </ActionBtn>
-                                                        )}
-                                                        <ActionBtn title="Paylaş" color="#8b5cf6" onClick={() => setShareTask(task)}>
+                                                        <ActionBtn title="Raporları Gör" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
+                                                            <FileText size={16} />
+                                                        </ActionBtn>
+                                                        <ActionBtn title="Görevi Düzenle" color="#f59e0b" onClick={() => isElectron ? setEditingTask(task) : toast.error("Düzenleme sadece masaüstü uygulamasında aktiftir.")}>
+                                                            <Edit3 size={16} />
+                                                        </ActionBtn>
+                                                        <ActionBtn title="Paylaş" color="#8b5cf6" onClick={() => isElectron ? setShareTask(task) : toast.error("Paylaşım sadece masaüstü uygulamasında aktiftir.")}>
                                                             <UserPlus size={16} />
                                                         </ActionBtn>
                                                         <ActionBtn title="İş Adımları" color="#3b82f6" onClick={() => setExpandedRow(isExpanded ? null : task.id)}>
                                                             <ClipboardList size={16} />
                                                         </ActionBtn>
-                                                        <ActionBtn title="Sil" color="#ef4444" onClick={() => handleDelete(task.id)}>
+                                                        <ActionBtn title="Sil" color="#ef4444" onClick={() => isElectron ? handleDelete(task.id) : toast.error("Silme işlemi sadece masaüstü uygulamasında aktiftir.")}>
                                                             <Trash2 size={16} />
                                                         </ActionBtn>
-                                                        <ActionBtn title="Analiz Et" color="#0ea5e9" onClick={() => setAnalysisTask(task)}>
+                                                        <ActionBtn title="Analiz Et" color="#0ea5e9" onClick={() => isElectron ? setAnalysisTask(task) : toast.error("Analiz sadece masaüstü uygulamasında aktiftir.")}>
                                                             <FileDigit size={16} />
                                                         </ActionBtn>
                                                     </div>

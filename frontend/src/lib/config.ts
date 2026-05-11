@@ -7,14 +7,19 @@ const API_URL_OVERRIDE = VITE_API_URL?.trim();
 const isLocalhost = typeof window !== 'undefined' && 
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
+const RAILWAY_URL = "https://mufyardv2.up.railway.app";
+const LOCAL_URL = "http://127.0.0.1:8000";
+
 // URL seçim önceliği:
-// 1) VITE_API_URL override
-// 2) Electron ortamında daima local backend
-// 3) Localhost dışındaki web ortamlarında Railway (Prod)
-// 4) Diğer durumlarda local backend
+// 1) VITE_API_URL override (en yüksek öncelik - geliştirme için)
+// 2) Electron → DAİMA Railway (tüm kullanıcılar aynı WS havuzunda olmalı)
+// 3) Web non-localhost → Railway
+// 4) Web localhost → Local backend (geliştirme)
+// NOT: Electron'un daima Railway'e bağlanması KRİTİK. Aksi halde masaüstü ve
+// web kullanıcıları farklı WS sunucularına düşer ve birbirlerini göremezler.
 const PUBLIC_BACKEND_URL = API_URL_OVERRIDE || (IS_ELECTRON
-    ? "http://127.0.0.1:8000"
-    : (!isLocalhost || IS_PROD ? "https://mufyardv2.up.railway.app" : "http://127.0.0.1:8000"));
+    ? RAILWAY_URL
+    : (!isLocalhost || IS_PROD ? RAILWAY_URL : LOCAL_URL));
 
 // Ortama göre backend URL'si
 export const BASE_URL = PUBLIC_BACKEND_URL;

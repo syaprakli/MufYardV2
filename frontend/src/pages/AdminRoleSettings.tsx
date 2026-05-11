@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { 
     Shield, ChevronRight, Save, Loader2, Check, 
-    LayoutDashboard, ClipboardList, FileText, 
-    Users, Gavel, StickyNote, Calendar, 
+    LayoutDashboard, FileText, 
+    Users, StickyNote, Calendar, 
     MessageSquare, Globe, Lock, Bot,
     CheckSquare, ClipboardCheck, FolderTree, BookOpen, Star
 } from "lucide-react";

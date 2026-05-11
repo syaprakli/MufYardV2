@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Minus, MessageSquare, Send, Paperclip, Smile, Image as ImageIcon, Search, FileText, Trash2, Edit3, Download } from 'lucide-react';
 import { WS_URL, API_URL } from '../lib/config';
 import { useAuth } from '../lib/hooks/useAuth';
+import { usePresence } from '../lib/context/PresenceContext';
 import { useTheme } from "../lib/context/ThemeContext";
 import { isElectron } from '../lib/firebase';
 import EmojiPicker, { type EmojiClickData, Theme as EmojiTheme } from 'emoji-picker-react';
@@ -84,6 +85,7 @@ function normalizeRoomId(roomId: string, type: FloatingChatProps['type']) {
 // ─── COMPONENT ──────────────────────────────────────────────────────────────
 export default function FloatingChat({ roomId, title, onClose, type = 'dm', inline = false, isOnline }: FloatingChatProps) {
   const { user, profile } = useAuth();
+  const { markAsRead } = usePresence();
   const { theme } = useTheme();
   const isDark = (theme as string) === "dark";
   const normalizedRoomId = normalizeRoomId(roomId, type);
@@ -91,6 +93,7 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
+  const [hasNew, setHasNew] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
 
   // panel states
@@ -138,8 +141,9 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
         }
       };
       fetchHistory();
+      markAsRead(normalizedRoomId);
     }
-  }, [roomId, type, user]);
+  }, [roomId, type, user, markAsRead, normalizedRoomId]);
 
   // ── websocket ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -229,7 +233,13 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
             timestamp: data.timestamp || new Date().toISOString(),
             attachment: data.attachment,
           }]);
+          markAsRead(normalizedRoomId);
           audioRef.current?.play().catch(() => {});
+          
+          // Minimize ise "Yeni Mesaj" uyarısı ver
+          if (isMinimized) {
+            setHasNew(true);
+          }
         } catch (e) {
           console.error("Chat WS message error:", e);
         }
@@ -262,7 +272,13 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
                 };
                 return [...prev, newMsg];
             });
+            markAsRead(normalizedRoomId);
             audioRef.current?.play().catch(() => {});
+
+            // Minimize ise "Yeni Mesaj" uyarısı ver
+            if (isMinimized) {
+              setHasNew(true);
+            }
         }
     };
 
@@ -278,7 +294,7 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
       }
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [normalizedRoomId, roomId, user, profile?.full_name, type]);
+  }, [normalizedRoomId, roomId, user, profile?.full_name, type, isMinimized]);
 
   // ── auto-scroll ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -352,9 +368,7 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
 
     const loadingToast = toast.loading(`${file.name} yükleniyor...`);
     try {
-      // Chat için özel bir klasöre yükle
       const result = await uploadFile(file, "chats");
-      
       const senderName = profile?.full_name || user?.displayName || user?.email?.split('@')[0] || 'Müfettiş';
       pushMessage({
         id: `local_${Date.now()}`,
@@ -365,7 +379,7 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
         attachment: { 
           type: 'file', 
           name: file.name, 
-          url: result.url, // Backend'den dönen gerçek URL (/Raporlar/chats/...)
+          url: result.url, 
           mime: file.type, 
           size: file.size 
         },
@@ -435,7 +449,7 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
         toast.error('Sohbet temizlenemedi.');
         return;
       }
-      setMessages([]); // TÜMÜNÜ SİL (Backend benden temizle mantığı ile çalışıyor, sadece benim fetchlerimde gelmeyecek)
+      setMessages([]);
       toast.success('Sohbet sizin için temizlendi.');
     } catch (e) {
       console.error('Sohbet temizleme hatası:', e);
@@ -449,10 +463,7 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
     if (!url) return '';
     const raw = String(url).trim();
     if (!raw) return '';
-
-    if (/^https?:\/\//i.test(raw)) {
-      return encodeURI(raw);
-    }
+    if (/^https?:\/\//i.test(raw)) return encodeURI(raw);
     return encodeURI(`${BACKEND_BASE_URL}${raw.startsWith('/') ? '' : '/'}${raw}`);
   };
 
@@ -461,20 +472,15 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
       const resolvedUrl = resolveAttachmentUrl(att.url);
       const ipcRenderer = (window as any)?.require?.('electron')?.ipcRenderer;
       if (!ipcRenderer?.invoke) return false;
-
       const result = await ipcRenderer.invoke('download-file-with-dialog', {
         url: resolvedUrl,
         fileName: att.name || 'dosya'
       });
-
       if (result?.ok) {
         toast.success('Dosya kaydedildi.');
         return true;
       }
-
-      if (!result?.canceled) {
-        toast.error(result?.error || 'Dosya kaydedilemedi.');
-      }
+      if (!result?.canceled) toast.error(result?.error || 'Dosya kaydedilemedi.');
       return false;
     } catch {
       toast.error('Dosya kaydedilemedi.');
@@ -485,33 +491,25 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
   // ── render helpers ────────────────────────────────────────────────────
   const renderAttachment = (att: Attachment, isOwn: boolean) => {
     const resolvedUrl = resolveAttachmentUrl(att.url);
-
-    if (att.type === 'gif') {
-      return <img src={resolvedUrl} alt="GIF" className="max-w-[200px] rounded-xl mt-1" />;
-    }
+    if (att.type === 'gif') return <img src={resolvedUrl} alt="GIF" className="max-w-[200px] rounded-xl mt-1 shadow-sm" />;
     const isImage = att.mime?.startsWith('image/');
     if (isImage) {
       return (
         <div className="mt-1">
-          <img src={resolvedUrl} alt={att.name} className="max-w-[200px] rounded-xl" />
-          <p className="text-[9px] font-bold opacity-60 mt-0.5 truncate max-w-[200px]">{att.name}</p>
+          <img src={resolvedUrl} alt={att.name} className="max-w-[200px] rounded-xl shadow-sm hover:scale-[1.02] transition-transform cursor-pointer" onClick={() => window.open(resolvedUrl, '_blank')} />
+          <p className="text-[9px] font-bold opacity-60 mt-1 truncate max-w-[200px]">{att.name}</p>
         </div>
       );
     }
     return (
       <div className="mt-1 flex items-center gap-1.5">
-        <a href={resolvedUrl} download={att.name} className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-colors ${isOwn ? 'border-white/20 text-white/90 hover:bg-white/10' : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-          <FileText size={14} />
+        <a href={resolvedUrl} download={att.name} className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border text-[11px] font-bold transition-all ${isOwn ? 'border-white/20 text-white/90 hover:bg-white/10' : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+          <FileText size={14} className={isOwn ? 'text-white/60' : 'text-slate-400'} />
           <span className="truncate max-w-[120px]">{att.name}</span>
           <span className="opacity-50 shrink-0">{att.size ? `${(att.size / 1024).toFixed(0)} KB` : ''}</span>
         </a>
         {isElectron && (
-          <button
-            type="button"
-            onClick={() => saveAttachmentToDisk(att)}
-            className={`px-2.5 py-2 rounded-xl border text-xs font-black transition-colors ${isOwn ? 'border-white/20 text-white/90 hover:bg-white/10' : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-            title="Kaydet"
-          >
+          <button type="button" onClick={() => saveAttachmentToDisk(att)} className={`px-2.5 py-2 rounded-xl border text-xs font-black transition-all ${isOwn ? 'border-white/20 text-white/90 hover:bg-white/10' : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`} title="Kaydet">
             <Download size={13} />
           </button>
         )}
@@ -519,133 +517,132 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
     );
   };
 
-  // ── minimized ─────────────────────────────────────────────────────────
+  // ── minimized (Bottom Bar Style) ──────────────────────────────────────
   if (isMinimized) {
-    // Kişinin baş harflerini al
-    const getInitials = (name: string) => {
-      const parts = name.trim().split(/\s+/);
-      if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-      return name.slice(0, 2).toUpperCase();
-    };
-    const initials = getInitials(title);
-    
     return (
-      <div className="relative group">
-        <div 
-          onClick={() => setIsMinimized(false)} 
-          className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center cursor-pointer shadow-xl shadow-primary/30 hover:scale-110 active:scale-95 transition-all border-2 border-white"
-          title={title}
-        >
-          <span className="text-xs font-black tracking-tight">{initials}</span>
+      <div 
+        onClick={() => { setIsMinimized(false); setHasNew(false); }}
+        className={`group flex items-center gap-3 w-[240px] h-10 px-4 bg-[#1E293B] text-white cursor-pointer transition-all duration-300 hover:bg-[#334155] border-t border-x border-white/10 shadow-[0_-4px_15px_rgba(0,0,0,0.1)] ${hasNew ? 'animate-pulse ring-2 ring-blue-500' : ''}`}
+        style={{ borderRadius: '12px 12px 0 0' }}
+      >
+        <div className="relative">
+          <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'}`} />
+          {hasNew && <div className="absolute inset-0 bg-blue-400 rounded-full animate-ping" />}
         </div>
-        {/* Bağlantı durumu noktası */}
-        <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${isConnected ? 'bg-emerald-500' : 'bg-red-500'}`} />
-        {/* Kapatma butonu */}
-        <button 
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
-          className="absolute -top-1 -left-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600 shadow-sm"
-        >
-          <X size={10} />
-        </button>
+        <span className="flex-1 text-[11px] font-black uppercase tracking-widest truncate">{title}</span>
+        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+          <button 
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
+            className="p-1 hover:bg-red-500 rounded-lg transition-colors text-white/40 hover:text-white"
+          >
+            <X size={12} />
+          </button>
+        </div>
       </div>
     );
   }
 
-  // ── full window ───────────────────────────────────────────────────────
+  // ── full window (Docked Style) ────────────────────────────────────────
   return (
     <div className={inline
       ? "relative w-full h-full bg-card border border-slate-200 dark:border-slate-800 rounded-3xl flex flex-col overflow-hidden"
-      : "relative w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-t-2xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5 duration-300"
-    } style={inline ? undefined : { height: 420 }}>
+      : "relative w-[320px] bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-white/10 rounded-t-[24px] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col animate-in slide-in-from-bottom-5 duration-300"
+    } style={inline ? undefined : { height: 480 }}>
 
       {/* Header */}
-      <div className="bg-slate-900 p-3 flex items-center justify-between text-white border-b border-white/10 shrink-0" style={inline ? { borderRadius: 'calc(1.5rem - 1px) calc(1.5rem - 1px) 0 0' } : { borderRadius: '1rem 1rem 0 0' }}>
-        <div className="flex items-center gap-2">
-          <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-red-400'}`} />
-          {inline && isOnline !== undefined && (
-            <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]' : 'bg-slate-500'}`} />
-          )}
+      <div className="bg-[#1E293B] p-4 flex items-center justify-between text-white border-b border-white/10 shrink-0" style={inline ? { borderRadius: '23px 23px 0 0' } : { borderRadius: '23px 23px 0 0' }}>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className={`w-3 h-3 rounded-full border-2 border-[#1E293B] ${isConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-400'}`} />
+            {isOnline && <div className="absolute inset-0 bg-emerald-400 rounded-full animate-ping opacity-20" />}
+          </div>
           <div className="flex flex-col">
-            <span className="text-xs font-black uppercase tracking-widest truncate max-w-[160px]">{title}</span>
-            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
-              {inline && isOnline !== undefined
-                ? (isOnline ? 'Şu an Online' : 'Çevrimdışı — Mesaj iletilecek')
-                : type === 'audit' ? 'Denetim Odası' : type === 'dm' ? 'Özel Mesaj' : 'Genel Sohbet'}
+            <span className="text-[11px] font-black uppercase tracking-widest truncate max-w-[140px]">{title}</span>
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter flex items-center gap-1">
+              {isOnline ? 'Çevrimiçi' : 'Çevrimdışı'} 
+              <span className="w-1 h-1 bg-slate-600 rounded-full" /> 
+              {type === 'dm' ? 'Özel' : type === 'audit' ? 'Denetim' : 'Genel'}
             </span>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {type === 'dm' && (
+          {type === 'dm' && messages.length > 0 && (
             <button
               onClick={clearMyMessages}
-              className="px-2 py-1 text-[10px] font-bold rounded bg-white/10 hover:bg-white/20 transition-colors"
-              title="Kendi mesajlarınızı temizler"
+              className="px-2 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-400 transition-all border border-white/10"
+              title="Sohbeti temizle"
             >
-              Sohbeti Temizle
+              TEMİZLE
             </button>
           )}
-          {!inline && <button onClick={() => setIsMinimized(true)} className="p-1 hover:bg-white/10 rounded transition-colors"><Minus size={14} /></button>}
-          <button onClick={onClose} className="p-1 hover:bg-red-500 rounded transition-colors"><X size={14} /></button>
+          {!inline && (
+            <button onClick={() => setIsMinimized(true)} className="p-1.5 hover:bg-white/10 rounded-xl transition-all text-white/50 hover:text-white">
+              <Minus size={16} />
+            </button>
+          )}
+          <button onClick={onClose} className="p-1.5 hover:bg-red-500 rounded-xl transition-all text-white/50 hover:text-white">
+            <X size={16} />
+          </button>
         </div>
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#f8fafc] dark:bg-slate-950/50">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#F8FAFC] dark:bg-[#0F172A] no-scrollbar">
         {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400 dark:text-slate-500 space-y-2">
-            <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-full"><MessageSquare size={24} className="opacity-20" /></div>
-            <p className="text-[10px] font-bold uppercase tracking-widest italic">Oturum Başladı</p>
-            <p className="text-[9px] font-medium leading-relaxed opacity-60">
-              {type === 'dm' ? 'Mesajlarınız buluta kaydedilir.' : 'Mesajlar bu oturum özelindedir.'}
-            </p>
+          <div className="h-full flex flex-col items-center justify-center text-center p-8 text-slate-400 space-y-4">
+            <div className="w-16 h-16 bg-slate-100 dark:bg-white/5 rounded-[24px] flex items-center justify-center">
+              <MessageSquare size={28} className="opacity-20" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] italic opacity-40">Uçtan Uca Şifreli</p>
+              <p className="text-[11px] font-bold leading-relaxed opacity-60">
+                {type === 'dm' ? 'Güvenli mesajlaşma başlatıldı.' : 'Genel oda mesajları geçicidir.'}
+              </p>
+            </div>
           </div>
         )}
-        {messages.map((msg) => {
+        {messages.map((msg, idx) => {
           const isOwn = msg.sender_id === user?.uid;
+          const showName = !isOwn && (idx === 0 || messages[idx-1].sender_id !== msg.sender_id);
+          
           return (
-            <div key={msg.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-              {!isOwn && <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.1em] mb-1 ml-1">{msg.sender_name}</span>}
-              <div className={`group relative max-w-[85%] ${msg.content ? 'p-3' : 'p-1'} rounded-2xl text-xs font-medium shadow-sm leading-relaxed ${isOwn ? 'bg-primary text-white rounded-tr-none' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-100 dark:border-slate-700 rounded-tl-none'}`}>
+            <div key={msg.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} group/msg animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+              {showName && (
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">{msg.sender_name}</span>
+              )}
+              <div className={`relative max-w-[85%] ${msg.content ? 'px-4 py-3' : 'p-1'} rounded-[20px] text-[13px] font-medium shadow-sm transition-all ${isOwn 
+                ? 'bg-blue-600 text-white rounded-tr-none shadow-blue-500/10' 
+                : 'bg-white dark:bg-white/5 text-slate-700 dark:text-slate-200 border border-slate-100 dark:border-white/5 rounded-tl-none'}`}>
+                
                 {editingMessageId === msg.id ? (
-                  <div className="space-y-2 min-w-[220px]">
-                    <input
+                  <div className="space-y-3 min-w-[200px] p-1">
+                    <textarea
                       value={editText}
                       onChange={(e) => setEditText(e.target.value)}
-                      className="w-full rounded-lg px-2 py-1 text-xs text-slate-900"
+                      className="w-full rounded-xl px-3 py-2 text-xs bg-slate-50 text-slate-900 border-none outline-none focus:ring-2 ring-blue-500/20"
                       autoFocus
+                      rows={2}
                     />
                     <div className="flex items-center justify-end gap-2">
-                      <button type="button" onClick={cancelEditMessage} className="px-2 py-1 text-[10px] rounded bg-white/20">Vazgeç</button>
-                      <button type="button" onClick={() => saveEditMessage(msg.id)} className="px-2 py-1 text-[10px] rounded bg-white text-primary">Kaydet</button>
+                      <button type="button" onClick={cancelEditMessage} className="px-3 py-1.5 text-[10px] font-bold rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">VAZGEÇ</button>
+                      <button type="button" onClick={() => saveEditMessage(msg.id)} className="px-3 py-1.5 text-[10px] font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">KAYDET</button>
                     </div>
                   </div>
                 ) : (
                   <>
-                    {msg.content && <span>{msg.content}</span>}
+                    {msg.content && <span className="leading-relaxed">{msg.content}</span>}
                     {msg.attachment && renderAttachment(msg.attachment, isOwn)}
                   </>
                 )}
                 
                 {isOwn && type === 'dm' && editingMessageId !== msg.id && (
-                  <div className="absolute -left-14 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                    <button 
-                      onClick={() => startEditMessage(msg)}
-                      className="p-1.5 text-slate-300 hover:text-blue-500"
-                      title="Düzenle"
-                    >
-                      <Edit3 size={12} />
-                    </button>
-                    <button 
-                      onClick={() => deleteMessage(msg.id)}
-                      className="p-1.5 text-slate-300 hover:text-red-500"
-                      title="Sil"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                  <div className="absolute -left-16 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover/msg:opacity-100 transition-all">
+                    <button onClick={() => startEditMessage(msg)} className="p-2 text-slate-400 hover:text-blue-500 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-100 dark:border-white/5"><Edit3 size={12} /></button>
+                    <button onClick={() => deleteMessage(msg.id)} className="p-2 text-slate-400 hover:text-red-500 bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-100 dark:border-white/5"><Trash2 size={12} /></button>
                   </div>
                 )}
               </div>
-              <span className="text-[8px] font-bold text-slate-300 mt-1 uppercase">
+              <span className="text-[8px] font-bold text-slate-300 mt-1.5 uppercase tracking-tighter px-1">
                 {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
@@ -653,76 +650,73 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
         })}
       </div>
 
-      {/* Emoji Picker */}
-      {showEmoji && (
-        <div className="absolute bottom-[72px] right-2 z-30" style={{ width: 320, maxWidth: "calc(100% - 16px)" }}>
-          <EmojiPicker onEmojiClick={onEmojiClick} theme={isDark ? EmojiTheme.DARK : EmojiTheme.LIGHT} width={320} height={360} searchPlaceholder="Emoji ara..." />
-        </div>
-      )}
-
-      {/* GIF Picker */}
-      {showGif && (
-        <div className="absolute bottom-[72px] right-2 z-30 w-80 max-w-[calc(100%-16px)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-          <div className="p-2 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-            <Search size={14} className="text-slate-400" />
-            <input
-              autoFocus
-              value={gifQuery}
-              onChange={e => handleGifSearch(e.target.value)}
-              placeholder="GIF ara..."
-              className="flex-1 text-xs outline-none font-medium bg-transparent"
-            />
-            <button onClick={() => setShowGif(false)} className="text-slate-400 dark:text-slate-500 hover:text-red-500"><X size={14} /></button>
+      {/* Input Section */}
+      <div className="shrink-0 p-4 bg-white dark:bg-[#0F172A] border-t border-slate-100 dark:border-white/5">
+        {/* GIF / Emoji Panels (Relative to Input) */}
+        {showEmoji && (
+          <div className="absolute bottom-[80px] left-4 right-4 z-50">
+            <div className="shadow-2xl rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10">
+              <EmojiPicker onEmojiClick={onEmojiClick} theme={isDark ? EmojiTheme.DARK : EmojiTheme.LIGHT} width="100%" height={320} skinTonesDisabled searchPlaceholder="Emoji ara..." />
+            </div>
           </div>
-          <div className="grid grid-cols-3 gap-1 p-2 max-h-56 overflow-y-auto">
-            {gifLoading && (
-              <div className="col-span-3 flex items-center justify-center py-8 text-slate-400 text-xs">Yükleniyor...</div>
-            )}
-            {!gifLoading && gifs.length === 0 && (
-              <div className="col-span-3 flex items-center justify-center py-8 text-slate-400 text-xs">Sonuç bulunamadı</div>
-            )}
-            {!gifLoading && gifs.map(gif => (
-              <button key={gif.id} onClick={() => sendGif(gif)} className="rounded-lg overflow-hidden hover:scale-105 transition-transform">
-                <img src={gif.preview} alt="gif" className="w-full h-20 object-cover" loading="lazy" />
-              </button>
-            ))}
+        )}
+
+        {showGif && (
+          <div className="absolute bottom-[80px] left-4 right-4 z-50 bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-3 border-b border-slate-100 dark:border-white/5 flex items-center gap-2">
+              <Search size={14} className="text-slate-400" />
+              <input autoFocus value={gifQuery} onChange={e => handleGifSearch(e.target.value)} placeholder="GIF ara..." className="flex-1 text-xs outline-none bg-transparent dark:text-white" />
+              <button onClick={() => setShowGif(false)} className="text-slate-400 hover:text-red-500"><X size={14} /></button>
+            </div>
+            <div className="grid grid-cols-3 gap-1 p-2 max-h-[240px] overflow-y-auto no-scrollbar bg-slate-50 dark:bg-[#0F172A]">
+              {gifLoading ? (
+                <div className="col-span-3 py-10 flex flex-col items-center gap-2"><Loader2 className="animate-spin text-primary" size={20} /><span className="text-[10px] font-bold text-slate-400">Yükleniyor</span></div>
+              ) : gifs.map(gif => (
+                <button key={gif.id} onClick={() => sendGif(gif)} className="rounded-lg overflow-hidden hover:ring-2 ring-primary transition-all">
+                  <img src={gif.preview} alt="gif" className="w-full h-16 object-cover" />
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Input bar */}
-      <div className="shrink-0 relative">
-        <form onSubmit={sendMessage} className="p-2 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center gap-1.5 rounded-b-2xl">
-          {/* Dosya */}
-          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
-          <button type="button" onClick={() => { setShowEmoji(false); setShowGif(false); fileInputRef.current?.click(); }} title="Dosya ekle" className="p-2 text-slate-400 hover:text-primary transition-colors rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800">
-            <Paperclip size={16} />
-          </button>
-
-          {/* Emoji */}
-          <button type="button" onClick={() => { setShowGif(false); setShowEmoji(v => !v); }} title="Emoji" className={`p-2 transition-colors rounded-lg hover:bg-slate-50 ${showEmoji ? 'text-primary' : 'text-slate-400 hover:text-primary'}`}>
-            <Smile size={16} />
-          </button>
-
-          {/* GIF */}
-          <button type="button" onClick={() => { setShowEmoji(false); setShowGif(v => !v); }} title="GIF" className={`p-2 transition-colors rounded-lg hover:bg-slate-50 ${showGif ? 'text-primary' : 'text-slate-400 hover:text-primary'}`}>
-            <ImageIcon size={16} />
-          </button>
-
-          <input
-            autoFocus
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onFocus={() => { setShowEmoji(false); setShowGif(false); }}
-            placeholder="Mesajınızı yazın..."
-            className="flex-1 bg-slate-50 dark:bg-slate-800 border-none outline-none text-xs p-2.5 rounded-xl font-medium focus:ring-2 focus:ring-primary/5 dark:text-slate-100 transition-all placeholder:text-slate-400"
-          />
-
-          <button type="submit" disabled={!input.trim()} className="p-2.5 bg-primary text-white rounded-xl shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100">
-            <Send size={16} />
-          </button>
+        <form onSubmit={sendMessage} className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
+            <button type="button" onClick={() => { setShowEmoji(false); setShowGif(false); fileInputRef.current?.click(); }} className="p-2.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-xl transition-all" title="Dosya"><Paperclip size={18} /></button>
+            <button type="button" onClick={() => { setShowGif(false); setShowEmoji(v => !v); }} className={`p-2.5 rounded-xl transition-all ${showEmoji ? 'bg-primary text-white' : 'text-slate-400 hover:text-primary hover:bg-primary/5'}`} title="Emoji"><Smile size={18} /></button>
+            <button type="button" onClick={() => { setShowEmoji(false); setShowGif(v => !v); }} className={`p-2.5 rounded-xl transition-all ${showGif ? 'bg-primary text-white' : 'text-slate-400 hover:text-primary hover:bg-primary/5'}`} title="GIF"><ImageIcon size={18} /></button>
+            
+            <div className="flex-1 bg-slate-100 dark:bg-white/5 rounded-2xl flex items-center px-4 h-11 border-2 border-transparent focus-within:border-blue-500/20 focus-within:bg-white dark:focus-within:bg-[#1E293B] transition-all">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onFocus={() => { setShowEmoji(false); setShowGif(false); }}
+                placeholder="Mesajınızı yazın..."
+                className="w-full bg-transparent border-none outline-none text-[13px] font-medium placeholder:text-slate-400 dark:text-white"
+              />
+            </div>
+            
+            <button type="submit" disabled={!input.trim()} className="h-11 w-11 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-500/20 flex items-center justify-center hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 disabled:shadow-none">
+              <Send size={18} />
+            </button>
+          </div>
         </form>
       </div>
     </div>
   );
 }
+
+// ── Helper Icons ──────────────────────────────────────────────────────────
+function Loader2(props: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props} className={cn("animate-spin", props.className)}>
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  );
+}
+
+function cn(...classes: any[]) {
+  return classes.filter(Boolean).join(' ');
+}
+

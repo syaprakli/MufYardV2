@@ -275,8 +275,22 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                 data["room_id"] = room_id
                 raw_data = json.dumps(data)
                 
-                # DM: sadece oda bazlı broadcast (send_to_user + broadcast = çift mesaj)
+                # DM: oda bazlı broadcast (FloatingChat açıksa alır)
                 await chat_manager.broadcast(room_id, raw_data)
+                
+                # Alıcı DM odasında değilse, global bağlantısına da gönder
+                # (PresenceContext'in yakalaması ve alt bar açması için)
+                recipient_in_room = False
+                if room_id in chat_manager.rooms:
+                    for ws_conn, info in chat_manager.rooms[room_id].items():
+                        if info["uid"] == recipient_id:
+                            recipient_in_room = True
+                            break
+                
+                if not recipient_in_room:
+                    await chat_manager.send_to_user(recipient_id, raw_data)
+                    logger.info(f"DM alıcı odada değil, global WS'e iletildi: {recipient_id}")
+                
                 logger.info(f"DM Broadcast tamamlandı: {room_id}")
                 continue
             

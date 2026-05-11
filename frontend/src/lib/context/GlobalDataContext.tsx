@@ -3,7 +3,6 @@ import { fetchStats } from '../api';
 import { fetchTasks } from '../api/tasks';
 import { fetchProfile } from '../api/profiles';
 import { fetchAudits } from '../api/audit';
-import { fetchInspectors } from '../api/inspectors';
 
 import { fetchContacts } from '../api/contacts';
 
@@ -61,7 +60,7 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 fetchTasks(uid),
                 fetchProfile(uid, email, displayName),
                 fetchAudits(uid, email, true),
-                fetchInspectors(),
+                fetchContacts('corporate'),
                 fetchContacts('personal', uid, email)
             ]);
 
@@ -104,7 +103,7 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const refreshContactsCorporate = useCallback(async () => {
         try {
-            const contactsCorporate = await fetchInspectors();
+            const contactsCorporate = await fetchContacts('corporate');
             setData(prev => ({ ...prev, contactsCorporate }));
         } catch (error) {
             console.error("Corporate contacts refresh error:", error);

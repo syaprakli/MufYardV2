@@ -131,9 +131,9 @@ function App() {
 
   return (
     <GlobalDataProvider>
-      <PresenceProvider>
-        <ThemeProvider>
-          <ChatProvider>
+      <ChatProvider>
+        <PresenceProvider>
+          <ThemeProvider>
             <ConfirmProvider>
               <NotificationProvider>
                 <Toaster
@@ -186,9 +186,9 @@ function App() {
                 </Router>
               </NotificationProvider>
             </ConfirmProvider>
-          </ChatProvider>
         </ThemeProvider>
       </PresenceProvider>
+    </ChatProvider>
     </GlobalDataProvider>
   );
 }

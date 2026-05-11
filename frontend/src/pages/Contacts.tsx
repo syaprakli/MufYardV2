@@ -429,7 +429,7 @@ export default function Contacts() {
                                         </p>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                                     {(groupedContacts[groupName] || []).map(contact => (
                                             <ContactCard
                                                 key={contact.id}
@@ -453,7 +453,7 @@ export default function Contacts() {
                         ))}
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         {sortedContacts.map(contact => (
                             <ContactCard
                                 key={contact.id}
@@ -595,10 +595,10 @@ export default function Contacts() {
 function ContactCard({ contact, isOwner, isFavorite, onToggleFavorite, onEdit, onShare, onShareCorporate, onDelete, onChat }: { contact: Contact, isOwner: boolean, isFavorite?: boolean, onToggleFavorite?: () => void, onEdit: () => void, onShare: () => void, onShareCorporate: () => void, onDelete: () => void, onChat: () => void }) {
 
     return (
-        <Card className="p-6 relative group overflow-hidden border border-border hover:border-primary/50 transition-all shadow-sm hover:shadow-md h-full flex flex-col">
+        <Card className="p-5 relative group overflow-hidden border border-border hover:border-primary/50 transition-all shadow-sm hover:shadow-md h-full flex flex-col">
             <div className="flex justify-between items-start mb-6">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all transform group-hover:scale-105 duration-300 ${!contact.is_shared ? 'bg-indigo-500/10 text-indigo-600' : 'bg-primary/10 text-primary'}`}>
-                    {!contact.is_shared ? <User size={28} /> : <Building2 size={28} />}
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all transform group-hover:scale-105 duration-300 ${!contact.is_shared ? 'bg-indigo-500/10 text-indigo-600' : 'bg-primary/10 text-primary'}`}>
+                    {!contact.is_shared ? <User size={24} /> : <Building2 size={24} />}
                 </div>
                 {isOwner && (
                     <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
@@ -634,7 +634,7 @@ function ContactCard({ contact, isOwner, isFavorite, onToggleFavorite, onEdit, o
 
             <div className="space-y-5 flex-1">
                 <div>
-                    <h4 className="font-bold text-xl text-secondary group-hover:text-primary transition-colors font-outfit">{contact.name}</h4>
+                    <h4 className="font-bold text-lg text-secondary group-hover:text-primary transition-colors font-outfit">{contact.name}</h4>
                     <p className="text-xs font-bold text-indigo-600 tracking-widest mt-1">{contact.title}</p>
                     <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1.5 font-medium">
                         <MapPin size={14} className="text-secondary" /> {contact.unit}

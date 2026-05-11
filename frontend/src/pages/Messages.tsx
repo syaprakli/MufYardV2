@@ -23,7 +23,7 @@ interface UnifiedContact {
 
 export default function Messages() {
   const { user } = useAuth();
-  const { onlineUsers } = usePresence();
+  const { onlineUsers, unreadMessages, markAsRead } = usePresence();
   const [contacts, setContacts] = useState<UnifiedContact[]>([]);
   const [selectedContact, setSelectedContact] = useState<UnifiedContact & { isOnline: boolean } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -42,6 +42,19 @@ export default function Messages() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, filterStatus]);
+
+  // Real-time DM bildirimi: Yeni mesaj geldiğinde kişi listesinde güncelleme tetikle
+  const [lastDmEvent, setLastDmEvent] = useState<number>(0);
+  useEffect(() => {
+    const handler = (e: any) => {
+      const data = e.detail;
+      if (!data || !data.room_id?.startsWith('dm_')) return;
+      // Force re-render to update unread badges instantly
+      setLastDmEvent(Date.now());
+    };
+    window.addEventListener('mufyard:new_message', handler);
+    return () => window.removeEventListener('mufyard:new_message', handler);
+  }, []);
 
   const fetchUsers = async () => {
     try {
@@ -111,6 +124,10 @@ export default function Messages() {
       return;
     }
     setSelectedContact(contact);
+    
+    // Mesajları okundu olarak işaretle
+    const roomId = ["dm", ...[user.uid, contact.uid!].sort()].join("_");
+    markAsRead(roomId);
   };
 
   const filteredContacts = (contacts.map(c => ({
@@ -125,7 +142,20 @@ export default function Messages() {
     if (filterStatus === 'online') return matchesSearch && c.isOnline;
     if (filterStatus === 'offline') return matchesSearch && !c.isOnline;
     return matchesSearch;
+  }).sort((a, b) => {
+    // Okunmamış mesajı olanlar en üstte
+    const roomA = ["dm", ...[user?.uid, a.uid].filter(Boolean).sort()].join("_");
+    const roomB = ["dm", ...[user?.uid, b.uid].filter(Boolean).sort()].join("_");
+    const unreadA = unreadMessages[roomA] || 0;
+    const unreadB = unreadMessages[roomB] || 0;
+    if (unreadA !== unreadB) return unreadB - unreadA;
+    // Online olanlar sonra
+    if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
+    // Alfabetik
+    return a.full_name.localeCompare(b.full_name);
   });
+  // lastDmEvent bağımlılığı: re-render tetikleyici (kullanılmasa bile referans gerekli)
+  void lastDmEvent;
 
   const totalPages = Math.ceil(filteredContacts.length / itemsPerPage);
   const paginatedContacts = filteredContacts.slice(
@@ -265,6 +295,15 @@ export default function Messages() {
                         </div>
                         
                         <div className="flex items-center gap-2">
+                          {(() => {
+                             const roomId = ["dm", ...[user?.uid, contact.uid].filter(Boolean).sort()].join("_");
+                             const count = unreadMessages[roomId];
+                             return count > 0 && (
+                                <span className="bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                                  {count}
+                                </span>
+                             );
+                          })()}
                           <ChevronRight size={16} className="text-slate-300 group-hover:text-primary transition-colors translate-x-0 group-hover:translate-x-1" />
                         </div>
                       </button>
