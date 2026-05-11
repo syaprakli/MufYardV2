@@ -1,0 +1,14 @@
+frontend/
+node_modules/
+.venv/
+.git/
+dist/
+build/
+release/
+backups/
+scratch/
+*.exe
+*.msi
+*.zip
+*.rar
+*.7z

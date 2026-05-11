@@ -14,13 +14,16 @@ class TaskBase(BaseModel):
     rapor_turu: str = "Genel Denetim"         # Genel Denetim / Soruşturma / İnceleme / Ön İnceleme / Spor Kulüpleri
     baslama_tarihi: Optional[str] = None      # 2026-03-15
     sure_gun: Optional[int] = 30             # Verilen süre (gün)
-    rapor_durumu: str = "Devam Ediyor"        # Devam Ediyor / İncelemede / Tamamlandı / Beklemede
+    rapor_durumu: str = "Başlanmadı"        # Başlanmadı / Devam Ediyor / Evrak Bekleniyor / İncelemede / Tamamlandı
     steps: List[Any] = Field(default_factory=list)  # İş adımları [{text, done}]
     owner_id: Optional[str] = None
     assigned_to: List[str] = Field(default_factory=list)
     shared_with: List[str] = Field(default_factory=list)
     pending_collaborators: List[str] = Field(default_factory=list)
     accepted_collaborators: List[str] = Field(default_factory=list)
+    completed_at: Optional[str] = None
+    completed_in_days: Optional[int] = None
+    status_history: List[Any] = Field(default_factory=list)
 
 
 class TaskCreate(TaskBase):
@@ -39,6 +42,9 @@ class TaskUpdate(BaseModel):
     shared_with: Optional[List[str]] = None
     pending_collaborators: Optional[List[str]] = None
     accepted_collaborators: Optional[List[str]] = None
+    completed_at: Optional[str] = None
+    completed_in_days: Optional[int] = None
+    status_history: Optional[List[Any]] = None
 
 
 class TaskResponse(TaskBase):

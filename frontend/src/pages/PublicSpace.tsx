@@ -36,6 +36,7 @@ function renderPostContent(raw: string) {
 }
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { 
     User, MessageSquare, Search, Send,
@@ -1001,8 +1002,8 @@ function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, 
         contentPlaceholder = "Çözüm yollarını veya rehber içeriğini açıklayın...";
     }
 
-    return (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-6 backdrop-blur-md bg-slate-900/40">
+    return createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center sm:p-6" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
             <motion.div key="post-creator-modal" initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-t-[32px] sm:rounded-[40px] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]">
                 <div className="p-5 md:p-8 border-b border-border flex items-center justify-between bg-card relative">
                     <div className="space-y-1">
@@ -1134,7 +1135,7 @@ function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, 
                 </div>
             </motion.div>
         </div>
-    );
+    , document.body);
 }
 
 function ThreadView({ post, comments, onBack, onComment, commentText, setCommentText, isCommenting, user, onReply, onDeleteComment, onUpdateComment, editingCommentId, setEditingCommentId, editCommentText, setEditCommentText, onEditPost, onDeletePost, onAttach, onFileUpload, attachments, setAttachments, onZoom, isStatic }: any) {
@@ -1294,14 +1295,14 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
 }
 
 function GalleryOverlay({ attachment, onClose }: any) {
-    return (
-        <div className="fixed inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center p-12" onClick={onClose}>
+    return createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/95 flex flex-col items-center justify-center p-12" onClick={onClose}>
             <div className="absolute top-10 right-10 flex items-center gap-4" onClick={e => e.stopPropagation()}>
                 <button onClick={onClose} className="p-3 bg-card/10 hover:bg-rose-500 text-white rounded-2xl transition-all backdrop-blur-md border border-white/10"><X size={24} /></button>
             </div>
             <img src={attachment.url} className="max-h-[80vh] max-w-full object-contain shadow-2xl rounded-3xl" />
         </div>
-    );
+    , document.body);
 }
 
 

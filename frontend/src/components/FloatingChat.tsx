@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Minus, MessageSquare, Send, Paperclip, Smile, Image as ImageIcon, Search, FileText, Trash2, Edit3 } from 'lucide-react';
+import { X, Minus, MessageSquare, Send, Paperclip, Smile, Image as ImageIcon, Search, FileText, Trash2, Edit3, Download } from 'lucide-react';
 import { WS_URL, API_URL } from '../lib/config';
 import { useAuth } from '../lib/hooks/useAuth';
 import { useTheme } from "../lib/context/ThemeContext";
+import { isElectron } from '../lib/firebase';
 import EmojiPicker, { type EmojiClickData, Theme as EmojiTheme } from 'emoji-picker-react';
 import { toast } from 'react-hot-toast';
 import { uploadFile } from '../lib/api/files';
@@ -442,26 +443,79 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
     }
   };
 
+  const BACKEND_BASE_URL = API_URL.replace(/\/api\/?$/, '');
+
+  const resolveAttachmentUrl = (url: string) => {
+    if (!url) return '';
+    const raw = String(url).trim();
+    if (!raw) return '';
+
+    if (/^https?:\/\//i.test(raw)) {
+      return encodeURI(raw);
+    }
+    return encodeURI(`${BACKEND_BASE_URL}${raw.startsWith('/') ? '' : '/'}${raw}`);
+  };
+
+  const saveAttachmentToDisk = async (att: Attachment) => {
+    try {
+      const resolvedUrl = resolveAttachmentUrl(att.url);
+      const ipcRenderer = (window as any)?.require?.('electron')?.ipcRenderer;
+      if (!ipcRenderer?.invoke) return false;
+
+      const result = await ipcRenderer.invoke('download-file-with-dialog', {
+        url: resolvedUrl,
+        fileName: att.name || 'dosya'
+      });
+
+      if (result?.ok) {
+        toast.success('Dosya kaydedildi.');
+        return true;
+      }
+
+      if (!result?.canceled) {
+        toast.error(result?.error || 'Dosya kaydedilemedi.');
+      }
+      return false;
+    } catch {
+      toast.error('Dosya kaydedilemedi.');
+      return false;
+    }
+  };
+
   // ── render helpers ────────────────────────────────────────────────────
   const renderAttachment = (att: Attachment, isOwn: boolean) => {
+    const resolvedUrl = resolveAttachmentUrl(att.url);
+
     if (att.type === 'gif') {
-      return <img src={att.url} alt="GIF" className="max-w-[200px] rounded-xl mt-1" />;
+      return <img src={resolvedUrl} alt="GIF" className="max-w-[200px] rounded-xl mt-1" />;
     }
     const isImage = att.mime?.startsWith('image/');
     if (isImage) {
       return (
         <div className="mt-1">
-          <img src={att.url} alt={att.name} className="max-w-[200px] rounded-xl" />
+          <img src={resolvedUrl} alt={att.name} className="max-w-[200px] rounded-xl" />
           <p className="text-[9px] font-bold opacity-60 mt-0.5 truncate max-w-[200px]">{att.name}</p>
         </div>
       );
     }
     return (
-      <a href={att.url} download={att.name} className={`mt-1 flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-colors ${isOwn ? 'border-white/20 text-white/90 hover:bg-white/10' : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-        <FileText size={14} />
-        <span className="truncate max-w-[140px]">{att.name}</span>
-        <span className="opacity-50 shrink-0">{att.size ? `${(att.size / 1024).toFixed(0)} KB` : ''}</span>
-      </a>
+      <div className="mt-1 flex items-center gap-1.5">
+        <a href={resolvedUrl} download={att.name} className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-colors ${isOwn ? 'border-white/20 text-white/90 hover:bg-white/10' : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+          <FileText size={14} />
+          <span className="truncate max-w-[120px]">{att.name}</span>
+          <span className="opacity-50 shrink-0">{att.size ? `${(att.size / 1024).toFixed(0)} KB` : ''}</span>
+        </a>
+        {isElectron && (
+          <button
+            type="button"
+            onClick={() => saveAttachmentToDisk(att)}
+            className={`px-2.5 py-2 rounded-xl border text-xs font-black transition-colors ${isOwn ? 'border-white/20 text-white/90 hover:bg-white/10' : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            title="Kaydet"
+          >
+            <Download size={13} />
+          </button>
+        )}
+      </div>
     );
   };
 

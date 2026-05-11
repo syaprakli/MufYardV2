@@ -9,9 +9,6 @@ const STATIONS = [
     { id: 'metrofm', name: 'Metro FM', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/METRO_FMAAC.aac', color: 'text-amber-400', bg: 'bg-amber-400' },
     { id: 'joyfm', name: 'Joy FM', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/JOY_FMAAC.aac', color: 'text-sky-400', bg: 'bg-sky-400' },
     { id: 'joyturk', name: 'Joy Türk', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/JOY_TURKAAC.aac', color: 'text-rose-400', bg: 'bg-rose-400' },
-    { id: 'virgin', name: 'Virgin Radio', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/VIRGIN_RADIO_TURKIYEAAC.aac', color: 'text-red-500', bg: 'bg-red-500' },
-    { id: 'retroturk', name: 'Retro Türk', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/RETRO_TURKAAC.aac', color: 'text-emerald-400', bg: 'bg-emerald-400' },
-    { id: 'palnostalji', name: 'Pal Nostalji', url: 'https://radyo.palnostalji.com.tr/nostalji/mpeg/icecast.audio', color: 'text-sky-300', bg: 'bg-sky-300' },
     { id: 'lofi', name: 'MüfyardFM', url: '', color: 'text-violet-400', bg: 'bg-violet-500', isLocked: true }
 ];
 

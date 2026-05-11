@@ -389,8 +389,24 @@ export default function Settings() {
         try {
             setLoading(true);
             const data = await fetchProfile(uid, user?.email || undefined, user?.displayName || undefined);
-            setProfile(data);
-            localStorage.setItem(`profile_${uid}`, JSON.stringify(data));
+
+            const rawBirthday = String((data as any)?.birthday || "").trim();
+            const normalizedBirthday = /^\d{2}-\d{2}$/.test(rawBirthday)
+                ? rawBirthday
+                : /^\d{4}-\d{2}-\d{2}$/.test(rawBirthday)
+                    ? rawBirthday.slice(5, 10)
+                    : "";
+            const currentYear = String(new Date().getFullYear());
+            const birthdayFull = normalizedBirthday ? `${currentYear}-${normalizedBirthday}` : "";
+
+            const hydrated = {
+                ...data,
+                birthday: normalizedBirthday,
+                birthday_full: birthdayFull
+            } as any;
+
+            setProfile(hydrated);
+            localStorage.setItem(`profile_${uid}`, JSON.stringify(hydrated));
         } catch (error) {
             console.error("Profil yüklenemedi:", error);
             const cached = localStorage.getItem(`profile_${uid}`);
@@ -406,7 +422,9 @@ export default function Settings() {
                     avatar_url: user?.photoURL || null,
                     theme: "light",
                     ai_enabled: true,
-                    notifications_enabled: true
+                    notifications_enabled: true,
+                    birthday: "",
+                    birthday_full: ""
                 } as any);
             }
         } finally {

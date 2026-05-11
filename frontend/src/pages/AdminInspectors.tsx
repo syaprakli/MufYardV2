@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Users, Search, ChevronLeft, ChevronRight, UserCheck, UserX, Loader2, MoreVertical, ShieldAlert, Shield, Link2, X } from "lucide-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -282,8 +283,8 @@ export default function AdminInspectors() {
                 </div>
             )}
 
-            {linkModal && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            {linkModal && createPortal(
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setLinkModal(null); setLinkSearch(""); }} />
                     <div className="relative w-full max-w-md bg-card rounded-3xl shadow-2xl border border-border overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         <div className="flex items-center justify-between p-6 border-b border-border">
@@ -323,7 +324,7 @@ export default function AdminInspectors() {
                         </div>
                     </div>
                 </div>
-            )}
+            , document.body)}
         </div>
     );
 }

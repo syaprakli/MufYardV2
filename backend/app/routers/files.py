@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from app.lib.folder_manager import FolderManager, BASE_REPORTS_DIR, STANDARD_SUBFOLDERS
 from app.config import BASE_DIR
+from app.config import settings, DATA_DIR
 def get_current_user_id():
     # Gerçek uygulamada auth'dan alınmalı, örnek için sabit
     return "user_1"
@@ -23,6 +24,7 @@ class FileItem(BaseModel):
     parentId: Optional[str] = None
     size: Optional[str] = None
     date: Optional[str] = None
+    url: Optional[str] = None
 
 class UploadResponse(BaseModel):
     url: str
@@ -33,6 +35,10 @@ class UploadResponse(BaseModel):
 class CreateFolderRequest(BaseModel):
     parentId: Optional[str] = None
     name: str
+
+class ShareFileRequest(BaseModel):
+    file_id: str
+    recipient_id: str
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload_file(
@@ -101,16 +107,10 @@ async def upload_file(
 
 @router.get("/tree", response_model=List[FileItem])
 async def get_file_tree(user_id: str = Depends(get_current_user_id)):
-    """Kullanıcının okuma izni olan dosya/klasörleri döndürür."""
+    """Tüm dosya/klasörleri döndürür."""
     try:
         all_items = await asyncio.to_thread(FolderManager.get_tree)
-        # Sadece okuma izni olanları filtrele
-        visible_items = []
-        for item in all_items:
-            # Klasörler için izin kontrolü opsiyonel, dosyalar için zorunlu
-            if item["type"] == "folder" or FolderManager.check_permission(item["id"], user_id, "read"):
-                visible_items.append(item)
-        return visible_items
+        return all_items
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -141,6 +141,48 @@ async def create_folder(req: CreateFolderRequest, user_id: str = Depends(get_cur
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/share-to-user", response_model=UploadResponse)
+async def share_file_to_user(req: ShareFileRequest, user_id: str = Depends(get_current_user_id)):
+    """Paylasilan dosyayi aliciya ait klasore fiziksel olarak kopyalar."""
+    try:
+        safe_item_path = req.file_id.replace("..", "").strip("/")
+        source_path = os.path.normpath(os.path.join(BASE_REPORTS_DIR, safe_item_path))
+
+        if not source_path.startswith(os.path.normpath(BASE_REPORTS_DIR)):
+            raise HTTPException(status_code=400, detail="Invalid file path")
+
+        if not await asyncio.to_thread(os.path.exists, source_path):
+            raise HTTPException(status_code=404, detail="Source file not found")
+
+        if await asyncio.to_thread(os.path.isdir, source_path):
+            raise HTTPException(status_code=400, detail="Folder sharing is not supported via this endpoint")
+
+        filename = os.path.basename(source_path)
+        recipient_safe = req.recipient_id.replace("..", "").replace("/", "_").replace("\\", "_").strip()
+        target_dir = os.path.join(settings.UPLOADS_DIR, "shared", recipient_safe)
+        await asyncio.to_thread(os.makedirs, target_dir, exist_ok=True)
+
+        target_path = os.path.join(target_dir, filename)
+        if await asyncio.to_thread(os.path.exists, target_path):
+            base, ext = os.path.splitext(filename)
+            target_path = os.path.join(target_dir, f"{base}_{int(datetime.now().timestamp())}{ext}")
+
+        await asyncio.to_thread(shutil.copy2, source_path, target_path)
+
+        relative_path_from_data = os.path.relpath(target_path, DATA_DIR).replace("\\", "/")
+        relative_url = f"/{relative_path_from_data}"
+
+        return {
+            "url": relative_url,
+            "name": os.path.basename(target_path),
+            "type": "file",
+            "path": os.path.relpath(target_path, BASE_REPORTS_DIR).replace("\\", "/")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.delete("/{file_id:path}")
 async def delete_item(file_id: str, user_id: str = Depends(get_current_user_id)):
     try:
@@ -158,6 +200,36 @@ async def delete_item(file_id: str, user_id: str = Depends(get_current_user_id))
         else:
             await asyncio.to_thread(os.remove, full_path)
 
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/open-file/{file_id:path}")
+async def open_file(file_id: str):
+    """Opens the specified file with the default OS application."""
+    try:
+        # Prevent traversal attacks
+        safe_item_path = file_id.replace("..", "").strip("/")
+        full_path = os.path.normpath(os.path.join(BASE_REPORTS_DIR, safe_item_path))
+        
+        if not await asyncio.to_thread(os.path.exists, full_path):
+            raise HTTPException(status_code=404, detail="Item not found")
+            
+        if await asyncio.to_thread(os.path.isdir, full_path):
+            # If it's a directory, use open_folder logic instead or just startfile
+            pass
+            
+        # Open in default app
+        if os.name == 'nt': # Windows
+            await asyncio.to_thread(os.startfile, full_path)
+        elif os.name == 'posix': # Mac/Linux
+            import subprocess
+            import platform
+            if platform.system() == 'Darwin':
+                subprocess.run(['open', full_path])
+            else:
+                subprocess.run(['xdg-open', full_path])
+            
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -180,16 +252,13 @@ async def open_folder(file_id: str):
         # Open in OS Explorer
         if os.name == 'nt': # Windows
             await asyncio.to_thread(os.startfile, target_path)
-        elif os.name == 'posix': # Mac/Linux (just in case)
+        elif os.name == 'posix': # Mac/Linux
             import subprocess
-            try:
-                import platform
-                if platform.system() == 'Darwin':
-                    subprocess.run(['open', target_path])
-                else:
-                    subprocess.run(['xdg-open', target_path])
-            except:
-                pass
+            import platform
+            if platform.system() == 'Darwin':
+                subprocess.run(['open', target_path])
+            else:
+                subprocess.run(['xdg-open', target_path])
             
         return {"status": "success"}
     except Exception as e:

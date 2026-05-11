@@ -7,7 +7,9 @@ export interface Note {
     title: string;
     text: string;
     is_pinned: boolean;
+    is_done?: boolean;
     color: string;
+    priority?: "normal" | "urgent" | "acil" | string;
     created_at: string;
     shared_with?: string[];
     pending_collaborators?: string[];
@@ -19,13 +21,17 @@ export interface NoteCreate {
     title: string;
     text: string;
     is_pinned: boolean;
+    is_done?: boolean;
     color: string;
+    priority?: "normal" | "urgent" | "acil" | string;
     pending_collaborators?: string[];
     accepted_collaborators?: string[];
 }
 
-export async function fetchNotes(uid: string): Promise<Note[]> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/notes/?uid=${uid}`);
+export async function fetchNotes(uid: string, email?: string): Promise<Note[]> {
+    const params = new URLSearchParams({ uid });
+    if (email) params.append("email", email);
+    const response = await fetchWithTimeout(`${API_BASE_URL}/notes/?${params.toString()}`);
     if (!response.ok) {
         throw new Error("Notlar yüklenemedi.");
     }
@@ -55,9 +61,41 @@ export async function updateNote(id: string, update: Partial<NoteCreate>): Promi
         },
         body: JSON.stringify(update),
     });
-    if (!response.ok) {
-        throw new Error("Not güncellenemedi.");
+
+    if (!response.ok && Object.prototype.hasOwnProperty.call(update, "is_done")) {
+        const fallbackResponse = await fetchWithTimeout(`${API_BASE_URL}/notes/${id}`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ is_completed: (update as any).is_done }),
+        });
+
+        if (fallbackResponse.ok) {
+            return fallbackResponse.json();
+        }
+
+        let fallbackDetail = "";
+        try {
+            const body = await fallbackResponse.json();
+            fallbackDetail = body?.detail ? ` (${body.detail})` : "";
+        } catch {
+            fallbackDetail = "";
+        }
+        throw new Error(`Not güncellenemedi${fallbackDetail}`);
     }
+
+    if (!response.ok) {
+        let detail = "";
+        try {
+            const body = await response.json();
+            detail = body?.detail ? ` (${body.detail})` : "";
+        } catch {
+            detail = "";
+        }
+        throw new Error(`Not güncellenemedi${detail}`);
+    }
+
     return response.json();
 }
 

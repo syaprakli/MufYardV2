@@ -23,6 +23,9 @@ export interface Profile {
     two_factor_enabled?: boolean;
     two_factor_secret?: string | null;
     verified?: boolean;
+    phone?: string;
+    birthday?: string;
+    birthday_full?: string;
 }
 
 export async function fetchProfile(uid: string, email?: string, fullName?: string): Promise<Profile> {

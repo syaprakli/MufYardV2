@@ -2,18 +2,21 @@ import {
     Folder, File as FileIcon, Plus, Search, ChevronRight, ChevronDown, 
     Download, Trash2, Shield, FolderOpen,
     FileText, Image as ImageIcon, Video, Music, 
-    Upload, X, Grid, List as ListIcon, RefreshCw, Share2
+    Upload, X, Grid, List as ListIcon, RefreshCw, Share2, ExternalLink, HelpCircle
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { useState, useEffect, useMemo, useRef, type DragEvent } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { fetchFileTree, uploadFile, createFolder, deleteItem, openFolder, type FileItem } from "../lib/api/files";
+import * as XLSX from "xlsx";
+import { fetchFileTree, uploadFile, createFolder, deleteItem, openFolder, openFile, shareFileToUser, type FileItem } from "../lib/api/files";
 import { aiSearch } from "../lib/api/ai";
 import { cn } from "../lib/utils";
 import { isElectron } from "../lib/firebase";
+import { API_URL } from "../lib/config";
 import { useAuth } from "../lib/hooks/useAuth";
 import { fetchAllProfiles, type Profile } from "../lib/api/profiles";
 import { sendDirectMessage } from "../lib/api/collaboration";
@@ -45,6 +48,121 @@ export default function Files() {
     const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
     const [creatingFolder, setCreatingFolder] = useState(false);
+    const [spreadsheetPreview, setSpreadsheetPreview] = useState<{ loading: boolean; error: string | null; rows: string[][] }>({
+        loading: false,
+        error: null,
+        rows: []
+    });
+    const [textPreview, setTextPreview] = useState<{ loading: boolean; error: string | null; content: string }>({
+        loading: false,
+        error: null,
+        content: ""
+    });
+
+    const BACKEND_BASE_URL = API_URL.replace(/\/api\/?$/, "");
+
+    const resolveFileUrl = (url?: string) => {
+        if (!url) return "";
+
+        const raw = String(url).trim();
+        if (!raw) return "";
+
+        // Bosluk/Turkce karakter gibi path sorunlarini onlemek icin URL'i encode et.
+        if (/^https?:\/\//i.test(raw)) {
+            return encodeURI(raw);
+        }
+
+        const normalized = `${BACKEND_BASE_URL}${raw.startsWith('/') ? '' : '/'}${raw}`;
+        return encodeURI(normalized);
+    };
+
+    const isSpreadsheetFile = (item: FileItem | null) => {
+        if (!item) return false;
+        const ext = (item.name.split('.').pop() || '').toLowerCase();
+        return ['xls', 'xlsx', 'csv'].includes(ext);
+    };
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadContentPreview = async () => {
+            if (!previewFile || !previewFile.url) {
+                setSpreadsheetPreview({ loading: false, error: null, rows: [] });
+                setTextPreview({ loading: false, error: null, content: "" });
+                return;
+            }
+
+            const ext = (previewFile.name.split('.').pop() || '').toLowerCase();
+            const isExcel = ['xls', 'xlsx', 'csv'].includes(ext);
+            const isText = ['txt', 'md', 'json', 'xml', 'js', 'ts', 'py', 'css', 'html', 'log', 'sql'].includes(ext);
+
+            if (isExcel) {
+                setSpreadsheetPreview({ loading: true, error: null, rows: [] });
+                try {
+                    const url = resolveFileUrl(previewFile.url);
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error(`Dosya okunamadı (HTTP ${res.status})`);
+
+                    let rows: string[][] = [];
+                    if (ext === 'csv') {
+                        const text = await res.text();
+                        const wb = XLSX.read(text, { type: 'string' });
+                        const firstSheet = wb.SheetNames[0];
+                        const matrix = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1, raw: false }) as any[];
+                        rows = matrix.map((r: any) => (Array.isArray(r) ? r : [String(r ?? '')]).map((c: any) => String(c ?? '')));
+                    } else {
+                        const buffer = await res.arrayBuffer();
+                        const wb = XLSX.read(buffer, { type: 'array' });
+                        const firstSheet = wb.SheetNames[0];
+                        const matrix = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1, raw: false }) as any[];
+                        rows = matrix.map((r: any) => (Array.isArray(r) ? r : [String(r ?? '')]).map((c: any) => String(c ?? '')));
+                    }
+
+                    if (!cancelled) setSpreadsheetPreview({ loading: false, error: null, rows: rows.slice(0, 200) });
+                } catch (e: any) {
+                    if (!cancelled) setSpreadsheetPreview({ loading: false, error: e?.message || 'Excel önizleme yüklenemedi.', rows: [] });
+                }
+            } else if (isText) {
+                setSpreadsheetPreview({ loading: false, error: null, rows: [] });
+                setTextPreview({ loading: true, error: null, content: "" });
+                try {
+                    const url = resolveFileUrl(previewFile.url);
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error(`Dosya okunamadı (HTTP ${res.status})`);
+                    const text = await res.text();
+                    if (!cancelled) setTextPreview({ loading: false, error: null, content: text });
+                } catch (e: any) {
+                    if (!cancelled) setTextPreview({ loading: false, error: e?.message || 'Metin önizleme yüklenemedi.', content: "" });
+                }
+            } else {
+                setSpreadsheetPreview({ loading: false, error: null, rows: [] });
+                setTextPreview({ loading: false, error: null, content: "" });
+            }
+        };
+
+        loadContentPreview();
+        return () => { cancelled = true; };
+    }, [previewFile]);
+
+    const saveWithElectronDialog = async (url: string, fileName: string) => {
+        const ipcRenderer = (window as any)?.require?.("electron")?.ipcRenderer;
+        if (!ipcRenderer?.invoke) return false;
+
+        const result = await ipcRenderer.invoke("download-file-with-dialog", {
+            url,
+            fileName: fileName || "dosya"
+        });
+
+        if (result?.ok) {
+            toast.success("Dosya kaydedildi.");
+            return true;
+        }
+
+        if (!result?.canceled) {
+            toast.error(result?.error || "Dosya kaydedilemedi.");
+        }
+        return false;
+    };
 
     // AI arama fonksiyonu
     useEffect(() => {
@@ -95,13 +213,30 @@ export default function Files() {
 
     useEffect(() => {
         loadData();
-        loadProfiles();
     }, []);
+
+    useEffect(() => {
+        loadProfiles();
+    }, [user?.uid, user?.email, profile?.uid, profile?.email]);
 
     const loadProfiles = async () => {
         try {
             const data = await fetchAllProfiles();
-            setAllProfiles(data.filter(p => p.uid !== user?.uid));
+            const meKeys = [
+                user?.uid,
+                user?.email?.trim().toLowerCase(),
+                profile?.uid,
+                profile?.email?.trim().toLowerCase()
+            ].filter(Boolean).map(v => String(v).toLowerCase());
+
+            setAllProfiles(
+                data.filter(p => {
+                    const pKeys = [p.uid, p.email?.trim().toLowerCase()]
+                        .filter(Boolean)
+                        .map(v => String(v).toLowerCase());
+                    return !pKeys.some(k => meKeys.includes(k));
+                })
+            );
         } catch (error) {
             console.error("Profiller yüklenemedi", error);
         }
@@ -210,7 +345,15 @@ export default function Files() {
         }
     };
 
-    const handleDownload = (item: FileItem) => {
+    const handleOpenFile = async (id: string) => {
+        try {
+            await openFile(id);
+        } catch (error) {
+            toast.error("Dosya açılamadı");
+        }
+    };
+
+    const handleDownload = async (item: FileItem) => {
         if (item.type === "folder") {
             toast.error("Klasör indirilemez. Lütfen dosya seçin.");
             return;
@@ -220,8 +363,15 @@ export default function Files() {
             return;
         }
 
+        const resolvedUrl = resolveFileUrl(item.url);
+
+        if (isElectron) {
+            const saved = await saveWithElectronDialog(resolvedUrl, item.name || "dosya");
+            if (saved) return;
+        }
+
         const link = document.createElement("a");
-        link.href = item.url;
+        link.href = resolvedUrl;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         link.download = item.name || "dosya";
@@ -232,19 +382,28 @@ export default function Files() {
 
     const handleShareToInspector = async (recipient: Profile) => {
         if (!sharingFile || !user) return;
+
+        if (!sharingFile.url) {
+            toast.error("Paylaşılacak dosya bağlantısı bulunamadı.");
+            return;
+        }
         
         setSharingLoading(true);
         const loadingToast = toast.loading(`${sharingFile.name} gönderiliyor...`);
         
         try {
             const senderName = profile?.full_name || user.displayName || user.email?.split('@')[0] || "Müfettiş";
+
+            // Dosyanın alıcıya ait gerçek bir kopyasını backend üzerinde oluştur.
+            const sharedCopy = await shareFileToUser(sharingFile.id, recipient.uid);
+
             const success = await sendDirectMessage(
                 recipient.uid,
                 `📁 Dosya paylaşıldı: ${sharingFile.name}`,
                 {
                     type: 'file',
-                    name: sharingFile.name,
-                    url: sharingFile.url,
+                    name: sharedCopy?.name || sharingFile.name,
+                    url: sharedCopy?.url || sharingFile.url,
                     size: 0 // Size already formatted in name or can be parsed
                 },
                 user.uid,
@@ -270,6 +429,10 @@ export default function Files() {
         if (item.type === 'pdf') return <FileText size={20} className="text-red-500" />;
         if (item.type === 'video') return <Video size={20} className="text-purple-500" />;
         if (item.type === 'audio') return <Music size={20} className="text-amber-500" />;
+        if (item.type === 'word') return <FileText size={20} className="text-blue-600" />;
+        if (item.type === 'excel') return <FileText size={20} className="text-emerald-600" />;
+        if (item.type === 'powerpoint') return <FileText size={20} className="text-orange-600" />;
+        if (item.type === 'text') return <FileText size={20} className="text-slate-500" />;
         return <FileIcon size={20} className="text-slate-400" />;
     };
 
@@ -309,6 +472,14 @@ export default function Files() {
                     >
                         {isUploading ? <RefreshCw className="mr-2 animate-spin" size={16} /> : <Upload className="mr-2" size={16} />}
                         Dosya Yükle
+                    </Button>
+                    <Button
+                        onClick={handleCreateFolder}
+                        variant="outline"
+                        className="h-10 px-4 rounded-2xl font-black uppercase text-[10px] tracking-widest"
+                    >
+                        <Plus size={16} className="mr-2" />
+                        Klasör
                     </Button>
                     <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" />
                 </div>
@@ -369,6 +540,18 @@ export default function Files() {
 
                         <div className="flex items-center justify-between px-2">
                             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+                                {currentPath && (
+                                    <button
+                                        onClick={() => {
+                                            const parts = currentPath.split('/');
+                                            parts.pop();
+                                            setCurrentPath(parts.join('/'));
+                                        }}
+                                        className="flex items-center gap-1 text-[11px] font-black uppercase tracking-widest text-primary hover:text-primary/70 bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-xl transition-all shrink-0"
+                                    >
+                                        <ChevronRight size={12} className="rotate-180" /> Geri
+                                    </button>
+                                )}
                                 <button 
                                     onClick={() => setCurrentPath('')}
                                     className={cn("text-[11px] font-black uppercase tracking-widest transition-colors", !currentPath ? "text-primary" : "text-slate-400 hover:text-slate-600")}
@@ -510,13 +693,15 @@ export default function Files() {
             </div>
 
             {/* Preview Modal */}
+            {createPortal(
             <AnimatePresence>
                 {previewFile && (
                     <motion.div 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-12 bg-slate-900/80 backdrop-blur-md"
+                        className="fixed inset-0 z-[99999] flex items-center justify-center p-4 md:p-12 backdrop-blur-md"
+                        style={{ backgroundColor: 'rgba(15,23,42,0.8)' }}
                         onClick={() => setPreviewFile(null)}
                     >
                         <motion.div 
@@ -555,24 +740,179 @@ export default function Files() {
                                     >
                                         <Download size={18} />
                                     </Button>
+                                    {isElectron && (
+                                        <Button
+                                            size="icon"
+                                            variant="outline"
+                                            onClick={() => handleOpenFile(previewFile.id)}
+                                            className="rounded-xl h-12 w-12 bg-primary/10 text-primary border-primary/20 hover:bg-primary hover:text-white"
+                                            title="Uygulamada Aç"
+                                        >
+                                            <ExternalLink size={18} />
+                                        </Button>
+                                    )}
                                     <Button size="icon" variant="outline" onClick={() => setPreviewFile(null)} className="rounded-2xl h-12 w-12 bg-card border-slate-100 dark:border-slate-800"><X size={18} /></Button>
                                 </div>
                             </div>
                             <div className="flex-1 bg-slate-100 dark:bg-slate-950 flex items-center justify-center overflow-hidden relative group">
                                 {previewFile.type === 'image' ? (
-                                    <img src={previewFile.url} alt={previewFile.name} className="max-w-full max-h-full object-contain shadow-2xl rounded-lg" />
+                                    <img src={resolveFileUrl(previewFile.url)} alt={previewFile.name} className="max-w-full max-h-full object-contain shadow-2xl rounded-lg" />
                                 ) : previewFile.type === 'pdf' ? (
-                                    <iframe src={previewFile.url} className="w-full h-full border-none shadow-2xl" />
-                                ) : (
-                                    <div className="text-center">
-                                        <FileIcon size={120} className="text-slate-300 mx-auto mb-6" strokeWidth={1} />
-                                        <p className="text-slate-500 font-bold">Önizleme bu dosya türü için desteklenmiyor.</p>
-                                        <Button
-                                            onClick={() => handleDownload(previewFile)}
-                                            className="mt-4 rounded-xl shadow-lg"
+                                    <div className="w-full h-full flex flex-col">
+                                        <div className="p-3 border-b border-slate-200/70 dark:border-slate-800 flex justify-end bg-white/70 dark:bg-slate-900/40">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => window.open(resolveFileUrl(previewFile.url), "_blank")}
+                                                className="rounded-xl"
+                                            >
+                                                PDF'yi Ayrı Pencerede Aç
+                                            </Button>
+                                        </div>
+                                        <object
+                                            data={resolveFileUrl(previewFile.url)}
+                                            type="application/pdf"
+                                            className="w-full flex-1"
                                         >
-                                            Şimdi İndir
-                                        </Button>
+                                            <iframe src={resolveFileUrl(previewFile.url)} className="w-full h-full border-none shadow-2xl" />
+                                        </object>
+                                    </div>
+                                ) : previewFile.type === 'video' ? (
+                                    <video 
+                                        src={resolveFileUrl(previewFile.url)} 
+                                        controls 
+                                        autoPlay
+                                        className="max-w-full max-h-full shadow-2xl"
+                                    />
+                                ) : previewFile.type === 'audio' ? (
+                                    <div className="flex flex-col items-center gap-8">
+                                        <div className="w-32 h-32 rounded-full bg-primary/10 flex items-center justify-center text-primary animate-pulse">
+                                            <Music size={64} />
+                                        </div>
+                                        <audio 
+                                            src={resolveFileUrl(previewFile.url)} 
+                                            controls 
+                                            autoPlay
+                                            className="w-[400px]"
+                                        />
+                                    </div>
+                                ) : previewFile.type === 'text' ? (
+                                    <div className="w-full h-full flex flex-col bg-slate-50 dark:bg-slate-900/50">
+                                        <div className="p-3 border-b border-slate-200/70 dark:border-slate-800 flex items-center justify-between bg-white/70 dark:bg-slate-900/40">
+                                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Dosya İçeriği</p>
+                                            <Button size="sm" variant="outline" onClick={() => handleDownload(previewFile)} className="rounded-xl">İndir</Button>
+                                        </div>
+                                        <div className="flex-1 overflow-auto p-6 font-mono text-sm">
+                                            {textPreview.loading ? (
+                                                <div className="h-full flex items-center justify-center gap-2 text-slate-500">
+                                                    <RefreshCw size={18} className="animate-spin" />
+                                                    <span className="text-sm font-semibold">Yükleniyor...</span>
+                                                </div>
+                                            ) : textPreview.error ? (
+                                                <div className="h-full flex flex-col items-center justify-center gap-3">
+                                                    <p className="text-rose-500">{textPreview.error}</p>
+                                                    <Button size="sm" onClick={() => handleDownload(previewFile)}>İndirip Aç</Button>
+                                                </div>
+                                            ) : (
+                                                <pre className="whitespace-pre-wrap break-words text-slate-700 dark:text-slate-300">
+                                                    {textPreview.content}
+                                                </pre>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : isSpreadsheetFile(previewFile) || previewFile.type === 'excel' ? (
+                                    <div className="w-full h-full flex flex-col">
+                                        <div className="p-3 border-b border-slate-200/70 dark:border-slate-800 flex items-center justify-between bg-white/70 dark:bg-slate-900/40">
+                                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Excel Önizleme (ilk 200 satır)</p>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => handleDownload(previewFile)}
+                                                className="rounded-xl"
+                                            >
+                                                Tamamını İndir
+                                            </Button>
+                                        </div>
+                                        <div className="flex-1 overflow-auto p-3">
+                                            {spreadsheetPreview.loading ? (
+                                                <div className="h-full flex items-center justify-center gap-2 text-slate-500">
+                                                    <RefreshCw size={18} className="animate-spin" />
+                                                    <span className="text-sm font-semibold">Excel içeriği yükleniyor...</span>
+                                                </div>
+                                            ) : spreadsheetPreview.error ? (
+                                                <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
+                                                    <p className="text-sm font-semibold text-rose-500">{spreadsheetPreview.error}</p>
+                                                    <Button size="sm" variant="outline" onClick={() => handleDownload(previewFile)}>
+                                                        İndirip Aç
+                                                    </Button>
+                                                </div>
+                                            ) : spreadsheetPreview.rows.length === 0 ? (
+                                                <div className="h-full flex items-center justify-center text-sm font-semibold text-slate-500">
+                                                    Görüntülenecek veri bulunamadı.
+                                                </div>
+                                            ) : (
+                                                <table className="min-w-full text-[11px] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-lg overflow-hidden">
+                                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                        {spreadsheetPreview.rows.map((row, rowIndex) => (
+                                                            <tr key={rowIndex} className={cn(rowIndex === 0 ? "bg-slate-50 dark:bg-slate-800/50 font-black text-slate-900 dark:text-white" : "hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors")}>
+                                                                {row.map((cell, cellIndex) => (
+                                                                    <td key={`${rowIndex}-${cellIndex}`} className="px-3 py-2 border-x border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                                                        {cell}
+                                                                    </td>
+                                                                ))}
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="text-center p-12">
+                                        <div className="relative inline-block mb-8">
+                                            <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full" />
+                                            <FileIcon size={140} className="text-slate-200 dark:text-slate-800 relative z-10" strokeWidth={0.5} />
+                                            <div className="absolute bottom-2 right-2 bg-amber-500 text-white p-3 rounded-2xl shadow-xl z-20">
+                                                <HelpCircle size={24} />
+                                            </div>
+                                        </div>
+                                        <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100 mb-2">Önizleme Desteklenmiyor</h3>
+                                        <p className="text-slate-500 font-medium max-w-sm mx-auto mb-8">
+                                            Bu dosya türü ({previewFile.name.split('.').pop()?.toUpperCase()}) tarayıcıda doğrudan görüntülenemiyor.
+                                        </p>
+                                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                                            {isElectron && (
+                                                <Button
+                                                    onClick={() => handleOpenFile(previewFile.id)}
+                                                    className="h-14 px-8 rounded-2xl shadow-xl shadow-primary/20 bg-primary text-white font-black uppercase text-xs tracking-widest hover:-translate-y-1 transition-all active:scale-95"
+                                                >
+                                                    <ExternalLink className="mr-3" size={20} />
+                                                    Uygulamada Aç
+                                                </Button>
+                                            )}
+                                            <Button
+                                                onClick={() => handleDownload(previewFile)}
+                                                variant={isElectron ? "outline" : "primary"}
+                                                className={cn(
+                                                    "h-14 px-8 rounded-2xl font-black uppercase text-xs tracking-widest transition-all active:scale-95",
+                                                    !isElectron && "shadow-xl shadow-primary/20 bg-primary text-white hover:-translate-y-1",
+                                                    isElectron && "border-2"
+                                                )}
+                                            >
+                                                <Download className="mr-3" size={20} />
+                                                Dosyayı İndir
+                                            </Button>
+                                            {isElectron && (
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => handleOpenFolder(previewFile.id)}
+                                                    className="h-14 px-8 rounded-2xl font-black uppercase text-xs tracking-widest border-2"
+                                                >
+                                                    <FolderOpen className="mr-3" size={20} />
+                                                    Klasörde Göster
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -580,15 +920,18 @@ export default function Files() {
                     </motion.div>
                 )}
             </AnimatePresence>
+            , document.body)}
 
             {/* Share Modal */}
+            {createPortal(
             <AnimatePresence>
                 {sharingFile && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
+                        className="fixed inset-0 z-[99999] flex items-center justify-center p-4"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}
                         onClick={() => !sharingLoading && setSharingFile(null)}
                     >
                         <motion.div
@@ -640,10 +983,11 @@ export default function Files() {
                     </motion.div>
                 )}
             </AnimatePresence>
+            , document.body)}
 
             {/* Yeni Klasör Modalı */}
-            {isFolderModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm animate-in fade-in duration-300">
+            {isFolderModalOpen && createPortal(
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 animate-in fade-in duration-300" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}>
                     <Card className="w-full max-w-md p-8 rounded-3xl shadow-2xl border-white/60 bg-card/90 backdrop-blur-xl animate-in zoom-in-95 duration-300">
                         <div className="flex items-center gap-3 mb-6">
                             <div className="p-3 bg-primary/10 text-primary rounded-2xl">
@@ -684,7 +1028,7 @@ export default function Files() {
                         </form>
                     </Card>
                 </div>
-            )}
+            , document.body)}
         </div>
     );
 }

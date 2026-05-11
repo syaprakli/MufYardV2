@@ -1,8 +1,9 @@
 import * as React from "react";
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History
+    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History, ArrowUpDown
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -81,12 +82,13 @@ import { useGlobalData } from "../lib/context/GlobalDataContext";
 
 export default function Tasks() {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { theme } = useTheme();
     const isDark = (theme as string) === "dark";
 
     const labelStyle: React.CSSProperties = { display: "block", fontSize: "0.65rem", fontWeight: 900, color: "var(--secondary)", letterSpacing: "0.15em", marginBottom: "0.4rem", textTransform: "uppercase", fontFamily: "'Outfit', sans-serif" };
     const inputStyle: React.CSSProperties = { width: "100%", padding: "0.8rem 1rem", border: "1px solid var(--border)", borderRadius: "1rem", fontSize: "0.875rem", outline: "none", fontFamily: "'Inter', sans-serif", boxSizing: "border-box", background: "var(--background)", color: "var(--foreground)", transition: "all 0.2s" };
-    const overlayStyle: React.CSSProperties = { position: "fixed", inset: 0, zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" };
+    const overlayStyle: React.CSSProperties = { position: "fixed", inset: 0, zIndex: 100000, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.65)", backdropFilter: "blur(10px)" };
     const modalBoxStyle: React.CSSProperties = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: "1.5rem", boxShadow: "var(--shadow-lg)", width: "100%", maxWidth: "550px", padding: "2rem" };
 
     const { user, profile } = useAuth();
@@ -118,6 +120,11 @@ export default function Tasks() {
     const importInputRef = useRef<HTMLInputElement>(null);
     const legacyReportInputRef = useRef<HTMLInputElement>(null);
     const [isLegacyMode, setIsLegacyMode] = useState(false);
+    const [analysisTask, setAnalysisTask] = useState<Task | null>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: "rapor_kodu" | "rapor_adi" | "rapor_turu" | "sure" | "rapor_durumu"; direction: "asc" | "desc" }>({
+        key: "rapor_kodu",
+        direction: "asc"
+    });
 
     const [isNewAuditModalOpen, setIsNewAuditModalOpen] = useState<Task | null>(null);
     const [newAudit, setNewAudit] = useState({
@@ -184,6 +191,13 @@ export default function Tasks() {
         }
     }, [effectiveUid, refreshAll, currentUser]);
 
+    useEffect(() => {
+        if (searchParams.get("status") && activeTab === "ortak") {
+            setActiveTab("kisisel");
+            setIsLegacyMode(false);
+        }
+    }, [searchParams, activeTab]);
+
 
     // Web sürümü uyarısı
     useEffect(() => {
@@ -234,9 +248,16 @@ export default function Tasks() {
                 owner_id: effectiveUid,
                 assigned_to: [effectiveUid, ...(form.assigned_to || [])].filter((id): id is string => !!id),
                 rapor_kodu: form.rapor_kodu || autoKodu,
-                rapor_durumu: isLegacyMode ? "Tamamlandı" : "Devam Ediyor",
+                rapor_durumu: isLegacyMode ? "Tamamlandı" : "Başlanmadı",
                 is_public: false,
-                steps: []
+                steps: [],
+                completed_at: isLegacyMode ? new Date().toISOString() : undefined,
+                completed_in_days: isLegacyMode ? form.sure_gun : undefined,
+                status_history: [{
+                    status: isLegacyMode ? "Tamamlandı" : "Başlanmadı",
+                    changed_at: new Date().toISOString(),
+                    to: isLegacyMode ? "Tamamlandı" : "Başlanmadı"
+                }]
             };
             await createTask(payload);
             toast.success(isLegacyMode ? "Eski kayıt arşive eklendi." : "Yeni görev oluşturuldu.");
@@ -263,6 +284,11 @@ export default function Tasks() {
     };
 
     const handleAcceptInvitation = async (taskId: string) => {
+        if (!isElectron) {
+            toast.error("Görev kabul işlemi yalnızca masaüstü uygulamasında yapılabilir.");
+            return;
+        }
+
         try {
             setSaving(true);
             await acceptTask(taskId, effectiveUid || "", effectiveEmail);
@@ -508,7 +534,7 @@ export default function Tasks() {
             
             // Görev durumunu güncelle
             if (task.rapor_durumu === "Başlanmadı") {
-                await updateTask(task.id, { rapor_durumu: "Devam Ediyor" });
+                await updateTask(task.id, buildStatusUpdatePayload(task, "Devam Ediyor"));
             }
 
             toast.success(`Rapor #${nextSeq} oluşturuldu.`);
@@ -545,18 +571,108 @@ export default function Tasks() {
         } catch { toast.error("Paylaşım güncellenemedi."); }
     };
 
+    const getCompletedDays = (task: Task) => {
+        if (typeof task.completed_in_days === "number" && Number.isFinite(task.completed_in_days)) {
+            return task.completed_in_days;
+        }
+        if (!task.baslama_tarihi) return null;
+        const start = new Date(task.baslama_tarihi);
+        const endSource = task.completed_at || task.created_at;
+        const end = endSource ? new Date(endSource) : new Date();
+        return Math.max(0, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+    };
+
     const getSureInfo = (task: Task) => {
         if (!task.baslama_tarihi || !task.sure_gun) return null;
         const start = new Date(task.baslama_tarihi);
+        if (task.rapor_durumu === "Tamamlandı") {
+            const completedInDays = getCompletedDays(task);
+            return { diff: 0, end: start, total: task.sure_gun, completedInDays, isCompleted: true };
+        }
         const end = new Date(start);
         end.setDate(end.getDate() + task.sure_gun);
         const diff = Math.ceil((end.getTime() - Date.now()) / (1000 * 3600 * 24));
-        return { diff, end, total: task.sure_gun };
+        return { diff, end, total: task.sure_gun, completedInDays: null, isCompleted: false };
     };
+
+    const buildStatusUpdatePayload = (task: Task, newStatus: string) => {
+        const prevStatus = task.rapor_durumu || "Başlanmadı";
+        const nowIso = new Date().toISOString();
+        const currentHistory = Array.isArray(task.status_history) ? [...task.status_history] : [];
+
+        if (prevStatus !== newStatus) {
+            currentHistory.push({
+                status: newStatus,
+                changed_at: nowIso,
+                from: prevStatus,
+                to: newStatus
+            });
+        }
+
+        const payload: any = {
+            rapor_durumu: newStatus,
+            status_history: currentHistory
+        };
+
+        if (newStatus === "Tamamlandı" && !task.completed_at) {
+            const completedDays = getCompletedDays(task) ?? 0;
+            payload.completed_at = nowIso;
+            payload.completed_in_days = completedDays;
+        }
+
+        return payload;
+    };
+
+    const updateTaskStatus = async (task: Task, newStatus: string) => {
+        const payload = buildStatusUpdatePayload(task, newStatus);
+        await updateTask(task.id, payload);
+    };
+
+    const getTaskTimeline = (task: Task) => {
+        const history = Array.isArray(task.status_history) ? [...task.status_history] : [];
+        if (history.length === 0) {
+            const createdFallback = task.created_at || new Date().toISOString();
+            history.push({ status: task.rapor_durumu || "Başlanmadı", changed_at: createdFallback, to: task.rapor_durumu || "Başlanmadı" });
+        }
+        history.sort((a: any, b: any) => new Date(a.changed_at).getTime() - new Date(b.changed_at).getTime());
+        return history;
+    };
+
+    const buildTaskAnalysisText = (task: Task) => {
+        const timeline = getTaskTimeline(task);
+        const rows = timeline.map((item: any, idx: number) => {
+            const dateText = new Date(item.changed_at).toLocaleString("tr-TR");
+            const fromText = item.from ? `${item.from} -> ` : "";
+            return `${idx + 1}. ${dateText}: ${fromText}${item.to || item.status}`;
+        });
+
+        const completedDays = getCompletedDays(task);
+        const summary = task.rapor_durumu === "Tamamlandı"
+            ? `Tamamlanma süresi: ${completedDays ?? 0} gün`
+            : `Kalan süre: ${getSureInfo(task)?.diff ?? "-"} gün`;
+
+        return [
+            `Rapor: ${task.rapor_kodu}`,
+            `Görev: ${task.rapor_adi}`,
+            `Durum: ${task.rapor_durumu}`,
+            summary,
+            "",
+            "Durum Geçmişi:",
+            ...rows
+        ].join("\n");
+    };
+
+    const statusFilter = searchParams.get("status");
 
     const filtered = tasks.filter(t => {
         const matchesSearch = t.rapor_adi?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                t.rapor_kodu?.toLowerCase().includes(searchQuery.toLowerCase());
+
+        const matchesStatusFilter = statusFilter === "active"
+            ? t.rapor_durumu !== "Tamamlandı"
+            : statusFilter === "completed"
+                ? t.rapor_durumu === "Tamamlandı"
+                : true;
         
         // 2 yıl (730 gün) kuralı
         const isOld = t.baslama_tarihi ? (Date.now() - new Date(t.baslama_tarihi).getTime() > 730 * 24 * 60 * 60 * 1000) : false;
@@ -567,8 +683,57 @@ export default function Tasks() {
         // Sekme mantığı: 'ortak' sekmesi artık 'Arşiv' sekmesi oldu.
         const matchesTab = activeTab === 'ortak' ? isArchived : !isArchived;
         
-        return matchesSearch && matchesTab;
+        return matchesSearch && matchesTab && matchesStatusFilter;
     });
+
+    const sortedFiltered = useMemo(() => {
+        const items = [...filtered];
+        const directionMultiplier = sortConfig.direction === "asc" ? 1 : -1;
+
+        items.sort((a, b) => {
+            switch (sortConfig.key) {
+                case "rapor_kodu": {
+                    const aCode = String(a.rapor_kodu || "");
+                    const bCode = String(b.rapor_kodu || "");
+                    return aCode.localeCompare(bCode, "tr", { numeric: true, sensitivity: "base" }) * directionMultiplier;
+                }
+                case "rapor_adi": {
+                    const aName = String(a.rapor_adi || "");
+                    const bName = String(b.rapor_adi || "");
+                    return aName.localeCompare(bName, "tr", { sensitivity: "base" }) * directionMultiplier;
+                }
+                case "rapor_turu": {
+                    const aType = String(a.rapor_turu || "");
+                    const bType = String(b.rapor_turu || "");
+                    return aType.localeCompare(bType, "tr", { sensitivity: "base" }) * directionMultiplier;
+                }
+                case "sure": {
+                    const aDiff = getSureInfo(a)?.diff ?? Number.POSITIVE_INFINITY;
+                    const bDiff = getSureInfo(b)?.diff ?? Number.POSITIVE_INFINITY;
+                    return (aDiff - bDiff) * directionMultiplier;
+                }
+                case "rapor_durumu": {
+                    const aIndex = RAPOR_DURUMLARI.indexOf(a.rapor_durumu || "");
+                    const bIndex = RAPOR_DURUMLARI.indexOf(b.rapor_durumu || "");
+                    const safeA = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
+                    const safeB = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+                    return (safeA - safeB) * directionMultiplier;
+                }
+                default:
+                    return 0;
+            }
+        });
+
+        return items;
+    }, [filtered, sortConfig]);
+
+    const toggleSort = (key: "rapor_kodu" | "rapor_adi" | "rapor_turu" | "sure" | "rapor_durumu") => {
+        setSortConfig(prev => (
+            prev.key === key
+                ? { key, direction: prev.direction === "asc" ? "desc" : "asc" }
+                : { key, direction: "asc" }
+        ));
+    };
 
     const getDurumColor = (durum: string) => {
         switch (durum) {
@@ -879,6 +1044,20 @@ export default function Tasks() {
                                 className="w-full h-11 pl-10 pr-4 rounded-xl border border-border bg-card text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all"
                             />
                         </div>
+                        {statusFilter && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    const params = new URLSearchParams(searchParams);
+                                    params.delete("status");
+                                    setSearchParams(params);
+                                }}
+                                className="w-full sm:w-auto h-11 px-4 rounded-xl border border-primary/30 text-primary font-black text-[10px] uppercase tracking-widest"
+                            >
+                                Durum Filtresini Kaldır
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -890,13 +1069,13 @@ export default function Tasks() {
                                 <Loader2 size={32} className="animate-spin text-primary" />
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Görevler Yükleniyor...</p>
                             </div>
-                        ) : filtered.length === 0 ? (
+                        ) : sortedFiltered.length === 0 ? (
                             <div className="p-12 text-center text-slate-400 font-bold text-sm">Kayıt bulunamadı.</div>
                         ) : (
-                            filtered.map(task => {
+                            sortedFiltered.map(task => {
                                 const sureInfo = getSureInfo(task);
                                 const statusColor = getDurumColor(task.rapor_durumu);
-                                const timeColor = sureInfo ? getKalanColor(sureInfo.diff, sureInfo.total) : '#94a3b8';
+                                const timeColor = sureInfo ? (sureInfo.isCompleted ? '#10b981' : getKalanColor(sureInfo.diff, sureInfo.total)) : '#94a3b8';
                                 
                                 return (
                                     <div key={task.id} className="p-4 space-y-4">
@@ -920,7 +1099,11 @@ export default function Tasks() {
                                             <div className="flex items-center gap-3">
                                                 <div className="flex flex-col">
                                                     <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Süre</span>
-                                                    <span className="text-xs font-black" style={{ color: timeColor }}>{sureInfo ? `${sureInfo.diff} Gün` : '—'}</span>
+                                                    <span className="text-xs font-black" style={{ color: timeColor }}>
+                                                        {sureInfo
+                                                            ? (sureInfo.isCompleted ? `${sureInfo.completedInDays ?? 0} Günde Tamamlandı` : `${sureInfo.diff} Gün`)
+                                                            : '—'}
+                                                    </span>
                                                 </div>
                                                 <div className="w-px h-6 bg-slate-200" />
                                                 <div className="flex flex-col">
@@ -930,7 +1113,7 @@ export default function Tasks() {
                                                         onChange={async (e) => {
                                                             const newStatus = e.target.value;
                                                             try {
-                                                                await updateTask(task.id, { rapor_durumu: newStatus });
+                                                                await updateTaskStatus(task, newStatus);
                                                                 if (effectiveUid) refreshTasks(effectiveUid);
                                                                 toast.success("Durum güncellendi.");
                                                             } catch { toast.error("Hata oluştu."); }
@@ -962,6 +1145,9 @@ export default function Tasks() {
                                                 </ActionBtn>
                                                 <ActionBtn title="Sil" color="#ef4444" onClick={() => handleDelete(task.id)}>
                                                     <Trash2 size={14} />
+                                                </ActionBtn>
+                                                <ActionBtn title="Analiz Et" color="#0ea5e9" onClick={() => setAnalysisTask(task)}>
+                                                    <FileDigit size={14} />
                                                 </ActionBtn>
                                             </div>
                                         </div>
@@ -1004,11 +1190,32 @@ export default function Tasks() {
                     <table className="hidden md:table w-full border-collapse">
                         <thead>
                             <tr className="bg-muted/30">
-                                {["Rapor No", "Görev Adı", "Tür", "Süre", "Durum", "İşlemler"].map(col => (
-                                    <th key={col} className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
-                                        {col}
-                                    </th>
-                                ))}
+                                <th className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                    <button type="button" onClick={() => toggleSort("rapor_kodu")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
+                                        Rapor No <ArrowUpDown size={12} />
+                                    </button>
+                                </th>
+                                <th className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                    <button type="button" onClick={() => toggleSort("rapor_adi")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
+                                        Görev Adı <ArrowUpDown size={12} />
+                                    </button>
+                                </th>
+                                <th className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                    <button type="button" onClick={() => toggleSort("rapor_turu")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
+                                        Tür <ArrowUpDown size={12} />
+                                    </button>
+                                </th>
+                                <th className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                    <button type="button" onClick={() => toggleSort("sure")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
+                                        Süre <ArrowUpDown size={12} />
+                                    </button>
+                                </th>
+                                <th className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                    <button type="button" onClick={() => toggleSort("rapor_durumu")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
+                                        Durum <ArrowUpDown size={12} />
+                                    </button>
+                                </th>
+                                <th className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">İşlemler</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -1018,12 +1225,12 @@ export default function Tasks() {
                                         <Loader2 size={32} className="animate-spin mx-auto text-primary" />
                                     </td>
                                 </tr>
-                            ) : filtered.length === 0 ? (
+                            ) : sortedFiltered.length === 0 ? (
                                 <tr>
                                     <td colSpan={6} className="py-20 text-center text-slate-400 font-bold">Kayıt bulunamadı.</td>
                                 </tr>
                             ) : (
-                                filtered.map(task => {
+                                sortedFiltered.map(task => {
                                     const isExpanded = expandedRow === task.id;
                                     const sureInfo = getSureInfo(task);
                                     return (
@@ -1036,9 +1243,9 @@ export default function Tasks() {
                                                     {sureInfo ? (
                                                         <span 
                                                             className="text-[11px] font-black px-2 py-1 rounded-lg"
-                                                            style={{ backgroundColor: getKalanColor(sureInfo.diff, sureInfo.total) + "15", color: getKalanColor(sureInfo.diff, sureInfo.total) }}
+                                                            style={{ backgroundColor: (sureInfo.isCompleted ? '#10b981' : getKalanColor(sureInfo.diff, sureInfo.total)) + "15", color: sureInfo.isCompleted ? '#10b981' : getKalanColor(sureInfo.diff, sureInfo.total) }}
                                                         >
-                                                            {sureInfo.diff} Gün
+                                                            {sureInfo.isCompleted ? `${sureInfo.completedInDays ?? 0} Günde Tamamlandı` : `${sureInfo.diff} Gün`}
                                                         </span>
                                                     ) : "—"}
                                                 </td>
@@ -1048,7 +1255,7 @@ export default function Tasks() {
                                                         onChange={async (e) => {
                                                             const newStatus = e.target.value;
                                                             try {
-                                                                await updateTask(task.id, { rapor_durumu: newStatus });
+                                                                await updateTaskStatus(task, newStatus);
                                                                 if (effectiveUid) refreshTasks(effectiveUid);
                                                                 toast.success("Durum güncellendi.");
                                                             } catch { toast.error("Hata oluştu."); }
@@ -1079,6 +1286,9 @@ export default function Tasks() {
                                                         </ActionBtn>
                                                         <ActionBtn title="Sil" color="#ef4444" onClick={() => handleDelete(task.id)}>
                                                             <Trash2 size={16} />
+                                                        </ActionBtn>
+                                                        <ActionBtn title="Analiz Et" color="#0ea5e9" onClick={() => setAnalysisTask(task)}>
+                                                            <FileDigit size={16} />
                                                         </ActionBtn>
                                                     </div>
                                                 </td>
@@ -1218,6 +1428,39 @@ export default function Tasks() {
                         )}
                     </div>
                 </div>
+            )}
+
+            {analysisTask && createPortal(
+                <div style={overlayStyle} onClick={(e) => { if (e.target === e.currentTarget) setAnalysisTask(null); }}>
+                    <div style={{ ...modalBoxStyle, maxWidth: "680px" }} onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4 border-b border-border pb-3">
+                            <div>
+                                <h3 className="text-lg font-black font-outfit text-foreground dark:text-slate-100">Görev Durum Analizi</h3>
+                                <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{analysisTask.rapor_kodu}</p>
+                            </div>
+                            <button onClick={() => setAnalysisTask(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
+                                <X size={18} className="text-slate-400" />
+                            </button>
+                        </div>
+                        <pre className="bg-muted/40 border border-border rounded-xl p-4 text-[12px] leading-relaxed font-semibold text-slate-700 dark:text-slate-200 whitespace-pre-wrap max-h-[420px] overflow-y-auto">
+                            {buildTaskAnalysisText(analysisTask)}
+                        </pre>
+                        <div className="mt-4 flex justify-end gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(buildTaskAnalysisText(analysisTask));
+                                    toast.success("Analiz metni kopyalandı.");
+                                }}
+                            >
+                                Kopyala
+                            </Button>
+                            <Button size="sm" onClick={() => setAnalysisTask(null)}>Kapat</Button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
 
             {/* Sablon Modal */}
@@ -1362,7 +1605,7 @@ export default function Tasks() {
 
             {/* Yeni Denetim Başlat Modalı (İlk Rapor İçin) */}
             {isNewAuditModalOpen && (
-                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setIsNewAuditModalOpen(null)}>
+                <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/65 backdrop-blur-md" onClick={() => setIsNewAuditModalOpen(null)}>
                     <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                         <div className="p-6 border-b border-border flex items-center justify-between bg-muted/30">
                             <div>

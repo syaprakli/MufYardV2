@@ -1,14 +1,15 @@
-import { Plus, StickyNote, Trash2, Search, Pin, PinOff, Loader2, Lock, AlertCircle, Shield, ChevronRight, Share2, UserPlus } from "lucide-react";
+import { Plus, StickyNote, Trash2, Search, Pin, PinOff, Loader2, Lock, AlertCircle, Shield, ChevronRight, Share2, UserPlus, Check } from "lucide-react";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { toast } from "react-hot-toast";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "../lib/utils";
 import { fetchNotes, createNote, updateNote, deleteNote, acceptNote, type Note } from "../lib/api/notes";
 import ShareModal from "../components/ShareModal";
+import { useSearchParams } from "react-router-dom";
 
 const NOTE_COLORS = [
     { id: 'amber', bg: 'bg-amber-50 dark:bg-amber-900/10', border: 'border-t-amber-500', text: 'text-amber-900 dark:text-amber-400', iconBg: 'bg-amber-200 dark:bg-amber-900/40' },
@@ -20,7 +21,8 @@ const NOTE_COLORS = [
 ];
 
 export default function Notes() {
-    const { user, loading: authLoading } = useAuth();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const { user } = useAuth();
     const confirm = useConfirm();
     const [notes, setNotes] = useState<Note[]>([]);
     const [invitations, setInvitations] = useState<Note[]>([]);
@@ -29,6 +31,15 @@ export default function Notes() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [editingNote, setEditingNote] = useState<Note | null>(null);
+    const [doneFlashId, setDoneFlashId] = useState<string | null>(null);
+    const priorityQuery = String(searchParams.get("priority") || "").toLowerCase();
+    const priorityFilter: "all" | "urgent" | "normal" = priorityQuery === "urgent"
+        ? "urgent"
+        : priorityQuery === "normal"
+            ? "normal"
+            : "all";
+    const initialLoadKeyRef = useRef<string | null>(null);
+    const activeRequestKeyRef = useRef<string | null>(null);
 
 
     const [newNote, setNewNote] = useState({ 
@@ -40,17 +51,16 @@ export default function Notes() {
     });
 
 
-    useEffect(() => {
-        if (user?.uid) {
-            loadNotes(user.uid);
+    const loadNotes = async (uid: string, options?: { force?: boolean }) => {
+        const reqKey = `${uid}:${user?.email || ""}`;
+        if (!options?.force && activeRequestKeyRef.current === reqKey) {
+            return;
         }
-    }, [user, authLoading]);
 
-
-    const loadNotes = async (uid: string) => {
+        activeRequestKeyRef.current = reqKey;
         try {
             setLoading(true);
-            const data = await fetchNotes(uid);
+            const data = await fetchNotes(uid, user?.email || undefined);
             const userEmail = user?.email?.toLowerCase();
             const userKeys = [uid, userEmail].filter(Boolean) as string[];
             
@@ -70,9 +80,20 @@ export default function Notes() {
         } catch (error) {
             console.error("Notlar yüklenemedi:", error);
         } finally {
+            activeRequestKeyRef.current = null;
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (!user?.uid) return;
+
+        const initKey = `${user.uid}:${user.email || ""}`;
+        if (initialLoadKeyRef.current === initKey) return;
+
+        initialLoadKeyRef.current = initKey;
+        loadNotes(user.uid);
+    }, [user?.uid, user?.email]);
 
 
     const handleSave = async (e: React.FormEvent) => {
@@ -128,6 +149,24 @@ export default function Notes() {
         }
     };
 
+    const handleToggleDone = async (id: string, currentDone: boolean) => {
+        if (!user?.uid) return;
+        try {
+            await updateNote(id, { is_done: !currentDone });
+            if (!currentDone) {
+                setDoneFlashId(id);
+                setTimeout(() => {
+                    setDoneFlashId((prev) => (prev === id ? null : prev));
+                }, 900);
+            }
+            loadNotes(user.uid, { force: true });
+            toast.success(!currentDone ? "Not yapıldı olarak işaretlendi." : "Not tekrar aktif edildi.");
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Durum güncellenemedi.";
+            toast.error(message);
+        }
+    };
+
     const handleAcceptInvitation = async (noteId: string) => {
         if (!user?.uid) return;
         try {
@@ -149,11 +188,29 @@ export default function Notes() {
         } catch { toast.error("Paylaşım güncellenemedi."); }
     };
 
+    const setPriorityFilter = (next: "all" | "urgent" | "normal") => {
+        if (next === "all") {
+            setSearchParams({});
+            return;
+        }
+        setSearchParams({ priority: next });
+    };
+
 
     const filteredNotes = notes.filter(n => {
         const matchesSearch = n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                               n.text.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesSearch;
+        const priority = String((n as any).priority || "normal").toLowerCase();
+        const isUrgent = priority === "urgent" || priority === "acil";
+
+        const matchesPriority =
+            priorityFilter === "urgent"
+                ? isUrgent
+                : priorityFilter === "normal"
+                    ? !isUrgent
+                    : true;
+
+        return matchesSearch && matchesPriority;
     });
 
 
@@ -169,9 +226,21 @@ export default function Notes() {
                         <span className="text-primary opacity-80 capitalize tracking-wide">Hızlı Notlar</span>
                     </div>
                     <p className="text-[10px] font-black text-slate-400">© 2025 MufYard Project • Sefa Yaprakli</p>
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-                        Hızlı Notlar
-                    </h1>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                            Hızlı Notlar
+                        </h1>
+                        {priorityFilter === "urgent" && (
+                            <span className="px-3 py-1 rounded-full bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-black uppercase tracking-widest">
+                                Acil Modu
+                            </span>
+                        )}
+                        {priorityFilter === "normal" && (
+                            <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-black uppercase tracking-widest">
+                                Normal Modu
+                            </span>
+                        )}
+                    </div>
                     <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mt-1">Denetim esnasında aldığınız pratik notları yönetin.</p>
                 </div>
 
@@ -187,8 +256,8 @@ export default function Notes() {
 
             </div>
 
-            <div className="flex items-center gap-4">
-                <div className="flex-1 bg-card border border-border dark:border-slate-800 rounded-xl px-5 py-3 flex items-center shadow-sm focus-within:ring-4 focus-within:ring-primary/5 transition-all">
+            <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 w-full">
+                <div className="w-full md:flex-1 bg-card border border-border dark:border-slate-800 rounded-xl px-5 py-3 flex items-center shadow-sm focus-within:ring-4 focus-within:ring-primary/5 transition-all">
                     <Search size={18} className="text-muted-foreground dark:text-slate-500 mr-3" />
                     <input
                         type="text"
@@ -197,6 +266,45 @@ export default function Notes() {
                         placeholder="Not başlığı veya içeriği ile ara..."
                         className="bg-transparent border-none outline-none text-sm w-full font-outfit font-medium dark:text-slate-200"
                     />
+                </div>
+
+                <div className="inline-flex items-center p-1 rounded-xl border border-border dark:border-slate-800 bg-card shadow-sm w-full md:flex-1">
+                    <button
+                        type="button"
+                        onClick={() => setPriorityFilter("urgent")}
+                        className={cn(
+                            "flex-1 px-4 h-10 rounded-lg text-xs font-black uppercase tracking-widest transition-all",
+                            priorityFilter === "urgent"
+                                ? "bg-rose-500 text-white shadow"
+                                : "text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                        )}
+                    >
+                        Acil
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setPriorityFilter("normal")}
+                        className={cn(
+                            "flex-1 px-4 h-10 rounded-lg text-xs font-black uppercase tracking-widest transition-all",
+                            priorityFilter === "normal"
+                                ? "bg-slate-700 text-white shadow dark:bg-slate-600"
+                                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                        )}
+                    >
+                        Normal
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setPriorityFilter("all")}
+                        className={cn(
+                            "flex-1 px-4 h-10 rounded-lg text-xs font-black uppercase tracking-widest transition-all",
+                            priorityFilter === "all"
+                                ? "bg-primary text-white shadow"
+                                : "text-primary hover:bg-primary/10"
+                        )}
+                    >
+                        Tümü
+                    </button>
                 </div>
             </div>
 
@@ -244,8 +352,10 @@ export default function Notes() {
                             key={note.id}
                             note={note}
                             onPin={() => handleTogglePin(note.id, note.is_pinned)}
+                            onToggleDone={() => handleToggleDone(note.id, Boolean((note as any).is_done))}
                             onDelete={() => handleDelete(note.id)}
                             onShare={() => setShareNote(note)}
+                            doneFlashing={doneFlashId === note.id}
                             onClick={() => {
                                 setEditingNote(note);
                                 setNewNote({
@@ -368,9 +478,11 @@ export default function Notes() {
     );
 }
 
-function NoteCard({ note, onPin, onDelete, onShare, onClick }: { note: Note, onPin: () => void, onDelete: () => void, onShare: () => void, onClick: () => void }) {
+function NoteCard({ note, onPin, onToggleDone, onDelete, onShare, doneFlashing, onClick }: { note: Note, onPin: () => void, onToggleDone: () => void, onDelete: () => void, onShare: () => void, doneFlashing: boolean, onClick: () => void }) {
     const color = NOTE_COLORS.find(c => c.id === note.color) || NOTE_COLORS[0];
-    const isUrgent = (note as any).priority === 'urgent';
+    const isDone = Boolean((note as any).is_done || (note as any).is_completed);
+    const priority = String((note as any).priority || '').toLowerCase();
+    const isUrgent = priority === 'urgent' || priority === 'acil';
 
     return (
         <Card 
@@ -379,16 +491,34 @@ function NoteCard({ note, onPin, onDelete, onShare, onClick }: { note: Note, onP
                 "p-6 h-72 flex flex-col justify-between transition-all group relative border-t-8 shadow-md rounded-2xl cursor-pointer active:scale-95",
                 color.border,
                 note.is_pinned ? "scale-[1.03] ring-2 ring-primary/10 bg-card" : "hover:shadow-xl hover:scale-[1.01] bg-white/80 dark:bg-slate-900/80",
+                isDone && "opacity-80 saturate-75",
+                doneFlashing && "animate-pulse ring-2 ring-emerald-300/50",
                 color.bg
             )}
         >
             {isUrgent && (
-                <div className="absolute -top-3 left-6 px-3 py-1 bg-rose-500 text-white rounded-full text-[10px] font-black capitalize tracking-wide shadow-lg flex items-center gap-1">
+                <div className="absolute -top-3 left-6 z-20 px-3 py-1 bg-rose-500 text-white rounded-full text-[10px] font-black capitalize tracking-wide shadow-lg flex items-center gap-1">
                     <AlertCircle size={10} /> Acil Not
                 </div>
             )}
 
-            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            {isDone && (
+                <div className="absolute -top-3 right-6 z-20 px-3 py-1 bg-emerald-500 text-white rounded-full text-[10px] font-black capitalize tracking-wide shadow-lg flex items-center gap-1">
+                    <Check size={10} /> Yapıldı
+                </div>
+            )}
+
+            <div className={cn("absolute right-4 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10", isDone ? "top-9" : "top-4")}>
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onToggleDone(); }} 
+                    title={isDone ? "Aktif Yap" : "Yapıldı"} 
+                    className={cn(
+                        "p-1.5 bg-card hover:bg-white dark:hover:bg-slate-700 rounded-full shadow-sm transition-all",
+                        isDone ? "text-emerald-600" : "text-slate-500"
+                    )}
+                >
+                    <Check size={16} className={cn(isDone && "stroke-[3]")} />
+                </button>
                 <button 
                     onClick={(e) => { e.stopPropagation(); onPin(); }} 
                     title={note.is_pinned ? "İğneyi Kaldır" : "İğnele"} 
@@ -416,10 +546,16 @@ function NoteCard({ note, onPin, onDelete, onShare, onClick }: { note: Note, onP
                     <div className={cn("p-2.5 rounded-xl", color.iconBg, color.text)}>
                         <StickyNote size={18} />
                     </div>
-                    <h4 className="font-bold text-sm truncate pr-14 font-outfit capitalize tracking-tight text-primary dark:text-primary/90">{note.title}</h4>
+                    <h4 className={cn(
+                        "font-bold text-sm truncate pr-14 font-outfit capitalize tracking-tight text-primary dark:text-primary/90",
+                        isDone && "line-through text-slate-500 dark:text-slate-500"
+                    )}>{note.title}</h4>
                 </div>
-                <p className="text-[9px] text-slate-300 dark:text-slate-600 font-bold mt-1 tracking-widest uppercase">Daha İyi Denetimler İçin Sevgiyle Hazırlandı</p>
-                <p className="text-[13px] text-slate-600 dark:text-slate-400 line-clamp-6 leading-relaxed font-outfit font-medium italic px-1">
+                <p className="text-[9px] text-slate-300 dark:text-slate-600 font-bold mt-1 tracking-widest uppercase">Daha iyi Denetimler İçin Özenle Hazırlandı</p>
+                <p className={cn(
+                    "text-[13px] text-slate-600 dark:text-slate-400 line-clamp-6 leading-relaxed font-outfit font-medium italic px-1",
+                    isDone && "line-through text-slate-500 dark:text-slate-500"
+                )}>
                     "{note.text}"
                 </p>
             </div>

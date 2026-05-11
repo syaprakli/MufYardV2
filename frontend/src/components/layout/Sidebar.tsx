@@ -31,14 +31,15 @@ interface SidebarProps {
 const navItems = [
     { icon: LayoutDashboard, label: "Genel Bakış", href: "/" },
     { icon: CheckSquare, label: "Görevler", href: "/tasks" },
+    { icon: ClipboardCheck, label: "Görev Analizleri", href: "/report-analytics" },
     { icon: FileText, label: "Raporlar", href: "/audit" },
+    { icon: StickyNote, label: "Hızlı Notlar", href: "/notes" },
+    { icon: FolderTree, label: "Dosyalar", href: "/files" },
+    { icon: BookOpen, label: "Mevzuat", href: "/legislation" },
     { icon: Calendar, label: "Takvim", href: "/calendar" },
     { icon: Users, label: "Rehber", href: "/contacts" },
     { icon: MessageSquare, label: "Mesajlar", href: "/messages" },
     { icon: BookOpen, label: "Kamusal Alan", href: "/public-space" },
-    { icon: FolderTree, label: "Dosyalar", href: "/files" },
-    { icon: StickyNote, label: "Hızlı Notlar", href: "/notes" },
-    { icon: BookOpen, label: "Mevzuat", href: "/legislation" },
     { icon: Bot, label: "Dijital Müfettiş", href: "/assistant" },
     { icon: Star, label: "Bize Puan Verin", href: "/feedback" },
 ];
@@ -89,11 +90,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         const pathMapping: Record<string, string> = {
             "/": "dashboard",
             "/tasks": "tasks",
+            "/report-analytics": "report-analytics",
             "/audit": "audit",
-            "/contacts": "contacts",
-            "/legislation": "legislation",
             "/notes": "notes",
+            "/files": "files",
+            "/legislation": "legislation",
             "/calendar": "calendar",
+            "/contacts": "contacts",
+            "/messages": "messages",
+            "/public-space": "public_space",
+            "/assistant": "assistant",
             "/feedback": "feedback"
         };
         

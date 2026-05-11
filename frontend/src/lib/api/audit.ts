@@ -112,7 +112,23 @@ export async function exportAuditsToExcel(): Promise<void> {
 }
 
 export async function exportAuditToWord(id: string): Promise<void> {
-    window.open(`${API_BASE_URL}/audit/${id}/export/word`, "_self");
+    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}/export/word`);
+    if (!response.ok) throw new Error("Word raporu oluşturulamadı");
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get("Content-Disposition");
+    let filename = `Denetim_Raporu.docx`;
+    if (contentDisposition) {
+        const match = contentDisposition.match(/filename=([^;]+)/);
+        if (match) filename = match[1].trim();
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 export async function fetchAuditVersions(id: string): Promise<AuditVersion[]> {

@@ -182,7 +182,7 @@ _allowed_origins = list(set(_default_origins + _env_origins))
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

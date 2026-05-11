@@ -1,4 +1,4 @@
-import { Plus, Search, Filter, FileText, Download, Loader2, FileSpreadsheet, Edit3, Shield, MapPin, Clock, Trash2, MoreVertical, ChevronRight, Share2, UserPlus, Upload } from "lucide-react";
+import { Plus, Search, Filter, FileText, Download, Loader2, FileSpreadsheet, Edit3, Shield, MapPin, Clock, Trash2, CheckCircle2, ChevronRight, Share2, UserPlus, Upload, Archive, RotateCcw } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { useEffect, useState, useMemo } from "react";
@@ -277,6 +277,12 @@ export default function Audit() {
 
     const handleAcceptInvitation = async (auditId: string) => {
         if (!user?.uid) return;
+
+        if (!isElectron) {
+            toast.error("Rapor kabul işlemi yalnızca masaüstü uygulamasında yapılabilir.");
+            return;
+        }
+
         try {
             await acceptAudit(auditId, user.uid, user.email || undefined);
             toast.success("Rapor kabul edildi ve listenize eklendi.");
@@ -690,7 +696,6 @@ export default function Audit() {
 
 function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect, task, onUpdate, onDelete, onShare }: { audit: AuditType, onExportWord: () => void, onEdit: () => void, isSelected: boolean, onToggleSelect: () => void, task?: Task, onUpdate: (id: string, updates: Partial<AuditType>) => void, onDelete: () => void, onShare: () => void }) {
     const { title, date, status, inspector, location } = audit;
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const statusColors: any = {
         "Başlanmadı": "bg-slate-500/10 text-slate-600 border-slate-500/20",
         "Devam Ediyor": "bg-blue-500/10 text-blue-600 border-blue-500/20",
@@ -701,16 +706,8 @@ function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect
     };
 
     useEffect(() => {
-        const handleClickOutside = () => {
-            if (isMenuOpen) {
-                setIsMenuOpen(false);
-            }
-        };
-        if (isMenuOpen) {
-            document.addEventListener('click', handleClickOutside);
-        }
-        return () => document.removeEventListener('click', handleClickOutside);
-    }, [isMenuOpen]);
+        // cleanup - no longer needed
+    }, []);
 
     return (
         <Card className={cn(
@@ -782,81 +779,77 @@ function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect
                     </span>
 
                     <div className="flex items-center gap-2 w-full md:w-auto">
-                        {isElectron && (
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={(audit as any).file_url ? () => window.open((audit as any).file_url, '_blank') : onEdit}
-                                className={cn(
-                                    "flex-1 md:flex-none h-11 md:h-12 px-3 md:px-6 rounded-xl md:rounded-2xl font-bold transition-all flex items-center justify-center gap-1.5 md:gap-2 text-[10px] md:text-xs uppercase tracking-widest",
-                                    (audit as any).file_url 
-                                        ? "text-emerald-600 border-emerald-200 hover:bg-emerald-600 hover:text-white"
-                                        : "text-primary border-primary/20 hover:bg-primary hover:text-white shadow-sm"
-                                )}
-                            >
-                                {(audit as any).file_url ? <Download size={16} /> : <Edit3 size={16} />}
-                                <span className="inline">{(audit as any).file_url ? "Dosyayı Aç" : "Düzenle"}</span>
-                            </Button>
-                        )}
-                        
                         <div className="flex items-center gap-1 shrink-0">
                             {isElectron && (
                                 <Button 
                                     variant="ghost" 
                                     size="icon" 
-                                    onClick={onExportWord}
-                                    className="w-11 h-11 md:w-12 md:h-12 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-xl"
-                                    title="Word olarak indir"
+                                    onClick={(audit as any).file_url ? () => window.open((audit as any).file_url, '_blank') : onEdit}
+                                    className={cn(
+                                        "w-10 h-10 rounded-xl",
+                                        (audit as any).file_url 
+                                            ? "text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50"
+                                            : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                                    )}
+                                    title={(audit as any).file_url ? "Dosyayı Aç" : "Düzenle"}
                                 >
-                                    <Download size={20} />
+                                    {(audit as any).file_url ? <Download size={18} /> : <Edit3 size={18} />}
                                 </Button>
                             )}
-                            
-                            <div className="relative">
+                            {isElectron && (
                                 <Button 
                                     variant="ghost" 
                                     size="icon" 
-                                    className={`w-11 h-11 md:w-12 md:h-12 text-muted-foreground hover:text-primary hover:bg-muted rounded-xl ${isMenuOpen ? 'bg-muted text-primary' : ''}`}
-                                    onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }}
-                                    title="Diğer Seçenekler"
+                                    onClick={onExportWord}
+                                    className="w-10 h-10 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-xl"
+                                    title="Word olarak indir"
                                 >
-                                    <MoreVertical size={20} />
+                                    <Download size={18} />
                                 </Button>
-                                {isMenuOpen && (
-                                    <div 
-                                        className="absolute right-0 top-full mt-2 w-64 bg-card rounded-xl shadow-2xl border border-slate-200 z-[9999] p-2 flex flex-col gap-1 ring-1 ring-black/5"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <button 
-                                            className="flex items-center gap-2 text-left px-3 py-3 text-xs font-bold hover:bg-muted text-foreground rounded-lg transition-colors border-b border-slate-50 mb-1"
-                                            onClick={() => { onUpdate(audit.id, { is_public: !(audit as any).is_public }); setIsMenuOpen(false); }}
-                                        >
-                                            {(audit as any).is_public ? '📥 Arşivden Çıkar' : '📤 Arşive Ekle / Paylaş'}
-                                        </button>
-                                        <button 
-                                            className="flex items-center gap-2 text-left px-3 py-3 text-xs font-bold hover:bg-blue-50 text-blue-600 rounded-lg transition-colors"
-                                            onClick={() => { onShare(); setIsMenuOpen(false); }}
-                                        >
-                                            <Share2 size={16} /> Kişilerle Paylaş
-                                        </button>
-                                        {!task && (
-                                            <button 
-                                                className="flex items-center gap-2 text-left px-3 py-3 text-xs font-bold hover:bg-muted text-muted-foreground rounded-lg transition-colors"
-                                                onClick={() => { onUpdate(audit.id, { status: status === 'Devam Ediyor' ? 'Tamamlandı' : 'Devam Ediyor' }); setIsMenuOpen(false); }}
-                                            >
-                                                {status === 'Devam Ediyor' ? '✅ "Tamamlandı" Yap' : '🔄 "Devam Ediyor" Yap'}
-                                            </button>
-                                        )}
-                                        <div className="h-px bg-slate-100 my-1"></div>
-                                        <button 
-                                            className="flex items-center gap-2 text-left px-3 py-3 text-xs font-bold hover:bg-red-50 text-red-600 rounded-lg transition-colors"
-                                            onClick={() => { onDelete(); setIsMenuOpen(false); }}
-                                        >
-                                            <Trash2 size={16} className="text-red-500" /> Kaydı Sil
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
+                            )}
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onShare()}
+                                className="w-10 h-10 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-xl"
+                                title="Kişilerle Paylaş"
+                            >
+                                <Share2 size={18} />
+                            </Button>
+                            {!task && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => onUpdate(audit.id, { status: status === 'Devam Ediyor' ? 'Tamamlandı' : 'Devam Ediyor' })}
+                                    className={cn(
+                                        "w-10 h-10 rounded-xl",
+                                        status === 'Devam Ediyor'
+                                            ? "text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50"
+                                            : "text-emerald-500 hover:text-orange-500 hover:bg-orange-50"
+                                    )}
+                                    title={status === 'Devam Ediyor' ? 'Tamamlandı Yap' : 'Devam Ediyor Yap'}
+                                >
+                                    {status === 'Devam Ediyor' ? <CheckCircle2 size={18} /> : <RotateCcw size={18} />}
+                                </Button>
+                            )}
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onUpdate(audit.id, { is_public: !(audit as any).is_public })}
+                                className="w-10 h-10 text-muted-foreground hover:text-amber-600 hover:bg-amber-50 rounded-xl"
+                                title={(audit as any).is_public ? 'Arşivden Çıkar' : 'Arşive Ekle'}
+                            >
+                                <Archive size={18} />
+                            </Button>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={onDelete}
+                                className="w-10 h-10 text-muted-foreground hover:text-red-500 hover:bg-red-50 rounded-xl"
+                                title="Kaydı Sil"
+                            >
+                                <Trash2 size={18} />
+                            </Button>
                         </div>
                     </div>
                 </div>

@@ -22,6 +22,15 @@ export interface Task {
     shared_with?: string[];
     pending_collaborators?: string[];
     accepted_collaborators?: string[];
+    created_at?: string;
+    completed_at?: string;
+    completed_in_days?: number;
+    status_history?: Array<{
+        status: string;
+        changed_at: string;
+        from?: string;
+        to?: string;
+    }>;
 }
 
 export interface TaskCreate {
@@ -39,6 +48,14 @@ export interface TaskCreate {
     shared_with?: string[];
     pending_collaborators?: string[];
     accepted_collaborators?: string[];
+    completed_at?: string;
+    completed_in_days?: number;
+    status_history?: Array<{
+        status: string;
+        changed_at: string;
+        from?: string;
+        to?: string;
+    }>;
 }
 
 // Smart Cache

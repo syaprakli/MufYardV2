@@ -167,18 +167,24 @@ class ProfileService:
                 search_email,
                 inspector_match.get('email')
             )
+            base_profile = dict(profile_data or {})
+            base_full_name = (base_profile.get('full_name') or '').strip()
+            base_is_generic = base_full_name in ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz", "Müfettiş"]
+
             new_data = {
+                **base_profile,
                 "uid": uid,
-                "full_name": inspector_match.get('name', profile_data.get('full_name') if profile_data else "Kullanıcı"),
-                "title": inspector_match.get('title', profile_data.get('title') if profile_data else "Müfettiş"),
-                "email": inspector_match.get('email', search_email or (profile_data.get('email') if profile_data else "")),
+                "full_name": base_full_name if base_full_name and not base_is_generic else inspector_match.get('name', base_full_name or "Kullanıcı"),
+                "title": (base_profile.get('title') or '').strip() or inspector_match.get('title', "Müfettiş"),
+                "email": (base_profile.get('email') or '').strip() or inspector_match.get('email', search_email or ""),
                 "emails": merged_emails,
-                "phone": inspector_match.get('phone', (profile_data.get('phone') if profile_data else "")),
-                "institution": "Gençlik ve Spor Bakanlığı",
+                "phone": (base_profile.get('phone') or '').strip() or inspector_match.get('phone', ""),
+                "institution": (base_profile.get('institution') or '').strip() or "Gençlik ve Spor Bakanlığı",
+                "birthday": base_profile.get('birthday'),  # Preserve saved birthday
                 "verified": True,
                 "updated_at": datetime.utcnow()
             }
-            
+
             # Add defaults for new profiles
             if not profile_data:
                 new_data.update({

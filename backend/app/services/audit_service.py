@@ -3,9 +3,50 @@ import asyncio
 from typing import List, Optional, Dict, Any
 import uuid
 from app.lib.firebase_admin import db
+from app.lib.folder_manager import FolderManager
 from app.schemas.audit import AuditCreate, AuditUpdate
 
 class AuditService:
+    @staticmethod
+    async def _resolve_task_folder_context(task_id: Optional[str]) -> Optional[Dict[str, str]]:
+        if not task_id:
+            return None
+
+        task_ref = db.collection('tasks').document(str(task_id))
+        task_doc = await asyncio.to_thread(task_ref.get)
+        if not task_doc.exists:
+            return None
+
+        task_data = task_doc.to_dict() or {}
+        start_date_str = task_data.get('baslama_tarihi')
+        year = str(datetime.utcnow().year)
+        if isinstance(start_date_str, str) and start_date_str:
+            try:
+                year = str(datetime.fromisoformat(start_date_str).year)
+            except Exception:
+                pass
+
+        return {
+            'year': year,
+            'audit_type': task_data.get('rapor_turu', 'Diger') or 'Diger',
+            'audit_code': task_data.get('rapor_kodu', 'Kodsuz') or 'Kodsuz',
+            'audit_title': task_data.get('rapor_adi', 'Basliksiz') or 'Basliksiz'
+        }
+
+    @staticmethod
+    async def _ensure_report_subfolder_for_audit(audit_data: Dict[str, Any]) -> None:
+        context = await AuditService._resolve_task_folder_context(audit_data.get('task_id'))
+        if not context:
+            return
+
+        await asyncio.to_thread(
+            FolderManager.ensure_report_subfolder,
+            context['year'],
+            context['audit_type'],
+            context['audit_code'],
+            context['audit_title']
+        )
+
     @staticmethod
     async def get_all_audits(user_id: Optional[str] = None, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
         audits_ref = db.collection('audits')
@@ -85,6 +126,7 @@ class AuditService:
                     new_audit = doc.to_dict() or {}
                     new_audit['id'] = result[1].id
                     new_audit.setdefault('created_at', datetime.utcnow().isoformat())
+                    await AuditService._ensure_report_subfolder_for_audit(new_audit)
                     return new_audit
         except Exception:
             pass
@@ -92,6 +134,7 @@ class AuditService:
         # Fallback for Mock DB or any failure
         new_id = str(uuid.uuid4())
         audit_data['id'] = new_id
+        await AuditService._ensure_report_subfolder_for_audit(audit_data)
         return audit_data
 
     @staticmethod
@@ -141,6 +184,11 @@ class AuditService:
         updated_doc_res = await asyncio.to_thread(doc_ref.get)
         updated_doc = updated_doc_res.to_dict()
         updated_doc['id'] = audit_id
+
+        # Rapor içerigi kaydedildiginde ilgili görevde sadece 04_Rapor_ve_Ekleri klasörünü garanti et.
+        if 'report_content' in update_data:
+            await AuditService._ensure_report_subfolder_for_audit(updated_doc)
+
         return updated_doc
 
     @staticmethod
@@ -209,6 +257,7 @@ class AuditService:
                     'pending_collaborators': pending,
                     'accepted_collaborators': accepted
                 })
+                await AuditService._ensure_report_subfolder_for_audit(audit_data)
                 return True
             return False
         except Exception:

@@ -4,7 +4,7 @@ import { fetchWithTimeout } from "./utils";
 export interface FileItem {
     id: string;
     name: string;
-    type: 'file' | 'folder' | 'image' | 'video' | 'audio' | 'pdf';
+    type: 'file' | 'folder' | 'image' | 'video' | 'audio' | 'pdf' | 'word' | 'excel' | 'powerpoint' | 'text';
     parentId?: string;
     size?: string;
     date?: string;
@@ -59,5 +59,25 @@ export const openFolder = async (id: string): Promise<any> => {
     });
     
     if (!response.ok) throw new Error("Klasör açılamadı");
+    return response.json();
+};
+
+export const openFile = async (id: string): Promise<any> => {
+    const response = await fetchWithTimeout(`${API_URL}/files/open-file/${encodeURIComponent(id)}`, {
+        method: "POST"
+    });
+    
+    if (!response.ok) throw new Error("Dosya açılamadı");
+    return response.json();
+};
+
+export const shareFileToUser = async (fileId: string, recipientId: string): Promise<any> => {
+    const response = await fetchWithTimeout(`${API_URL}/files/share-to-user`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: fileId, recipient_id: recipientId })
+    });
+
+    if (!response.ok) throw new Error("Paylasilan dosya hazirlanamadi");
     return response.json();
 };

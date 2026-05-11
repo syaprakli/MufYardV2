@@ -15,6 +15,7 @@ import {
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { IdentitySelectionModal } from "../components/IdentitySelectionModal";
+import { fetchNotes } from "../lib/api/notes";
 
 // Premium Color Palette with Dark Mode support
 const COLORS = {
@@ -50,6 +51,43 @@ const getKalanColor = (diff: number, total: number = 30) => {
     return "#ef4444";                      // Kırmızı
 };
 
+const getCompletedDays = (task: any) => {
+    if (typeof task?.completed_in_days === "number" && Number.isFinite(task.completed_in_days)) {
+        return task.completed_in_days;
+    }
+    if (!task?.baslama_tarihi) return 0;
+    const start = new Date(task.baslama_tarihi);
+    const endSource = task.completed_at || task.created_at;
+    const end = endSource ? new Date(endSource) : new Date();
+    return Math.max(0, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
+};
+
+const getSureInfo = (task: any) => {
+    if (!task?.baslama_tarihi || !task?.sure_gun) return null;
+    const start = new Date(task.baslama_tarihi);
+
+    if (task.rapor_durumu === "Tamamlandı") {
+        const completedInDays = getCompletedDays(task);
+        return {
+            diff: 0,
+            total: task.sure_gun,
+            color: "#10b981",
+            label: `${completedInDays} Günde Tamamlandı`
+        };
+    }
+
+    const end = new Date(start);
+    end.setDate(end.getDate() + task.sure_gun);
+    const diff = Math.ceil((end.getTime() - Date.now()) / (1000 * 3600 * 24));
+
+    return {
+        diff,
+        total: task.sure_gun,
+        color: getKalanColor(diff, task.sure_gun),
+        label: `${diff} Gün`
+    };
+};
+
 
 
 import { useGlobalData } from "../lib/context/GlobalDataContext";
@@ -80,7 +118,9 @@ export default function Dashboard() {
     const [showAnalysis, setShowAnalysis] = useState(false);
     const [analysisLoading, setAnalysisLoading] = useState(false);
     const [analysisText, setAnalysisText] = useState("");
-    const [showBirthdayModal, setShowBirthdayModal] = useState(false);
+    const [shouldShowBirthdayModal, setShouldShowBirthdayModal] = useState(false);
+    const [urgentNotesCount, setUrgentNotesCount] = useState(0);
+    const [showArchivedReports, setShowArchivedReports] = useState(false);
 
     // ─── Filtre State ───
     const [showFilters, setShowFilters] = useState(false);
@@ -89,12 +129,78 @@ export default function Dashboard() {
     const [filterPeriod, setFilterPeriod] = useState<string>("Tümü");
     const filterRef = useRef<HTMLDivElement>(null);
 
+    const getBirthdayCelebratedKey = (uid: string) => {
+        const today = new Date();
+        return `birthday_modal_shown_v2_${uid}_${today.toDateString()}`;
+    };
+
+    const closeBirthdayModal = () => {
+        if (effectiveUid) {
+            localStorage.setItem(getBirthdayCelebratedKey(effectiveUid), "true");
+        }
+        setShouldShowBirthdayModal(false);
+    };
+
     // Initial load and background refresh
     useEffect(() => {
         if (effectiveUid) {
             refreshAll(effectiveUid, currentUser?.email || undefined, currentUser?.displayName || undefined);
         }
     }, [effectiveUid, refreshAll, currentUser?.email, currentUser?.displayName]);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadUrgentNotes = async () => {
+            if (!effectiveUid) {
+                if (isMounted) setUrgentNotesCount(0);
+                return;
+            }
+
+            try {
+                const email = currentUser?.email || undefined;
+                const primaryNotes = await fetchNotes(effectiveUid, email);
+                if (!isMounted) return;
+
+                let noteList = Array.isArray(primaryNotes) ? primaryNotes : [];
+
+                // Legacy fallback: Some old records may keep owner_id as email instead of uid.
+                if (noteList.length === 0 && email && email.toLowerCase() !== String(effectiveUid).toLowerCase()) {
+                    const legacyNotes = await fetchNotes(email, email);
+                    if (!isMounted) return;
+                    noteList = Array.isArray(legacyNotes) ? legacyNotes : [];
+                }
+
+                const urgentCount = noteList.filter((note: any) => {
+                    const isDone = note?.is_done === true || note?.is_completed === true;
+                    if (isDone) return false;
+
+                    const priority = String(note?.priority || note?.oncelik || "normal").trim().toLowerCase();
+                    const isUrgentByPriority = ["urgent", "acil", "high", "kritik"].includes(priority);
+                    const isUrgentByFlags = note?.is_urgent === true || note?.urgent === true;
+                    const tagValues = Array.isArray(note?.tags)
+                        ? note.tags.map((v: any) => String(v).trim().toLowerCase())
+                        : [];
+                    const isUrgentByTags = tagValues.includes("acil") || tagValues.includes("urgent") || tagValues.includes("kritik");
+                    const title = String(note?.title || "").toLowerCase();
+                    const text = String(note?.text || "").toLowerCase();
+                    const isUrgentByText = title.includes("#acil") || text.includes("#acil") || title.startsWith("acil:") || text.startsWith("acil:");
+
+                    return isUrgentByPriority || isUrgentByFlags || isUrgentByTags || isUrgentByText;
+                }).length;
+                setUrgentNotesCount(urgentCount);
+            } catch (error) {
+                if (!isMounted) return;
+                console.error("Acil notlar yüklenemedi:", error);
+                setUrgentNotesCount(0);
+            }
+        };
+
+        loadUrgentNotes();
+        return () => {
+            isMounted = false;
+        };
+    }, [effectiveUid, currentUser?.email]);
 
     // Extra logic (Birthday, Identity)
     useEffect(() => {
@@ -117,21 +223,48 @@ export default function Dashboard() {
             try {
                 const today = new Date();
                 const todayMD = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-                
-                if (profile?.birthday === todayMD && !sessionStorage.getItem('celebrated')) {
-                    setShowBirthdayModal(true);
-                    sessionStorage.setItem('celebrated', 'true');
+                const normalizeBirthday = (value: any) => {
+                    const raw = String(value || "").trim();
+                    if (/^\d{2}-\d{2}$/.test(raw)) return raw;
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw.slice(5, 10);
+                    return "";
+                };
+
+                const myBirthday = normalizeBirthday((profile as any)?.birthday || (profile as any)?.birthday_full);
+                const celebratedKey = getBirthdayCelebratedKey(effectiveUid);
+                const celebrated = localStorage.getItem(celebratedKey);
+
+                if (myBirthday === todayMD && !celebrated) {
+                    setShouldShowBirthdayModal(true);
                 }
 
-                // Check other birthdays once per session or if not fetched
-                if (birthdayUsers.length === 0) {
-                    const profilesRes = await fetchWithTimeout(`${API_URL}/profiles/`);
+                // Build birthday list with safe fallback: include current user + others from API.
+                const currentUserBirthday = myBirthday === todayMD
+                    ? [{ uid: effectiveUid, full_name: profile?.full_name || currentUser?.displayName || "Kullanıcı" }]
+                    : [];
+
+                let otherBirthdayUsers: any[] = [];
+                try {
+                    const headers = await getAuthHeaders();
+                    const profilesRes = await fetchWithTimeout(`${API_URL}/profiles/`, { headers });
                     const allProfiles = await profilesRes.json();
-                    const bdayUsers = (Array.isArray(allProfiles) ? allProfiles : []).filter(
-                        (p: any) => p.birthday && p.birthday === todayMD && p.uid !== effectiveUid
-                    );
-                    setBirthdayUsers(bdayUsers);
+                    otherBirthdayUsers = (Array.isArray(allProfiles) ? allProfiles : []).filter((p: any) => {
+                        const b = normalizeBirthday(p?.birthday || p?.birthday_full);
+                        const pid = String(p?.uid || p?.id || "");
+                        return b === todayMD && pid !== String(effectiveUid);
+                    });
+                } catch {
+                    otherBirthdayUsers = [];
                 }
+
+                const uniqueBirthdayUsers = new Map<string, any>();
+                [...currentUserBirthday, ...otherBirthdayUsers].forEach((u: any) => {
+                    const key = String(u?.uid || u?.id || u?.email || u?.full_name || "");
+                    if (key && !uniqueBirthdayUsers.has(key)) {
+                        uniqueBirthdayUsers.set(key, u);
+                    }
+                });
+                setBirthdayUsers(Array.from(uniqueBirthdayUsers.values()));
             } catch { /* silent */ }
         };
         runExtraLogic();
@@ -323,15 +456,6 @@ Lütfen şunları analiz et:
     const activeTasksCount = filteredTasks.filter((t: any) => t.rapor_durumu !== "Tamamlandı" && t.rapor_durumu !== "Askıya Alındı").length;
     const completedTasksCount = filteredTasks.filter((t: any) => t.rapor_durumu === "Tamamlandı").length;
     
-    // Calculate "Acil" (Urgent) tasks: e.g., less than 0 days (overdue) or in critique status
-    const urgentTasksCount = filteredTasks.filter((task: any) => {
-        const start = new Date(task.baslama_tarihi);
-        const end = new Date(start);
-        end.setDate(end.getDate() + task.sure_gun);
-        const diff = Math.ceil((end.getTime() - Date.now()) / (1000 * 3600 * 24));
-        return diff < 0 && task.rapor_durumu !== "Tamamlandı";
-    }).length;
-
     // Process Type Data
     const typesMap: Record<string, number> = {};
     filteredTasks.forEach((t: any) => {
@@ -342,6 +466,21 @@ Lütfen şunları analiz et:
         value,
         color: Object.values(COLORS)[idx % 6].chart
     }));
+
+    const isArchivedTask = (task: any) => {
+        const isOld = task.baslama_tarihi
+            ? (Date.now() - new Date(task.baslama_tarihi).getTime() > 730 * 24 * 60 * 60 * 1000)
+            : false;
+        return task.rapor_durumu === "Tamamlandı" && isOld;
+    };
+
+    const currentSummaryTasks = filteredTasks
+        .filter((task: any) => !isArchivedTask(task))
+        .sort((a: any, b: any) => new Date(b.baslama_tarihi).getTime() - new Date(a.baslama_tarihi).getTime());
+
+    const archivedSummaryTasks = filteredTasks
+        .filter((task: any) => isArchivedTask(task))
+        .sort((a: any, b: any) => new Date(b.baslama_tarihi).getTime() - new Date(a.baslama_tarihi).getTime());
 
     if (!user) return null;
 
@@ -479,6 +618,8 @@ Lütfen şunları analiz et:
                     trend={`${activeTasksCount > 0 ? "+0" : ""} bu hafta`}
                     icon={FileText} 
                     style={COLORS.blue}
+                    onCardClick={() => navigate('/tasks?status=active')}
+                    onIconClick={() => navigate('/tasks?status=active')}
                 />
                 <StatCard 
                     title="Tamamlanan Raporlar" 
@@ -486,14 +627,17 @@ Lütfen şunları analiz et:
                     trend="Toplam"
                     icon={CheckCircle2} 
                     style={COLORS.green}
+                    onCardClick={() => navigate('/tasks?status=completed')}
+                    onIconClick={() => navigate('/tasks?status=completed')}
                 />
                 <StatCard 
                     title="Acil Notlar" 
-                    value={urgentTasksCount.toString()} 
-                    trend={urgentTasksCount > 0 ? "İvedi Müdahale" : "Her Şey Yolunda"}
+                    value={urgentNotesCount.toString()} 
+                    trend={urgentNotesCount > 0 ? "İvedi Müdahale" : "Her Şey Yolunda"}
                     icon={AlertCircle} 
                     style={COLORS.rose}
-                    isAlert={urgentTasksCount > 0}
+                    isAlert={urgentNotesCount > 0}
+                    onCardClick={() => navigate('/notes?priority=urgent')}
                 />
                 <StatCard 
                     title="Performans Skoru" 
@@ -501,18 +645,9 @@ Lütfen şunları analiz et:
                     trend="Başarı Oranı"
                     icon={Zap} 
                     style={COLORS.amber}
+                    onCardClick={() => navigate('/report-analytics')}
                     onIconClick={() => {
-                        toast("Performans skoru, toplam görevleriniz içerisindeki tamamlanma oranına (Tamamlanan / Toplam) göre hesaplanır.", {
-                            icon: '💡',
-                            duration: 4000,
-                            style: {
-                                borderRadius: '12px',
-                                background: '#333',
-                                color: '#fff',
-                                fontSize: '11px',
-                                fontWeight: 'bold'
-                            }
-                        });
+                        navigate('/report-analytics');
                     }}
                 />
             </div>
@@ -725,7 +860,7 @@ Lütfen şunları analiz et:
                             { name: "EBYS (BelgeNET)", url: "https://belgenet.gsb.gov.tr/", icon: FileText, color: "#3b82f6" },
                             { name: "Mevzuat", url: "https://www.mevzuat.gov.tr/", icon: BookOpen, color: "#8b5cf6" },
                             { name: "GSB Mevzuat", url: "https://gsb.gov.tr/tr/sayfa/36-mevzuat", icon: Shield, color: "#059669" },
-                            { name: "E-Posta", url: "https://eposta.gsb.gov.tr/", icon: Bell, color: "#f59e0b" },
+                            { name: "Kurumsal E-Posta", url: "https://eposta.gsb.gov.tr/", icon: Bell, color: "#f59e0b" },
                             { name: "Kurumsal", url: "https://kurumsal.gsb.gov.tr/login", icon: ExternalLink, color: "#0ea5e9" },
                             { name: "Resmi Gazete", url: "https://www.resmigazete.gov.tr/", icon: FileSpreadsheet, color: "#dc2626" },
                         ].map((link) => (
@@ -754,18 +889,17 @@ Lütfen şunları analiz et:
                     <div className="space-y-2 flex-1 overflow-y-auto scrollbar-thin mt-2 pr-1">
                         {birthdayUsers.length > 0 ? (
                             birthdayUsers.map((u, i) => (
-                                <div key={i} className="flex items-center justify-center md:justify-start gap-2.5 p-2 rounded-xl bg-white/50 dark:bg-slate-950/30 border border-amber-100/50 dark:border-amber-900/20">
-                                    <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 font-black text-[11px] shrink-0">
-                                        {u.full_name?.charAt(0) || '?'}
-                                    </div>
-                                    <div className="min-w-0 hidden md:block">
-                                        <p className="text-[10px] font-black text-slate-800 dark:text-slate-200 truncate">{u.full_name}</p>
-                                    </div>
+                                <div key={i} className="flex items-center justify-center md:justify-start gap-1.5 p-1.5 rounded-xl bg-white/50 dark:bg-slate-950/30 border border-amber-100/50 dark:border-amber-900/20">
+                                    <p className="min-w-0 max-w-[120px] text-[10px] font-black text-slate-800 dark:text-slate-200 truncate text-center md:text-left">
+                                        {u.full_name}
+                                    </p>
+                                    <Cake size={11} className="text-amber-500 shrink-0" />
                                 </div>
                             ))
                         ) : (
-                            <div className="h-full flex flex-col items-center justify-center opacity-40">
+                            <div className="h-full flex flex-col items-center justify-center opacity-40 text-center">
                                 <Cake size={28} className="text-slate-300 mb-2" />
+                                <p className="text-[10px] font-bold text-slate-400">Bugün doğum günü olan kullanıcı yok</p>
                             </div>
                         )}
                     </div>
@@ -786,15 +920,15 @@ Lütfen şunları analiz et:
                     </Button>
                 </div>
                 
+                {/* Mevcut Raporlar */}
+                <div className="px-4 md:px-6 pt-4 pb-2 border-b border-slate-50 dark:border-slate-800">
+                    <h4 className="font-black text-[11px] uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Mevcut Raporlar</h4>
+                </div>
+
                 {/* Mobile List View (Hidden on Desktop) */}
                 <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
-                    {filteredTasks.slice(0, 5).map((task: any) => {
-                         const start = new Date(task.baslama_tarihi);
-                         const end = new Date(start);
-                         end.setDate(end.getDate() + task.sure_gun);
-                         const diff = Math.ceil((end.getTime() - Date.now()) / (1000 * 3600 * 24));
-                         const total = task.sure_gun;
-                         const color = getKalanColor(diff, total);
+                    {currentSummaryTasks.slice(0, 5).map((task: any) => {
+                         const sureInfo = getSureInfo(task);
                          const statusColor = getDurumColor(task.rapor_durumu);
 
                          return (
@@ -813,13 +947,20 @@ Lütfen şunları analiz et:
                                  </div>
                                  <div className="flex items-center justify-between text-[11px] font-bold">
                                      <span className="text-slate-400">{task.rapor_turu}</span>
-                                     <span className="flex items-center gap-1.5" style={{ color }}>
-                                         <Clock size={12} /> {diff} Gün
-                                     </span>
+                                     {sureInfo ? (
+                                         <span className="flex items-center gap-1.5" style={{ color: sureInfo.color }}>
+                                             <Clock size={12} /> {sureInfo.label}
+                                         </span>
+                                     ) : (
+                                         <span className="text-slate-400">—</span>
+                                     )}
                                  </div>
                              </div>
                          );
                     })}
+                    {currentSummaryTasks.length === 0 && (
+                        <div className="p-6 text-center text-[11px] font-bold text-slate-400">Mevcut rapor bulunmuyor.</div>
+                    )}
                 </div>
 
                 {/* Desktop Table View (Hidden on Mobile) */}
@@ -835,13 +976,8 @@ Lütfen şunları analiz et:
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                            {filteredTasks.slice(0, 5).map((task: any) => {
-                                const start = new Date(task.baslama_tarihi);
-                                const end = new Date(start);
-                                end.setDate(end.getDate() + task.sure_gun);
-                                const diff = Math.ceil((end.getTime() - Date.now()) / (1000 * 3600 * 24));
-                                const total = task.sure_gun;
-                                const color = getKalanColor(diff, total);
+                            {currentSummaryTasks.slice(0, 5).map((task: any) => {
+                                const sureInfo = getSureInfo(task);
                                 
                                 return (
                                     <TableRow 
@@ -850,16 +986,111 @@ Lütfen şunları analiz et:
                                         title={task.rapor_adi} 
                                         type={task.rapor_turu} 
                                         status={task.rapor_durumu} 
-                                        diff={diff}
-                                        total={total}
-                                        rawColor={color}
+                                        sureLabel={sureInfo?.label || "—"}
+                                        rawColor={sureInfo?.color || "#94a3b8"}
                                         rawStatusColor={getDurumColor(task.rapor_durumu)}
                                     />
                                 );
                             })}
+                            {currentSummaryTasks.length === 0 && (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-6 text-center text-[11px] font-bold text-slate-400">Mevcut rapor bulunmuyor.</td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
+
+                {/* Arşiv Raporlar Accordion */}
+                <div className="border-t border-slate-50 dark:border-slate-800">
+                    <button
+                        type="button"
+                        className="w-full px-4 md:px-6 py-4 flex items-center justify-between hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors"
+                        onClick={() => setShowArchivedReports((prev) => !prev)}
+                    >
+                        <div className="flex items-center gap-2">
+                            <h4 className="font-black text-[11px] uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Arşiv Raporlar</h4>
+                            <span className="text-[10px] font-bold text-slate-400">({archivedSummaryTasks.length})</span>
+                        </div>
+                        <ChevronRight
+                            size={16}
+                            className={cn(
+                                "text-slate-400 transition-transform duration-200",
+                                showArchivedReports && "rotate-90"
+                            )}
+                        />
+                    </button>
+
+                    {showArchivedReports && (
+                        <>
+                            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800 border-t border-slate-50 dark:border-slate-800">
+                                {archivedSummaryTasks.map((task: any) => {
+                                    const sureInfo = getSureInfo(task);
+                                    const statusColor = getDurumColor(task.rapor_durumu);
+
+                                    return (
+                                        <div key={`arch-mobile-${task.id}`} className="p-4 space-y-3">
+                                            <div className="flex justify-between items-start">
+                                                <div className="space-y-1">
+                                                    <span className="text-[10px] font-black text-primary tracking-widest">{task.rapor_kodu}</span>
+                                                    <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 line-clamp-1">{task.rapor_adi}</h4>
+                                                </div>
+                                                <span
+                                                    className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter"
+                                                    style={{ backgroundColor: statusColor + '15', color: statusColor }}
+                                                >
+                                                    {task.rapor_durumu}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-[11px] font-bold">
+                                                <span className="text-slate-400">{task.rapor_turu}</span>
+                                                {sureInfo ? (
+                                                    <span className="flex items-center gap-1.5" style={{ color: sureInfo.color }}>
+                                                        <Clock size={12} /> {sureInfo.label}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-400">—</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {archivedSummaryTasks.length === 0 && (
+                                    <div className="p-6 text-center text-[11px] font-bold text-slate-400">Arşiv rapor bulunmuyor.</div>
+                                )}
+                            </div>
+
+                            <div className="hidden md:block overflow-x-auto border-t border-slate-50 dark:border-slate-800">
+                                <table className="w-full text-sm">
+                                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                                        {archivedSummaryTasks.map((task: any) => {
+                                            const sureInfo = getSureInfo(task);
+
+                                            return (
+                                                <TableRow
+                                                    key={`arch-desktop-${task.id}`}
+                                                    code={task.rapor_kodu}
+                                                    title={task.rapor_adi}
+                                                    type={task.rapor_turu}
+                                                    status={task.rapor_durumu}
+                                                    sureLabel={sureInfo?.label || "—"}
+                                                    rawColor={sureInfo?.color || "#94a3b8"}
+                                                    rawStatusColor={getDurumColor(task.rapor_durumu)}
+                                                />
+                                            );
+                                        })}
+                                        {archivedSummaryTasks.length === 0 && (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-6 text-center text-[11px] font-bold text-slate-400">Arşiv rapor bulunmuyor.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    )}
+                </div>
+
                 <div className="p-4 bg-card flex justify-end items-center border-t border-slate-50 dark:border-slate-800">
                     <Button 
                         variant="link" 
@@ -874,7 +1105,7 @@ Lütfen şunları analiz et:
 
             {/* ─── AI Analiz Raporu Drawer ─── */}
             {showAnalysis && createPortal(
-                <div className="fixed inset-0 z-[1000] flex justify-end">
+                <div className="fixed inset-0 z-[99999] flex justify-end">
                     {/* Overlay */}
                     <div 
                         className="absolute inset-0 bg-black/30 backdrop-blur-md animate-in fade-in duration-200"
@@ -959,11 +1190,11 @@ Lütfen şunları analiz et:
             )}
 
             {/* ─── Sürpriz Doğum Günü Kutlaması ─── */}
-            {showBirthdayModal && createPortal(
-                <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
+            {shouldShowBirthdayModal && createPortal(
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
                     <div 
                         className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm animate-in fade-in duration-500"
-                        onClick={() => setShowBirthdayModal(false)}
+                        onClick={closeBirthdayModal}
                     />
                     <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-500 text-center overflow-hidden border border-amber-100 dark:border-amber-900/20">
                         {/* Konfeti Parçacıkları (CSS ile) */}
@@ -996,21 +1227,20 @@ Lütfen şunları analiz et:
                                 </p>
                             </div>
                             <Button 
-                                onClick={() => setShowBirthdayModal(false)}
+                                onClick={closeBirthdayModal}
                                 className="w-full h-14 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black uppercase tracking-widest text-xs shadow-xl shadow-amber-200/50 dark:shadow-amber-950/20"
                             >
                                 Teşekkürler! 🎉
                             </Button>
                         </div>
                     </div>
-                </div>,
-                document.body
-            )}
+                </div>
+            , document.body)}
         </div>
     );
 }
 
-function TableRow({ code, title, type, status, diff, rawColor, rawStatusColor }: any) {
+function TableRow({ code, title, type, status, sureLabel, rawColor, rawStatusColor }: any) {
     return (
         <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-50 dark:border-slate-800 last:border-0">
             <td className="px-6 py-5 font-black text-primary dark:text-primary-light text-[10px] tracking-wider font-outfit">{code}</td>
@@ -1025,7 +1255,7 @@ function TableRow({ code, title, type, status, diff, rawColor, rawStatusColor }:
                     color: rawColor, 
                     fontWeight: 700 
                 }}>
-                    {diff} Gün
+                    {sureLabel}
                 </span>
             </td>
             <td className="px-6 py-4 text-center">
@@ -1049,11 +1279,13 @@ function TableRow({ code, title, type, status, diff, rawColor, rawStatusColor }:
 }
 
 
-function StatCard({ title, value, trend, icon: Icon, isAlert, style, onIconClick }: any) {
+function StatCard({ title, value, trend, icon: Icon, isAlert, style, onIconClick, onCardClick }: any) {
     return (
         <Card 
+            onClick={onCardClick}
             className={cn(
                 "p-5 border-none shadow-none transition-all group",
+                onCardClick ? "cursor-pointer hover:scale-[1.01] active:scale-[0.99]" : "",
                 style?.bg || (isAlert ? "bg-rose-50 dark:bg-rose-950/20" : "bg-card"),
                 "border dark:border-slate-800",
                 style?.border || (isAlert ? "border-rose-100 dark:border-rose-900/30" : "border-slate-100 dark:border-slate-800")

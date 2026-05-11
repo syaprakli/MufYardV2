@@ -1,6 +1,8 @@
 import { X, Search, UserPlus, CheckCircle2, Users, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { fetchAllProfiles } from "../lib/api/profiles";
+import { useAuth } from "../lib/hooks/useAuth";
 
 interface ShareModalProps {
     isOpen: boolean;
@@ -11,10 +13,18 @@ interface ShareModalProps {
 }
 
 export default function ShareModal({ isOpen, onClose, sharedWith, onShare, title = "Paylaşımı Yönet" }: ShareModalProps) {
+    const { user, profile } = useAuth();
     const [search, setSearch] = useState("");
     const [selected, setSelected] = useState<string[]>(sharedWith);
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+
+    const currentUserKeys = [
+        user?.uid,
+        user?.email?.trim().toLowerCase(),
+        profile?.uid,
+        profile?.email?.trim().toLowerCase(),
+    ].filter(Boolean).map((v) => String(v).toLowerCase()) as string[];
 
     useEffect(() => {
         if (isOpen) {
@@ -28,17 +38,21 @@ export default function ShareModal({ isOpen, onClose, sharedWith, onShare, title
                 setLoading(true);
                 try {
                     const profiles = await fetchAllProfiles();
-                    setUsers(profiles.map((p: any) => {
-                        const uid = p.uid || p.id;
-                        const email = p.email;
-                        const identityKeys = [uid, email].filter(Boolean);
-                        return {
-                            id: uid || email,
-                            name: p.full_name || p.display_name || p.email,
-                            email,
-                            identityKeys
-                        };
-                    }));
+                    const normalized = profiles
+                        .map((p: any) => {
+                            const uid = p.uid || p.id;
+                            const email = p.email?.trim().toLowerCase();
+                            const identityKeys = [uid, email].filter(Boolean);
+                            return {
+                                id: uid || email,
+                                name: p.full_name || p.display_name || p.email,
+                                email,
+                                identityKeys
+                            };
+                        })
+                        .filter((p: any) => p.id)
+                        .filter((p: any) => !(p.identityKeys || []).some((k: string) => currentUserKeys.includes(String(k).toLowerCase())));
+                    setUsers(normalized);
                 } catch (e) {
                     console.error("User fetch failed:", e);
                 } finally {
@@ -47,6 +61,15 @@ export default function ShareModal({ isOpen, onClose, sharedWith, onShare, title
             };
             loadUsers();
         }
+    }, [isOpen, user?.uid, user?.email, profile?.uid, profile?.email]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const originalOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.body.style.overflow = originalOverflow;
+        };
     }, [isOpen]);
 
     if (!isOpen) return null;
@@ -68,12 +91,12 @@ export default function ShareModal({ isOpen, onClose, sharedWith, onShare, title
             users
                 .filter((u) => selected.includes(u.id) || (u.email && selected.includes(u.email)))
                 .flatMap((u) => u.identityKeys || [u.id, u.email].filter(Boolean))
-        ));
+        )).filter((k) => !currentUserKeys.includes(String(k).toLowerCase()));
         onShare(expandedKeys);
         onClose();
     };
 
-    return (
+    const modalContent = (
         <div style={overlayStyle} onClick={onClose}>
             <div style={modalBoxStyle} onClick={e => e.stopPropagation()}>
                 {/* Header */}
@@ -160,10 +183,12 @@ export default function ShareModal({ isOpen, onClose, sharedWith, onShare, title
             </div>
         </div>
     );
+
+    return createPortal(modalContent, document.body);
 }
 
 // Styles
-const overlayStyle: React.CSSProperties = { position: "fixed", inset: 0, zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)" };
+const overlayStyle: React.CSSProperties = { position: "fixed", inset: 0, zIndex: 100000, display: "flex", alignItems: "center", justifyContent: "center", padding: "8px", backgroundColor: "rgba(0,0,0,0.65)", backdropFilter: "blur(10px)" };
 const modalBoxStyle: React.CSSProperties = { background: "white", borderRadius: "1.25rem", boxShadow: "0 25px 60px rgba(0,0,0,0.2)", width: "100%", maxWidth: "450px", padding: "1.5rem", border: "1px solid #f1f5f9" };
 const headerStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "1.5rem" };
 const iconBoxStyle: React.CSSProperties = { width: "36px", height: "36px", borderRadius: "0.75rem", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", color: "#0f172a" };

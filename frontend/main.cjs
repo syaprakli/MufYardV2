@@ -1,8 +1,10 @@
-const { app, BrowserWindow, ipcMain, Notification: NativeNotification, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification: NativeNotification, Menu, dialog } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const net = require('net');
+const http = require('http');
+const https = require('https');
 const { spawn } = require('child_process');
 
 let backendProcess = null;
@@ -14,6 +16,18 @@ app.setPath('userData', userDataPath);
 // GPU disk cache hatalarını susturmak için (Terminaldeki hataları giderir)
 app.commandLine.appendSwitch('disable-gpu-cache');
 app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('disable-http-cache');
+
+// Cache dizinini temp altına taşıyarak "Erişim engellendi" hatalarını azalt.
+const electronCacheDir = path.join(os.tmpdir(), 'MufYardV2', 'electron-cache');
+try {
+    if (!fs.existsSync(electronCacheDir)) {
+        fs.mkdirSync(electronCacheDir, { recursive: true });
+    }
+    app.commandLine.appendSwitch('disk-cache-dir', electronCacheDir);
+} catch {
+    // cache dizini oluşturulamazsa varsayılan davranışla devam et.
+}
 
 // Windows Bildirimleri için Uygulama Kimliği (App ID)
 if (process.platform === 'win32') {
@@ -133,8 +147,8 @@ async function startBackend() {
         const backendAlreadyRunning = await isPortReachable(8000);
 
         if (backendAlreadyRunning) {
-            console.log('[DEV] Port 8000 zaten aktif. Harici backend kullanılacak, yeni süreç başlatılmayacak.');
-            return;
+            console.log('[DEV] Port 8000 aktif. Eski backend süreci sonlandırılıp güncel backend başlatılacak.');
+            await killPortProcess(8000);
         }
 
         // Use venv python if available, fallback to system python
@@ -181,6 +195,7 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
+            plugins: true,
             webSecurity: false, // Radyo yayınları ve CORS sorunlarını aşmak için geçici olarak kapatıldı
             allowRunningInsecureContent: true, // HTTP radyo akışlarına izin ver
         }
@@ -268,4 +283,55 @@ ipcMain.on('show-notification', (event, { title, body }) => {
 
     notification.on('show', () => console.log("[+] Bildirim ekrana fırlatıldı."));
     notification.on('error', (err) => console.error("[-] BİLDİRİM HATASI:", err));
+});
+
+ipcMain.handle('download-file-with-dialog', async (_event, { url, fileName }) => {
+    try {
+        if (!url || typeof url !== 'string') {
+            return { ok: false, error: 'Geçersiz dosya adresi.' };
+        }
+
+        const safeName = String(fileName || 'dosya').replace(/[\\/:*?"<>|]/g, '_');
+        const browserWindow = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+        const saveResult = await dialog.showSaveDialog(browserWindow, {
+            title: 'Dosyayı Kaydet',
+            defaultPath: path.join(app.getPath('downloads'), safeName)
+        });
+
+        if (saveResult.canceled || !saveResult.filePath) {
+            return { ok: false, canceled: true };
+        }
+
+        const parsed = new URL(url);
+        const client = parsed.protocol === 'https:' ? https : http;
+
+        await new Promise((resolve, reject) => {
+            const request = client.get(parsed, (response) => {
+                if (response.statusCode && response.statusCode >= 400) {
+                    reject(new Error(`Dosya indirilemedi (HTTP ${response.statusCode})`));
+                    response.resume();
+                    return;
+                }
+
+                const writer = fs.createWriteStream(saveResult.filePath);
+                response.pipe(writer);
+
+                writer.on('finish', () => {
+                    writer.close(resolve);
+                });
+
+                writer.on('error', reject);
+                response.on('error', reject);
+            });
+
+            request.on('error', reject);
+        });
+
+        return { ok: true, filePath: saveResult.filePath };
+    } catch (err) {
+        return {
+            ok: false,
+            error: err && err.message ? err.message : 'Dosya kaydedilemedi.'
+        };
+    }
 });

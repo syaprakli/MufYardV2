@@ -33,6 +33,7 @@ import About from "./pages/About";
 import Notifications from "./pages/Notifications";
 import Messages from "./pages/Messages";
 import Feedback from "./pages/Feedback";
+import ReportAnalytics from "./pages/ReportAnalytics";
 import ChatContainer from "./components/ChatContainer";
 import IntroPresentation from "./components/IntroPresentation";
 
@@ -135,7 +136,13 @@ function App() {
           <ChatProvider>
             <ConfirmProvider>
               <NotificationProvider>
-                <Toaster position="top-right" />
+                <Toaster
+                  position="top-right"
+                  containerStyle={{ zIndex: 2147483647 }}
+                  toastOptions={{
+                    style: { zIndex: 2147483647 }
+                  }}
+                />
                 {showUpdateModal && (
                   <UpdateModal 
                     isOpen={showUpdateModal}
@@ -168,6 +175,7 @@ function App() {
                       <Route path="notifications" element={<Notifications />} />
                       <Route path="messages" element={<Messages />} />
                       <Route path="feedback" element={<Feedback />} />
+                      <Route path="report-analytics" element={<ReportAnalytics />} />
                       <Route path="admin/feedback" element={<AdminFeedback />} />
                       <Route path="admin/inspectors" element={<AdminInspectors />} />
                       <Route path="admin/roles" element={<AdminRoleSettings />} />

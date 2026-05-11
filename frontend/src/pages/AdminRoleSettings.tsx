@@ -13,45 +13,45 @@ import { fetchRolesSettings, updateRolesSettings } from "../lib/api/settings";
 const MODUL_LISTESI = [
     { 
         id: "dashboard", 
-        label: "Ana Panel", 
+        label: "Genel Bakış", 
         icon: LayoutDashboard,
         description: "Genel istatistikler ve özet bilgilere erişim."
     },
     { 
         id: "tasks", 
-        label: "Görev Yönetimi", 
+        label: "Görevler", 
         icon: ClipboardList,
         description: "Denetim görevlerini görüntüleme ve yönetme yetkisi."
     },
     { 
+        id: "report-analytics", 
+        label: "Görev Analizleri", 
+        icon: FileText,
+        description: "Tamamlanan görevlerin derinlemesine analizleri."
+    },
+    { 
         id: "audit", 
-        label: "Raporlar / Denetim", 
+        label: "Raporlar", 
         icon: FileText,
         description: "Denetim raporlarına ve analiz araçlarına tam erişim."
     },
     { 
-        id: "contacts", 
-        label: "Kurumsal Rehber", 
-        icon: Users,
-        description: "Müfettiş ve personel iletişim bilgilerine erişim."
+        id: "notes", 
+        label: "Hızlı Notlar", 
+        icon: StickyNote,
+        description: "Hızlı notlar ve kişisel çalışma alanı."
+    },
+    { 
+        id: "files", 
+        label: "Dosyalar", 
+        icon: FileText,
+        description: "Dosya yönetimi ve arşiv sistemi."
     },
     { 
         id: "legislation", 
-        label: "Mevzuat Yönetimi", 
+        label: "Mevzuat", 
         icon: Gavel,
-        description: "Mevzuat verilerini güncelleme ve yönetme (Kritik)."
-    },
-    { 
-        id: "public_space", 
-        label: "Kamusal Alan", 
-        icon: Globe,
-        description: "Forum ve duyuru alanlarında moderasyon yetkisi."
-    },
-    { 
-        id: "notes", 
-        label: "Notlar ve Arşiv", 
-        icon: StickyNote,
-        description: "Hızlı notlar ve geçmiş rapor arşivine erişim."
+        description: "Mevzuat verilerine erişim ve yönetim."
     },
     { 
         id: "calendar", 
@@ -60,10 +60,34 @@ const MODUL_LISTESI = [
         description: "Denetim takvimi ve program yönetimi."
     },
     { 
-        id: "feedback", 
-        label: "Geribildirimler", 
+        id: "contacts", 
+        label: "Rehber", 
+        icon: Users,
+        description: "Müfettiş ve personel iletişim bilgilerine erişim."
+    },
+    { 
+        id: "messages", 
+        label: "Mesajlar", 
         icon: MessageSquare,
-        description: "Kullanıcı geri bildirimlerini inceleme yetkisi."
+        description: "Sistem içi mesajlaşma ve iletişim."
+    },
+    { 
+        id: "public_space", 
+        label: "Kamusal Alan", 
+        icon: Globe,
+        description: "Forum ve ortak paylaşım alanı."
+    },
+    { 
+        id: "assistant", 
+        label: "Dijital Müfettiş", 
+        icon: FileText,
+        description: "Yapay zeka destekli denetim asistanı."
+    },
+    { 
+        id: "feedback", 
+        label: "Bize Puan Verin", 
+        icon: MessageSquare,
+        description: "Sistem geri bildirimlerini iletme."
     },
 ];
 

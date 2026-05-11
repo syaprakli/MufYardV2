@@ -34,8 +34,12 @@ export function Modal({ isOpen, onClose, title, children, size = 'medium' }: Mod
 
     const modalContent = (
         <div 
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm" 
-            onClick={onClose}
+            className="fixed inset-0 z-[100000] flex items-center justify-center p-2 sm:p-4 bg-black/65 backdrop-blur-md" 
+            onMouseDown={(e) => {
+                if (e.target === e.currentTarget) {
+                    onClose();
+                }
+            }}
         >
             <div 
                 className={`bg-card rounded-2xl shadow-2xl w-full flex flex-col max-h-[90vh] ${sizes[size]} border border-border overflow-hidden`}
