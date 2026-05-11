@@ -259,11 +259,8 @@ class CollaborationService:
         post_data['created_at'] = datetime.utcnow()
         post_data['likes_count'] = 0
         
-        # Onay mekanizması
-        if not is_admin and post_data.get('is_public', True):
-            post_data['is_approved'] = False
-        else:
-            post_data['is_approved'] = True
+        # Herkesin paylaştığı doğrudan onaylı olacak
+        post_data['is_approved'] = True
             
         doc_ref = await asyncio.to_thread(db.collection('posts').add, post_data)
         new_post_doc = await asyncio.to_thread(doc_ref[1].get)
@@ -297,10 +294,14 @@ class CollaborationService:
         return True
 
     @staticmethod
-    async def delete_post(post_id: str) -> bool:
+    async def delete_post(post_id: str, requester_uid: str = None, is_admin: bool = False) -> bool:
         doc_ref = db.collection('posts').document(post_id)
-        exists = await asyncio.to_thread(lambda: doc_ref.get().exists)
-        if not exists:
+        doc = await asyncio.to_thread(doc_ref.get)
+        if not doc.exists:
+            return False
+            
+        data = doc.to_dict() or {}
+        if not is_admin and data.get('author_id') != requester_uid:
             return False
             
         await asyncio.to_thread(doc_ref.delete)

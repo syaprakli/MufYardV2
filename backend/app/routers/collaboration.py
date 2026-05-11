@@ -159,10 +159,11 @@ async def reject_post(post_id: str):
     return {"status": "success"}
 
 @router.delete("/posts/{post_id}")
-async def delete_public_post(post_id: str):
-    if await CollaborationService.delete_post(post_id):
+async def delete_public_post(post_id: str, uid: str = Query(None), role: str = Query("user")):
+    is_admin = (role or "").strip().lower() in ["admin", "moderator"]
+    if await CollaborationService.delete_post(post_id, uid, is_admin):
         return {"status": "success", "message": "Paylaşım silindi."}
-    raise HTTPException(status_code=404, detail="Paylaşım bulunamadı.")
+    raise HTTPException(status_code=403, detail="Paylaşım bulunamadı veya silme yetkiniz yok.")
 
 @router.post("/posts/{post_id}/like")
 async def like_public_post(post_id: str):

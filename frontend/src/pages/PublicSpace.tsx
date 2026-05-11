@@ -46,7 +46,8 @@ import {
     ArrowLeft, Image as ImageIcon, Paperclip, 
     Shield, Bell, HelpCircle, Check, X, Lock as LockIcon,
     ChevronRight, ChevronLeft, FolderTree, Reply,
-    Bold, Italic, List, ListOrdered, AlignJustify, Minus as HR
+    Bold, Italic, List, ListOrdered, AlignJustify, Minus as HR,
+    FileText, Download
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
@@ -290,7 +291,11 @@ export default function PublicSpace() {
     };
 
     const handleCreatePost = async () => {
-        if (!newPost.content.trim() || !newPost.title.trim() || !user) return;
+        if (!newPost.title.trim() || !newPost.content.trim()) {
+            toast.error("Başlık ve içerik alanları zorunludur.");
+            return;
+        }
+        if (!user) return;
         setIsPosting(true);
         try {
             const isModerator = userRole === 'admin' || userRole === 'moderator';
@@ -393,7 +398,7 @@ export default function PublicSpace() {
         });
         if (!confirmed) return;
         try {
-            await fetchWithTimeout(`${API_URL}/collaboration/posts/${postId}`, { method: 'DELETE' });
+            await fetchWithTimeout(`${API_URL}/collaboration/posts/${postId}?uid=${user?.uid}&role=${userRole}`, { method: 'DELETE' });
             setPosts(prev => prev.filter(p => p.id !== postId));
             toast.success("Silindi");
         } catch {
@@ -440,11 +445,16 @@ export default function PublicSpace() {
         try {
             const res = await fetchWithTimeout(`${API_URL}/files/upload`, { method: 'POST', body: formData });
             const data = await res.json();
+            // Resim/dosya URL'sini tam URL'e çevir
+            if (data.url && data.url.startsWith('/')) {
+                const baseUrl = API_URL.replace(/\/api$/, '');
+                data.url = baseUrl + data.url;
+            }
             if (isComment) setCommentAttachments(p => [...p, data]);
             else setNewPost(p => ({ ...p, attachments: [...p.attachments, data] }));
-            toast.success("Yüklendi");
+            toast.success("Dosya yüklendi!");
         } catch {
-            toast.error("Hata");
+            toast.error("Dosya yüklenirken hata oluştu.");
         } finally {
             setFileUploading(false);
         }
@@ -1037,8 +1047,7 @@ function FAQCard({ faq, isOpen, onToggle, onApprove, onReject, isAdmin }: any) {
     );
 }
 
-function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, isEdit, inspectors, sharedWith, onSharedWithChange, onUpload, uploading, isAdmin }: any) {
-    const [step, setStep] = useState(1);
+function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, isEdit, onUpload, uploading }: any) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const isForum = post.category !== 'Duyurular' && post.category !== 'SSS';
 
@@ -1100,8 +1109,6 @@ function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, 
                 </div>
                 <input id="post-file-input" type="file" hidden onChange={onUpload} />
                 <div className="p-5 md:p-8 overflow-y-auto space-y-5 md:space-y-6">
-                    {step === 1 ? (
-                        <>
                             {isForum && (
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black capitalize text-slate-400 tracking-widest ml-1">Kategori</label>
@@ -1150,47 +1157,18 @@ function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, 
                                     />
                                 </div>
                             </div>
-                        </>
-                    ) : (
-                        <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black capitalize text-slate-400 tracking-widest ml-1">Seçmeli Paylaşım</label>
-                                <div className="p-6 bg-muted rounded-3xl space-y-4">
-                                    <p className="text-xs font-bold text-muted-foreground mb-4">Bu konuyu sadece seçtiğiniz müfettişler görebilir.</p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                        {inspectors.map((insp: any) => (
-                                            <button 
-                                                key={insp.uid || insp.id}
-                                                type="button"
-                                                onClick={() => {
-                                                    const id = insp.uid || insp.id;
-                                                    onSharedWithChange(sharedWith.includes(id) ? sharedWith.filter((x: string) => x !== id) : [...sharedWith, id]);
-                                                }}
-                                                className={cn("flex items-center gap-3 p-3 rounded-2xl border-2 transition-all text-left", sharedWith.includes(insp.uid || insp.id) ? "border-primary bg-primary/5 text-primary" : "border-transparent bg-card text-slate-600")}
-                                            >
-                                                <div className="w-8 h-8 rounded-lg bg-muted/80 flex items-center justify-center font-black text-xs">{insp.full_name?.charAt(0) || insp.name?.charAt(0)}</div>
-                                                <span className="text-[11px] font-black truncate">{insp.full_name || insp.name}</span>
-                                                {sharedWith.includes(insp.uid || insp.id) && <Check size={14} className="ml-auto" />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                            {!isAdmin && !isEdit && sharedWith.length === 0 && (
-                                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-start gap-3">
-                                    <Shield size={16} className="text-amber-500 shrink-0 mt-0.5" />
-                                    <p className="text-[10px] font-bold text-amber-700 leading-normal uppercase">
-                                        Genel paylaşımlar (Forum, SSS, Duyuru) moderatör onayından sonra diğer kullanıcılara görünür olacaktır.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    )}
                     {post.attachments && post.attachments.length > 0 && (
                         <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-2xl border border-dashed border-border mt-4 overflow-x-auto no-scrollbar">
                             {post.attachments.map((at: any, i: number) => (
                                 <div key={i} className="relative group/at w-20 h-20 rounded-xl overflow-hidden border border-border bg-card shadow-sm flex items-center justify-center shrink-0">
-                                    {at.type === 'image' ? <img src={at.url} className="w-full h-full object-cover" /> : <Paperclip size={24} className="text-slate-300" />}
+                                    {at.type === 'image' ? (
+                                        <img src={at.url} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center w-full h-full bg-muted/30 p-2">
+                                            <FileText size={24} className="text-slate-400" />
+                                            <span className="text-[8px] font-bold text-muted-foreground mt-1 truncate w-full text-center" title={at.name}>{at.name || "Dosya"}</span>
+                                        </div>
+                                    )}
                                     <button type="button" onClick={() => setPost((p: any) => ({ ...p, attachments: p.attachments.filter((_: any, idx: number) => idx !== i) }))} className="absolute top-1 right-1 bg-rose-500 text-white rounded-full p-1 opacity-0 group-hover/at:opacity-100 transition-all shadow-lg z-10"><X size={8} /></button>
                                 </div>
                             ))}
@@ -1207,11 +1185,6 @@ function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, 
                         </button>
                     </div>
                     <div className="flex gap-3">
-                        {step === 1 ? (
-                            <Button type="button" onClick={() => setStep(2)} className="rounded-2xl px-10 h-11 font-bold text-[11px] capitalize tracking-wider bg-slate-200 text-slate-600">İleri</Button>
-                        ) : (
-                            <Button type="button" onClick={() => setStep(1)} variant="ghost" className="rounded-2xl px-6 h-11 font-bold text-[11px] capitalize tracking-wider text-slate-400">Geri</Button>
-                        )}
                         <Button type="button" disabled={isPosting} onClick={onSubmit} className="rounded-2xl px-12 h-11 font-bold text-[11px] capitalize tracking-wider shadow-xl shadow-primary/20 bg-primary">
                             {isPosting ? <Loader2 className="animate-spin" /> : (isEdit ? "Kaydet" : "Paylaş")}
                         </Button>
@@ -1265,16 +1238,27 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                     {post.attachments && post.attachments.length > 0 && (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4">
                             {post.attachments.map((at: any, i: number) => (
-                                <div key={i} onClick={() => at.type === 'image' && onZoom(at)} className="group/img relative aspect-square rounded-3xl overflow-hidden bg-muted/80 border border-border cursor-pointer flex items-center justify-center">
+                                <div 
+                                    key={i} 
+                                    onClick={() => {
+                                        if (at.type === 'image') onZoom(at);
+                                        else window.open(at.url, '_blank');
+                                    }} 
+                                    className="group/img relative aspect-square rounded-3xl overflow-hidden bg-muted/80 border border-border cursor-pointer flex items-center justify-center"
+                                >
                                     {at.type === 'image' ? (
                                         <>
                                             <img src={at.url} className="w-full h-full object-cover transition-transform group-hover/img:scale-110" />
                                             <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center"><Eye className="text-white" size={32} /></div>
                                         </>
                                     ) : (
-                                        <div className="flex flex-col items-center gap-2 p-6 justify-center">
-                                            <Paperclip size={40} className="text-slate-300" />
-                                            <span className="text-[10px] font-black capitalize text-muted-foreground text-center truncate w-full">{at.name}</span>
+                                        <div className="flex flex-col items-center gap-3 p-4 justify-center w-full h-full group-hover/img:bg-primary/5 transition-all relative">
+                                            <FileText size={40} className="text-slate-400 group-hover/img:text-primary transition-all" />
+                                            <span className="text-[10px] font-black text-muted-foreground group-hover/img:text-primary text-center break-all line-clamp-2 leading-tight px-2">{at.name || "Dosya Eki"}</span>
+                                            <div className="absolute inset-0 bg-primary/80 opacity-0 group-hover/img:opacity-100 transition-all flex flex-col items-center justify-center gap-2">
+                                                <Download className="text-white" size={24} />
+                                                <span className="text-white text-[9px] font-black tracking-widest">İNDİR</span>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -1339,9 +1323,20 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                             {attachments.length > 0 && (
                                 <div className="flex gap-2 p-2 overflow-x-auto no-scrollbar">
                                     {attachments.map((at: any, i: number) => (
-                                        <div key={i} className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden border border-border bg-card flex items-center justify-center">
-                                            {at.type === 'image' ? <img src={at.url} className="w-full h-full object-cover" /> : <Paperclip size={18} className="text-slate-300" />}
-                                            <button onClick={() => setAttachments((prev: any[]) => prev.filter((_, idx) => idx !== i))} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8} /></button>
+                                        <div 
+                                            key={i} 
+                                            onClick={() => at.type !== 'image' && window.open(at.url, '_blank')}
+                                            className={cn("relative w-16 h-16 shrink-0 rounded-xl overflow-hidden border border-border bg-card flex items-center justify-center group/cat", at.type !== 'image' && "cursor-pointer hover:bg-primary/5")}
+                                        >
+                                            {at.type === 'image' ? (
+                                                <img src={at.url} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="flex flex-col items-center justify-center w-full h-full p-1">
+                                                    <FileText size={18} className="text-slate-400 group-hover/cat:text-primary transition-colors" />
+                                                    <span className="text-[7px] font-black mt-1 text-muted-foreground group-hover/cat:text-primary text-center truncate w-full">{at.name || "Dosya"}</span>
+                                                </div>
+                                            )}
+                                            <button onClick={(e) => { e.stopPropagation(); setAttachments((prev: any[]) => prev.filter((_, idx) => idx !== i)); }} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8} /></button>
                                         </div>
                                     ))}
                                 </div>
