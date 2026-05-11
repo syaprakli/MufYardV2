@@ -592,6 +592,7 @@ export default function Audit() {
                             onUpdate={handleUpdateAudit}
                             onDelete={() => handleSingleDelete(audit.id)}
                             onShare={() => setShareAudit(audit)}
+                            onRefresh={() => loadData(true)}
                         />
                     ))}
                 </div>
@@ -738,7 +739,7 @@ export default function Audit() {
     );
 }
 
-function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect, task, onUpdate, onDelete, onShare }: { audit: AuditType, onExportWord: () => void, onEdit: () => void, isSelected: boolean, onToggleSelect: () => void, task?: Task, onUpdate: (id: string, updates: Partial<AuditType>) => void, onDelete: () => void, onShare: () => void }) {
+function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect, task, onUpdate, onDelete, onShare, onRefresh }: { audit: AuditType, onExportWord: () => void, onEdit: () => void, isSelected: boolean, onToggleSelect: () => void, task?: Task, onUpdate: (id: string, updates: Partial<AuditType>) => void, onDelete: () => void, onShare: () => void, onRefresh: () => void }) {
     const { title, date, status, inspector, location } = audit;
     const statusColors: any = {
         "Başlanmadı": "bg-slate-500/10 text-slate-600 border-slate-500/20",
@@ -793,7 +794,7 @@ function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect
                                     } else {
                                         await onUpdate(audit.id, { status: newStatus });
                                     }
-                                    await loadData(true);
+                                    await onRefresh();
                                 } catch (error) {
                                     toast.error("Durum güncellenemedi.");
                                 }
@@ -845,7 +846,7 @@ function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect
                                 } else {
                                     await onUpdate(audit.id, { status: newStatus });
                                 }
-                                await loadData(true);
+                                    await onRefresh();
                             } catch (error) {
                                 toast.error("Durum güncellenemedi.");
                             }

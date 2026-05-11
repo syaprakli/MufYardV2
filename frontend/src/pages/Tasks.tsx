@@ -791,7 +791,7 @@ export default function Tasks() {
             </div>
 
             {/* Web Sürümü Kısıtlama Uyarısı - Daha Belirgin */}
-            {!isElectron && (
+            {false && (
                 <div className="mb-8 animate-in slide-in-from-top-4 duration-700">
                     <Card className="p-6 border-l-4 border-l-amber-500 border-amber-200 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-900/30">
                         <div className="flex items-center gap-5 text-amber-800 dark:text-amber-400">
@@ -804,9 +804,11 @@ export default function Tasks() {
                                     <span className="px-2 py-0.5 bg-amber-500 text-white text-[8px] rounded-full">BİLGİ</span>
                                 </h4>
                                 <p className="text-xs font-bold mt-1.5 leading-relaxed opacity-90">
-                                    Güvenlik politikaları ve yerel dosya sistemi (Excel/Rapor) entegrasyonu nedeniyle **web sürümünde yeni görev oluşturulamaz.** 
-                                    Mevcut görevlerinizi görüntüleyebilir ve durumlarını güncelleyebilirsiniz. 
-                                    <br className="hidden md:block" />
+                                    {/* 
+                                        Yeni Görev Oluşturma formu artık her iki ortamda da aktiftir.
+                                        Ancak Rapor oluşturma ve Excel entegrasyonu gibi yerel dosya işlemleri 
+                                        yalnızca masaüstü sürümünde mevcuttur.
+                                    */}                           <br className="hidden md:block" />
                                     Yeni kayıtlar eklemek için lütfen <span className="underline decoration-2 underline-offset-4">MufYard Masaüstü</span> uygulamasını kullanın.
                                 </p>
                             </div>
@@ -815,7 +817,7 @@ export default function Tasks() {
                 </div>
             )}
 
-            {isElectron && (
+            {true && (
                 <Card className={cn(
                     "p-4 md:p-8 bg-card border shadow-sm mb-6 transition-all",
                     activeTab === 'ortak' ? "border-amber-200 ring-4 ring-amber-500/5" : "border-border"
@@ -1130,16 +1132,12 @@ export default function Tasks() {
                                                 <ActionBtn title="İş Adımları" color="#3b82f6" onClick={() => setExpandedRow(expandedRow === task.id ? null : task.id)}>
                                                     <ClipboardList size={14} />
                                                 </ActionBtn>
-                                                {isElectron && (
-                                                    <ActionBtn title="Rapor Başlat" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
-                                                        <FileText size={14} />
-                                                    </ActionBtn>
-                                                )}
-                                                {isElectron && (
-                                                    <ActionBtn title="Düzenle" color="#f59e0b" onClick={() => setEditingTask(task)}>
-                                                        <Edit3 size={14} />
-                                                    </ActionBtn>
-                                                )}
+                                                <ActionBtn title="Raporları Gör" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
+                                                    <FileText size={14} />
+                                                </ActionBtn>
+                                                <ActionBtn title="Düzenle" color="#f59e0b" onClick={() => setEditingTask(task)}>
+                                                    <Edit3 size={14} />
+                                                </ActionBtn>
                                                 <ActionBtn title="Paylaş" color="#8b5cf6" onClick={() => setShareTask(task)}>
                                                     <UserPlus size={14} />
                                                 </ActionBtn>
