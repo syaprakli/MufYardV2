@@ -86,6 +86,27 @@ export default function Audit() {
         }
     }, [user, refreshAll]);
 
+    // Web sürümü uyarısı (Tasks sayfasındaki ile uyumlu)
+    useEffect(() => {
+        if (!isElectron) {
+            const hasShownToast = sessionStorage.getItem('audits_web_warning_shown');
+            if (!hasShownToast) {
+                toast("Web sürümünde rapor oluşturma ve düzenleme kısıtlıdır.", {
+                    icon: '🚀',
+                    duration: 5000,
+                    style: {
+                        borderRadius: '12px',
+                        background: '#333',
+                        color: '#fff',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                    }
+                });
+                sessionStorage.setItem('audits_web_warning_shown', 'true');
+            }
+        }
+    }, []);
+
     const loadData = async (silent = false) => {
         if (!user) return;
         if (!silent) setLoading(true);
@@ -393,6 +414,27 @@ export default function Audit() {
                     )}
                 </div>
             </div>
+
+            {/* Web Sürümü Kısıtlama Uyarısı */}
+            {!isElectron && (
+                <div className="mb-8 animate-in slide-in-from-top-4 duration-700">
+                    <Card className="p-6 border-l-4 border-l-amber-500 border-amber-200 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-900/30">
+                        <div className="flex items-center gap-5 text-amber-800 dark:text-amber-400">
+                            <div className="p-3.5 bg-amber-500/20 rounded-2xl shadow-inner">
+                                <Shield size={28} className="animate-pulse" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-black uppercase tracking-tight mb-1 font-outfit">Sınırlı Web Erişimi</h3>
+                                <p className="text-xs font-medium opacity-90 leading-relaxed max-w-2xl">
+                                    Güvenlik ve yerel dosya sistemi erişimi kısıtlamaları nedeniyle rapor yazma ve düzenleme işlemleri sadece 
+                                    <strong className="text-amber-900 dark:text-amber-200 mx-1">MufYard Masaüstü Uygulaması</strong> üzerinden yapılabilir. 
+                                    Web sürümünde sadece mevcut raporları inceleyebilir ve Excel çıktısı alabilirsiniz.
+                                </p>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            )}
 
             <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3 bg-card h-12 px-4 rounded-xl border border-border shadow-sm">
