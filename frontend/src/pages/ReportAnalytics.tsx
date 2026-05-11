@@ -30,6 +30,14 @@ function isCompleted(task: any) {
     return String(task?.rapor_durumu || "") === "Tamamlandı";
 }
 
+function isArchivedTask(task: any) {
+    if (task?.rapor_durumu !== "Tamamlandı") return false;
+    const baslama = task?.baslama_tarihi;
+    if (!baslama) return false;
+    const isOld = (Date.now() - new Date(baslama).getTime()) > 730 * 24 * 60 * 60 * 1000;
+    return isOld;
+}
+
 function getTimeline(task: any): StatusEntry[] {
     const list = Array.isArray(task.status_history) ? [...task.status_history] : [];
     if (list.length === 0) {
@@ -191,7 +199,15 @@ export default function ReportAnalytics() {
         for (const task of merged) {
             const key = String(task?.id || "");
             if (!key) continue;
-            uniqueMap.set(key, task);
+            
+            // Yalnızca kullanıcıya ait olan veya onunla paylaşılan geçerli görevleri dahil et
+            if (
+                task.owner_id === effectiveUid ||
+                (Array.isArray(task.accepted_collaborators) && task.accepted_collaborators.includes(effectiveUid)) ||
+                (Array.isArray(task.accepted_collaborators) && user?.email && task.accepted_collaborators.includes(user.email))
+            ) {
+                uniqueMap.set(key, task);
+            }
         }
 
         return Array.from(uniqueMap.values()).sort((a: any, b: any) => {
@@ -199,7 +215,7 @@ export default function ReportAnalytics() {
             const bTime = new Date(b?.created_at || 0).getTime();
             return bTime - aTime;
         });
-    }, [liveTasks, cachedData.tasks]);
+    }, [liveTasks, cachedData.tasks, effectiveUid, user?.email]);
 
     const summary = useMemo(() => {
         const total = tasks.length;
@@ -311,13 +327,19 @@ export default function ReportAnalytics() {
             ? `${task.completed_in_days ?? "-"} gün`
             : "-";
         const currentTone = getStatusTone(task.rapor_durumu || "Başlanmadı");
+        const isArchived = isArchivedTask(task);
 
         return (
             <div
                 key={task.id}
-                className="rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-900/65 p-4 md:p-5 shadow-[0_14px_35px_-28px_rgba(15,23,42,0.45)]"
+                className="rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-900/65 p-4 md:p-5 shadow-[0_14px_35px_-28px_rgba(15,23,42,0.45)] relative overflow-hidden"
             >
-                <div className="flex items-start justify-between gap-3">
+                {isArchived && (
+                    <div className="absolute top-0 right-0 bg-amber-500 text-white text-[9px] font-black tracking-widest px-3 py-1 rounded-bl-xl uppercase shadow-sm z-10">
+                        Arşiv Rapor
+                    </div>
+                )}
+                <div className="flex items-start justify-between gap-3 relative z-0">
                     <div>
                         <p className="text-[11px] font-black text-primary tracking-wider">{task.rapor_kodu}</p>
                         <p className="text-base font-black text-slate-800 dark:text-slate-100 mt-1 leading-snug">{task.rapor_adi}</p>
