@@ -16,6 +16,7 @@ import {
     Star,
     MessageSquare,
     ClipboardCheck,
+    Globe,
     X
 } from "lucide-react";
 import { cn } from "../../lib/utils";
@@ -39,7 +40,7 @@ const navItems = [
     { icon: Calendar, label: "Takvim", href: "/calendar" },
     { icon: Users, label: "Rehber", href: "/contacts" },
     { icon: MessageSquare, label: "Mesajlar", href: "/messages" },
-    { icon: BookOpen, label: "Kamusal Alan", href: "/public-space" },
+    { icon: Globe, label: "Kamusal Alan", href: "/public-space" },
     { icon: Bot, label: "Dijital Müfettiş", href: "/assistant" },
     { icon: Star, label: "Bize Puan Verin", href: "/feedback" },
 ];

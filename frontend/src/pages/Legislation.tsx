@@ -10,6 +10,7 @@ import { cn } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
 import { Lock, Globe } from "lucide-react";
 import { isElectron } from "../lib/firebase";
+import { BASE_URL } from "../lib/config";
 
 
 const CATEGORIES = ["Tümü", "GSB", "KYK", "Federasyon", "Özel Yurt", "Spor Kulüpleri", "Genel"];
@@ -880,7 +881,7 @@ function LegislationRow({
                         title="Dosyayı Görüntele"
                         onClick={() => {
                             const url = leg.local_path
-                                ? (leg.local_path.startsWith('http') ? leg.local_path : `http://localhost:8000${leg.local_path}`)
+                                ? (leg.local_path.startsWith('http') ? leg.local_path : `${BASE_URL}${leg.local_path}`)
                                 : leg.document_url;
                             if (url) window.open(url, '_blank');
                         }}

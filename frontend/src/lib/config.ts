@@ -17,5 +17,6 @@ const PUBLIC_BACKEND_URL = API_URL_OVERRIDE || (IS_ELECTRON
     : (!isLocalhost || IS_PROD ? "https://mufyardv2.up.railway.app" : "http://127.0.0.1:8000"));
 
 // Ortama göre backend URL'si
+export const BASE_URL = PUBLIC_BACKEND_URL;
 export const API_URL = `${PUBLIC_BACKEND_URL}/api`;
 export const WS_URL = PUBLIC_BACKEND_URL.replace("https", "wss").replace("http", "ws");

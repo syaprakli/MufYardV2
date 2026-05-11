@@ -13,6 +13,8 @@ import { isElectron } from "../lib/firebase";
 import { cn } from "../lib/utils";
 import ShareModal from "../components/ShareModal";
 
+const RAPOR_DURUMLARI = ["Başlanmadı", "Devam Ediyor", "Evrak Bekleniyor", "İncelemede", "Rapor Yazılıyor", "Tamamlandı"];
+
 const RAPOR_SABLONLARI: Record<string, string> = {
     "Boş Rapor": "",
     "Genel Teftiş": "<h1 style=\"text-align: center;\">GENEL TEFTİŞ RAPORU</h1><p><br></p><p><strong>1. GİRİŞ</strong></p><p>....... tarihli ve ....... sayılı Makam Onayı üzerine ....... İl Müdürlüğü ve bağlı birimlerinde yürütülen Genel Teftiş çalışmaları sonucunda bu rapor düzenlenmiştir.</p><p><br></p><p><strong>2. YAPILAN İNCELEME VE TESPİTLER</strong></p><p>Kurumun mevzuata uygunluk, mali ve idari işlemleri incelenmiş olup, tespit edilen hususlar aşağıda maddeler halinde açıklanmıştır:</p><ul><li>İlk tespit...</li></ul><p><br></p><p><strong>3. SONUÇ VE ÖNERİLER</strong></p><p>Yapılan genel teftiş neticesinde ....... kanaatine varılmıştır.</p>",
@@ -299,10 +301,10 @@ export default function Audit() {
     const handleAcceptInvitation = async (auditId: string) => {
         if (!user?.uid) return;
 
-        if (!isElectron) {
-            toast.error("Rapor kabul işlemi yalnızca masaüstü uygulamasında yapılabilir.");
-            return;
-        }
+        /* 
+           Rapor kabul işlemi veri tabanı üzerinden yürütülür, 
+           bu nedenle Web sürümünde de aktiftir.
+        */
 
         try {
             await acceptAudit(auditId, user.uid, user.email || undefined);
@@ -780,12 +782,31 @@ function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect
                     </div>
                     {/* Status Badge - Mobile only in top right */}
                     <div className="md:hidden">
-                        <span className={cn(
-                            "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm",
-                            statusColors[task?.rapor_durumu || status] || 'bg-slate-100 text-slate-500'
-                        )}>
-                            {task ? task.rapor_durumu : 'Taslak'}
-                        </span>
+                        <select
+                            value={task?.rapor_durumu || status}
+                            onChange={async (e) => {
+                                const newStatus = e.target.value;
+                                try {
+                                    if (task) {
+                                        await updateTask(task.id, { rapor_durumu: newStatus });
+                                        toast.success("Görev durumu güncellendi.");
+                                    } else {
+                                        await onUpdate(audit.id, { status: newStatus });
+                                    }
+                                    await loadData(true);
+                                } catch (error) {
+                                    toast.error("Durum güncellenemedi.");
+                                }
+                            }}
+                            className={cn(
+                                "px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm outline-none bg-transparent",
+                                statusColors[task?.rapor_durumu || status] || 'bg-slate-100 text-slate-500'
+                            )}
+                        >
+                            {RAPOR_DURUMLARI.map(d => (
+                                <option key={d} value={d} className="text-slate-900 bg-white">{d}</option>
+                            ))}
+                        </select>
                     </div>
                 </div>
 
@@ -813,12 +834,31 @@ function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect
 
                 <div className="flex items-center justify-between md:justify-end gap-3 pt-4 md:pt-0 border-t md:border-t-0 border-border/40 w-full md:w-auto">
                     {/* Status Badge - Desktop only */}
-                    <span className={cn(
-                        "hidden md:block px-5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.1em] border shadow-sm",
-                        statusColors[task?.rapor_durumu || status] || 'bg-slate-100 text-slate-500'
-                    )}>
-                        {task ? task.rapor_durumu : (audit.task_id ? `Görev Bulunamadı` : "Rapor Taslağı")}
-                    </span>
+                    <select
+                        value={task?.rapor_durumu || status}
+                        onChange={async (e) => {
+                            const newStatus = e.target.value;
+                            try {
+                                if (task) {
+                                    await updateTask(task.id, { rapor_durumu: newStatus });
+                                    toast.success("Görev durumu güncellendi.");
+                                } else {
+                                    await onUpdate(audit.id, { status: newStatus });
+                                }
+                                await loadData(true);
+                            } catch (error) {
+                                toast.error("Durum güncellenemedi.");
+                            }
+                        }}
+                        className={cn(
+                            "hidden md:block px-5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.1em] border shadow-sm outline-none cursor-pointer hover:bg-slate-50 transition-colors",
+                            statusColors[task?.rapor_durumu || status] || 'bg-slate-100 text-slate-500'
+                        )}
+                    >
+                        {RAPOR_DURUMLARI.map(d => (
+                            <option key={d} value={d} className="text-slate-900 bg-white">{d}</option>
+                        ))}
+                    </select>
 
                     <div className="flex items-center gap-2 w-full md:w-auto">
                         <div className="flex items-center gap-1 shrink-0">

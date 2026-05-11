@@ -3,7 +3,8 @@ import {
     Shield, ChevronRight, Save, Loader2, Check, 
     LayoutDashboard, ClipboardList, FileText, 
     Users, Gavel, StickyNote, Calendar, 
-    MessageSquare, Globe, Lock
+    MessageSquare, Globe, Lock, Bot,
+    CheckSquare, ClipboardCheck, FolderTree, BookOpen, Star
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "../components/ui/Button";
@@ -20,13 +21,13 @@ const MODUL_LISTESI = [
     { 
         id: "tasks", 
         label: "Görevler", 
-        icon: ClipboardList,
+        icon: CheckSquare,
         description: "Denetim görevlerini görüntüleme ve yönetme yetkisi."
     },
     { 
         id: "report-analytics", 
         label: "Görev Analizleri", 
-        icon: FileText,
+        icon: ClipboardCheck,
         description: "Tamamlanan görevlerin derinlemesine analizleri."
     },
     { 
@@ -44,13 +45,13 @@ const MODUL_LISTESI = [
     { 
         id: "files", 
         label: "Dosyalar", 
-        icon: FileText,
+        icon: FolderTree,
         description: "Dosya yönetimi ve arşiv sistemi."
     },
     { 
         id: "legislation", 
         label: "Mevzuat", 
-        icon: Gavel,
+        icon: BookOpen,
         description: "Mevzuat verilerine erişim ve yönetim."
     },
     { 
@@ -80,13 +81,13 @@ const MODUL_LISTESI = [
     { 
         id: "assistant", 
         label: "Dijital Müfettiş", 
-        icon: FileText,
+        icon: Bot,
         description: "Yapay zeka destekli denetim asistanı."
     },
     { 
         id: "feedback", 
         label: "Bize Puan Verin", 
-        icon: MessageSquare,
+        icon: Star,
         description: "Sistem geri bildirimlerini iletme."
     },
 ];
