@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from app.lib.firebase_admin import db
 from app.schemas.notification import NotificationCreate
@@ -29,6 +29,34 @@ class NotificationService:
             print(f"[WS] Notification broadcast failed: {e}")
             
         return new_notif
+
+    @staticmethod
+    async def create_throttled_notification(notification: NotificationCreate, cooldown_minutes: int = 30) -> Optional[Dict[str, Any]]:
+        """
+        Belirli bir süre (cooldown_minutes) içinde aynı kullanıcıya, aynı oda (chat_room_id) için 
+        tekrar bildirim gitmesini engeller.
+        """
+        if not notification.chat_room_id:
+            return await NotificationService.create_notification(notification)
+
+        notifs_ref = db.collection('notifications')
+        since = datetime.utcnow() - timedelta(minutes=cooldown_minutes)
+        
+        # Firestore üzerinden son cooldown süresindeki benzer bildirimi kontrol et
+        try:
+            query = notifs_ref.where('user_id', '==', notification.user_id) \
+                              .where('chat_room_id', '==', notification.chat_room_id) \
+                              .where('created_at', '>=', since) \
+                              .limit(1)
+            
+            docs = await asyncio.to_thread(lambda: list(query.stream()))
+            if docs:
+                # Yakın zamanda bildirim gönderilmiş, pas geç.
+                return None
+        except Exception as e:
+            print(f"[THROTTLE] Check failed: {e}")
+            
+        return await NotificationService.create_notification(notification)
 
 
     @staticmethod

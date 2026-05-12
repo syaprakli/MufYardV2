@@ -72,7 +72,7 @@ async def send_dm(msg: DirectMessageCreate, uid: str, name: str):
             type="collaboration",
             chat_room_id="dm_" + "_".join(sorted([uid, msg.recipient_id]))
         )
-        await NotificationService.create_notification(notif)
+        await NotificationService.create_throttled_notification(notif, cooldown_minutes=30)
         
         return new_msg
     except Exception as e:
