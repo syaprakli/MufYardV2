@@ -1,37 +1,70 @@
 // ── post content markdown renderer ────────────────────────────────────────────
-function renderPostContent(raw: string) {
+function renderPostContent(raw: string, resolveUrl: (url: string) => string) {
+    if (!raw) return "";
+    
     // Escape HTML first
     let safe = raw
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
+    
     // Bold / italic
     safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     safe = safe.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    
+    // Markdown Images: ![alt](url)
+    safe = safe.replace(/!\[(.*?)\]\((.*?)\)/g, (match, alt, url) => {
+        const fullUrl = resolveUrl(url);
+        return `<div class="my-4 rounded-3xl overflow-hidden border border-border shadow-sm group/inline-img relative">
+            <img src="${fullUrl}" alt="${alt}" class="w-full h-auto max-h-[500px] object-contain bg-muted/30 transition-transform hover:scale-[1.01] cursor-zoom-in" onclick="window.open('${fullUrl}', '_blank')"/>
+            ${alt ? `<div class="absolute bottom-0 left-0 right-0 p-3 bg-black/40 backdrop-blur-sm text-white text-[10px] font-black tracking-widest opacity-0 group-hover/inline-img:opacity-100 transition-opacity">${alt.toUpperCase()}</div>` : ''}
+        </div>`;
+    });
+
+    // Markdown Links: [text](url)
+    safe = safe.replace(/\[(.+?)\]\((.+?)\)/g, (match, text, url) => {
+        const fullUrl = resolveUrl(url);
+        return `<a href="${fullUrl}" target="_blank" class="text-primary font-black hover:underline decoration-2 underline-offset-4">${text}</a>`;
+    });
+
     // Horizontal rule
-    safe = safe.replace(/---/g, '<hr class="my-3 border-border"/>');
+    safe = safe.replace(/---/g, '<hr class="my-6 border-border/60"/>');
+    
     // Process lines → paragraphs / lists
     const lines = safe.split('\n');
     let html = '';
     let ulOpen = false;
     let olOpen = false;
+    
     for (const line of lines) {
         if (/^- /.test(line)) {
             if (olOpen) { html += '</ol>'; olOpen = false; }
-            if (!ulOpen) { html += '<ul class="list-disc pl-5 my-2 space-y-0.5">'; ulOpen = true; }
-            html += `<li>${line.slice(2)}</li>`;
+            if (!ulOpen) { html += '<ul class="list-disc pl-6 my-4 space-y-2">'; ulOpen = true; }
+            html += `<li class="font-medium text-slate-600">${line.slice(2)}</li>`;
         } else if (/^\d+\. /.test(line)) {
             if (ulOpen) { html += '</ul>'; ulOpen = false; }
-            if (!olOpen) { html += '<ol class="list-decimal pl-5 my-2 space-y-0.5">'; olOpen = true; }
-            html += `<li>${line.replace(/^\d+\. /, '')}</li>`;
+            if (!olOpen) { html += '<ol class="list-decimal pl-6 my-4 space-y-2">'; olOpen = true; }
+            html += `<li class="font-medium text-slate-600">${line.replace(/^\d+\. /, '')}</li>`;
         } else {
             if (ulOpen) { html += '</ul>'; ulOpen = false; }
             if (olOpen) { html += '</ol>'; olOpen = false; }
-            html += line === '' ? '<br/>' : `<p class="mb-1.5">${line}</p>`;
+            
+            if (line.trim() === '') {
+                html += '<div class="h-2"></div>';
+            } else {
+                // Auto-link URLs that are not already in a tag
+                let processedLine = line;
+                if (!processedLine.includes('<a') && !processedLine.includes('<img')) {
+                    processedLine = processedLine.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="text-primary hover:underline">$1</a>');
+                }
+                html += `<p class="mb-3 font-medium text-slate-600 leading-relaxed">${processedLine}</p>`;
+            }
         }
     }
+    
     if (ulOpen) html += '</ul>';
     if (olOpen) html += '</ol>';
+    
     return html;
 }
 
@@ -156,6 +189,16 @@ export default function PublicSpace() {
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [editCommentText, setEditCommentText] = useState("");
     const [chatAttachments, setChatAttachments] = useState<Attachment[]>([]);
+    const [uploading, setUploading] = useState(false);
+
+    // URL Resolution Helper
+    const resolveAttachmentUrl = (url: string) => {
+        if (!url) return '';
+        const raw = String(url).trim();
+        if (raw.startsWith('http') || raw.startsWith('blob:') || raw.startsWith('data:')) return raw;
+        const baseUrl = API_URL.replace(/\/api\/?$/, '');
+        return `${baseUrl}${raw.startsWith('/') ? '' : '/'}${raw}`;
+    };
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -445,11 +488,8 @@ export default function PublicSpace() {
         try {
             const res = await fetchWithTimeout(`${API_URL}/files/upload`, { method: 'POST', body: formData });
             const data = await res.json();
-            // Resim/dosya URL'sini tam URL'e çevir
-            if (data.url && data.url.startsWith('/')) {
-                const baseUrl = API_URL.replace(/\/api$/, '');
-                data.url = baseUrl + data.url;
-            }
+            
+            // Backend'den gelen URL'yi direkt kullanabiliriz, resolveAttachmentUrl render sırasında halledecek
             if (isComment) setCommentAttachments(p => [...p, data]);
             else setNewPost(p => ({ ...p, attachments: [...p.attachments, data] }));
             toast.success("Dosya yüklendi!");
@@ -770,21 +810,22 @@ export default function PublicSpace() {
 
             <AnimatePresence>
                 {showPostCreator && (
-                    <PostCreator 
-                        onClose={() => { setShowPostCreator(false); setEditingPost(null); }} 
-                        onSubmit={handleCreatePost}
-                        post={newPost}
-                        setPost={setNewPost}
-                        categories={categories}
-                        isPosting={isPosting}
-                        isEdit={!!editingPost}
-                        inspectors={allInspectors}
-                        sharedWith={sharedWith}
-                        onSharedWithChange={setSharedWith}
-                        onUpload={handleFileUpload}
-                        uploading={fileUploading}
-                        isAdmin={userRole === 'admin' || userRole === 'moderator'}
-                    />
+                        <PostCreator 
+                            onClose={() => { setShowPostCreator(false); setEditingPost(null); }} 
+                            onSubmit={handleCreatePost}
+                            post={newPost}
+                            setPost={setNewPost}
+                            categories={categories}
+                            isPosting={isPosting}
+                            isEdit={!!editingPost}
+                            inspectors={allInspectors}
+                            sharedWith={sharedWith}
+                            onSharedWithChange={setSharedWith}
+                            onUpload={handleFileUpload}
+                            uploading={fileUploading}
+                            isAdmin={userRole === 'admin' || userRole === 'moderator'}
+                            resolveUrl={resolveAttachmentUrl}
+                        />
                 )}
                 {zoomedAttachment && <GalleryOverlay attachment={zoomedAttachment} onClose={() => setZoomedAttachment(null)} />}
             </AnimatePresence>
@@ -857,22 +898,23 @@ export default function PublicSpace() {
                                     <div key={msg.id || idx} className={cn("flex flex-col", isMine ? "items-end" : "items-start")}>
                                         <div className={cn("max-w-[85%] p-4 rounded-3xl text-[13px] font-medium shadow-sm space-y-2", isMine ? "bg-primary text-white rounded-tr-none" : "bg-slate-100 text-slate-800 rounded-tl-none")}>
                                             {msg.text && <div>{msg.text}</div>}
-                                            {msg.attachments && msg.attachments.length > 0 && (
                                                 <div className="flex flex-wrap gap-2 mt-2">
-                                                    {msg.attachments.map((at, i) => (
+                                                    {msg.attachments.map((at, i) => {
+                                                        const resolvedUrl = resolveAttachmentUrl(at.url);
+                                                        return (
                                                         <div 
                                                             key={i} 
                                                             className={cn(
                                                                 "relative rounded-xl overflow-hidden border",
                                                                 at.type === 'image' ? "w-32 h-32 cursor-pointer" : "p-3 bg-white/10 backdrop-blur-sm border-white/20 min-w-[120px]"
                                                             )}
-                                                            onClick={() => at.type === 'image' && setZoomedAttachment(at)}
+                                                            onClick={() => at.type === 'image' && setZoomedAttachment({ ...at, url: resolvedUrl })}
                                                         >
                                                             {at.type === 'image' ? (
-                                                                <img src={at.url} className="w-full h-full object-cover" />
+                                                                <img src={resolvedUrl} className="w-full h-full object-cover" />
                                                             ) : (
                                                                 <a 
-                                                                    href={at.url} 
+                                                                    href={resolvedUrl} 
                                                                     target="_blank" 
                                                                     rel="noopener noreferrer"
                                                                     className="flex items-center gap-2 hover:opacity-80 transition-opacity"
@@ -888,9 +930,8 @@ export default function PublicSpace() {
                                                                 </a>
                                                             )}
                                                         </div>
-                                                    ))}
+                                                    );})}
                                                 </div>
-                                            )}
                                         </div>
                                         <span className="text-[10px] font-bold text-slate-400 mt-1 px-2">{msg.author_name} • {new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
                                     </div>
@@ -905,7 +946,7 @@ export default function PublicSpace() {
                             <div className="flex flex-wrap gap-2 mb-2 p-2 bg-slate-50 rounded-2xl border border-dashed border-slate-200 overflow-x-auto no-scrollbar">
                                 {chatAttachments.map((at, i) => (
                                     <div key={i} className="relative group/chatat w-16 h-16 rounded-xl overflow-hidden border border-slate-200 bg-white flex items-center justify-center shrink-0">
-                                        {at.type === 'image' ? <img src={at.url} className="w-full h-full object-cover" /> : <Paperclip size={18} className="text-slate-300" />}
+                                        {at.type === 'image' ? <img src={resolveAttachmentUrl(at.url)} className="w-full h-full object-cover" /> : <Paperclip size={18} className="text-slate-300" />}
                                         <button 
                                             type="button" 
                                             onClick={() => setChatAttachments(prev => prev.filter((_, idx) => idx !== i))}
@@ -1047,7 +1088,7 @@ function FAQCard({ faq, isOpen, onToggle, onApprove, onReject, isAdmin }: any) {
     );
 }
 
-function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, isEdit, onUpload, uploading }: any) {
+function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, isEdit, onUpload, uploading, resolveUrl }: any) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const isForum = post.category !== 'Duyurular' && post.category !== 'SSS';
 
@@ -1162,7 +1203,7 @@ function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, 
                             {post.attachments.map((at: any, i: number) => (
                                 <div key={i} className="relative group/at w-20 h-20 rounded-xl overflow-hidden border border-border bg-card shadow-sm flex items-center justify-center shrink-0">
                                     {at.type === 'image' ? (
-                                        <img src={at.url} className="w-full h-full object-cover" />
+                                        <img src={resolveUrl(at.url)} className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="flex flex-col items-center justify-center w-full h-full bg-muted/30 p-2">
                                             <FileText size={24} className="text-slate-400" />
@@ -1195,7 +1236,7 @@ function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, 
     , document.body);
 }
 
-function ThreadView({ post, comments, onBack, onComment, commentText, setCommentText, isCommenting, user, onReply, onDeleteComment, onUpdateComment, editingCommentId, setEditingCommentId, editCommentText, setEditCommentText, onEditPost, onDeletePost, onAttach, onFileUpload, attachments, setAttachments, onZoom, isStatic }: any) {
+function ThreadView({ post, comments, onBack, onComment, commentText, setCommentText, isCommenting, user, onReply, onDeleteComment, onUpdateComment, editingCommentId, setEditingCommentId, editCommentText, setEditCommentText, onEditPost, onDeletePost, onAttach, onFileUpload, attachments, setAttachments, onZoom, isStatic, resolveUrl }: any) {
     return (
         <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-500">
             <input id="comment-file-input" type="file" hidden onChange={(e) => onFileUpload(e, true)} />
@@ -1232,23 +1273,25 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                         <h1 className="text-xl font-black text-foreground leading-tight tracking-tight">{post.title}</h1>
                         <div
                             className="text-slate-600 font-medium leading-relaxed text-sm [&_strong]:font-black [&_strong]:text-foreground [&_em]:italic [&_ul]:list-disc [&_ol]:list-decimal [&_li]:ml-2"
-                            dangerouslySetInnerHTML={{ __html: renderPostContent(post.content) }}
+                            dangerouslySetInnerHTML={{ __html: renderPostContent(post.content, resolveUrl) }}
                         />
                     </div>
                     {post.attachments && post.attachments.length > 0 && (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4">
-                            {post.attachments.map((at: any, i: number) => (
+                            {post.attachments.map((at: any, i: number) => {
+                                const resolvedUrl = resolveUrl(at.url);
+                                return (
                                 <div 
                                     key={i} 
                                     onClick={() => {
-                                        if (at.type === 'image') onZoom(at);
-                                        else window.open(at.url, '_blank');
+                                        if (at.type === 'image') onZoom({ ...at, url: resolvedUrl });
+                                        else window.open(resolvedUrl, '_blank');
                                     }} 
                                     className="group/img relative aspect-square rounded-3xl overflow-hidden bg-muted/80 border border-border cursor-pointer flex items-center justify-center"
                                 >
                                     {at.type === 'image' ? (
                                         <>
-                                            <img src={at.url} className="w-full h-full object-cover transition-transform group-hover/img:scale-110" />
+                                            <img src={resolvedUrl} className="w-full h-full object-cover transition-transform group-hover/img:scale-110" />
                                             <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center"><Eye className="text-white" size={32} /></div>
                                         </>
                                     ) : (
@@ -1262,7 +1305,7 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                                         </div>
                                     )}
                                 </div>
-                            ))}
+                            );})}
                         </div>
                     )}
                 </div>
@@ -1325,11 +1368,11 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                                     {attachments.map((at: any, i: number) => (
                                         <div 
                                             key={i} 
-                                            onClick={() => at.type !== 'image' && window.open(at.url, '_blank')}
+                                            onClick={() => at.type !== 'image' && window.open(resolveUrl(at.url), '_blank')}
                                             className={cn("relative w-16 h-16 shrink-0 rounded-xl overflow-hidden border border-border bg-card flex items-center justify-center group/cat", at.type !== 'image' && "cursor-pointer hover:bg-primary/5")}
                                         >
                                             {at.type === 'image' ? (
-                                                <img src={at.url} className="w-full h-full object-cover" />
+                                                <img src={resolveUrl(at.url)} className="w-full h-full object-cover" />
                                             ) : (
                                                 <div className="flex flex-col items-center justify-center w-full h-full p-1">
                                                     <FileText size={18} className="text-slate-400 group-hover/cat:text-primary transition-colors" />
