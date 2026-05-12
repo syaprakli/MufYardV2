@@ -7,7 +7,8 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Modal } from "../components/ui/Modal";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
-import { fetchTasks, type Task } from "../lib/api/tasks";
+import { useGlobalData } from "../lib/context/GlobalDataContext";
+import { type Task } from "../lib/api/tasks";
 import {
     fetchCalendarNotes,
     createCalendarNote,
@@ -126,6 +127,7 @@ function getSpecialDatesForDay(y: number, m: number, day: number): SpecialDateEn
 
 export default function Calendar() {
     const { user, loading: authLoading } = useAuth();
+    const { data: globalData } = useGlobalData();
     const confirm = useConfirm();
 
     const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
@@ -139,7 +141,16 @@ export default function Calendar() {
     const [allNotes, setAllNotes] = useState<CalendarNote[]>([]);
     const [notesLoading, setNotesLoading] = useState(false);
 
-    const [tasks, setTasks] = useState<Task[]>([]);
+    const isArchivedTask = (task: any) => {
+        const isOld = task.baslama_tarihi
+            ? (Date.now() - new Date(task.baslama_tarihi).getTime() > 730 * 24 * 60 * 60 * 1000)
+            : false;
+        return task.rapor_durumu === "Tamamlandı" && isOld;
+    };
+
+    const tasks = useMemo(() => {
+        return (globalData.tasks || []).filter(t => !isArchivedTask(t));
+    }, [globalData.tasks]);
 
     // ── helpers ────────────────────────────────────────────────────────────────
     const effectiveUid = useCallback(() => {
@@ -154,15 +165,6 @@ export default function Calendar() {
         const uid = effectiveUid();
         if (!uid) return;
 
-        const loadTasks = async () => {
-            try {
-                const data = await fetchTasks(uid, user?.email ?? undefined);
-                setTasks(data);
-            } catch {
-                console.error("Takvim görevleri yüklenemedi.");
-            }
-        };
-
         const loadNotes = async () => {
             setNotesLoading(true);
             try {
@@ -175,7 +177,6 @@ export default function Calendar() {
             }
         };
 
-        loadTasks();
         loadNotes();
     }, [user, authLoading, effectiveUid]);
 

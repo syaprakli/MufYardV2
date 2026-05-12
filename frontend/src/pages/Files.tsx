@@ -16,7 +16,7 @@ import { fetchFileTree, uploadFile, createFolder, deleteItem, openFolder, openFi
 import { aiSearch } from "../lib/api/ai";
 import { cn } from "../lib/utils";
 import { isElectron } from "../lib/firebase";
-import { API_URL } from "../lib/config";
+import { API_URL, LOCAL_API_URL, IS_ELECTRON } from "../lib/config";
 import { useAuth } from "../lib/hooks/useAuth";
 import { fetchAllProfiles, type Profile } from "../lib/api/profiles";
 import { sendDirectMessage } from "../lib/api/collaboration";
@@ -59,7 +59,9 @@ export default function Files() {
         content: ""
     });
 
-    const BACKEND_BASE_URL = API_URL.replace(/\/api\/?$/, "");
+    // Masaüstünde yerel dosyalara (Belgelerim/MufYARD), Web'de Bulut'a (Railway) odaklan
+    const CURRENT_API_URL = IS_ELECTRON ? LOCAL_API_URL : API_URL;
+    const BACKEND_BASE_URL = CURRENT_API_URL.replace(/\/api\/?$/, "");
 
     const resolveFileUrl = (url?: string) => {
         if (!url) return "";
@@ -238,7 +240,7 @@ export default function Files() {
                 })
             );
         } catch (error) {
-            console.error("Profiller yüklenemedi", error);
+            console.error("Profiller yüklenemedi:", error);
         }
     };
 
@@ -305,7 +307,7 @@ export default function Files() {
         if (!confirmed) return;
 
         try {
-            await deleteItem(id);
+            await deleteItem(id, user?.uid);
             await loadData();
             if (previewFile?.id === id) setPreviewFile(null);
             toast.success("Silindi");
@@ -623,25 +625,25 @@ export default function Files() {
                                                     <p className={cn("font-bold text-foreground dark:text-slate-200 transition-colors group-hover:text-primary", viewMode === 'list' ? "text-sm truncate" : "text-xs line-clamp-2 uppercase tracking-wide")}>{item.name}</p>
                                                     <p className="text-[10px] text-slate-400 font-medium truncate">{item.size || 'Klasör'} {item.date && `• ${item.date}`}</p>
                                                 </div>
-                                            </div>
-                                            
-                                            <div className={cn("flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0 z-20", viewMode === 'list' ? "ml-2" : "absolute top-4 right-4")}>
-                                                <Button 
-                                                    size="icon" 
-                                                    variant="ghost" 
-                                                    onClick={(e) => { e.stopPropagation(); handleCreateFolder(); }}
-                                                    className="h-8 w-8 rounded-xl text-primary hover:bg-primary hover:text-white"
-                                                    title="Buraya Klasör Ekle"
-                                                >
-                                                    <Plus size={14} />
-                                                </Button>
+                                              <div className={cn("flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0 z-20", viewMode === 'list' ? "ml-2" : "absolute top-4 right-4")}>
+                                                {item.type === 'folder' && (
+                                                    <Button 
+                                                        size="icon" 
+                                                        variant="ghost" 
+                                                        onClick={(e) => { e.stopPropagation(); handleCreateFolder(); }}
+                                                        className="h-8 w-8 rounded-xl text-primary hover:bg-primary hover:text-white hidden md:flex"
+                                                        title="İçine Klasör Ekle"
+                                                    >
+                                                        <Plus size={14} />
+                                                    </Button>
+                                                )}
 
-                                                {isElectron && (
+                                                {isElectron && item.type === 'folder' && (
                                                 <Button 
                                                     size="icon" 
                                                     variant="ghost" 
                                                     onClick={(e) => { e.stopPropagation(); handleOpenFolder(item.id); }}
-                                                    className="h-8 w-8 rounded-xl text-slate-400 hover:text-primary"
+                                                    className="h-8 w-8 rounded-xl text-slate-400 hover:text-primary hidden md:flex"
                                                     title="Klasörü Aç"
                                                 >
                                                     <FolderOpen size={14} />
@@ -660,7 +662,7 @@ export default function Files() {
                                                     size="icon"
                                                     variant="ghost"
                                                     onClick={(e) => { e.stopPropagation(); setSharingFile(item); }}
-                                                    className="h-8 w-8 rounded-xl text-slate-400 hover:text-emerald-500"
+                                                    className="h-8 w-8 rounded-xl text-slate-400 hover:text-emerald-500 hidden sm:flex"
                                                     title="Paylaş"
                                                 >
                                                     <Share2 size={14} />
@@ -674,8 +676,28 @@ export default function Files() {
                                                     <Trash2 size={14} />
                                                 </Button>
                                             </div>
+                                        </div>
                                         </motion.div>
                                     ))}
+
+                                    {/* Yeni Klasör Ekle Kartı (En Sonunda) */}
+                                    {!searchQuery && (
+                                        <motion.div
+                                            layout
+                                            initial={{ opacity: 0, scale: 0.9 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            onClick={handleCreateFolder}
+                                            className={cn(
+                                                "group cursor-pointer transition-all active:scale-95 duration-300 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-primary/50 hover:bg-primary/5 rounded-3xl flex flex-col items-center justify-center gap-3",
+                                                viewMode === 'list' ? "hidden" : "aspect-square p-6"
+                                            )}
+                                        >
+                                            <div className="p-4 rounded-2xl bg-primary/10 text-primary group-hover:scale-110 transition-transform duration-500">
+                                                <Plus size={24} strokeWidth={3} />
+                                            </div>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-primary/70">Klasör Ekle</p>
+                                        </motion.div>
+                                    )}
                                 </AnimatePresence>
                             </div>
                         ) : (
@@ -1006,7 +1028,7 @@ export default function Files() {
                                 value={newFolderName}
                                 onChange={(e) => setNewFolderName(e.target.value)}
                                 placeholder="Klasör Adı (Örn: 2024 Denetimleri)"
-                                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                                className="w-full px-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-black text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
                             />
                             <div className="flex gap-3 pt-2">
                                 <Button 

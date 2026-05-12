@@ -20,6 +20,7 @@ interface GlobalDataContextType {
     data: GlobalData;
     loading: boolean;
     refreshAll: (uid: string, email?: string, displayName?: string, force?: boolean) => Promise<void>;
+    refreshProfile: (uid: string, email?: string, displayName?: string) => Promise<void>;
     refreshTasks: (uid: string) => Promise<void>;
     refreshAudits: (uid: string, email?: string) => Promise<void>;
     refreshContactsCorporate: () => Promise<void>;
@@ -119,8 +120,17 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
     }, []);
 
+    const refreshProfile = useCallback(async (uid: string, email?: string, displayName?: string) => {
+        try {
+            const profile = await fetchProfile(uid, email, displayName);
+            setData(prev => ({ ...prev, profile }));
+        } catch (error) {
+            console.error("Profile refresh error:", error);
+        }
+    }, []);
+
     return (
-        <GlobalDataContext.Provider value={{ data, loading, refreshAll, refreshTasks, refreshAudits, refreshContactsCorporate, refreshContactsPersonal }}>
+        <GlobalDataContext.Provider value={{ data, loading, refreshAll, refreshProfile, refreshTasks, refreshAudits, refreshContactsCorporate, refreshContactsPersonal }}>
             {children}
         </GlobalDataContext.Provider>
     );

@@ -664,8 +664,8 @@ Lütfen şunları analiz et:
                         {sureData.every(d => d.value === 0) ? (
                             <div className="flex items-center justify-center h-full text-slate-400 text-xs font-bold">Henüz veri yok</div>
                         ) : (
-                        <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={0}>
-                            <BarChart data={sureData}>
+                        <ResponsiveContainer width="100%" height={300} minWidth={0}>
+                            <BarChart data={sureData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={(theme as string) === 'dark' ? '#1e293b' : '#f8fafc'} />
                                 <XAxis 
                                     dataKey="name" 
@@ -712,7 +712,7 @@ Lütfen şunları analiz et:
                         {typeData.length === 0 ? (
                             <div className="flex items-center justify-center h-full text-slate-400 text-xs font-bold">Henüz veri yok</div>
                         ) : (
-                        <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={0}>
+                        <ResponsiveContainer width="100%" height={300} minWidth={0}>
                             <PieChart>
                                 <Pie
                                     data={typeData}
@@ -724,7 +724,7 @@ Lütfen şunları analiz et:
                                     ))}
                                 </Pie>
                                 <Tooltip />
-                                <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{fontSize: '9px', fontWeight: 'bold'}} />
+                                <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{fontSize: '9px', fontWeight: 'bold', paddingTop: '10px'}} />
                             </PieChart>
                         </ResponsiveContainer>
                         )}
@@ -741,7 +741,7 @@ Lütfen şunları analiz et:
                         {statusCounts.length === 0 ? (
                             <div className="flex items-center justify-center h-full text-slate-400 text-xs font-bold">Henüz veri yok</div>
                         ) : (
-                        <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={0}>
+                        <ResponsiveContainer width="100%" height={300} minWidth={0}>
                             <PieChart>
                                 <Pie
                                     data={statusCounts}
@@ -753,7 +753,7 @@ Lütfen şunları analiz et:
                                     ))}
                                 </Pie>
                                 <Tooltip />
-                                <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{fontSize: '9px', fontWeight: 'bold'}} />
+                                <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{fontSize: '9px', fontWeight: 'bold', paddingTop: '10px'}} />
                             </PieChart>
                         </ResponsiveContainer>
                         )}

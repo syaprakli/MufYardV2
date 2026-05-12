@@ -6,6 +6,7 @@ import { toast } from "react-hot-toast";
 import { useAuth } from "../../lib/hooks/useAuth";
 import { fetchProfile, updateProfile, uploadAvatar, type Profile } from "../../lib/api/profiles";
 import { updateProfile as firebaseUpdateProfile } from "firebase/auth";
+import { BASE_URL } from "../../lib/config";
 
 interface ProfileModalProps {
     isOpen: boolean;
@@ -23,6 +24,14 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         institution: "",
         phone: ""
     });
+
+    const resolveUrl = (url: string | null | undefined) => {
+        if (!url) return null;
+        const raw = String(url).trim();
+        if (raw.startsWith('http') || raw.startsWith('blob:') || raw.startsWith('data:')) return raw;
+        const cleanRaw = raw.startsWith('/') ? raw : `/${raw}`;
+        return `${BASE_URL.replace(/\/$/, '')}${cleanRaw}`;
+    };
 
     useEffect(() => {
         if (isOpen && user) {
@@ -117,8 +126,8 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                     <div className="flex flex-col items-center pb-6 border-b border-slate-50">
                         <div className="relative group">
                             <div className="w-24 h-24 rounded-[2rem] bg-primary flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-primary/20 relative overflow-hidden">
-                                {profile?.avatar_url ? (
-                                    <img src={profile.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                                {resolveUrl(profile?.avatar_url) ? (
+                                    <img src={resolveUrl(profile?.avatar_url) || ''} alt="avatar" className="w-full h-full object-cover" />
                                 ) : (
                                     <span>{formData.full_name.substring(0, 2).toUpperCase()}</span>
                                 )}

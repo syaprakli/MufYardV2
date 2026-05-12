@@ -67,11 +67,21 @@ class FolderManager:
         Belirli bir dosya/klasör için kullanıcıya verilen izni kontrol eder.
         action: 'read', 'write', 'delete'
         """
+        # Admin bypass (E-posta ve UID)
+        admin_ids = ["sefa.yaprakli@gsb.gov.tr", "admin", "user_1", "VKV8SfuNkWf9WeTYeSCTizd4oG83"]
+        if user_id in admin_ids:
+            return True
+
         permissions = FolderManager.load_permissions()
         file_meta = permissions.get(file_id)
+        
         if not file_meta:
-            # Metadata yoksa herkese açık kabul edilebilir veya False dönebilir
+            # Metadata yoksa, sistem tarafından oluşturulmuş standart bir klasör olabilir.
+            # Güvenlik için okuma/yazmaya izin verelim ama silme işlemini kısıtlayalım (admin hariç).
+            if action in ["read", "write"]:
+                return True
             return False
+            
         allowed = file_meta.get("permissions", {}).get(action, [])
         return user_id in allowed or user_id == file_meta.get("owner_id")
 

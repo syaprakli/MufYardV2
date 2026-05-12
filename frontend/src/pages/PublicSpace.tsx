@@ -15,8 +15,10 @@ function renderPostContent(raw: string, resolveUrl: (url: string) => string) {
     // Markdown Images: ![alt](url)
     safe = safe.replace(/!\[(.*?)\]\((.*?)\)/g, (_, alt, url) => {
         const fullUrl = resolveUrl(url);
+        // Escape single quotes for the onclick JS handler to prevent crashes with filenames like "L'image.png"
+        const escapedUrl = fullUrl.replace(/'/g, "\\'");
         return `<div class="my-4 rounded-3xl overflow-hidden border border-border shadow-sm group/inline-img relative">
-            <img src="${fullUrl}" alt="${alt}" class="w-full h-auto max-h-[500px] object-contain bg-muted/30 transition-transform hover:scale-[1.01] cursor-zoom-in" onclick="window.open('${fullUrl}', '_blank')"/>
+            <img src="${fullUrl}" alt="${alt}" class="w-full h-auto max-h-[500px] object-contain bg-muted/30 transition-transform hover:scale-[1.01] cursor-zoom-in" onclick="window.open('${escapedUrl}', '_blank')"/>
             ${alt ? `<div class="absolute bottom-0 left-0 right-0 p-3 bg-black/40 backdrop-blur-sm text-white text-[10px] font-black tracking-widest opacity-0 group-hover/inline-img:opacity-100 transition-opacity">${alt.toUpperCase()}</div>` : ''}
         </div>`;
     });
@@ -88,7 +90,7 @@ import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { DraggableChatWidget } from "../components/layout/DraggableChatWidget";
 import { usePresence } from "../lib/context/PresenceContext";
-import { API_URL } from "../lib/config";
+import { API_URL, BASE_URL, IS_ELECTRON } from "../lib/config";
 import { fetchWithTimeout } from "../lib/api/utils";
 import toast from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
@@ -191,12 +193,23 @@ export default function PublicSpace() {
     const [chatAttachments, setChatAttachments] = useState<Attachment[]>([]);
 
     // URL Resolution Helper
-    const resolveAttachmentUrl = (url: string) => {
+    const resolveAttachmentUrl = (url: string | null | undefined) => {
         if (!url) return '';
         const raw = String(url).trim();
+        
+        // Already absolute
         if (raw.startsWith('http') || raw.startsWith('blob:') || raw.startsWith('data:')) return raw;
-        const baseUrl = API_URL.replace(/\/api\/?$/, '');
-        return `${baseUrl}${raw.startsWith('/') ? '' : '/'}${raw}`;
+        
+        // Use BASE_URL (which is absolute in Electron/Prod)
+        const baseUrl = (BASE_URL || '').replace(/\/$/, '');
+        const cleanRaw = raw.startsWith('/') ? raw : `/${raw}`;
+        
+        // Ensure we use the production URL if BASE_URL is not provided or relative
+        if (!baseUrl || (IS_ELECTRON && !baseUrl.startsWith('http'))) {
+            return `https://mufyardv2.up.railway.app${cleanRaw}`;
+        }
+        
+        return `${baseUrl}${cleanRaw}`;
     };
 
     useEffect(() => {
@@ -634,6 +647,7 @@ export default function PublicSpace() {
                                     setAttachments={setCommentAttachments}
                                     onZoom={setZoomedAttachment}
                                     isStatic={false}
+                                    resolveUrl={resolveAttachmentUrl}
                                 />
                             </motion.div>
                         ) : (
@@ -1208,7 +1222,7 @@ function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, 
                                     ) : (
                                         <div className="flex flex-col items-center justify-center w-full h-full bg-muted/30 p-2">
                                             <FileText size={24} className="text-slate-400" />
-                                            <span className="text-[8px] font-bold text-muted-foreground mt-1 truncate w-full text-center" title={at.name}>{at.name || "Dosya"}</span>
+                                            <span className="text-[8px] font-black text-muted-foreground mt-1 truncate w-full text-center" title={at.name}>{at.name || "Dosya"}</span>
                                         </div>
                                     )}
                                     <button type="button" onClick={() => setPost((p: any) => ({ ...p, attachments: p.attachments.filter((_: any, idx: number) => idx !== i) }))} className="absolute top-1 right-1 bg-rose-500 text-white rounded-full p-1 opacity-0 group-hover/at:opacity-100 transition-all shadow-lg z-10"><X size={8} /></button>
@@ -1349,7 +1363,42 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                                             <Button onClick={() => onUpdateComment(comment.id)}>Kaydet</Button>
                                         </div>
                                     </div>
-                                ) : <p className="text-sm text-slate-600 font-medium leading-relaxed">{comment.content}</p>}
+                                ) : (
+                                    <div className="space-y-3">
+                                        <p className="text-sm text-slate-600 font-medium leading-relaxed">{comment.content}</p>
+                                        
+                                        {/* Comment Attachments */}
+                                        {comment.attachments && comment.attachments.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 pt-2">
+                                                {comment.attachments.map((at: any, i: number) => {
+                                                    const resolvedUrl = resolveUrl(at.url);
+                                                    return (
+                                                        <div 
+                                                            key={i} 
+                                                            onClick={() => {
+                                                                if (at.type === 'image') onZoom({ ...at, url: resolvedUrl });
+                                                                else window.open(resolvedUrl, '_blank');
+                                                            }}
+                                                            className="relative w-16 h-16 rounded-xl overflow-hidden border border-border bg-muted/30 cursor-pointer group/cat"
+                                                        >
+                                                            {at.type === 'image' ? (
+                                                                <img src={resolvedUrl} className="w-full h-full object-cover transition-transform group-hover/cat:scale-110" />
+                                                            ) : (
+                                                                <div className="flex flex-col items-center justify-center w-full h-full p-1 text-center">
+                                                                    <FileText size={18} className="text-slate-400 group-hover/cat:text-primary transition-colors" />
+                                                                    <span className="text-[7px] font-black mt-1 text-muted-foreground truncate w-full px-1">{at.name || "Dosya"}</span>
+                                                                </div>
+                                                            )}
+                                                            <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover/cat:opacity-100 transition-opacity flex items-center justify-center">
+                                                                {at.type === 'image' ? <Eye size={16} className="text-white" /> : <Download size={16} className="text-white" />}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )) : (
@@ -1367,20 +1416,20 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                             {attachments.length > 0 && (
                                 <div className="flex gap-2 p-2 overflow-x-auto no-scrollbar">
                                     {attachments.map((at: any, i: number) => (
-                                        <div 
+                                         <div 
                                             key={i} 
-                                            onClick={() => at.type !== 'image' && window.open(resolveUrl(at.url), '_blank')}
-                                            className={cn("relative w-16 h-16 shrink-0 rounded-xl overflow-hidden border border-border bg-card flex items-center justify-center group/cat", at.type !== 'image' && "cursor-pointer hover:bg-primary/5")}
+                                            className={cn("relative w-16 h-16 shrink-0 rounded-xl overflow-hidden border border-border bg-card flex items-center justify-center group/cat")}
+                                            title={at.name || "Dosya"}
                                         >
                                             {at.type === 'image' ? (
                                                 <img src={resolveUrl(at.url)} className="w-full h-full object-cover" />
                                             ) : (
                                                 <div className="flex flex-col items-center justify-center w-full h-full p-1">
-                                                    <FileText size={18} className="text-slate-400 group-hover/cat:text-primary transition-colors" />
-                                                    <span className="text-[7px] font-black mt-1 text-muted-foreground group-hover/cat:text-primary text-center truncate w-full">{at.name || "Dosya"}</span>
+                                                    <FileText size={18} className="text-slate-400 transition-colors" />
+                                                    <span className="text-[7px] font-black mt-1 text-muted-foreground text-center truncate w-full">{at.name || "Dosya"}</span>
                                                 </div>
                                             )}
-                                            <button onClick={(e) => { e.stopPropagation(); setAttachments((prev: any[]) => prev.filter((_, idx) => idx !== i)); }} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5"><X size={8} /></button>
+                                            <button type="button" onClick={(e) => { e.stopPropagation(); setAttachments((prev: any[]) => prev.filter((_, idx) => idx !== i)); }} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 z-10"><X size={8} /></button>
                                         </div>
                                     ))}
                                 </div>

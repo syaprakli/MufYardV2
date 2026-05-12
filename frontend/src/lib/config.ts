@@ -1,5 +1,5 @@
-const IS_PROD = import.meta.env.PROD;
-const IS_ELECTRON = typeof window !== 'undefined' && /Electron/.test(navigator.userAgent);
+export const IS_PROD = import.meta.env.PROD;
+export const IS_ELECTRON = typeof window !== 'undefined' && /Electron/.test(navigator.userAgent);
 const VITE_API_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_PUBLIC_API_URL) as string | undefined;
 const API_URL_OVERRIDE = VITE_API_URL?.trim();
 
@@ -24,4 +24,5 @@ const PUBLIC_BACKEND_URL = API_URL_OVERRIDE || (IS_ELECTRON
 // Ortama göre backend URL'si
 export const BASE_URL = PUBLIC_BACKEND_URL;
 export const API_URL = `${PUBLIC_BACKEND_URL}/api`;
+export const LOCAL_API_URL = `${LOCAL_URL}/api`;
 export const WS_URL = PUBLIC_BACKEND_URL.replace("https", "wss").replace("http", "ws");

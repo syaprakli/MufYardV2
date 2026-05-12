@@ -1,5 +1,8 @@
-import { API_URL } from "../config";
+import { API_URL, LOCAL_API_URL, IS_ELECTRON } from "../config";
 import { fetchWithTimeout } from "./utils";
+
+// Masaüstündeysen yerel backend'i (Belgelerim/MufYARD), Web'deysen Railway'i kullan
+const CURRENT_FILES_API = IS_ELECTRON ? LOCAL_API_URL : API_URL;
 
 export interface FileItem {
     id: string;
@@ -11,8 +14,8 @@ export interface FileItem {
     url?: string;
 }
 
-export const fetchFileTree = async (): Promise<FileItem[]> => {
-    const response = await fetchWithTimeout(`${API_URL}/files/tree`);
+export const fetchFileTree = async (path?: string): Promise<FileItem[]> => {
+    const response = await fetchWithTimeout(`${CURRENT_FILES_API}/files/tree?path=${path || ""}`);
     if (!response.ok) throw new Error("Dosya ağacı yüklenemedi");
     return response.json();
 };
@@ -21,7 +24,7 @@ export const uploadFile = async (file: File, path?: string): Promise<any> => {
     const formData = new FormData();
     formData.append("file", file);
     
-    const url = new URL(`${API_URL}/files/upload`);
+    const url = new URL(`${CURRENT_FILES_API}/files/upload`);
     if (path) url.searchParams.append("path", path);
     
     const response = await fetchWithTimeout(url.toString(), {
@@ -33,8 +36,8 @@ export const uploadFile = async (file: File, path?: string): Promise<any> => {
     return response.json();
 };
 
-export const createFolder = async (name: string, parentId?: string): Promise<any> => {
-    const response = await fetchWithTimeout(`${API_URL}/files/create-folder`, {
+export const createFolder = async (name: string, path: string, parentId?: string): Promise<any> => {
+    const response = await fetchWithTimeout(`${CURRENT_FILES_API}/files/folder?path=${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, parentId })
@@ -44,17 +47,25 @@ export const createFolder = async (name: string, parentId?: string): Promise<any
     return response.json();
 };
 
-export const deleteItem = async (id: string): Promise<any> => {
-    const response = await fetchWithTimeout(`${API_URL}/files/${encodeURIComponent(id)}`, {
+export const deleteItem = async (id: string, uid?: string): Promise<any> => {
+    // Slah'ları koruyarak diğer özel karakterleri encode et
+    const safeId = id.split('/').map(part => encodeURIComponent(part)).join('/');
+    const url = uid ? `${CURRENT_FILES_API}/files/delete-item/${safeId}?uid=${uid}` : `${CURRENT_FILES_API}/files/delete-item/${safeId}`;
+    
+    const response = await fetchWithTimeout(url, {
         method: "DELETE"
     });
     
-    if (!response.ok) throw new Error("Silme işlemi başarısız");
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: "Silme işlemi başarısız" }));
+        throw new Error(errorData.detail || "Silme işlemi başarısız");
+    }
     return response.json();
 };
 
 export const openFolder = async (id: string): Promise<any> => {
-    const response = await fetchWithTimeout(`${API_URL}/files/open-folder/${encodeURIComponent(id)}`, {
+    const safeId = id.split('/').map(part => encodeURIComponent(part)).join('/');
+    const response = await fetchWithTimeout(`${CURRENT_FILES_API}/files/open-folder/${safeId}`, {
         method: "POST"
     });
     
@@ -63,11 +74,22 @@ export const openFolder = async (id: string): Promise<any> => {
 };
 
 export const openFile = async (id: string): Promise<any> => {
-    const response = await fetchWithTimeout(`${API_URL}/files/open-file/${encodeURIComponent(id)}`, {
+    const safeId = id.split('/').map(part => encodeURIComponent(part)).join('/');
+    const response = await fetchWithTimeout(`${CURRENT_FILES_API}/files/open-file/${safeId}`, {
         method: "POST"
     });
     
     if (!response.ok) throw new Error("Dosya açılamadı");
+    return response.json();
+};
+
+export const openTaskFolder = async (taskId: string): Promise<any> => {
+    const baseUrl = IS_ELECTRON ? LOCAL_API_URL : API_URL;
+    const response = await fetchWithTimeout(`${baseUrl}/files/open-task-folder/${taskId}`, {
+        method: "POST"
+    });
+    
+    if (!response.ok) throw new Error("Görev klasörü açılamadı");
     return response.json();
 };
 

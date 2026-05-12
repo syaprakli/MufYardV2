@@ -3,9 +3,9 @@ import { useState, useRef, useEffect } from "react";
 import { NotificationDropdown } from "./NotificationDropdown";
 import { useAuth } from "../../lib/hooks/useAuth";
 import { useConfirm } from "../../lib/context/ConfirmContext";
+import { useGlobalData } from "../../lib/context/GlobalDataContext";
 import { useNotifications } from "../../lib/context/NotificationContext";
 import { Search, Bell, ChevronDown, User, LogOut, Menu } from "lucide-react";
-import { fetchProfile } from "../../lib/api/profiles";
 import { cn } from "../../lib/utils";
 import { usePresence } from "../../lib/context/PresenceContext";
 import { fetchPendingRequests } from "../../lib/api/collaboration";
@@ -30,18 +30,34 @@ export function Header({ toggleSidebar }: HeaderProps) {
 
 
 
+    const { data: { profile }, refreshProfile } = useGlobalData();
     const [showUserMenu, setShowUserMenu] = useState(false);
-    const [profile, setProfile] = useState<any>(null);
     const notificationRef = useRef<HTMLDivElement>(null);
     const userMenuRef = useRef<HTMLDivElement>(null);
     const presenceReady = wsConnected || onlineUsers.length > 0;
 
+    const resolveUrl = (url: string | null) => {
+        if (!url) return null;
+        if (url.startsWith('data:') || url.startsWith('blob:') || url.includes('dicebear.com') || url.includes('liara.run') || url.includes('unavatar.io') || url.includes('robohash.org') || url.includes('ui-avatars.com') || url.startsWith('/avatars/')) return url;
+        let processed = url;
+        if (url.includes('localhost:8000') || url.includes('127.0.0.1:8000')) {
+            processed = url.split(':8000')[1];
+        }
+        if (processed.startsWith('http')) return processed;
+        
+        // Önce Railway'i dene (Ana sunucu)
+        const RAILWAY_URL = "https://mufyardv2.up.railway.app";
+        return `${RAILWAY_URL}${processed.startsWith('/') ? '' : '/'}${processed}`;
+    };
+
+    useEffect(() => {
+        if (user?.uid && !profile) {
+            refreshProfile(user.uid, user.email || undefined);
+        }
+    }, [user, profile, refreshProfile]);
+
     useEffect(() => {
         if (user?.uid) {
-            fetchProfile(user.uid, user.email || undefined)
-                .then(setProfile)
-                .catch(err => console.error("Header profile load error:", err));
-            
             // Bekleyen istekleri çek ve periyodik olarak güncelle (30 saniye)
             const updateRequests = () => fetchPendingRequests(user.uid, user.email || undefined).then(setPendingRequests);
             updateRequests();
@@ -266,8 +282,31 @@ export function Header({ toggleSidebar }: HeaderProps) {
                             </p>
                         </div>
                         <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 font-black text-xs relative overflow-hidden transform group-hover:scale-105 transition-all">
-                            {user?.photoURL ? (
-                                <img src={user.photoURL} alt="p" className="w-full h-full rounded-2xl object-cover" />
+                            {resolveUrl(profile?.avatar_url) || user?.photoURL ? (
+                                <img 
+                                    src={resolveUrl(profile?.avatar_url) || user?.photoURL || ''} 
+                                    alt="p" 
+                                    className="w-full h-full rounded-2xl object-cover"
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        // Eğer Railway başarısız olursa Localhost'u dene
+                                        if (target.src.includes('railway.app')) {
+                                            const LOCAL_URL = "http://127.0.0.1:8000";
+                                            const path = target.src.split('railway.app')[1];
+                                            target.src = `${LOCAL_URL}${path}`;
+                                        } else {
+                                            // İkisi de yoksa Baş Harflere dön
+                                            target.style.display = 'none';
+                                            const parent = target.parentElement;
+                                            if (parent && !parent.querySelector('.avatar-fallback')) {
+                                                const span = document.createElement('span');
+                                                span.className = 'avatar-fallback';
+                                                span.innerText = initials;
+                                                parent.appendChild(span);
+                                            }
+                                        }
+                                    }}
+                                />
                             ) : (
                                 <span>{initials}</span>
                             )}

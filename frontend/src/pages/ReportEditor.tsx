@@ -25,6 +25,7 @@ import { WS_URL, API_URL } from "../lib/config";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
 import { useChat } from "../lib/context/ChatContext";
 import { useAuth } from "../lib/hooks/useAuth";
+import { useGlobalData } from "../lib/context/GlobalDataContext";
 
 
 export default function ReportEditor() {
@@ -33,6 +34,7 @@ export default function ReportEditor() {
 
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { refreshAudits } = useGlobalData();
     const [audit, setAudit] = useState<Audit | null>(null);
     const quillRef = useRef<any>(null);
     const [content, setContent] = useState("");
@@ -322,6 +324,9 @@ export default function ReportEditor() {
         try {
             setSaving(true);
             await updateAudit(id, { report_content: content });
+            if (user?.uid) {
+                refreshAudits(user.uid, user?.email || undefined);
+            }
             setLastSaved(new Date());
             loadVersions(id);
             toast.success("Rapor başarıyla kaydedildi.");

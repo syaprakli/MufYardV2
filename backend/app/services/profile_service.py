@@ -60,9 +60,9 @@ class ProfileService:
         with open(file_path, "wb") as f:
             f.write(content)
             
-        # Standardized local public URL (assuming backend is on port 8000)
-        # In a real setup, this would use a base URL from config
-        public_url = f"http://localhost:8000/uploads/profiles/{uid}/{file_name}"
+        # Standardized relative URL for both local and production
+        # Frontend resolveUrl will append BASE_URL (https://mufyardv2.up.railway.app)
+        public_url = f"/uploads/profiles/{uid}/{file_name}"
         
         # Update profile URL in Firestore
         await ProfileService.update_profile(uid, ProfileUpdate(avatar_url=public_url))
@@ -197,7 +197,8 @@ class ProfileService:
                 })
             
             # Admin role enforcement
-            if email in ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com"]:
+            _admin_ids = ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com", "VKV8SfuNkWf9WeTYeSCTizd4oG83"]
+            if (email or search_email or "").lower() in _admin_ids or uid in _admin_ids:
                 new_data["role"] = "admin"
 
             try:
@@ -239,8 +240,8 @@ class ProfileService:
             return profile_data
 
         # Final Fallback
-        _admin_emails = ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com"]
-        _fallback_role = "admin" if (search_email or "").lower() in _admin_emails else "user"
+        _admin_ids = ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com", "VKV8SfuNkWf9WeTYeSCTizd4oG83"]
+        _fallback_role = "admin" if ((search_email or "").lower() in _admin_ids or uid in _admin_ids) else "user"
         default_profile = {
             "uid": uid,
             "full_name": "Kullanıcı (Mod-Dışı)",

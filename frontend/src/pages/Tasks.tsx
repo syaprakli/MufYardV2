@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History, ArrowUpDown
+    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History, ArrowUpDown, FolderOpen
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -15,6 +15,7 @@ import { Card } from "../components/ui/Card";
 import { cn } from "../lib/utils";
 import { createTask, updateTask, deleteTask, acceptTask, importTasksFromExcel, type Task, type TaskStep } from "../lib/api/tasks";
 import { fetchAudits, createAudit, deleteAudit, invalidateAuditCache } from "../lib/api/audit";
+import { openTaskFolder } from "../lib/api/files";
 import ShareModal from "../components/ShareModal";
 
 // Shared styles and sub-components
@@ -139,6 +140,20 @@ export default function Tasks() {
     const [showInspectorDropdown, setShowInspectorDropdown] = useState(false);
     const [inspectorSearch, setInspectorSearch] = useState("");
     const inspectorDropdownRef = useRef<HTMLDivElement>(null);
+    const [registeredProfiles, setRegisteredProfiles] = useState<any[]>([]);
+
+    useEffect(() => {
+        const loadProfiles = async () => {
+            try {
+                const { fetchAllProfiles } = await import("../lib/api/profiles");
+                const profiles = await fetchAllProfiles();
+                setRegisteredProfiles(profiles);
+            } catch (err) {
+                console.error("Profiller yüklenemedi:", err);
+            }
+        };
+        loadProfiles();
+    }, []);
 
     // Memoized derived data from global cache
     const { tasks, invitations } = useMemo(() => {
@@ -159,14 +174,25 @@ export default function Tasks() {
 
     const inspectors = useMemo(() => {
         if (!cachedData.contactsCorporate) return [];
-        return cachedData.contactsCorporate.map((p: any) => ({
-            id: p.uid || p.id,
-            name: p.full_name || p.display_name || p.email || p.name,
-            email: p.email,
-            title: p.title || "Müfettiş",
-            created_at: new Date().toISOString()
-        }));
-    }, [cachedData.contactsCorporate]);
+        
+        // Sadece kayıtlı profili olan kişileri filtrele
+        const registeredEmails = new Set(registeredProfiles.map(p => p.email?.toLowerCase()));
+        const registeredUids = new Set(registeredProfiles.map(p => p.uid));
+
+        return cachedData.contactsCorporate
+            .filter((p: any) => {
+                const email = p.email?.toLowerCase();
+                const uid = p.uid || p.id;
+                return registeredEmails.has(email) || registeredUids.has(uid);
+            })
+            .map((p: any) => ({
+                id: p.uid || p.id,
+                name: p.full_name || p.display_name || p.email || p.name,
+                email: p.email,
+                title: p.title || "Müfettiş",
+                created_at: new Date().toISOString()
+            }));
+    }, [cachedData.contactsCorporate, registeredProfiles]);
 
     const raporOnek = localStorage.getItem('raporKoduOnek') || 'S.Y.64';
     const currentYear = new Date().getFullYear();
@@ -305,9 +331,23 @@ export default function Tasks() {
         setDeleteConfirmId(id);
     };
 
+    const handleOpenTaskFolder = async (task: Task) => {
+        if (!isElectron) {
+            toast.error("Klasör açma işlemi sadece masaüstü uygulamasında aktiftir.");
+            return;
+        }
+        try {
+            await openTaskFolder(task.id);
+            toast.success("Klasör açılıyor...");
+        } catch (error) {
+            toast.error("Klasör açılamadı.");
+        }
+    };
+
     const confirmDelete = async () => {
         if (!deleteConfirmId) return;
         try {
+            setSaving(true);
             // 1. Find and delete all associated audits first (Cascading Delete)
             const allAudits = await fetchAudits(effectiveUid, effectiveEmail, true);
             const associatedAudits = allAudits.filter(a => a.task_id === deleteConfirmId);
@@ -325,6 +365,7 @@ export default function Tasks() {
             console.error("Silme hatası:", error);
             toast.error("Silme işlemi başarısız.");
         } finally {
+            setSaving(false);
             setDeleteConfirmId(null);
         }
     };
@@ -755,7 +796,7 @@ export default function Tasks() {
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-8 animate-in fade-in duration-500 max-w-full overflow-x-hidden">
             {/* Standardized Page Header */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6 font-outfit">
                 <div>
@@ -1018,11 +1059,11 @@ export default function Tasks() {
 
             {/* Görev Listesi */}
             <Card className="overflow-hidden border border-border shadow-sm">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:p-6 border-b border-border bg-muted/20">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 md:p-6 border-b border-border bg-muted/20">
                     <h3 className="text-xl font-black font-outfit text-slate-900 dark:text-slate-100 tracking-tight">
                         {activeTab === 'ortak' ? "Arşiv Görev Listesi" : "Aktif Görev Listesi"}
                     </h3>
-                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
                         <input
                             type="file"
                             ref={importInputRef}
@@ -1042,7 +1083,7 @@ export default function Tasks() {
                                 Excel'den İçe Aktar
                             </Button>
                         )}
-                        <div className="relative w-full md:w-[320px]">
+                        <div className="relative w-full lg:w-[320px]">
                             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                             <input
                                 placeholder="Dosya no veya görev adı ile ara..."
@@ -1070,7 +1111,7 @@ export default function Tasks() {
 
                 <div className="overflow-x-auto">
                     {/* Mobile Task List (Cards) */}
-                    <div className="md:hidden divide-y divide-border">
+                    <div className="lg:hidden divide-y divide-border">
                         {loading ? (
                             <div className="p-12 flex flex-col items-center justify-center space-y-4">
                                 <Loader2 size={32} className="animate-spin text-primary" />
@@ -1090,13 +1131,13 @@ export default function Tasks() {
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[10px] font-black text-primary tracking-widest">{task.rapor_kodu}</span>
-                                                    <span className="text-[9px] font-bold text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded uppercase">{task.rapor_turu}</span>
+                                                    <span className="text-[9px] font-bold text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded">{task.rapor_turu}</span>
                                                 </div>
                                                 <h4 className="font-bold text-slate-900 dark:text-slate-100 leading-tight">{task.rapor_adi}</h4>
                                             </div>
                                             <button 
                                                 onClick={() => setExpandedRow(expandedRow === task.id ? null : task.id)}
-                                                className="p-2 rounded-lg bg-slate-100 text-slate-400"
+                                                className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400"
                                             >
                                                 <ChevronRight size={16} className={cn("transition-transform", expandedRow === task.id ? "rotate-90" : "")} />
                                             </button>
@@ -1126,7 +1167,7 @@ export default function Tasks() {
                                                                 toast.success("Durum güncellendi.");
                                                             } catch { toast.error("Hata oluştu."); }
                                                         }}
-                                                        className={cn("text-[10px] font-black uppercase tracking-tight bg-transparent border-none p-0 outline-none cursor-pointer", !isElectron && "opacity-50 cursor-not-allowed")}
+                                                        className={cn("text-[10px] font-black tracking-tight bg-transparent border-none p-0 outline-none cursor-pointer", !isElectron && "opacity-50 cursor-not-allowed")}
                                                         style={{ color: statusColor }}
                                                     >
                                                         {RAPOR_DURUMLARI.map(d => <option key={d} value={d} className="text-slate-900">{d}</option>)}
@@ -1138,6 +1179,9 @@ export default function Tasks() {
                                                 <ActionBtn title="İş Adımları" color="#3b82f6" onClick={() => setExpandedRow(expandedRow === task.id ? null : task.id)}>
                                                     <ClipboardList size={14} />
                                                 </ActionBtn>
+                                                <ActionBtn title="Klasörü Aç" color="#64748b" onClick={() => handleOpenTaskFolder(task)}>
+                                                    <FolderOpen size={14} />
+                                                </ActionBtn>
                                                 <ActionBtn title="Raporları Gör" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
                                                     <FileText size={14} />
                                                 </ActionBtn>
@@ -1147,11 +1191,11 @@ export default function Tasks() {
                                                 <ActionBtn title="Paylaş" color="#8b5cf6" onClick={() => isElectron ? setShareTask(task) : toast.error("Paylaşım sadece masaüstü uygulamasında aktiftir.")}>
                                                     <UserPlus size={14} />
                                                 </ActionBtn>
-                                                <ActionBtn title="Sil" color="#ef4444" onClick={() => isElectron ? handleDelete(task.id) : toast.error("Silme işlemi sadece masaüstü uygulamasında aktiftir.")}>
-                                                    <Trash2 size={14} />
-                                                </ActionBtn>
                                                 <ActionBtn title="Analiz Et" color="#0ea5e9" onClick={() => isElectron ? setAnalysisTask(task) : toast.error("Analiz sadece masaüstü uygulamasında aktiftir.")}>
                                                     <FileDigit size={14} />
+                                                </ActionBtn>
+                                                <ActionBtn title="Sil" color="#ef4444" onClick={() => isElectron ? handleDelete(task.id) : toast.error("Silme işlemi sadece masaüstü uygulamasında aktiftir.")}>
+                                                    <Trash2 size={14} />
                                                 </ActionBtn>
                                             </div>
                                         </div>
@@ -1193,30 +1237,30 @@ export default function Tasks() {
                     </div>
 
                     {/* Desktop Task Table */}
-                    <table className="hidden md:table w-full border-collapse">
+                    <table className="hidden lg:table w-full border-collapse">
                         <thead>
                             <tr className="bg-muted/30">
-                                <th className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
                                     <button type="button" onClick={() => toggleSort("rapor_kodu")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
                                         Rapor No <ArrowUpDown size={12} />
                                     </button>
                                 </th>
-                                <th className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
                                     <button type="button" onClick={() => toggleSort("rapor_adi")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
                                         Görev Adı <ArrowUpDown size={12} />
                                     </button>
                                 </th>
-                                <th className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
                                     <button type="button" onClick={() => toggleSort("rapor_turu")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
                                         Tür <ArrowUpDown size={12} />
                                     </button>
                                 </th>
-                                <th className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
                                     <button type="button" onClick={() => toggleSort("sure")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
                                         Süre <ArrowUpDown size={12} />
                                     </button>
                                 </th>
-                                <th className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
                                     <button type="button" onClick={() => toggleSort("rapor_durumu")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
                                         Durum <ArrowUpDown size={12} />
                                     </button>
@@ -1242,10 +1286,10 @@ export default function Tasks() {
                                     return (
                                         <React.Fragment key={task.id}>
                                             <tr className={cn("hover:bg-muted/50 transition-colors", isExpanded ? "bg-muted/50" : "bg-transparent")}>
-                                                <td className="px-6 py-4"><span className="font-black text-primary text-[11px] tracking-widest font-outfit">{task.rapor_kodu}</span></td>
-                                                <td className="px-6 py-4"><span className="font-bold text-slate-900 dark:text-slate-100 text-sm">{task.rapor_adi}</span></td>
-                                                <td className="px-6 py-4"><span className="font-bold text-slate-400 text-[11px] uppercase">{task.rapor_turu}</span></td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-4 lg:px-6 py-4"><span className="font-black text-primary text-[11px] tracking-widest font-outfit">{task.rapor_kodu}</span></td>
+                                                <td className="px-4 lg:px-6 py-4"><span className="font-bold text-slate-900 dark:text-slate-100 text-sm">{task.rapor_adi}</span></td>
+                                                <td className="px-4 lg:px-6 py-4"><span className="font-bold text-slate-400 text-[11px]">{task.rapor_turu}</span></td>
+                                                <td className="px-4 lg:px-6 py-4">
                                                     {sureInfo ? (
                                                         <span 
                                                             className="text-[11px] font-black px-2 py-1 rounded-lg"
@@ -1255,7 +1299,7 @@ export default function Tasks() {
                                                         </span>
                                                     ) : "—"}
                                                 </td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-4 lg:px-6 py-4">
                                                     <select
                                                         disabled={!isElectron}
                                                         value={task.rapor_durumu}
@@ -1267,14 +1311,17 @@ export default function Tasks() {
                                                                 toast.success("Durum güncellendi.");
                                                             } catch { toast.error("Hata oluştu."); }
                                                         }}
-                                                        className={cn("bg-transparent text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer p-1 rounded-lg hover:bg-slate-100", !isElectron && "opacity-50 cursor-not-allowed")}
+                                                        className={cn("bg-transparent text-[11px] font-black tracking-widest outline-none cursor-pointer p-1 rounded-lg hover:bg-slate-100", !isElectron && "opacity-50 cursor-not-allowed")}
                                                         style={{ color: getDurumColor(task.rapor_durumu) }}
                                                     >
                                                         {RAPOR_DURUMLARI.map(d => <option key={d} value={d} className="text-slate-900">{d}</option>)}
                                                     </select>
                                                 </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2">
+                                                <td className="px-4 lg:px-6 py-4">
+                                                    <div className="grid grid-cols-3 gap-1.5 w-fit">
+                                                        <ActionBtn title="Dosya Aç" color="#64748b" onClick={() => handleOpenTaskFolder(task)}>
+                                                            <FolderOpen size={16} />
+                                                        </ActionBtn>
                                                         <ActionBtn title="Raporları Gör" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
                                                             <FileText size={16} />
                                                         </ActionBtn>
@@ -1284,14 +1331,11 @@ export default function Tasks() {
                                                         <ActionBtn title="Paylaş" color="#8b5cf6" onClick={() => isElectron ? setShareTask(task) : toast.error("Paylaşım sadece masaüstü uygulamasında aktiftir.")}>
                                                             <UserPlus size={16} />
                                                         </ActionBtn>
-                                                        <ActionBtn title="İş Adımları" color="#3b82f6" onClick={() => setExpandedRow(isExpanded ? null : task.id)}>
-                                                            <ClipboardList size={16} />
+                                                        <ActionBtn title="Analiz Et" color="#0ea5e9" onClick={() => isElectron ? setAnalysisTask(task) : toast.error("Analiz sadece masaüstü uygulamasında aktiftir.")}>
+                                                            <FileDigit size={16} />
                                                         </ActionBtn>
                                                         <ActionBtn title="Sil" color="#ef4444" onClick={() => isElectron ? handleDelete(task.id) : toast.error("Silme işlemi sadece masaüstü uygulamasında aktiftir.")}>
                                                             <Trash2 size={16} />
-                                                        </ActionBtn>
-                                                        <ActionBtn title="Analiz Et" color="#0ea5e9" onClick={() => isElectron ? setAnalysisTask(task) : toast.error("Analiz sadece masaüstü uygulamasında aktiftir.")}>
-                                                            <FileDigit size={16} />
                                                         </ActionBtn>
                                                     </div>
                                                 </td>
@@ -1336,7 +1380,7 @@ export default function Tasks() {
             </Card>
 
             {/* Report Selector Modal */}
-            {showReportSelector && (
+            {showReportSelector && createPortal(
                 <div style={overlayStyle} onClick={(e) => { if (e.target === e.currentTarget) setShowReportSelector(null); }}>
                     <div style={{...modalBoxStyle, maxWidth: "600px"}} onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-6">
@@ -1431,7 +1475,7 @@ export default function Tasks() {
                         )}
                     </div>
                 </div>
-            )}
+            , document.body)}
 
             {analysisTask && createPortal(
                 <div style={overlayStyle} onClick={(e) => { if (e.target === e.currentTarget) setAnalysisTask(null); }}>
@@ -1467,7 +1511,7 @@ export default function Tasks() {
             )}
 
             {/* Sablon Modal */}
-            {showSablonModal && (
+            {showSablonModal && createPortal(
                 <div style={overlayStyle} onClick={(e) => { if (e.target === e.currentTarget) setShowSablonModal(null); }}>
                     <div style={modalBoxStyle} onClick={e => e.stopPropagation()}>
                         <h3 style={{ marginBottom: "1rem" }}>Rapor Şablonu Seçin</h3>
@@ -1480,10 +1524,10 @@ export default function Tasks() {
                         </div>
                     </div>
                 </div>
-            )}
+            , document.body)}
 
             {/* Editing Modal */}
-            {editingTask && (
+            {editingTask && createPortal(
                 <div style={overlayStyle} onClick={(e) => { if (e.target === e.currentTarget) setEditingTask(null); }}>
                     <div style={{...modalBoxStyle, maxWidth: "600px"}} onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-6 border-b border-slate-50 dark:border-slate-800 pb-4">
@@ -1564,19 +1608,20 @@ export default function Tasks() {
                         </div>
                     </div>
                 </div>
-            )}
+            , document.body)}
 
             {/* Share Modal */}
-            <ShareModal 
-                isOpen={!!shareTask}
-                onClose={() => setShareTask(null)}
-                sharedWith={shareTask?.shared_with || []}
-                onShare={handleShareUpdate}
-                title={`"${shareTask?.rapor_adi}" Paylaşımı`}
-            />
+            {shareTask && createPortal(
+                <ShareModal 
+                    isOpen={!!shareTask}
+                    onClose={() => setShareTask(null)}
+                    sharedWith={shareTask?.shared_with || []}
+                    onShare={handleShareUpdate}
+                    title={`"${shareTask?.rapor_adi}" Paylaşımı`}
+                />
+            , document.body)}
 
-            {/* Delete Confirmation Modal */}
-            {deleteConfirmId && (
+            {deleteConfirmId && createPortal(
                 <div style={overlayStyle} onClick={(e) => { if (e.target === e.currentTarget) setDeleteConfirmId(null); }}>
                     <div style={modalBoxStyle} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '1.5rem' }}>
@@ -1589,25 +1634,28 @@ export default function Tasks() {
                             </div>
                             <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
                                 <button 
+                                    disabled={saving}
                                     onClick={() => setDeleteConfirmId(null)}
-                                    style={{ flex: 1, padding: '0.85rem', borderRadius: '0.75rem', border: isDark ? "1px solid #334155" : '1px solid #e2e8f0', backgroundColor: 'transparent', fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif', color: isDark ? '#94a3b8' : '#64748b' }}
+                                    style={{ flex: 1, padding: '0.85rem', borderRadius: '0.75rem', border: isDark ? "1px solid #334155" : '1px solid #e2e8f0', backgroundColor: 'transparent', fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif', color: isDark ? '#94a3b8' : '#64748b', opacity: saving ? 0.5 : 1 }}
                                 >
                                     İptal
                                 </button>
                                 <button 
+                                    disabled={saving}
                                     onClick={confirmDelete}
-                                    style={{ flex: 1, padding: '0.85rem', borderRadius: '0.75rem', border: 'none', backgroundColor: '#ef4444', color: 'white', fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
+                                    style={{ flex: 1, padding: '0.85rem', borderRadius: '0.75rem', border: 'none', backgroundColor: '#ef4444', color: 'white', fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif', opacity: saving ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                 >
-                                    Sil
+                                    {saving ? <Loader2 size={18} className="animate-spin" /> : "Sil"}
                                 </button>
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Yeni Denetim Başlat Modalı (İlk Rapor İçin) */}
-            {isNewAuditModalOpen && (
+            {isNewAuditModalOpen && createPortal(
                 <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/65 backdrop-blur-md" onClick={() => setIsNewAuditModalOpen(null)}>
                     <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                         <div className="p-6 border-b border-border flex items-center justify-between bg-muted/30">
@@ -1692,7 +1740,7 @@ export default function Tasks() {
                         </form>
                     </div>
                 </div>
-            )}
+            , document.body)}
 
             <style>{`
                 @keyframes slideIn {

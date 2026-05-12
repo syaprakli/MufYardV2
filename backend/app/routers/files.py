@@ -9,9 +9,9 @@ from datetime import datetime
 from app.lib.folder_manager import FolderManager, BASE_REPORTS_DIR, STANDARD_SUBFOLDERS
 from app.config import BASE_DIR
 from app.config import settings, DATA_DIR
-def get_current_user_id():
-    # Gerçek uygulamada auth'dan alınmalı, örnek için sabit
-    return "user_1"
+def get_current_user_id(uid: Optional[str] = Query(None)):
+    # Query parametresinden uid varsa onu kullan, yoksa fallback
+    return uid or "user_1"
 
 router = APIRouter(tags=["files"])
 
@@ -183,26 +183,55 @@ async def share_file_to_user(req: ShareFileRequest, user_id: str = Depends(get_c
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/{file_id:path}")
-async def delete_item(file_id: str, user_id: str = Depends(get_current_user_id)):
+@router.delete("/delete-item/{file_id:path}")
+async def delete_item(file_id: str, uid: Optional[str] = Query(None)):
+    """Dosya veya klasörü zorla siler."""
+    import logging
+    logger = logging.getLogger("app.files")
+    user_id = uid or "user_1"
+    
     try:
-        safe_item_path = file_id.replace("..", "").strip("/")
-        full_path = os.path.join(BASE_REPORTS_DIR, safe_item_path)
+        logger.info(f"SİLME TALEBİ: {file_id} (UID: {user_id})")
         
-        if not await asyncio.to_thread(os.path.exists, full_path):
-            raise HTTPException(status_code=404, detail="Item not found")
-        # Yetki kontrolü
+        safe_item_path = file_id.replace("..", "").strip("/")
+        full_path = os.path.normpath(os.path.join(BASE_REPORTS_DIR, safe_item_path))
+        
+        if not os.path.exists(full_path):
+            logger.error(f"SİLME HATASI: Yol bulunamadı -> {full_path}")
+            return {"status": "success", "message": "Dosya zaten mevcut değil."}
+            
+        # Yetki kontrolü (Admin bypass dahil)
         if not FolderManager.check_permission(safe_item_path, user_id, "delete"):
+            logger.warning(f"SİLME REDDEDİLDİ: Yetki yok -> {user_id}")
             raise HTTPException(status_code=403, detail="Bu dosyayı silme yetkiniz yok.")
+            
+        if os.path.isdir(full_path):
+            # Klasörü ve içindekileri (kilitli/salt okunur olsa bile) sil
+            def remove_readonly(func, path, _):
+                import stat
+                try:
+                    os.chmod(path, stat.S_IWRITE)
+                    func(path)
+                except: pass
 
-        if await asyncio.to_thread(os.path.isdir, full_path):
-            await asyncio.to_thread(shutil.rmtree, full_path)
+            await asyncio.to_thread(shutil.rmtree, full_path, onerror=remove_readonly)
+            logger.info(f"KLASÖR SİLİNDİ: {full_path}")
         else:
+            # Dosyayı sil
+            try:
+                import stat
+                os.chmod(full_path, stat.S_IWRITE)
+            except: pass
             await asyncio.to_thread(os.remove, full_path)
-
-        return {"status": "success"}
+            logger.info(f"DOSYA SİLİNDİ: {full_path}")
+            
+        return {"status": "success", "message": "Başarıyla silindi"}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e)
+        logger.error(f"SİLME KRİTİK HATA: {error_msg}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Silme Hatası: {error_msg}")
 
 @router.post("/open-file/{file_id:path}")
 async def open_file(file_id: str):
@@ -261,5 +290,53 @@ async def open_folder(file_id: str):
                 subprocess.run(['xdg-open', target_path])
             
         return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/open-task-folder/{task_id}")
+async def open_task_folder(task_id: str):
+    """
+    Belirli bir göreve (Task) ait ana klasörü işletim sistemi gezgininde açar.
+    """
+    try:
+        from app.services.audit_service import AuditService
+        context = await AuditService._resolve_task_folder_context(task_id)
+        if not context:
+            raise HTTPException(status_code=404, detail="Göreve ait klasör bilgisi bulunamadı.")
+        
+        # FolderManager üzerinden tam yolu hesapla
+        full_path = await asyncio.to_thread(
+            FolderManager.get_audit_path,
+            context['year'],
+            context['audit_type'],
+            context['audit_code'],
+            context['audit_title']
+        )
+        
+        if not await asyncio.to_thread(os.path.exists, full_path):
+            # Klasör henüz oluşturulmamış olabilir, oluşturup açalım mı? 
+            # Kullanıcı beklentisi açılması yönünde olduğu için oluşturuyoruz.
+            await asyncio.to_thread(os.makedirs, full_path, exist_ok=True)
+            # Standart alt klasörleri de garanti edelim
+            await asyncio.to_thread(
+                FolderManager.ensure_audit_folders,
+                context['year'],
+                context['audit_type'],
+                context['audit_code'],
+                context['audit_title']
+            )
+
+        # Open in OS Explorer
+        if os.name == 'nt': # Windows
+            await asyncio.to_thread(os.startfile, full_path)
+        elif os.name == 'posix': # Mac/Linux
+            import subprocess
+            import platform
+            if platform.system() == 'Darwin':
+                subprocess.run(['open', full_path])
+            else:
+                subprocess.run(['xdg-open', full_path])
+            
+        return {"status": "success", "path": full_path}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -812,7 +812,7 @@ function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect
                                 }
                             }}
                             className={cn(
-                                "px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm outline-none bg-transparent",
+                                "px-2 py-1.5 rounded-lg text-[9px] font-black tracking-widest border shadow-sm outline-none bg-transparent",
                                 statusColors[task?.rapor_durumu || status] || 'bg-slate-100 text-slate-500'
                             )}
                         >
@@ -864,7 +864,7 @@ function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect
                             }
                         }}
                         className={cn(
-                            "hidden md:block px-5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.1em] border shadow-sm outline-none cursor-pointer hover:bg-slate-50 transition-colors",
+                            "hidden md:block px-5 py-2 rounded-xl text-[10px] font-bold tracking-[0.1em] border shadow-sm outline-none cursor-pointer hover:bg-slate-50 transition-colors",
                             statusColors[task?.rapor_durumu || status] || 'bg-slate-100 text-slate-500'
                         )}
                     >

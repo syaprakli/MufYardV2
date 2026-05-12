@@ -286,8 +286,42 @@ class TaskService:
     @staticmethod
     async def delete_task(task_id: str) -> bool:
         try:
-            await asyncio.to_thread(lambda: db.collection('tasks').document(task_id).delete())
-            return True
+            # Önce task verisini al (klasörü silmek için bilgi lazım)
+            doc_ref = db.collection('tasks').document(task_id)
+            doc = await asyncio.to_thread(doc_ref.get)
+            if doc.exists:
+                task_data = doc.to_dict()
+                
+                # Klasörü de temizle (opsiyonel ama ghost dosya kalmaması için iyi)
+                try:
+                    from app.lib.folder_manager import FolderManager
+                    import shutil
+                    import os
+                    
+                    bt = task_data.get('baslama_tarihi')
+                    year = datetime.now().year
+                    if bt:
+                        try:
+                            if '-' in bt and len(bt) >= 10:
+                                year = int(bt.split('-')[0])
+                        except: pass
+                    
+                    audit_path = FolderManager.get_audit_path(
+                        year=str(year),
+                        audit_type=task_data.get('rapor_turu', 'Diger'),
+                        audit_code=task_data.get('rapor_kodu', 'Kodsuz'),
+                        audit_title=task_data.get('rapor_adi', 'Basliksiz')
+                    )
+                    
+                    if os.path.exists(audit_path):
+                        # Klasör boş değilse de siler (rmtree)
+                        await asyncio.to_thread(shutil.rmtree, audit_path)
+                except Exception as ef:
+                    print(f"Task folder deletion failed: {ef}")
+
+                await asyncio.to_thread(doc_ref.delete)
+                return True
+            return False
         except Exception:
             return False
 

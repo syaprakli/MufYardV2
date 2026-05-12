@@ -1,10 +1,11 @@
-import { User, Bell, Shield, Wand2, Database, LogOut, Loader2, Save, FileText, CheckCircle2, Upload, Users, Camera, AlertTriangle, Key, Download, HardDrive, Globe, ShieldAlert, Search, MoreVertical, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { User, Bell, Shield, Wand2, Database, LogOut, Loader2, Save, FileText, CheckCircle2, Upload, Users, Camera, AlertTriangle, Key, Download, HardDrive, Globe, ShieldAlert, Search, MoreVertical, ChevronLeft, ChevronRight, Eye, EyeOff, LayoutGrid, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useConfirm } from "../lib/context/ConfirmContext";
+import { useGlobalData } from "../lib/context/GlobalDataContext";
 import { fetchProfile, updateProfile, fetchAllProfiles, deleteProfile as apiDeleteProfile, uploadAvatar as uploadAvatarApi, type Profile } from "../lib/api/profiles";
 import { fetchInspectors, type Inspector } from "../lib/api/inspectors";
 import { cn } from "../lib/utils";
@@ -12,6 +13,7 @@ import { exportSystemData, backupToDrive, importSystemData } from "../lib/api/ba
 import { isElectron } from "../lib/firebase";
 import { API_URL } from "../lib/config";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 const GEMINI_MODELS = [
     { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro (Mevzuat Uzmanı)" },
@@ -200,6 +202,7 @@ function GeminiKeySection() {
 
 export default function Settings() {
     const { user, logout, resetPassword } = useAuth();
+    const { refreshProfile: globalRefreshProfile } = useGlobalData();
     const confirm = useConfirm();
     const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
@@ -213,11 +216,26 @@ export default function Settings() {
     const [driveBackupLoading, setDriveBackupLoading] = useState(false);
     const [importLoading, setImportLoading] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
+    const [showAvatarModal, setShowAvatarModal] = useState(false);
 
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
     const avatarInputRef = useRef<HTMLInputElement>(null);
+
+    const resolveUrl = (url: string | null) => {
+        if (!url) return null;
+        if (url.startsWith('data:') || url.startsWith('blob:') || url.includes('dicebear.com') || url.includes('liara.run') || url.includes('unavatar.io') || url.includes('robohash.org') || url.includes('ui-avatars.com') || url.startsWith('/avatars/')) return url;
+        let processed = url;
+        if (url.includes('localhost:8000') || url.includes('127.0.0.1:8000')) {
+            processed = url.split(':8000')[1];
+        }
+        if (processed.startsWith('http')) return processed;
+        
+        // Önce Railway'i dene
+        const RAILWAY_URL = "https://mufyardv2.up.railway.app";
+        return `${RAILWAY_URL}${processed.startsWith('/') ? '' : '/'}${processed}`;
+    };
 
     useEffect(() => {
         if (user?.uid) {
@@ -344,7 +362,8 @@ export default function Settings() {
                     phone: (p as any).phone || dirEntry?.phone || '',
                     extension: (p as any).extension || dirEntry?.extension || '',
                     room: (p as any).room || dirEntry?.room || '',
-                    created_at: new Date().toISOString()
+                    created_at: new Date().toISOString(),
+                    is_registered: true
                 };
             });
             
@@ -375,7 +394,12 @@ export default function Settings() {
         try {
             setUploadingAvatar(true);
             const data = await uploadAvatarApi(user.uid, file);
-            setProfile(prev => prev ? { ...prev, avatar_url: data.avatar_url } : null);
+            const updatedProfile = (prev: Profile | null) => prev ? { ...prev, avatar_url: data.avatar_url } : null;
+            setProfile(updatedProfile);
+            
+            // Global Context'i tazele (Header vb. yerler için)
+            await globalRefreshProfile(user.uid, user.email || undefined);
+            
             toast.success("Profil fotoğrafı güncellendi.");
         } catch (error: any) {
             toast.error(error.message || "Fotoğraf yüklenemedi.");
@@ -578,13 +602,109 @@ export default function Settings() {
                     {/* Profil Sekmesi */}
                     {activeTab === "Profil" && (
                         <Card className="p-4 sm:p-6 md:p-10 space-y-6 md:space-y-8 rounded-3xl border-none shadow-xl bg-card group">
+                            {/* Avatar Seçim Modalı */}
+                            <AnimatePresence>
+                                {showAvatarModal && (
+                                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+                                        <motion.div 
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            onClick={() => setShowAvatarModal(false)}
+                                            className="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
+                                        />
+                                        <motion.div 
+                                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                            className="relative w-full max-w-2xl bg-card border border-border rounded-[2.5rem] shadow-2xl overflow-hidden"
+                                        >
+                                            <div className="p-8 border-b border-border flex justify-between items-center bg-muted/30">
+                                                <div>
+                                                    <h3 className="text-xl font-black font-outfit text-primary tracking-tight">Business Avatar Kütüphanesi</h3>
+                                                    <p className="text-xs text-muted-foreground font-medium mt-1">Sektörel kimliğinize uygun 20 farklı seçenek</p>
+                                                </div>
+                                                <Button variant="ghost" size="icon" onClick={() => setShowAvatarModal(false)} className="rounded-full">
+                                                    <X size={20} />
+                                                </Button>
+                                            </div>
+
+                                            <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                                                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 gap-4">
+                                                        {/* Mega Koleksiyon (Sadece En Son Attığın 57 Adet) */}
+                                                        {Array.from({ length: 57 }).map((_, i) => {
+                                                            const avatarPath = `/avatars/avatar_mega_${i + 1}.png`;
+                                                            return (
+                                                                <button
+                                                                    key={`mega-${i}`}
+                                                                    onClick={async () => {
+                                                                        try {
+                                                                            setUploadingAvatar(true);
+                                                                            const updated = await updateProfile(user!.uid, { avatar_url: avatarPath });
+                                                                            setProfile(updated);
+                                                                            
+                                                                            // Global Context'i tazele (Header vb. yerler için)
+                                                                            await globalRefreshProfile(user!.uid, user?.email || undefined);
+                                                                            
+                                                                            setShowAvatarModal(false);
+                                                                            toast.success("Avatar başarıyla güncellendi.");
+                                                                        } catch (err) {
+                                                                            toast.error("Avatar seçilemedi.");
+                                                                        } finally {
+                                                                            setUploadingAvatar(false);
+                                                                        }
+                                                                    }}
+                                                                    className="aspect-square rounded-2xl bg-white dark:bg-slate-800 border-2 border-transparent hover:border-primary hover:scale-110 transition-all p-1 overflow-hidden flex items-center justify-center relative group shadow-sm hover:shadow-lg"
+                                                                >
+                                                                    <img 
+                                                                        src={`${avatarPath}?v=3`} 
+                                                                        alt={`Mega Avatar ${i+1}`} 
+                                                                        className="w-full h-full object-contain"
+                                                                    />
+                                                                    <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                            </div>
+
+                                            <div className="p-6 bg-muted/30 border-t border-border flex justify-end">
+                                                <Button variant="outline" onClick={() => setShowAvatarModal(false)} className="rounded-xl px-8 font-bold">Kapat</Button>
+                                            </div>
+                                        </motion.div>
+                                    </div>
+                                )}
+                            </AnimatePresence>
+
                             <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8 border-b border-slate-100 dark:border-slate-800 pb-8 relative z-10 text-center md:text-left">
                                 <div className="relative group/avatar">
                                     <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-primary/5 dark:bg-primary/10 flex items-center justify-center overflow-hidden border-4 border-border shadow-xl ring-2 ring-primary/10 mx-auto transition-transform group-hover/avatar:scale-105">
                                         {uploadingAvatar ? (
                                             <Loader2 size={32} className="text-primary animate-spin" />
                                         ) : profile?.avatar_url ? (
-                                            <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                                            <img 
+                                                src={resolveUrl(profile.avatar_url) || ""} 
+                                                alt="Avatar" 
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    // Bulut yoksa Yerel'i dene
+                                                    if (target.src.includes('railway.app')) {
+                                                        const LOCAL_URL = "http://127.0.0.1:8000";
+                                                        const path = target.src.split('railway.app')[1];
+                                                        target.src = `${LOCAL_URL}${path}`;
+                                                    } else {
+                                                        target.style.display = 'none';
+                                                        const parent = target.parentElement;
+                                                        if (parent && !parent.querySelector('.avatar-fallback')) {
+                                                            const icon = document.createElement('div');
+                                                            icon.className = 'avatar-fallback text-primary/20';
+                                                            icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+                                                            parent.appendChild(icon);
+                                                        }
+                                                    }
+                                                }}
+                                            />
                                         ) : (
                                             <User size={48} className="text-primary/20 dark:text-muted-foreground" />
                                         )}
@@ -598,8 +718,16 @@ export default function Settings() {
                                         ref={avatarInputRef}
                                     />
                                     <button 
-                                        onClick={() => avatarInputRef.current?.click()}
+                                        onClick={() => setShowAvatarModal(true)}
                                         className="absolute -bottom-1 -right-1 w-8 h-8 md:w-10 md:h-10 bg-primary text-white rounded-xl shadow-lg border-2 border-card flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
+                                        title="Kütüphaneden Seç"
+                                    >
+                                        <LayoutGrid size={14} className="md:size-5" />
+                                    </button>
+                                    <button 
+                                        onClick={() => avatarInputRef.current?.click()}
+                                        className="absolute -bottom-1 -left-1 w-8 h-8 md:w-10 md:h-10 bg-slate-800 text-white rounded-xl shadow-lg border-2 border-card flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
+                                        title="Bilgisayardan Yükle"
                                     >
                                         <Camera size={14} className="md:size-5" />
                                     </button>
