@@ -13,7 +13,7 @@ function renderPostContent(raw: string, resolveUrl: (url: string) => string) {
     safe = safe.replace(/\*(.+?)\*/g, '<em>$1</em>');
     
     // Markdown Images: ![alt](url)
-    safe = safe.replace(/!\[(.*?)\]\((.*?)\)/g, (match, alt, url) => {
+    safe = safe.replace(/!\[(.*?)\]\((.*?)\)/g, (_, alt, url) => {
         const fullUrl = resolveUrl(url);
         return `<div class="my-4 rounded-3xl overflow-hidden border border-border shadow-sm group/inline-img relative">
             <img src="${fullUrl}" alt="${alt}" class="w-full h-auto max-h-[500px] object-contain bg-muted/30 transition-transform hover:scale-[1.01] cursor-zoom-in" onclick="window.open('${fullUrl}', '_blank')"/>
@@ -22,7 +22,7 @@ function renderPostContent(raw: string, resolveUrl: (url: string) => string) {
     });
 
     // Markdown Links: [text](url)
-    safe = safe.replace(/\[(.+?)\]\((.+?)\)/g, (match, text, url) => {
+    safe = safe.replace(/\[(.+?)\]\((.+?)\)/g, (_, text, url) => {
         const fullUrl = resolveUrl(url);
         return `<a href="${fullUrl}" target="_blank" class="text-primary font-black hover:underline decoration-2 underline-offset-4">${text}</a>`;
     });
@@ -189,7 +189,6 @@ export default function PublicSpace() {
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [editCommentText, setEditCommentText] = useState("");
     const [chatAttachments, setChatAttachments] = useState<Attachment[]>([]);
-    const [uploading, setUploading] = useState(false);
 
     // URL Resolution Helper
     const resolveAttachmentUrl = (url: string) => {
@@ -898,6 +897,7 @@ export default function PublicSpace() {
                                     <div key={msg.id || idx} className={cn("flex flex-col", isMine ? "items-end" : "items-start")}>
                                         <div className={cn("max-w-[85%] p-4 rounded-3xl text-[13px] font-medium shadow-sm space-y-2", isMine ? "bg-primary text-white rounded-tr-none" : "bg-slate-100 text-slate-800 rounded-tl-none")}>
                                             {msg.text && <div>{msg.text}</div>}
+                                            {msg.attachments && msg.attachments.length > 0 && (
                                                 <div className="flex flex-wrap gap-2 mt-2">
                                                     {msg.attachments.map((at, i) => {
                                                         const resolvedUrl = resolveAttachmentUrl(at.url);
@@ -932,6 +932,7 @@ export default function PublicSpace() {
                                                         </div>
                                                     );})}
                                                 </div>
+                                            )}
                                         </div>
                                         <span className="text-[10px] font-bold text-slate-400 mt-1 px-2">{msg.author_name} • {new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
                                     </div>
