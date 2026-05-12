@@ -4,14 +4,18 @@ import { Play, Pause, AlertCircle, GripHorizontal, ChevronUp, Music, Lock } from
 import { cn } from '../../lib/utils';
 import toast from 'react-hot-toast';
 
-const STATIONS = [
-    { id: 'superfm', name: 'Süper FM', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/SUPER_FMAAC.aac', color: 'text-orange-400', bg: 'bg-orange-400' },
-    { id: 'metrofm', name: 'Metro FM', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/METRO_FMAAC.aac', color: 'text-amber-400', bg: 'bg-amber-400' },
-    { id: 'joyfm', name: 'Joy FM', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/JOY_FMAAC.aac', color: 'text-sky-400', bg: 'bg-sky-400' },
-    { id: 'joyturk', name: 'Joy Türk', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/JOY_TURKAAC.aac', color: 'text-rose-400', bg: 'bg-rose-400' },
-    { id: 'lofi', name: 'MüfyardFM', url: '', color: 'text-violet-400', bg: 'bg-violet-500', isLocked: true }
+const MUFYARD_PLAYLIST = [
+    { name: 'Başkanım (Özel)', url: '/Baskanim.mp3' },
+    { name: 'Üstadım (Özel)', url: '/Ustadim.mp3' }
 ];
 
+const STATIONS = [
+    { id: 'lofi', name: 'MüfyardFM', url: '/Baskanim.mp3', color: 'text-violet-400', bg: 'bg-violet-500', isLocked: false },
+    { id: 'superfm', name: 'Süper FM', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/SUPER_FMAAC.aac', color: 'text-orange-400', bg: 'bg-orange-400', isLocked: false },
+    { id: 'metrofm', name: 'Metro FM', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/METRO_FMAAC.aac', color: 'text-amber-400', bg: 'bg-amber-400', isLocked: false },
+    { id: 'joyfm', name: 'Joy FM', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/JOY_FMAAC.aac', color: 'text-sky-400', bg: 'bg-sky-400', isLocked: false },
+    { id: 'joyturk', name: 'Joy Türk', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/JOY_TURKAAC.aac', color: 'text-rose-400', bg: 'bg-rose-400', isLocked: false }
+];
 export function DraggableRadioWidget() {
     const [currentStation, setCurrentStation] = useState(STATIONS[0]);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -20,6 +24,8 @@ export function DraggableRadioWidget() {
     const [hasError, setHasError] = useState(false);
     const [showStations, setShowStations] = useState(false);
     const [isCompact, setIsCompact] = useState(false);
+    const [playlistIndex, setPlaylistIndex] = useState(0);
+    const [currentSongTitle, setCurrentSongTitle] = useState('');
 
     useEffect(() => {
         if (isPlaying && audioRef.current && !currentStation.isLocked) {
@@ -29,7 +35,30 @@ export function DraggableRadioWidget() {
                 setIsPlaying(false);
             });
         }
-    }, [currentStation]);
+        
+        // Şarkı ismini güncelle
+        if (currentStation.id === 'lofi') {
+            setCurrentSongTitle(MUFYARD_PLAYLIST[playlistIndex].name);
+        } else {
+            setCurrentSongTitle('');
+        }
+    }, [currentStation, playlistIndex]);
+
+    const handleTrackEnd = () => {
+        if (currentStation.id === 'lofi') {
+            const nextIndex = (playlistIndex + 1) % MUFYARD_PLAYLIST.length;
+            setPlaylistIndex(nextIndex);
+            
+            // İstasyonun URL'ini manuel güncelle (STATIONS içindeki statik kalıyor)
+            if (audioRef.current) {
+                audioRef.current.src = MUFYARD_PLAYLIST[nextIndex].url;
+                audioRef.current.load();
+                audioRef.current.play().catch(() => setHasError(true));
+            }
+        } else {
+            setIsPlaying(false);
+        }
+    };
 
     const togglePlay = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -46,12 +75,19 @@ export function DraggableRadioWidget() {
                 setIsPlaying(false);
             } else {
                 audioRef.current.volume = 0.5;
+                
+                // Eğer lofi ise ve URL güncel değilse set et
+                if (currentStation.id === 'lofi') {
+                    audioRef.current.src = MUFYARD_PLAYLIST[playlistIndex].url;
+                }
+
                 const playPromise = audioRef.current.play();
                 
                 if (playPromise !== undefined) {
                     playPromise.then(() => {
                         setIsPlaying(true);
-                        toast.success(`${currentStation.name} yayında.`, {
+                        const displayTitle = currentStation.id === 'lofi' ? MUFYARD_PLAYLIST[playlistIndex].name : currentStation.name;
+                        toast.success(`${displayTitle} yayında.`, {
                             icon: '📻',
                             style: { borderRadius: '10px', background: '#333', color: '#fff', fontSize: '12px' }
                         });
@@ -59,7 +95,7 @@ export function DraggableRadioWidget() {
                         console.error("Radio play error:", error);
                         setHasError(true);
                         setIsPlaying(false);
-                        toast.error("Bağlantı kurulamadı. Kaynak HTTPS desteklemiyor olabilir.", {
+                        toast.error("Bağlantı kurulamadı.", {
                             icon: '🚫',
                             style: { borderRadius: '10px', background: '#333', color: '#fff', fontSize: '12px' }
                         });
@@ -115,7 +151,7 @@ export function DraggableRadioWidget() {
                                             "text-xs font-bold whitespace-nowrap",
                                             currentStation.id === station.id ? "text-white" : "text-slate-400 group-hover/btn:text-slate-100"
                                         )}>
-                                                {station.name}{station.isLocked && <span className="ml-1 text-[9px] font-black text-violet-400 opacity-80">(yakında)</span>}
+                                                {station.name}
                                         </span>
                                     </div>
                                 </button>
@@ -166,7 +202,7 @@ export function DraggableRadioWidget() {
                             </span>
                         </div>
                         <span className="text-[10px] font-bold text-slate-400 truncate">
-                            {hasError ? "Bağlantı Başarısız" : currentStation.isLocked ? "Bakımda" : isPlaying ? "Canlı Yayınlanıyor..." : "Dinlemeye Hazır"}
+                            {hasError ? "Bağlantı Başarısız" : currentStation.isLocked ? "Bakımda" : isPlaying ? (currentSongTitle || "Canlı Yayınlanıyor...") : "Dinlemeye Hazır"}
                         </span>
                     </div>
                     {isPlaying && !hasError && !currentStation.isLocked && (
@@ -207,6 +243,7 @@ export function DraggableRadioWidget() {
                 ref={audioRef} 
                 src={currentStation.url} 
                 preload="none" 
+                onEnded={handleTrackEnd}
             />
         </motion.div>
     );
