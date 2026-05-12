@@ -5,12 +5,12 @@ import { cn } from '../../lib/utils';
 import toast from 'react-hot-toast';
 
 const MUFYARD_PLAYLIST = [
-    { name: 'Başkanım (Özel)', url: '/Baskanim.mp3' },
-    { name: 'Üstadım (Özel)', url: '/Ustadim.mp3' }
+    { name: 'Başkanım (Özel)', url: 'Baskanim.mp3' },
+    { name: 'Üstadım (Özel)', url: 'Ustadim.mp3' }
 ];
 
 const STATIONS = [
-    { id: 'lofi', name: 'MüfyardFM', url: '/Baskanim.mp3', color: 'text-violet-400', bg: 'bg-violet-500', isLocked: false },
+    { id: 'lofi', name: 'MüfyardFM', url: 'Baskanim.mp3', color: 'text-violet-400', bg: 'bg-violet-500', isLocked: false },
     { id: 'superfm', name: 'Süper FM', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/SUPER_FMAAC.aac', color: 'text-orange-400', bg: 'bg-orange-400', isLocked: false },
     { id: 'metrofm', name: 'Metro FM', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/METRO_FMAAC.aac', color: 'text-amber-400', bg: 'bg-amber-400', isLocked: false },
     { id: 'joyfm', name: 'Joy FM', url: 'https://playerservices.streamtheworld.com/api/livestream-redirect/JOY_FMAAC.aac', color: 'text-sky-400', bg: 'bg-sky-400', isLocked: false },
