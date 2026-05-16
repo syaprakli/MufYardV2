@@ -3,13 +3,15 @@ import {
     Shield, ChevronRight, Save, Loader2, Check, 
     LayoutDashboard, FileText, 
     Users, StickyNote, Calendar, 
-    MessageSquare, Globe, Lock, Bot,
+    MessageSquare, Globe, Lock, Bot, ArrowLeft,
     CheckSquare, ClipboardCheck, FolderTree, BookOpen, Star
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { fetchRolesSettings, updateRolesSettings } from "../lib/api/settings";
+import { useAuth } from "../lib/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 
 const MODUL_LISTESI = [
     { 
@@ -93,6 +95,21 @@ const MODUL_LISTESI = [
 ];
 
 export default function AdminRoleSettings() {
+    const { user } = useAuth();
+    const navigate = useNavigate();
+
+    const isFounder = user?.email === "sefayaprakli@hotmail.com" || 
+                      user?.email === "sefa.yaprakli@gsb.gov.tr" ||
+                      user?.email === "syaprakli@gmail.com" ||
+                      user?.uid === "VKV8SfuNkWf9WeTYeSCTizd4oG83";
+
+    useEffect(() => {
+        if (!isFounder && user) {
+            toast.error("Bu sayfaya erişim yetkiniz bulunmamaktadır.");
+            navigate("/");
+        }
+    }, [isFounder, user, navigate]);
+
     const [permissions, setPermissions] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -145,37 +162,43 @@ export default function AdminRoleSettings() {
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto pb-20">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-1">
                 <div className="flex-1">
-                    <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-primary/60 mb-3 bg-primary/5 w-fit px-3 py-1.5 rounded-full">
+                    <div className="flex items-center gap-2 text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-primary/60 mb-3 bg-primary/5 w-fit px-3 py-1.5 rounded-full">
+                        <button 
+                            onClick={() => navigate('/admin')}
+                            className="flex items-center gap-1 hover:text-primary transition-colors mr-2 group border-r border-primary/20 pr-2"
+                        >
+                            <ArrowLeft size={12} className="group-hover:-translate-x-0.5 transition-transform" />
+                            <span>Panele Dön</span>
+                        </button>
                         <Lock size={12} />
-                        <span>Güvenlik ve Yetkilendirme</span>
-                        <ChevronRight size={12} />
-                        <span className="text-primary">Moderatör İzinleri</span>
+                        <span>Güvenlik</span>
+                        <ChevronRight size={10} />
+                        <span className="text-primary">Yetkiler</span>
                     </div>
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                    <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight flex flex-wrap items-center gap-3">
                         Yetki Kontrol Paneli
-                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-md font-bold uppercase tracking-tighter">Admin</span>
+                        <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded-md font-bold uppercase tracking-tighter">Admin</span>
                     </h1>
-                    <p className="text-slate-500 text-base font-medium mt-2 max-w-2xl leading-relaxed">
-                        Sistem moderatörlerinin hangi alanlarda işlem yapabileceğini belirleyin. 
-                        Mevzuat ve Kamusal Alan yetkileri moderasyon sorumluluğu için kritiktir.
+                    <p className="text-slate-500 text-sm md:text-base font-medium mt-2 max-w-2xl leading-relaxed">
+                        Moderatörlerin hangi modüllere erişebileceğini buradan belirleyin.
                     </p>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
                     <Button
                         variant="outline"
                         onClick={handleClearAll}
-                        className="h-12 px-5 rounded-2xl font-bold border-2 border-slate-200 text-slate-600 hover:bg-slate-50"
+                        className="h-11 md:h-12 px-5 rounded-2xl font-bold border-2 border-slate-200 text-slate-600 hover:bg-slate-50 text-xs md:text-sm"
                     >
                         Sıfırla
                     </Button>
                     <Button
                         onClick={handleSave}
                         disabled={saving || loading}
-                        className="h-12 px-8 rounded-2xl font-bold bg-primary text-white shadow-xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        className="h-11 md:h-12 px-8 rounded-2xl font-bold bg-primary text-white shadow-xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98] text-xs md:text-sm"
                     >
-                        {saving ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Save className="w-5 h-5 mr-2" />}
+                        {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                         Değişiklikleri Uygula
                     </Button>
                 </div>

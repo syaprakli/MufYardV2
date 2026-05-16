@@ -224,18 +224,22 @@ export default function Files() {
     const loadProfiles = async () => {
         try {
             const data = await fetchAllProfiles();
-            const meKeys = [
-                user?.uid,
-                user?.email?.trim().toLowerCase(),
-                profile?.uid,
-                profile?.email?.trim().toLowerCase()
-            ].filter(Boolean).map(v => String(v).toLowerCase());
+            const myUid = user?.uid;
+            const myEmail = user?.email?.trim().toLowerCase();
+            const myProfileUid = profile?.uid;
+            const myProfileEmail = profile?.email?.trim().toLowerCase();
+            
+            const meKeys = [myUid, myEmail, myProfileUid, myProfileEmail]
+                .filter(Boolean)
+                .map(v => String(v).toLowerCase().trim());
 
             setAllProfiles(
                 data.filter(p => {
-                    const pKeys = [p.uid, p.email?.trim().toLowerCase()]
+                    const pUid = p.uid;
+                    const pEmail = p.email?.trim().toLowerCase();
+                    const pKeys = [pUid, pEmail]
                         .filter(Boolean)
-                        .map(v => String(v).toLowerCase());
+                        .map(v => String(v).toLowerCase().trim());
                     return !pKeys.some(k => meKeys.includes(k));
                 })
             );
@@ -576,7 +580,7 @@ export default function Files() {
 
                     {/* File List/Grid */}
                     <Card className={cn(
-                        "p-0 border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-md overflow-hidden rounded-3xl min-h-[550px] border-none transition-all duration-300",
+                        "p-0 border-white/60 dark:border-slate-800 bg-card/90 dark:bg-slate-900/90 backdrop-blur-xl shadow-md overflow-hidden rounded-3xl min-h-[550px] border-none transition-all duration-300",
                         isDragActive && "ring-4 ring-primary/40 bg-primary/10 border-primary/30"
                     )}>
                         {isDragActive && (
@@ -610,8 +614,8 @@ export default function Files() {
                                             className={cn(
                                                 "group cursor-pointer transition-all active:scale-95 duration-300",
                                                 viewMode === 'list' 
-                                                    ? "flex items-center justify-between p-4 rounded-2xl hover:bg-card/60 dark:hover:bg-slate-800/60 border border-transparent hover:border-white dark:hover:border-slate-700 hover:shadow-sm"
-                                                    : "flex flex-col items-center justify-center p-6 rounded-3xl bg-card/30 dark:bg-slate-900/30 border border-white/60 dark:border-slate-800 hover:bg-card/80 dark:hover:bg-slate-800 hover:shadow-lg hover:border-primary/20 aspect-square text-center relative"
+                                                    ? "flex items-center justify-between p-4 rounded-2xl hover:bg-card/90 dark:hover:bg-slate-800/90 border border-transparent hover:border-white dark:hover:border-slate-700 hover:shadow-sm"
+                                                    : "flex flex-col items-center justify-center p-6 rounded-3xl bg-card/80 dark:bg-slate-900/80 border border-white/60 dark:border-slate-800 hover:bg-card dark:hover:bg-slate-800 hover:shadow-lg hover:border-primary/20 aspect-square text-center relative"
                                             )}
                                         >
                                             <div className={cn("flex items-center", viewMode === 'list' ? "gap-4" : "flex-col gap-3")}>
@@ -1009,46 +1013,53 @@ export default function Files() {
 
             {/* Yeni Klasör Modalı */}
             {isFolderModalOpen && createPortal(
-                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 animate-in fade-in duration-300" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}>
-                    <Card className="w-full max-w-md p-8 rounded-3xl shadow-2xl border-white/60 bg-card/90 backdrop-blur-xl animate-in zoom-in-95 duration-300">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-3 bg-primary/10 text-primary rounded-2xl">
-                                <Plus size={24} />
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 animate-in fade-in duration-300" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        className="w-full max-w-md p-8 rounded-[32px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+                    >
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="p-4 bg-primary/10 text-primary rounded-2xl shadow-inner">
+                                <Plus size={28} strokeWidth={3} />
                             </div>
                             <div>
-                                <h3 className="text-xl font-black font-outfit text-slate-900">Yeni Klasör Oluştur</h3>
-                                <p className="text-xs text-slate-500 font-medium">Lütfen klasör adını giriniz.</p>
+                                <h3 className="text-2xl font-black font-outfit text-slate-900 dark:text-white tracking-tight">Yeni Klasör Oluştur</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest mt-0.5">Klasör adını giriniz</p>
                             </div>
                         </div>
-                        <form onSubmit={handleFolderSubmit} className="space-y-6">
-                            <input
-                                autoFocus
-                                required
-                                type="text"
-                                value={newFolderName}
-                                onChange={(e) => setNewFolderName(e.target.value)}
-                                placeholder="Klasör Adı (Örn: 2024 Denetimleri)"
-                                className="w-full px-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-black text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
-                            />
-                            <div className="flex gap-3 pt-2">
+                        <form onSubmit={handleFolderSubmit} className="space-y-8">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Klasör İsmi</label>
+                                <input
+                                    autoFocus
+                                    required
+                                    type="text"
+                                    value={newFolderName}
+                                    onChange={(e) => setNewFolderName(e.target.value)}
+                                    placeholder="Örn: 2024 Denetimleri"
+                                    className="w-full px-6 py-5 bg-slate-50 dark:bg-slate-800/50 border-2 border-slate-100 dark:border-slate-800 rounded-2xl text-base font-bold text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-inner"
+                                />
+                            </div>
+                            <div className="flex gap-4">
                                 <Button 
                                     type="button"
                                     variant="ghost" 
                                     onClick={() => setIsFolderModalOpen(false)}
-                                    className="flex-1 h-14 rounded-2xl font-bold text-slate-500"
+                                    className="flex-1 h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                                 >
                                     İptal
                                 </Button>
                                 <Button 
                                     type="submit"
                                     disabled={creatingFolder || !newFolderName.trim()}
-                                    className="flex-1 h-14 rounded-2xl bg-primary text-white font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:-translate-y-1 transition-all"
+                                    className="flex-1 h-14 rounded-2xl bg-primary text-white font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/30 hover:-translate-y-1 active:scale-95 transition-all"
                                 >
-                                    {creatingFolder ? <RefreshCw className="animate-spin" size={18} /> : "Oluştur"}
+                                    {creatingFolder ? <RefreshCw className="animate-spin" size={18} /> : "OLUŞTUR"}
                                 </Button>
                             </div>
                         </form>
-                    </Card>
+                    </motion.div>
                 </div>
             , document.body)}
         </div>

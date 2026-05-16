@@ -84,7 +84,7 @@ import {
     Bold, Italic, List, ListOrdered, AlignJustify, Minus as HR,
     FileText, Download
 } from "lucide-react";
-import { cn } from "../lib/utils";
+import { cn, getUserColor } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -154,9 +154,17 @@ export default function PublicSpace() {
     const { user } = useAuth();
 
     const confirm = useConfirm();
-    const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage } = usePresence();
+    const { 
+        onlineUsers, 
+        messages: globalMessages, 
+        sendMessage: sendGlobalMessage, 
+        clearLocalMessages 
+    } = usePresence();
+
     const [chatInput, setChatInput] = useState("");
+    const [editingMessage, setEditingMessage] = useState<{id: string, text: string} | null>(null);
     const [desktopChatOpen, setDesktopChatOpen] = useState(true);
+
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     const location = useLocation();
@@ -345,7 +353,43 @@ export default function PublicSpace() {
         }
     };
 
+    const handleEditMessage = async (id: string, newText: string) => {
+        try {
+            const res = await fetch(`${API_URL}/collaboration/messages/${id}?uid=${user?.uid}&role=${userRole}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: newText })
+            });
+            if (res.ok) {
+                setEditingMessage(null);
+                toast.success("Mesaj güncellendi.");
+            }
+        } catch (err) {
+            toast.error("Güncellenemedi.");
+        }
+    };
+
+    const handleDeleteSingleMessage = async (id: string) => {
+        try {
+            const ok = await confirm({
+                title: "Mesajı Sil",
+                message: "Bu mesajı silmek istediğinize emin misiniz?"
+            });
+            if (!ok) return;
+
+            const res = await fetch(`${API_URL}/collaboration/messages/${id}?uid=${user?.uid}&role=${userRole}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                toast.success("Mesaj silindi.");
+            }
+        } catch (err) {
+            toast.error("Silinemedi.");
+        }
+    };
+
     const handleCreatePost = async () => {
+
         if (!newPost.title.trim() || !newPost.content.trim()) {
             toast.error("Başlık ve içerik alanları zorunludur.");
             return;
@@ -866,37 +910,49 @@ export default function PublicSpace() {
                             <h3 className="text-sm font-black capitalize tracking-widest flex items-center gap-2">
                                 <MessageSquare size={16} className="text-blue-400" /> Canlı Müzakere
                             </h3>
-                            {/* Compact Online Indicator */}
-                            {onlineUsers.length > 0 && (
-                                <div className="group relative">
-                                    <div className="flex items-center gap-2 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10 transition-all cursor-help">
-                                        <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
-                                        <span className="text-[10px] font-black">{onlineUsers.length}</span>
-                                    </div>
-                                    
-                                    {/* Hover Avatars Tooltip */}
-                                    <div className="absolute top-full right-0 mt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-[100] translate-y-2 group-hover:translate-y-0">
-                                        <div className="bg-white p-3 rounded-[20px] shadow-2xl border border-slate-100 min-w-[180px]">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 px-2 border-b border-slate-50 pb-2">Aktif Müfettişler</p>
-                                            <div className="space-y-1 max-h-60 overflow-y-auto no-scrollbar">
-                                                {onlineUsers.map((u: any) => (
-                                                    <div key={u.uid} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl transition-colors">
-                                                        <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-[10px] font-black text-white capitalize shadow-sm shrink-0">
-                                                            {u.name ? u.name.charAt(0) : '?'}
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={clearGlobalMessages}
+                                    className="p-2 hover:bg-white/10 rounded-xl text-white/60 hover:text-rose-400 transition-all group/clear border border-white/5 bg-white/5"
+                                    title="Mesajlarımı Sunucudan Temizle"
+                                >
+                                    <Trash2 size={16} className="group-hover/clear:scale-110 transition-transform" />
+                                </button>
+
+
+                                {/* Compact Online Indicator */}
+                                {onlineUsers.length > 0 && (
+                                    <div className="group relative">
+                                        <div className="flex items-center gap-2 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10 transition-all cursor-help">
+                                            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+                                            <span className="text-[10px] font-black">{onlineUsers.filter((u: any) => u.uid !== user?.uid).length}</span>
+                                        </div>
+                                        
+                                        {/* Hover Avatars Tooltip */}
+                                        <div className="absolute top-full right-0 mt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-[100] translate-y-2 group-hover:translate-y-0">
+                                            <div className="bg-white p-3 rounded-[20px] shadow-2xl border border-slate-100 min-w-[180px]">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 px-2 border-b border-slate-50 pb-2">Aktif Müfettişler</p>
+                                                <div className="space-y-1 max-h-60 overflow-y-auto no-scrollbar">
+                                                    {onlineUsers.filter((u: any) => u.uid !== user?.uid).map((u: any) => (
+                                                        <div key={u.uid} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl transition-colors">
+                                                            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-[10px] font-black text-white capitalize shadow-sm shrink-0">
+                                                                {u.name ? u.name.charAt(0) : '?'}
+                                                            </div>
+                                                            <div className="flex flex-col min-w-0">
+                                                                <span className="text-[11px] font-black text-slate-700 truncate">{u.name}</span>
+                                                                <span className="text-[8px] font-bold text-emerald-500 uppercase tracking-tighter">Çevrimiçi</span>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex flex-col min-w-0">
-                                                            <span className="text-[11px] font-black text-slate-700 truncate">{u.name}</span>
-                                                            <span className="text-[8px] font-bold text-emerald-500 uppercase tracking-tighter">Çevrimiçi</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     </div>
+
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar bg-white">
                         {globalMessages.length === 0 ? (
@@ -908,50 +964,100 @@ export default function PublicSpace() {
                             globalMessages.map((msg, idx) => {
                                 const isMine = msg.author_id === user?.uid;
                                 return (
-                                    <div key={msg.id || idx} className={cn("flex flex-col", isMine ? "items-end" : "items-start")}>
-                                        <div className={cn("max-w-[85%] p-4 rounded-3xl text-[13px] font-medium shadow-sm space-y-2", isMine ? "bg-primary text-white rounded-tr-none" : "bg-slate-100 text-slate-800 rounded-tl-none")}>
-                                            {msg.text && <div>{msg.text}</div>}
-                                            {msg.attachments && msg.attachments.length > 0 && (
-                                                <div className="flex flex-wrap gap-2 mt-2">
-                                                    {msg.attachments.map((at, i) => {
-                                                        const resolvedUrl = resolveAttachmentUrl(at.url);
-                                                        return (
-                                                        <div 
-                                                            key={i} 
-                                                            className={cn(
-                                                                "relative rounded-xl overflow-hidden border",
-                                                                at.type === 'image' ? "w-32 h-32 cursor-pointer" : "p-3 bg-white/10 backdrop-blur-sm border-white/20 min-w-[120px]"
-                                                            )}
-                                                            onClick={() => at.type === 'image' && setZoomedAttachment({ ...at, url: resolvedUrl })}
-                                                        >
-                                                            {at.type === 'image' ? (
-                                                                <img src={resolvedUrl} className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                <a 
-                                                                    href={resolvedUrl} 
-                                                                    target="_blank" 
-                                                                    rel="noopener noreferrer"
-                                                                    className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                >
-                                                                    <div className={cn("p-1.5 rounded-lg", isMine ? "bg-white/20" : "bg-slate-200")}>
-                                                                        <Paperclip size={14} className={isMine ? "text-white" : "text-slate-500"} />
-                                                                    </div>
-                                                                    <div className="flex flex-col min-w-0">
-                                                                        <span className={cn("text-[9px] font-black truncate", isMine ? "text-white" : "text-slate-700")}>{at.name || "Dosya"}</span>
-                                                                        <span className={cn("text-[7px] font-bold uppercase tracking-tighter opacity-60", isMine ? "text-white" : "text-slate-500")}>Görüntüle</span>
-                                                                    </div>
-                                                                </a>
-                                                            )}
-                                                        </div>
-                                                    );})}
+                                    <div key={msg.id || idx} className={cn("flex flex-col group/msg", isMine ? "items-end" : "items-start")}>
+                                        <div className="flex items-center gap-2 mb-1 px-1">
+                                            {!isMine && <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{msg.author_name}</span>}
+                                            <span className="text-[9px] font-bold text-slate-300">
+                                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        </div>
+                                        
+                                        <div className="relative max-w-[90%] flex items-center gap-2">
+                                            {/* Action Buttons for Messages */}
+                                            {isMine && (
+                                                <div className="opacity-50 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1">
+                                                    <button 
+                                                        onClick={() => setEditingMessage({ id: msg.id, text: msg.text })}
+                                                        className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary transition-colors"
+                                                        title="Düzenle"
+                                                    >
+                                                        <Edit3 size={12} />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDeleteSingleMessage(msg.id)}
+                                                        className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-colors"
+                                                        title="Sil"
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
                                                 </div>
                                             )}
+
+                                             <div className={cn(
+                                                "p-4 rounded-2xl text-[13px] font-medium shadow-sm transition-all border-l-4",
+                                                isMine 
+                                                    ? cn(getUserColor(msg.author_id), "text-white rounded-tr-none border-white/20")
+                                                    : cn(getUserColor(msg.author_id), "text-white rounded-tl-none border-transparent")
+                                            )}>
+                                                {editingMessage?.id === msg.id ? (
+                                                    <div className="flex flex-col gap-2 min-w-[200px]">
+                                                        <textarea 
+                                                            className="w-full bg-white/10 border border-white/20 rounded-lg p-2 text-white text-[12px] focus:outline-none focus:border-blue-400"
+                                                            value={editingMessage.text}
+                                                            onChange={(e) => setEditingMessage({...editingMessage, text: e.target.value})}
+                                                            autoFocus
+                                                        />
+                                                        <div className="flex justify-end gap-2">
+                                                            <button onClick={() => setEditingMessage(null)} className="text-[10px] font-black text-white/50 hover:text-white">İPTAL</button>
+                                                            <button onClick={() => handleEditMessage(msg.id, editingMessage.text)} className="text-[10px] font-black text-blue-400 hover:text-blue-300">KAYDET</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        {msg.text && <div className="leading-relaxed">{msg.text}</div>}
+                                                        {msg.attachments && msg.attachments.length > 0 && (
+                                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                                {msg.attachments.map((at, i) => {
+                                                                    const resolvedUrl = resolveAttachmentUrl(at.url);
+                                                                    return (
+                                                                    <div 
+                                                                        key={i} 
+                                                                        className={cn(
+                                                                            "relative rounded-xl overflow-hidden border border-white/10",
+                                                                            at.type === 'image' ? "w-24 h-24 cursor-pointer" : "p-2 bg-white/5 border-white/10"
+                                                                        )}
+                                                                        onClick={() => at.type === 'image' && setZoomedAttachment({ ...at, url: resolvedUrl })}
+                                                                    >
+                                                                        {at.type === 'image' ? (
+                                                                            <img src={resolvedUrl} className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            <a href={resolvedUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[10px] text-white/70 hover:text-white">
+                                                                                <FileText size={12} /> Dosya
+                                                                            </a>
+                                                                        )}
+                                                                    </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                            
+                                            {!isMine && (userRole === 'admin' || userRole === 'moderator') && (
+                                                <button 
+                                                    onClick={() => handleDeleteSingleMessage(msg.id)}
+                                                    className="opacity-50 group-hover/msg:opacity-100 p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-all"
+                                                    title="Yönetici Olarak Sil"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            )}
                                         </div>
-                                        <span className="text-[10px] font-bold text-slate-400 mt-1 px-2">{msg.author_name} • {new Date(msg.timestamp || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
                                     </div>
                                 );
                             })
+
                         )}
                         <div ref={chatEndRef} />
                     </div>

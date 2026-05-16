@@ -354,8 +354,14 @@ class CollaborationService:
         if not doc.exists:
             return False
 
+        # Admin/Founder bypass
+        founders = ["sefa.yaprakli@gsb.gov.tr", "syaprakli@gmail.com", "yasir.yaprakli@gsb.gov.tr", "admin", "user_1", "VKV8SfuNkWf9WeTYeSCTizd4oG83"]
+        if is_admin or requester_uid in founders or requester_uid.lower() in [f.lower() for f in founders]:
+            await asyncio.to_thread(doc_ref.delete)
+            return True
+
         data = doc.to_dict() or {}
-        if not is_admin and data.get('author_id') != requester_uid:
+        if data.get('author_id') != requester_uid:
             return False
             
         await asyncio.to_thread(doc_ref.delete)
@@ -368,8 +374,12 @@ class CollaborationService:
         if not doc.exists:
             return None
 
+        # Admin/Founder bypass
+        founders = ["sefa.yaprakli@gsb.gov.tr", "syaprakli@gmail.com", "yasir.yaprakli@gsb.gov.tr", "admin", "user_1", "VKV8SfuNkWf9WeTYeSCTizd4oG83"]
+        is_bypass = is_admin or requester_uid in founders or requester_uid.lower() in [f.lower() for f in founders]
+
         existing = doc.to_dict() or {}
-        if not is_admin and existing.get('author_id') != requester_uid:
+        if not is_bypass and existing.get('author_id') != requester_uid:
             return None
 
         update_data = {
