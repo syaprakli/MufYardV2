@@ -14,8 +14,10 @@ export default function ChatContainer() {
             roomId={chat.roomId}
             title={chat.title}
             type={chat.type}
+            recipientId={chat.recipientId}
             onClose={() => closeChat(chat.roomId)}
           />
+
         </div>
       ))}
     </div>

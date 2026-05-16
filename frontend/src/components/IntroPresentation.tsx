@@ -8,9 +8,13 @@ import {
   MessageSquare, 
   Bot, 
   Zap, 
-  ShieldCheck, 
-  LayoutDashboard
+  LayoutDashboard,
+  Loader2,
+  Sparkles
 } from 'lucide-react';
+import { useGlobalData } from '../lib/context/GlobalDataContext';
+import { updateProfile } from '../lib/api/profiles';
+import { toast } from 'react-hot-toast';
 
 interface SlideProps {
   title: string;
@@ -51,22 +55,52 @@ const slides: SlideProps[] = [
     color: "from-emerald-500 to-teal-600"
   },
   {
-    title: "Hadi Başlayalım!",
-    description: "Artık MufYardV2'nin tüm gücünü keşfetmeye hazırsınız. Ayarlardan profilinizi düzenlemeyi unutmayın.",
-    icon: <ShieldCheck className="w-16 h-16" />,
-    features: ["Kişiselleştirilmiş Deneyim", "7/24 Teknik Destek", "Sürekli Güncellenen İçerik"],
+    title: "30 Günlük Ücretsiz Deneme",
+    description: "MufYardV2'nin tüm gücünü 30 gün boyunca hiçbir kısıtlama olmadan ücretsiz keşfetmeye başlayın.",
+    icon: <Sparkles className="w-16 h-16" />,
+    features: ["Kredi Kartı Gerekmez", "Tüm Pro Özellikler Açık", "Sınırsız Mevzuat Erişimi"],
     color: "from-amber-500 to-orange-600"
   }
 ];
 
 export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const { data, refreshProfile } = useGlobalData();
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [loading, setLoading] = useState(false);
 
-  const nextSlide = () => {
+  const nextSlide = async () => {
     if (currentSlide < slides.length - 1) {
       setCurrentSlide(currentSlide + 1);
     } else {
-      handleClose();
+      await handleStartTrial();
+    }
+  };
+
+  const handleStartTrial = async () => {
+    // Eğer zaten adminse veya trial başladıysa kapat gitsin
+    if (data.profile?.role === 'admin' || data.profile?.trial_started) {
+        onClose();
+        return;
+    }
+
+    if (!data.profile?.uid) return;
+    
+    setLoading(true);
+    try {
+        await updateProfile(data.profile.uid, { trial_started: true });
+        // Tarayıcı hafızasına da işaret koy ki reload sonrası tekrar gelmesin
+        localStorage.setItem(`mufyard_intro_seen_${data.profile.uid}`, 'true');
+        
+        toast.success("30 Günlük deneme süreniz başarıyla başlatıldı! Keyifli kullanımlar.");
+        
+        // Veriyi tazele ve kapat
+        await refreshProfile(data.profile.uid, data.profile.email);
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
+    } catch (error) {
+        toast.error("Deneme süresi başlatılamadı.");
+        setLoading(false);
     }
   };
 
@@ -77,6 +111,11 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
   };
 
   const handleClose = () => {
+    // Eğer trial başlamadıysa ve admin değilse kapatmaya izin verme
+    if (data.profile?.role !== 'admin' && !data.profile?.trial_started) {
+        toast.error("Devam etmek için deneme süresini başlatmalısınız.");
+        return;
+    }
     onClose();
   };
 
@@ -84,14 +123,17 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0f172a]/95 backdrop-blur-md overflow-hidden p-4">
-      <motion.button
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        onClick={handleClose}
-        className="absolute top-6 right-6 p-2 text-white/50 hover:text-white transition-colors z-[10000]"
-      >
-        <X className="w-6 h-6" />
-      </motion.button>
+      {/* KESİN KONTROL: Sadece admin veya denemesi zaten başlamış olanlar X butonunu görebilir */}
+      {(data.profile?.role === 'admin' || data.profile?.trial_started === true) ? (
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          onClick={handleClose}
+          className="absolute top-6 right-6 p-2 text-white/50 hover:text-white transition-colors z-[10000]"
+        >
+          <X className="w-6 h-6" />
+        </motion.button>
+      ) : null}
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -170,17 +212,25 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
                 {currentSlide > 0 && (
                   <button
                     onClick={prevSlide}
-                    className="p-3 rounded-full bg-slate-800 text-white hover:bg-slate-700 transition-colors"
+                    disabled={loading}
+                    className="p-3 rounded-full bg-slate-800 text-white hover:bg-slate-700 transition-colors disabled:opacity-50"
                   >
                     <ChevronLeft className="w-6 h-6" />
                   </button>
                 )}
                 <button
                   onClick={nextSlide}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold text-white transition-all transform hover:scale-105 active:scale-95 bg-gradient-to-r ${slide.color} shadow-lg`}
+                  disabled={loading}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold text-white transition-all transform hover:scale-105 active:scale-95 bg-gradient-to-r ${slide.color} shadow-lg disabled:opacity-50`}
                 >
-                  {currentSlide === slides.length - 1 ? 'Başlayalım' : 'Devam Et'}
-                  <ChevronRight className="w-5 h-5" />
+                  {loading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      {currentSlide === slides.length - 1 ? 'Ücretsiz Denemeyi Başlat' : 'Devam Et'}
+                      <ChevronRight className="w-5 h-5" />
+                    </>
+                  )}
                 </button>
               </div>
             </div>

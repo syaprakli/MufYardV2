@@ -12,7 +12,10 @@ class ProfileBase(BaseModel):
     theme: str = Field(default="navy", example="dark") # "navy", "dark", "light"
     ai_enabled: bool = True
     has_premium_ai: bool = False
+    premium_type: Optional[str] = None
+    premium_until: Optional[str] = None
     notifications_enabled: bool = True
+    trial_started: bool = False
     role: str = Field(default="user", example="admin") # "admin", "moderator", "user"
     fcm_token: Optional[str] = None
     email_assignments: bool = True
@@ -24,6 +27,7 @@ class ProfileBase(BaseModel):
     ai_model: str = Field(default="gemini-2.0-flash")
     gemini_api_key: Optional[str] = None
     gemini_model: str = Field(default="gemini-2.0-flash")
+    report_prefix: Optional[str] = Field(default="S.Y.64")
 
     ai_temperature: float = Field(default=0.7)
     ai_system_prompt: Optional[str] = None
@@ -40,7 +44,10 @@ class ProfileUpdate(BaseModel):
     theme: Optional[str] = None
     ai_enabled: Optional[bool] = None
     has_premium_ai: Optional[bool] = None
+    premium_type: Optional[str] = None
+    premium_until: Optional[str] = None
     notifications_enabled: Optional[bool] = None
+    trial_started: Optional[bool] = None
     role: Optional[str] = None
     fcm_token: Optional[str] = None
     email_assignments: Optional[bool] = None
@@ -52,6 +59,7 @@ class ProfileUpdate(BaseModel):
     ai_model: Optional[str] = None
     gemini_api_key: Optional[str] = None
     gemini_model: Optional[str] = None
+    report_prefix: Optional[str] = None
 
     ai_temperature: Optional[float] = None
     ai_system_prompt: Optional[str] = None
@@ -60,6 +68,7 @@ class ProfileUpdate(BaseModel):
 
 class ProfileResponse(ProfileBase):
     uid: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:

@@ -86,10 +86,20 @@ export default function Messages() {
       const unified: UnifiedContact[] = [];
 
       // Kayıtlı profilleri ekle ve rehber bilgisiyle zenginleştir.
+      const myUid = user?.uid;
+      const myEmail = user?.email?.toLowerCase().trim();
+
       profiles.forEach(profile => {
-        const isMe = profile.uid === user?.uid;
+        const pUid = profile.uid;
+        const pEmail = profile.email?.toLowerCase().trim();
+        
+        const isMe = !!((pUid && pUid === myUid) || (pEmail && pEmail === myEmail));
         if (isMe) return;
-        const dirEntry = directory.find(d => d.email?.toLowerCase() === profile.email?.toLowerCase());
+        
+        const dirEntry = directory.find(d => {
+            const dEmail = d.email?.toLowerCase().trim();
+            return dEmail && dEmail === pEmail;
+        });
         
         unified.push({
           uid: profile.uid,
@@ -109,7 +119,14 @@ export default function Messages() {
       // Listeyi alfabetik sırala
       unified.sort((a, b) => a.full_name.localeCompare(b.full_name));
 
-      setContacts(unified);
+      // Son güvenlik filtresi: Kendini listede görme
+      const finalContacts = unified.filter(c => {
+        const cUid = c.uid;
+        const cEmail = c.email?.toLowerCase().trim();
+        return (cUid !== myUid) && (cEmail !== myEmail);
+      });
+
+      setContacts(finalContacts);
     } catch (error) {
       console.error("Kullanıcılar yüklenemedi:", error);
     } finally {
@@ -188,8 +205,10 @@ export default function Messages() {
             title={selectedContact.full_name}
             type="dm"
             isOnline={selectedContact.isOnline}
+            recipientId={selectedContact.uid!}
             onClose={() => setSelectedContact(null)}
           />
+
         </div>
       )}
 
@@ -353,8 +372,10 @@ export default function Messages() {
               title={selectedContact.full_name}
               type="dm"
               isOnline={selectedContact.isOnline}
+              recipientId={selectedContact.uid!}
               onClose={() => setSelectedContact(null)}
             />
+
           ) : (
             <div className="flex-1 bg-card/50 border border-slate-200 dark:border-slate-800 border-dashed rounded-3xl flex flex-col items-center justify-center text-center p-12 space-y-6">
               <div className="w-20 h-20 rounded-3xl bg-muted flex items-center justify-center text-slate-300 dark:text-slate-600">

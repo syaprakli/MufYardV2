@@ -29,6 +29,13 @@ async def save_global_message(message: MessageCreate):
 async def delete_message(message_id: str, uid: str = Query(...), role: str = Query("user")):
     is_admin = (role or "").strip().lower() == "admin"
     if await CollaborationService.delete_message(message_id, uid, is_admin):
+        # WebSocket üzerinden herkese bildir
+        delete_event = json.dumps({
+            "type": "delete_message",
+            "message_id": message_id,
+            "room_id": "global"
+        })
+        await chat_manager.broadcast("global", delete_event)
         return {"status": "success", "message": "Mesaj silindi."}
     raise HTTPException(status_code=403, detail="Mesaj silinemedi veya yetkiniz yok.")
 
@@ -41,6 +48,15 @@ async def update_message(message_id: str, payload: Dict[str, Any], uid: str = Qu
     is_admin = (role or "").strip().lower() == "admin"
     updated = await CollaborationService.update_message(message_id, text, uid, is_admin)
     if updated:
+        # WebSocket üzerinden herkese bildir
+        update_event = json.dumps({
+            "type": "update_message",
+            "message_id": message_id,
+            "room_id": "global",
+            "text": text,
+            "message": updated
+        })
+        await chat_manager.broadcast("global", update_event)
         return updated
     raise HTTPException(status_code=403, detail="Mesaj düzenlenemedi veya yetkiniz yok.")
 

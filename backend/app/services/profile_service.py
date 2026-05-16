@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import asyncio
 import logging
 from typing import Optional, Dict, Any, List
@@ -11,6 +11,12 @@ import os
 logger = logging.getLogger(__name__)
 
 class ProfileService:
+    FOUNDER_EMAILS = [
+        "sefa.yaprakli@gsb.gov.tr",
+        "syaprakli@gmail.com",
+        "sefayaprakli@hotmail.com"
+    ]
+
     @staticmethod
     def _normalize_email(value: Optional[str]) -> str:
         return (value or "").strip().lower()
@@ -185,21 +191,37 @@ class ProfileService:
                 "updated_at": datetime.utcnow()
             }
 
+            # Admin & Premium role enforcement (Whitelisted emails)
+            _premium_emails = ProfileService.FOUNDER_EMAILS
+            user_email_normalized = (email or search_email or "").lower().strip()
+            
             # Add defaults for new profiles
             if not profile_data:
+                is_premium = user_email_normalized in _premium_emails or uid in _premium_emails
                 new_data.update({
                     "theme": "navy",
                     "ai_enabled": True,
                     "ai_model": "Gemini 2.0 Flash",
                     "ai_temperature": 0.7,
                     "notifications_enabled": True,
-                    "role": "admin" if email in ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com"] else "user"
+                    "created_at": datetime.utcnow(),
+                    "has_premium_ai": is_premium,
+                    "trial_started": is_premium, # Premium ise zaten başlamış sayılır
+                    "role": "admin" if is_premium else "user"
                 })
             
-            # Admin role enforcement
-            _admin_ids = ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com", "VKV8SfuNkWf9WeTYeSCTizd4oG83"]
-            if (email or search_email or "").lower() in _admin_ids or uid in _admin_ids:
+            if user_email_normalized in _premium_emails or uid in _premium_emails:
                 new_data["role"] = "admin"
+                new_data["has_premium_ai"] = True
+            else:
+                # Kurucu olmayanlar için mevcut veriyi koru, yoksa varsayılanları ata
+                if not profile_data:
+                    new_data["role"] = "user"
+                    new_data["has_premium_ai"] = False
+                else:
+                    # Veritabanındaki mevcut durumu koru (Sadece kurucular zorla admin yapılır)
+                    new_data["role"] = profile_data.get("role", "user")
+                    new_data["has_premium_ai"] = profile_data.get("has_premium_ai", False)
 
             try:
                 await asyncio.to_thread(lambda: doc_ref.set(new_data, merge=True))
@@ -230,18 +252,32 @@ class ProfileService:
                     await asyncio.to_thread(lambda: doc_ref.update({"emails": current_emails, "updated_at": datetime.utcnow()}))
                     profile_data['emails'] = current_emails
 
-                # Admin role enforcement for existing profiles
-                _admin_emails = ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com"]
-                if (profile_data.get('email') or search_email or '').lower() in _admin_emails:
-                    if profile_data.get('role') != 'admin':
-                        await asyncio.to_thread(lambda: doc_ref.update({"role": "admin"}))
+                # Admin & Premium enforcement for existing profiles
+                _premium_emails = ProfileService.FOUNDER_EMAILS
+                user_email_normalized = (profile_data.get('email') or search_email or '').lower().strip()
+                
+                if user_email_normalized in _premium_emails:
+                    if profile_data.get('role') != 'admin' or profile_data.get('has_premium_ai') != True:
+                        await asyncio.to_thread(lambda: doc_ref.update({
+                            "role": "admin",
+                            "has_premium_ai": True,
+                            "premium_type": "Sınırsız",
+                            "updated_at": datetime.utcnow()
+                        }))
                         profile_data['role'] = 'admin'
-            except: pass # Quota
+                        profile_data['has_premium_ai'] = True
+                        profile_data['premium_type'] = "Sınırsız"
+            except: pass 
             return profile_data
 
-        # Final Fallback
-        _admin_ids = ["sefa.yaprakli@gsb.gov.tr", "sefayaprakli@hotmail.com", "VKV8SfuNkWf9WeTYeSCTizd4oG83"]
-        _fallback_role = "admin" if ((search_email or "").lower() in _admin_ids or uid in _admin_ids) else "user"
+        # Final Fallback (New Account Creation)
+        _premium_emails = ProfileService.FOUNDER_EMAILS + ["VKV8SfuNkWf9WeTYeSCTizd4oG83"]
+        user_email_normalized = (search_email or "").lower().strip()
+        is_premium_email = user_email_normalized in _premium_emails or uid in _premium_emails
+        
+        _fallback_role = "admin" if is_premium_email else "user"
+        _has_premium = True if is_premium_email else False
+
         default_profile = {
             "uid": uid,
             "full_name": "Kullanıcı (Mod-Dışı)",
@@ -251,11 +287,14 @@ class ProfileService:
             "emails": ProfileService._merge_emails(search_email or "sefa.yaprakli@gsb.gov.tr"),
             "theme": "navy",
             "ai_enabled": True,
+            "has_premium_ai": _has_premium,
+            "premium_type": "Sınırsız" if _has_premium else None,
             "ai_model": "Gemini 2.0 Flash",
             "ai_temperature": 0.7,
             "notifications_enabled": True,
             "role": _fallback_role,
             "verified": False,
+            "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }
         
@@ -297,14 +336,158 @@ class ProfileService:
 
         update_data['updated_at'] = datetime.utcnow()
         
-        # set(merge=True) kullan: update() belge yoksa exception fırlatır,
-        # set(merge=True) hem yeni oluşturur hem günceller.
+        # Eğer has_premium_ai False yapılıyorsa, kullanılan lisansı boşa çıkar
+        if update_data.get('has_premium_ai') == False:
+            try:
+                # Bu kullanıcı tarafından kullanılan anahtarı bul
+                license_docs = await asyncio.to_thread(lambda: list(db.collection('license_keys').where('used_by', '==', uid).stream()))
+                for ldoc in license_docs:
+                    await asyncio.to_thread(ldoc.reference.update, {
+                        'is_used': False,
+                        'used_by': None,
+                        'used_by_email': None,
+                        'used_by_name': None,
+                        'used_at': None
+                    })
+                    logger.info(f"Lisans anahtarı iade edildi (Kullanıcı resetlendi): {ldoc.id}")
+            except Exception as e:
+                logger.error(f"Lisans iade hatası: {e}")
+
         await asyncio.to_thread(lambda: doc_ref.set(update_data, merge=True))
         
         updated_doc_res = await asyncio.to_thread(doc_ref.get)
         updated_doc = updated_doc_res.to_dict()
         updated_doc['uid'] = uid
         return updated_doc
+
+    @staticmethod
+    async def activate_premium(uid: str, license_key: str) -> bool:
+        """
+        Lisans anahtarını doğrular ve Pro özelliklerini (Sınırsız kullanım) açar.
+        """
+        from datetime import datetime, timedelta
+        
+        if not license_key:
+            return False
+            
+        try:
+            logger.info(f"[ProfileService] Aktivasyon adımları başlıyor: {uid}")
+            
+            # 0. Kullanıcı bilgilerini al
+            doc_ref = db.collection('profiles').document(uid)
+            user_doc = await asyncio.to_thread(doc_ref.get)
+            if not user_doc.exists:
+                logger.error(f"[ProfileService] Kullanıcı profili bulunamadı: {uid}")
+                return False
+            user_data = user_doc.to_dict()
+            user_email = user_data.get('email', 'Bilinmiyor')
+            user_name = user_data.get('full_name', 'Bilinmiyor')
+            logger.info(f"[ProfileService] Kullanıcı teyit edildi: {user_name} ({user_email})")
+            
+            # 1. Lisans anahtarını koleksiyonda ara
+            logger.info(f"[ProfileService] Anahtar sorgulanıyor: {license_key.strip().upper()}")
+            license_ref = db.collection('license_keys').document(license_key.strip().upper())
+            doc = await asyncio.to_thread(license_ref.get)
+            
+            if not doc.exists:
+                logger.warning(f"[ProfileService] Anahtar veritabanında yok: {license_key}")
+                return False
+                
+            license_data = doc.to_dict()
+            if license_data.get('is_used'):
+                logger.warning(f"[ProfileService] Anahtar zaten kullanılmış: {license_key} (used_by={license_data.get('used_by')})")
+                return False
+                
+            duration_months = license_data.get('duration_months', 0)
+            expires_at = None
+            if duration_months > 0:
+                expires_at = datetime.utcnow() + timedelta(days=duration_months * 30)
+
+            # 2. Lisans anahtarını kullanıldı olarak işaretle
+            logger.info("[ProfileService] Anahtar kullanıldı olarak işaretleniyor...")
+            await asyncio.to_thread(license_ref.update, {
+                'is_used': True,
+                'used_by': uid,
+                'used_by_email': user_email,
+                'used_by_name': user_name,
+                'used_at': datetime.utcnow().isoformat(),
+                'expires_at': expires_at.isoformat() if expires_at else None
+            })
+            
+            # 3. Kullanıcı profilini güncelle
+            logger.info("[ProfileService] Kullanıcı profili premium'a yükseltiliyor...")
+            update_data = {
+                'has_premium_ai': True,
+                'trial_started': True,
+                'premium_until': expires_at.isoformat() if expires_at else None,
+                'premium_type': license_data.get('duration_label', 'Sınırsız'),
+                'updated_at': datetime.utcnow()
+            }
+            await asyncio.to_thread(doc_ref.set, update_data, merge=True)
+            
+            # 4. Bildirim gönder (Hata alsa bile ana işlemi bozmasın)
+            try:
+                logger.info("[ProfileService] Tebrik bildirimi gönderiliyor...")
+                await asyncio.to_thread(db.collection('notifications').add, {
+                    "user_id": uid,
+                    "title": "MufYard Pro Aktif! 💎",
+                    "message": "Lisans anahtarınız başarıyla doğrulandı. Artık sınırsız kullanım hakkına sahipsiniz.",
+                    "type": "success",
+                    "read": False,
+                    "created_at": datetime.utcnow()
+                })
+            except Exception as e:
+                logger.warning(f"[ProfileService] Bildirim gönderilemedi (işlem devam ediyor): {e}")
+            
+            logger.info(f"[ProfileService] Aktivasyon BAŞARILI: {uid}")
+            return True
+        except Exception as e:
+            logger.error(f"[ProfileService] Aktivasyon HATASI (uid={uid}): {e}")
+            return False
+    @staticmethod
+    async def reset_to_trial(uid: str) -> bool:
+        """
+        Kullanıcıyı deneme sürümüne geri döndürür. (Kayıt tarihini bugüne çeker ve Pro'yu kapatır)
+        """
+        from datetime import datetime
+        try:
+            doc_ref = db.collection('profiles').document(uid)
+            update_data = {
+                'has_premium_ai': False,
+                'trial_started': True,
+                'account_created_at': datetime.utcnow(), # Deneme süresini baştan başlat
+                'premium_until': None,
+                'premium_type': None,
+                'updated_at': datetime.utcnow()
+            }
+            await asyncio.to_thread(doc_ref.update, update_data)
+            logger.info(f"[ProfileService] Kullanıcı deneme sürümüne SIFIRLANDI: {uid}")
+            return True
+        except Exception as e:
+            logger.error(f"[ProfileService] Deneme sürümü sıfırlama hatası: {e}")
+            return False
+
+    @staticmethod
+    async def cancel_premium(uid: str) -> bool:
+        """
+        Kullanıcının Pro üyeliğini iptal eder ama deneme süresine dokunmaz.
+        """
+        from datetime import datetime
+        try:
+            doc_ref = db.collection('profiles').document(uid)
+            update_data = {
+                'has_premium_ai': False,
+                'premium_until': None,
+                'premium_type': None,
+                'updated_at': datetime.utcnow()
+            }
+            await asyncio.to_thread(doc_ref.update, update_data)
+            logger.info(f"[ProfileService] Kullanıcı Pro üyeliği İPTAL EDİLDİ: {uid}")
+            return True
+        except Exception as e:
+            logger.error(f"[ProfileService] Pro iptal hatası: {e}")
+            return False
+
     @staticmethod
     async def get_all_profiles() -> List[Dict[str, Any]]:
         try:
@@ -327,10 +510,12 @@ class ProfileService:
                 if 'theme' not in p: p['theme'] = "navy"
                 if 'ai_enabled' not in p: p['ai_enabled'] = True
                 if 'has_premium_ai' not in p: p['has_premium_ai'] = False
+                if 'trial_started' not in p: p['trial_started'] = p.get('has_premium_ai', False)
                 if 'notifications_enabled' not in p: p['notifications_enabled'] = True
                 if 'role' not in p: p['role'] = "user"
                 if 'two_factor_enabled' not in p: p['two_factor_enabled'] = False
                 if 'verified' not in p: p['verified'] = False
+                if 'created_at' not in p: p['created_at'] = p.get('updated_at', now)
                 if 'updated_at' not in p: p['updated_at'] = now
                 
                 profiles.append(p)
@@ -338,6 +523,91 @@ class ProfileService:
         except Exception as e:
             logger.error(f"Error getting all profiles: {e}")
             return []
+
+    @staticmethod
+    async def generate_license_key(duration_months: int = 0):
+        """Generates a unique license key and stores it in Firestore."""
+        import random
+        import string
+        from datetime import datetime, timezone
+        
+        # Generate a key like MUFYARD-XXXX-XXXX-XXXX
+        suffix = '-'.join([''.join(random.choices(string.ascii_uppercase + string.digits, k=4)) for _ in range(3)])
+        key = f"MUFYARD-{suffix}"
+        
+        # Duration label for humans
+        duration_label = "Sınırsız" if duration_months == 0 else f"{duration_months} Ay"
+        
+        try:
+            await asyncio.to_thread(db.collection("license_keys").document(key).set, {
+                "key": key,
+                "is_used": False,
+                "used_by": None,
+                "used_by_email": None,
+                "used_at": None,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "duration_months": duration_months,
+                "duration_label": duration_label
+            })
+            return key
+        except Exception as e:
+            logger.error(f"Error generating license key: {e}")
+            return None
+
+    @staticmethod
+    async def get_all_license_keys() -> List[Dict[str, Any]]:
+        """Tüm lisans anahtarlarını listeler."""
+        try:
+            docs = await asyncio.to_thread(lambda: list(db.collection('license_keys').stream()))
+            keys = []
+            for doc in docs:
+                data = doc.to_dict()
+                data['id'] = doc.id
+                
+                # Normalize created_at for sorting
+                created_at = data.get('created_at')
+                if created_at:
+                    if hasattr(created_at, 'isoformat'): # It's a datetime/Timestamp object
+                        data['created_at'] = created_at.isoformat()
+                    # If it's already a string, keep it
+                else:
+                    data['created_at'] = ""
+                    
+                keys.append(data)
+            return sorted(keys, key=lambda x: x['created_at'], reverse=True)
+        except Exception as e:
+            logger.error(f"Lisans listeleme hatası: {e}")
+            return None # Return None to indicate actual failure
+
+    @staticmethod
+    async def delete_license_key(key: str) -> bool:
+        """Kullanılmamış bir lisans anahtarını siler."""
+        try:
+            ref = db.collection('license_keys').document(key)
+            doc = await asyncio.to_thread(ref.get)
+            if doc.exists:
+                await asyncio.to_thread(ref.delete)
+                return True
+            return False
+        except Exception:
+            return False
+
+    @staticmethod
+    async def bulk_delete_licenses(keys: List[str]) -> Dict[str, int]:
+        """Birden fazla lisans anahtarını siler. Sadece kullanılmamış olanlar silinir."""
+        success_count = 0
+        error_count = 0
+        try:
+            for key in keys:
+                res = await ProfileService.delete_license_key(key)
+                if res:
+                    success_count += 1
+                else:
+                    error_count += 1
+            return {"success": success_count, "error": error_count}
+        except Exception as e:
+            logger.error(f"Bulk delete error: {e}")
+            return {"success": success_count, "error": error_count}
 
     @staticmethod
     async def delete_profile(uid: str) -> bool:

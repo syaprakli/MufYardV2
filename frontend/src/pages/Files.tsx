@@ -202,7 +202,7 @@ export default function Files() {
 
         setIsUploading(true);
         try {
-            await uploadFile(file, currentPath);
+            await uploadFile(file, currentPath, user?.uid);
             await loadData();
             toast.success("Dosya yüklendi");
         } catch (error) {
@@ -291,7 +291,7 @@ export default function Files() {
 
         setIsUploading(true);
         try {
-            await uploadFile(file, currentPath);
+            await uploadFile(file, currentPath, user?.uid);
             await loadData();
             toast.success("Dosya yüklendi");
         } catch (error) {
@@ -331,7 +331,7 @@ export default function Files() {
         
         setCreatingFolder(true);
         try {
-            await createFolder(newFolderName.trim(), currentPath);
+            await createFolder(newFolderName.trim(), currentPath, undefined, user?.uid);
             await loadData();
             setIsFolderModalOpen(false);
             setNewFolderName("");

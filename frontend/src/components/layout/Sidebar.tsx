@@ -17,7 +17,8 @@ import {
     MessageSquare,
     ClipboardCheck,
     Globe,
-    X
+    X,
+    Shield
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { isElectron } from "../../lib/firebase";
@@ -43,7 +44,6 @@ const navItems = [
     { icon: MessageSquare, label: "Mesajlar", href: "/messages" },
     { icon: Globe, label: "Kamusal Alan", href: "/public-space" },
     { icon: Bot, label: "Dijital Müfettiş", href: "/assistant" },
-    { icon: Star, label: "Bize Puan Verin", href: "/feedback" },
 ];
 
 const comingSoonItems = [
@@ -52,6 +52,7 @@ const comingSoonItems = [
 ];
 
 const bottomNavItems = [
+    { icon: Star, label: "Puan Ver", href: "/feedback" },
     { icon: HelpCircle, label: "Hakkında", href: "/about" },
     { icon: Settings, label: "Ayarlar", href: "/settings" },
 ];
@@ -62,10 +63,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     
     const totalUnread = Object.values(unreadMessages).reduce((a, b) => a + b, 0);
     
+    const isFounder = user?.email === "sefayaprakli@hotmail.com" || 
+                      user?.email === "sefa.yaprakli@gsb.gov.tr" ||
+                      user?.email === "syaprakli@gmail.com";
+
     // Check role from profile, or fallback to hardcoded emails for initial setup
-    const isAdmin = profile?.role === 'admin' || 
-                    user?.email === "sefayaprakli@hotmail.com" || 
-                    user?.email === "sefa.yaprakli@gsb.gov.tr";
+    const isAdmin = profile?.role === 'admin' || isFounder;
     
     const isModerator = profile?.role === 'moderator' || isAdmin;
     
@@ -84,14 +87,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     // Role-based visibility check
     const isVisible = (href: string) => {
         if (isAdmin) return true; // Admin sees everything
-        if (!isModerator) return true; // Standard user sees everything by default? Wait!
+        if (!isModerator) return true; // Standard user sees everything by default
         
-        // If they are a moderator, and NOT an admin, they ONLY see what is permitted.
-        // Wait, standard users see everything. Why would a moderator see LESS?
-        // Ah, "moderatör sadece kamusal alandaki sayfaya erişimi olacak ama bunu ben belirleyeceğim"
-        // Wait! If they are a moderator, do we hide things from them that a standard user can see?
-        // Actually, maybe the user wants the moderator to manage specific modules. But the prompt says "Seçili olmayan sayfalar moderatörün sol menüsünde görünmeyecektir." 
-        // Let's hide unpermitted ones.
         const pathMapping: Record<string, string> = {
             "/": "dashboard",
             "/tasks": "tasks",
@@ -117,7 +114,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     return (
         <aside className={cn(
-            "w-64 bg-slate-950 text-white h-screen flex flex-col fixed left-0 top-0 z-50 border-r border-slate-900/50 transition-all duration-300 ease-in-out",
+            "w-64 bg-slate-950 text-white h-[100dvh] flex flex-col fixed left-0 top-0 z-50 border-r border-slate-900/50 transition-all duration-300 ease-in-out",
             "lg:translate-x-0", // Always show on desktop
             isOpen ? "translate-x-0" : "-translate-x-full" // Toggle on mobile
         )}>
@@ -185,7 +182,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     </div>
                 ))}
 
-                {isAdmin && (
+                {isFounder && (
                     <div className="pt-2">
                         <div className="flex items-center gap-1.5 px-4 pb-1.5">
                             <div className="h-px flex-1 bg-amber-500/20" />
@@ -193,73 +190,45 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                             <div className="h-px flex-1 bg-amber-500/20" />
                         </div>
                         <NavLink
-                            to="/admin/feedback"
+                            to="/admin"
                             onClick={() => {
                                 if (window.innerWidth < 1024) onClose();
                             }}
                             className={({ isActive }) => cn(
                                 "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 border border-amber-500/20 bg-amber-500/5",
                                 isActive
-                                    ? "bg-amber-500 text-white shadow-md"
-                                    : "text-amber-500 hover:bg-amber-500/10"
+                                    ? "bg-amber-500 text-white shadow-md shadow-amber-500/20 scale-[1.02]"
+                                    : "text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/40"
                             )}
                         >
-                            <Star size={18} className="fill-current" />
-                            <span className="font-bold text-sm">Değerlendirmeleri Gör</span>
-                        </NavLink>
-                        <NavLink
-                            to="/admin/inspectors"
-                            onClick={() => {
-                                if (window.innerWidth < 1024) onClose();
-                            }}
-                            className={({ isActive }) => cn(
-                                "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 border border-amber-500/20 bg-amber-500/5 mt-1",
-                                isActive
-                                    ? "bg-amber-500 text-white shadow-md"
-                                    : "text-amber-500 hover:bg-amber-500/10"
-                            )}
-                        >
-                            <Users size={18} />
-                            <span className="font-bold text-sm">Müfettiş Listesi</span>
-                        </NavLink>
-                        <NavLink
-                            to="/admin/roles"
-                            onClick={() => {
-                                if (window.innerWidth < 1024) onClose();
-                            }}
-                            className={({ isActive }) => cn(
-                                "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 border border-amber-500/20 bg-amber-500/5 mt-1",
-                                isActive
-                                    ? "bg-amber-500 text-white shadow-md"
-                                    : "text-amber-500 hover:bg-amber-500/10"
-                            )}
-                        >
-                            <Settings size={18} />
-                            <span className="font-bold text-sm">Moderatör İzinleri</span>
+                            <Shield size={18} className={cn("transition-transform duration-300")} />
+                            <span className="font-bold text-sm">Kurucu Paneli</span>
                         </NavLink>
                     </div>
                 )}
             </nav>
 
-            <div className="p-4 border-t border-primary-light space-y-1">
-                {bottomNavItems.map((item) => (
-                    <NavLink
-                        key={item.href}
-                        to={item.href}
-                        onClick={() => {
-                            if (window.innerWidth < 1024) onClose();
-                        }}
-                        className={({ isActive }) => cn(
-                            "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
-                            isActive
-                                ? "bg-primary-light text-white shadow-inner"
-                                : "text-secondary hover:bg-primary-light/50 hover:text-white"
-                        )}
-                    >
-                        <item.icon size={20} />
-                        <span className="font-medium">{item.label}</span>
-                    </NavLink>
-                ))}
+            <div className="p-3 border-t border-white/5 space-y-0.5">
+                <div className="flex flex-col gap-0.5">
+                    {bottomNavItems.map((item) => (
+                        <NavLink
+                            key={item.href}
+                            to={item.href}
+                            onClick={() => {
+                                if (window.innerWidth < 1024) onClose();
+                            }}
+                            className={({ isActive }) => cn(
+                                "flex items-center gap-2.5 px-3.5 py-2 rounded-lg transition-all duration-200",
+                                isActive
+                                    ? "bg-white/10 text-white"
+                                    : "text-white/40 hover:text-white/70 hover:bg-white/5"
+                            )}
+                        >
+                            <item.icon size={15} />
+                            <span className="font-medium text-[11px] uppercase tracking-wider">{item.label}</span>
+                        </NavLink>
+                    ))}
+                </div>
             </div>
         </aside>
     );

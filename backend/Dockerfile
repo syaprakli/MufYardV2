@@ -4,9 +4,11 @@ FROM python:3.11
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies (Full image has most, but we ensure essentials)
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    libxml2-dev \
+    libxslt-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install

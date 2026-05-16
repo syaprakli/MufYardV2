@@ -158,8 +158,8 @@ class MockCollection:
         return self
 
     def stream(self):
-        docs = _MOCK_DATA.get(self.name, {}).values()
-        return [MockDocument(d.get('id', 'mock'), d) for d in docs]
+        docs_dict = _MOCK_DATA.get(self.name, {})
+        return [MockDocument(doc_id, data) for doc_id, data in docs_dict.items()]
 
     def get(self):
         return self.stream()

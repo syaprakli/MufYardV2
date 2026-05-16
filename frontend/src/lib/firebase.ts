@@ -1,6 +1,6 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword as firebaseSignIn, createUserWithEmailAndPassword as firebaseSignUp, GoogleAuthProvider, signInWithPopup, updateProfile, sendEmailVerification } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const isDummy = !import.meta.env.VITE_FIREBASE_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY === "AIzaSy_FAKE_KEY_PLEASE_CHANGE";
@@ -14,22 +14,22 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-let app;
-try {
-  app = initializeApp(firebaseConfig);
-} catch (e) {
-  app = { options: {} } as any;
-}
-
+// Singleton initialization to prevent HMR errors
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Offline Persistence with new API (replaces deprecated enableIndexedDbPersistence)
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-});
+let _db;
+try {
+  _db = getFirestore(app);
+} catch (e) {
+  _db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+}
+export const db = _db;
 
 export const storage = getStorage(app);
-export const messaging = null; // Mobil Bildirimler Devre Dışı
+export const messaging = null; 
 
 // Electron environment detection
 // User-Agent bazli kontrol bazi makinelerde false donebiliyor.

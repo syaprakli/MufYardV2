@@ -38,7 +38,7 @@ from app.routers import (
     dashboard, audit, tasks, contacts, 
     inspectors, profiles, legislation, 
     notes, ai_knowledge, backup, files,
-    calendar, notifications, ai, collaboration, feedback, online, settings as settings_router
+    calendar, notifications, ai, collaboration, feedback, online, settings as settings_router, licenses
 )
 
 from app.services.contact_service import ContactService
@@ -80,34 +80,14 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     try:
-        logger.info("Startup süreci başladı...")
+        logger.info("Startup süreci başladı (MINIMAL MODE)...")
+        # Tüm ağır işleri devre dışı bıraktık
+        logger.info("Ağır senkronizasyon görevleri geçici olarak devre dışı.")
         
-        # Kritik dosya kontrolleri
-        files_to_check = {
-            "Firebase Anahtarı": settings.FIREBASE_SERVICE_ACCOUNT_PATH,
-            "Rehber Excel": os.path.join(BASE_DIR, "rehber.xlsx"),
-            ".env Dosyası": os.path.join(BASE_DIR, ".env")
-        }
-        
-        for name, path in files_to_check.items():
-            if os.path.exists(path):
-                logger.info(f"KONTROL: {name} bulundu -> {path}")
-            else:
-                logger.error(f"KONTROL: {name} BULUNAMADI! -> {path}")
-
-        if settings.STARTUP_SYNC_ENABLED:
-            try:
-                logger.info("Otomatik senkronizasyon başlatılıyor...")
-                asyncio.create_task(ContactService.sync_from_rdb_rehber_v6())
-                asyncio.create_task(InspectorService.sync_from_excel())
-                logger.info("Senkronizasyon görevleri arka plana atıldı.")
-            except Exception as e:
-                logger.error(f"Startup senkronizasyon hatası: {str(e)}")
-        else:
-            logger.info("Startup senkronizasyonu ayarlar gereği devre dışı.")
-
-        # Bundled content sync to DATA_DIR (Background)
-        asyncio.create_task(sync_bundled_content())
+        # Sadece kritik dosyaları kontrol et ama bir şey yapma
+        if not os.path.exists(settings.FIREBASE_SERVICE_ACCOUNT_PATH):
+             logger.warning("Firebase anahtarı yok, Mock DB kullanılabilir.")
+             
     except Exception as e:
         logger.error(f"KRİTİK STARTUP HATASI: {e}")
 
@@ -197,6 +177,7 @@ app.include_router(legislation.router, prefix="/api/legislation", tags=["Legisla
 app.include_router(notes.router, prefix="/api/notes", tags=["Notes"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
 app.include_router(profiles.router, prefix="/api/profiles", tags=["Profiles"])
+app.include_router(licenses.router, prefix="/api/licenses", tags=["Licenses"])
 app.include_router(inspectors.router, prefix="/api/inspectors", tags=["Inspectors"])
 app.include_router(files.router, prefix="/api/files", tags=["Files"])
 app.include_router(ai.router, prefix="/api/ai", tags=["AI"])
@@ -232,71 +213,118 @@ async def websocket_chat_endpoint(websocket: WebSocket):
     await chat_manager.connect(websocket, room_id, uid, name)
     try:
         while True:
-            raw_data = await websocket.receive_text()
-            data = json.loads(raw_data)
+            try:
+                raw_data = await websocket.receive_text()
+                data = json.loads(raw_data)
 
-            # Ping/pong heartbeat - Railway WS timeout'unu önler
-            if data.get("type") == "ping":
-                await websocket.send_text(json.dumps({"type": "pong"}))
-                continue
-            
-            # Eğer DM odasıysa ve mesaj geliyorsa, veri tabanına kaydet
-            is_dm = room_id.startswith("dm_")
-            msg_type = data.get("type", "message")
-            
-            if is_dm and msg_type == "message":
-                logger.info(f"DM Mesajı alınıyor: {uid} -> {room_id}")
-                # Alıcıyı room_id'den bul (dm_uid1_uid2)
-                parts = room_id.split("_")
-                recipient_id = parts[1] if parts[2] == uid else parts[2]
+                # Ping/pong heartbeat - Railway WS timeout'unu önler
+                if data.get("type") == "ping":
+                    await websocket.send_text(json.dumps({"type": "pong"}))
+                    continue
                 
-                # Servis üzerinden kaydet (persistent)
-                dm_create = DirectMessageCreate(
-                    recipient_id=recipient_id,
-                    content=data.get("content", ""),
-                    attachment=data.get("attachment")
-                )
-                new_db_msg = await CollaborationService.save_private_message(uid, name, dm_create)
+                # Mesaj içeriğini normalize et (Hem 'text' hem 'content' desteği)
+                msg_text = data.get("text") or data.get("content") or ""
+                msg_attachments = data.get("attachments", [])
+                if not msg_attachments and data.get("attachment"):
+                    msg_attachments = [data.get("attachment")]
                 
-                # Bildirim gönder (async)
-                notif = NotificationCreate(
-                    user_id=recipient_id,
-                    title=f"Yeni Mesaj: {name}",
-                    message=data.get("content", "")[:100],
-                    type="dm",
-                    chat_room_id=room_id
-                )
-                asyncio.create_task(NotificationService.create_notification(notif))
+                # Eğer DM odasıysa ve mesaj geliyorsa, veri tabanına kaydet
+                is_dm = room_id.startswith("dm_")
+                msg_type = data.get("type", "message")
                 
-                # Mesajın ID'sini geri dönen dataya ekle
-                data["id"] = new_db_msg["id"]
-                data["timestamp"] = new_db_msg["timestamp"]
-                # DM ise oda bilgisini de ekle (frontend'in yakalaması için)
-                data["room_id"] = room_id
-                raw_data = json.dumps(data)
+                if msg_type == "message":
+                    if is_dm:
+                        logger.info(f"DM Mesajı alınıyor: {uid} -> {room_id}")
+                        
+                        # Alıcıyı bul (En sağlam yöntem: client'ın gönderdiği recipient_id)
+                        recipient_id = data.get("recipient_id")
+                        
+                        # Fallback: room_id'den ayıkla
+                        if not recipient_id:
+                            parts = room_id.split("_")
+                            if len(parts) >= 3:
+                                recipient_id = parts[1] if parts[2] == uid else parts[2]
+                        
+                        if not recipient_id:
+                            logger.error(f"Alıcı bulunamadı! Room: {room_id}, UID: {uid}")
+                            continue
+
+                        # Servis üzerinden kaydet (persistent)
+                        dm_create = DirectMessageCreate(
+                            recipient_id=recipient_id,
+                            content=msg_text,
+                            attachment=msg_attachments[0] if msg_attachments else None
+                        )
+                        new_db_msg = await CollaborationService.save_private_message(uid, name, dm_create)
+                        
+                        # Bildirim gönder (async)
+                        notif = NotificationCreate(
+                            user_id=recipient_id,
+                            title=f"Yeni Mesaj: {name}",
+                            message=msg_text[:100],
+                            type="dm",
+                            chat_room_id=room_id
+                        )
+                        asyncio.create_task(NotificationService.create_notification(notif))
+                        
+                        # Mesaj verisini zenginleştir
+                        data["id"] = new_db_msg["id"]
+                        data["timestamp"] = new_db_msg["timestamp"]
+                        data["room_id"] = room_id
+                        data["content"] = msg_text
+                        data["text"] = msg_text
+                        data["sender_id"] = uid
+                        data["sender_name"] = name
+                        raw_data = json.dumps(data)
+                        
+                        # 1. Mevcut odaya bas (FloatingChat)
+                        await chat_manager.broadcast(room_id, raw_data)
+                        
+                        # 2. Alıcının TÜM diğer bağlantılarına bas (Bildirim ve diğer sekmeler)
+                        await chat_manager.send_to_user(recipient_id, raw_data)
+                        
+                        # 3. GÖNDERENİN diğer bağlantılarına da bas (Diğer sekmeler senkron kalsın)
+                        await chat_manager.send_to_user(uid, raw_data)
+                        
+                        logger.info(f"DM İletimi tamamlandı: {uid} -> {recipient_id}")
+                    else:
+                        # Global mesaj (Canlı Müzakere): Veritabanına kaydet
+                        logger.info(f"Global Mesaj alınıyor: {uid} -> {room_id}")
+                        from app.schemas.messaging import MessageCreate
+                        global_msg = MessageCreate(
+                            text=msg_text,
+                            author_id=uid,
+                            author_name=name,
+                            author_role="Müfettiş"
+                        )
+                        new_db_msg = await CollaborationService.save_message(global_msg)
+                        
+                        # Veriyi zenginleştir
+                        data["id"] = new_db_msg["id"]
+                        data["timestamp"] = new_db_msg["timestamp"].isoformat() if hasattr(new_db_msg["timestamp"], "isoformat") else new_db_msg["timestamp"]
+                        data["author_id"] = uid
+                        data["author_name"] = name
+                        data["text"] = msg_text
+                        data["content"] = msg_text
+                        data["room_id"] = "global"
+                        raw_data = json.dumps(data)
+                        
+                        # Herkese yayınla
+                        await chat_manager.broadcast(room_id, raw_data)
+                        logger.info(f"Global Broadcast tamamlandı: {room_id}")
+                    
+                    continue
                 
-                # DM: oda bazlı broadcast (FloatingChat açıksa alır)
+                # Diğer tipler için sadece broadcast
                 await chat_manager.broadcast(room_id, raw_data)
-                
-                # Alıcı DM odasında değilse, global bağlantısına da gönder
-                # (PresenceContext'in yakalaması ve alt bar açması için)
-                recipient_in_room = False
-                if room_id in chat_manager.rooms:
-                    for ws_conn, info in chat_manager.rooms[room_id].items():
-                        if info["uid"] == recipient_id:
-                            recipient_in_room = True
-                            break
-                
-                if not recipient_in_room:
-                    await chat_manager.send_to_user(recipient_id, raw_data)
-                    logger.info(f"DM alıcı odada değil, global WS'e iletildi: {recipient_id}")
-                
-                logger.info(f"DM Broadcast tamamlandı: {room_id}")
+
+            except Exception as e:
+                if isinstance(e, WebSocketDisconnect):
+                    raise e
+                logger.error(f"WebSocket döngü hatası: {str(e)}")
                 continue
-            
-            # Global mesaj: odaya yayınla
-            await chat_manager.broadcast(room_id, raw_data)
-            logger.info(f"Broadcast tamamlandı: {room_id}")
+
+
     except WebSocketDisconnect:
         logger.info(f"WS Bağlantısı kesildi: {name} (Oda: {room_id})")
         await chat_manager.disconnect(websocket, room_id)

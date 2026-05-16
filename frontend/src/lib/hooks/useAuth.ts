@@ -79,6 +79,8 @@ export function useAuth() {
             localStorage.removeItem("mufyard_assistant_messages");
             setUser(null);
             await firebaseSignOut(auth);
+            // Giriş sayfasına yönlendir
+            window.location.href = "/";
         } catch (error) {
             console.error("Çıkış yapılırken hata oluştu:", error);
         }

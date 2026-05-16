@@ -44,3 +44,10 @@ export async function sendDirectMessage(recipientId: string, content: string, at
     });
     return res.ok;
 }
+
+export async function fetchGlobalMessages(limit: number = 50) {
+    const res = await fetchWithTimeout(`${API_URL}/collaboration/messages?limit=${limit}`);
+    if (!res.ok) return [];
+    return await res.json();
+}
+

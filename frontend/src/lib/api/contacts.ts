@@ -3,6 +3,7 @@ import { fetchWithTimeout } from "./utils";
 
 export interface Contact {
     id: string;
+    uid?: string;
     name: string;
     title: string;
     unit: string;

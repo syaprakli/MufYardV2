@@ -74,7 +74,8 @@ class FolderManager:
             "yasir.yaprakli@gsb.gov.tr",
             "admin", 
             "user_1", 
-            "VKV8SfuNkWf9WeTYeSCTizd4oG83" # Sefa UID
+            "VKV8SfuNkWf9WeTYeSCTizd4oG83", # Sefa UID
+            "tvmLKgsHf5WvjB12BEeGWaAT4tK2"  # Yeni eklenen UID
         ]
         if user_id in founders or user_id.lower() in [f.lower() for f in founders]:
             return True

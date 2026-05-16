@@ -26,19 +26,53 @@ export interface Profile {
     phone?: string;
     birthday?: string;
     birthday_full?: string;
+    trial_started?: boolean;
+    premium_type?: string;
+    premium_until?: string;
+    report_prefix?: string;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export async function fetchProfile(uid: string, email?: string, fullName?: string): Promise<Profile> {
-    const params = new URLSearchParams();
-    if (email) params.set("email", email);
-    if (fullName) params.set("full_name", fullName);
-    const query = params.toString();
-    const url = `${API_BASE_URL}/profiles/${uid}${query ? `?${query}` : ""}`;
-    const response = await fetchWithTimeout(url);
-    if (!response.ok) {
-        throw new Error("Profil yüklenemedi.");
+    const storageKey = `mufyard_profile_cache_${uid}`;
+    
+    try {
+        const params = new URLSearchParams();
+        if (email) params.set("email", email);
+        if (fullName) params.set("full_name", fullName);
+        const query = params.toString();
+        const url = `${API_BASE_URL}/profiles/${uid}${query ? `?${query}` : ""}`;
+        
+        const response = await fetchWithTimeout(url);
+        if (!response.ok) {
+            throw new Error("Profil yüklenemedi.");
+        }
+        const data = await response.json();
+        
+        // Cache the profile
+        localStorage.setItem(storageKey, JSON.stringify({
+            data,
+            timestamp: Date.now()
+        }));
+        
+        return data;
+    } catch (error) {
+        console.warn(`Network error fetching profile ${uid}, attempting local fallback:`, error);
+        
+        const localData = localStorage.getItem(storageKey);
+        if (localData) {
+            try {
+                const parsed = JSON.parse(localData);
+                console.log(`Loaded profile ${uid} from local storage fallback.`);
+                return parsed.data;
+            } catch (e) {
+                console.error("Error parsing local profile cache:", e);
+            }
+        }
+        
+        throw error;
     }
-    return response.json();
 }
 
 export async function fetchAllProfiles(): Promise<Profile[]> {
@@ -110,6 +144,63 @@ export async function deleteProfile(uid: string): Promise<boolean> {
     const response = await fetchWithTimeout(`${API_BASE_URL}/profiles/${uid}`, {
         method: "DELETE",
         headers,
+    });
+    return response.ok;
+}
+export async function fetchLicenses(): Promise<any[]> {
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/licenses/list`, {
+        headers,
+    });
+    if (!response.ok) throw new Error("Lisanslar yüklenemedi.");
+    return response.json();
+}
+
+export async function generateLicense(duration_months: number = 0): Promise<{key: string}> {
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
+    const response = await fetchWithTimeout(`${API_BASE_URL}/licenses/generate`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ duration_months })
+    });
+    if (!response.ok) throw new Error("Lisans üretilemedi.");
+    return response.json();
+}
+
+export async function deleteLicense(key: string): Promise<boolean> {
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/licenses/${key}`, {
+        method: "DELETE",
+        headers,
+    });
+    return response.ok;
+}
+
+export async function bulkDeleteLicenses(keys: string[]): Promise<{ success: number, error: number }> {
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
+    const response = await fetchWithTimeout(`${API_BASE_URL}/licenses/bulk-delete`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ keys }),
+    });
+    if (!response.ok) throw new Error("Toplu silme işlemi başarısız oldu.");
+    return response.json();
+}
+
+export async function resetTrial(uid: string): Promise<boolean> {
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/profiles/${uid}/reset-trial`, {
+        method: 'POST',
+        headers
+    });
+    return response.ok;
+}
+
+export async function cancelPremium(uid: string): Promise<boolean> {
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/profiles/${uid}/cancel-premium`, {
+        method: 'POST',
+        headers
     });
     return response.ok;
 }

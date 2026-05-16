@@ -205,19 +205,14 @@ export default function PublicSpace() {
         if (!url) return '';
         const raw = String(url).trim();
         
-        // Already absolute
         if (raw.startsWith('http') || raw.startsWith('blob:') || raw.startsWith('data:')) return raw;
         
-        // Use BASE_URL (which is absolute in Electron/Prod)
-        const baseUrl = (BASE_URL || '').replace(/\/$/, '');
         const cleanRaw = raw.startsWith('/') ? raw : `/${raw}`;
+        const parts = cleanRaw.split('/');
+        const encodedRaw = parts.map(p => encodeURIComponent(p)).join('/');
         
-        // Ensure we use the production URL if BASE_URL is not provided or relative
-        if (!baseUrl || (IS_ELECTRON && !baseUrl.startsWith('http'))) {
-            return `https://mufyardv2.up.railway.app${cleanRaw}`;
-        }
-        
-        return `${baseUrl}${cleanRaw}`;
+        // FORUM ALWAYS USES RAILWAY FOR ATTACHMENTS TO ENSURE PUBLIC AVAILABILITY
+        return `https://mufyardv2.up.railway.app${encodedRaw}`;
     };
 
     useEffect(() => {
@@ -542,7 +537,7 @@ export default function PublicSpace() {
         const formData = new FormData();
         formData.append('file', file);
         try {
-            const res = await fetchWithTimeout(`${API_URL}/files/upload`, { method: 'POST', body: formData });
+            const res = await fetchWithTimeout(`https://mufyardv2.up.railway.app/api/files/upload?user_id=${user?.uid || 'guest'}`, { method: 'POST', body: formData });
             const data = await res.json();
             
             // Backend'den gelen URL'yi direkt kullanabiliriz, resolveAttachmentUrl render sırasında halledecek
@@ -563,7 +558,7 @@ export default function PublicSpace() {
         const formData = new FormData();
         formData.append('file', file);
         try {
-            const res = await fetchWithTimeout(`${API_URL}/files/upload`, { method: 'POST', body: formData });
+            const res = await fetchWithTimeout(`https://mufyardv2.up.railway.app/api/files/upload?user_id=${user?.uid || 'guest'}`, { method: 'POST', body: formData });
             const data = await res.json();
             setChatAttachments(p => [...p, data]);
             toast.success("Dosya hazır");

@@ -32,22 +32,8 @@ export default function Login() {
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
-        
-        // ACİL DURUM BYPASS (Yalnızca Giriş Modunda)
-        if (!isRegister && email.trim().toLowerCase() === "sefa.yaprakli@gsb.gov.tr" && password === "123456") {
-            const mockUser = { 
-                email: email.trim().toLowerCase(), 
-                uid: "sefa-yaprakli-gsb-unique-id",
-                displayName: "Sefa Yapraklı"
-            };
-            localStorage.setItem("demo_user", JSON.stringify(mockUser));
-            navigate("/dashboard");
-            return;
-        }
-
         setLoading(true);
         setError("");
-        
 
         try {
             let result;
@@ -172,7 +158,7 @@ export default function Login() {
         <div className="min-h-screen lg:h-screen flex items-center justify-center bg-[#0f172a] font-sans selection:bg-blue-500/30 overflow-x-hidden sm:p-0">
             <div className="absolute inset-0 opacity-5 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
 
-            <div className="relative z-10 w-full lg:max-w-[1050px] flex bg-white dark:bg-slate-900 rounded-none lg:rounded-[50px] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.6)] border-none lg:border lg:border-white/10 dark:lg:border-slate-800/50 min-h-screen lg:h-[92vh] lg:max-h-[850px]">
+            <div className="relative z-10 w-full lg:max-w-[1050px] flex bg-white dark:bg-slate-900 rounded-none lg:rounded-[50px] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.6)] border-none lg:border lg:border-white/10 dark:lg:border-slate-800/50 h-auto lg:h-[88vh] lg:max-h-[820px]">
 
                 {/* Sol Taraf: Kurumsal Alan */}
                 <div className="hidden md:flex w-[40%] bg-slate-50 dark:bg-slate-950/50 p-12 flex-col relative overflow-hidden border-r border-slate-100 dark:border-slate-800">

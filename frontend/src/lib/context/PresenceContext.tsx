@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { WS_URL } from '../config';
+import { WS_URL, API_URL } from '../config';
+
 import { fetchOnlineUsers } from '../api/online';
 import { toast } from 'react-hot-toast';
 import { useChat } from './ChatContext';
+import { fetchGlobalMessages } from '../api/collaboration';
+
 
 interface OnlineUser {
     uid: string;
@@ -27,7 +30,10 @@ interface PresenceContextType {
     unreadMessages: Record<string, number>;
     markAsRead: (roomId: string) => void;
     sendMessage: (text: string, attachments?: any[]) => string;
+    clearGlobalMessages: () => Promise<void>;
+    clearLocalMessages: () => void;
 }
+
 
 const PresenceContext = createContext<PresenceContextType | undefined>(undefined);
 
@@ -99,6 +105,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         };
 
         syncOnlineUsers();
+
         const timer = setInterval(syncOnlineUsers, 15000);
 
         return () => {
@@ -106,6 +113,35 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             clearInterval(timer);
         };
     }, [user?.uid]);
+
+    // Fetch Global Message History
+    useEffect(() => {
+        if (!user?.uid) return;
+
+        const loadHistory = async () => {
+            try {
+                const history = await fetchGlobalMessages(50);
+                if (Array.isArray(history)) {
+
+                    const normalized = history.map((m: any) => ({
+                        id: m.id,
+                        text: m.text || m.content || '',
+                        author_id: m.author_id,
+                        author_name: m.author_name,
+                        author_role: m.author_role || 'Müfettiş',
+                        timestamp: m.timestamp,
+                        attachments: m.attachments || []
+                    }));
+                    setMessages(normalized);
+                }
+            } catch (err) {
+                console.error("Global history fetch error:", err);
+            }
+        };
+
+        loadHistory();
+    }, [user?.uid]);
+
 
     // WebSocket Connection Logic
     useEffect(() => {
@@ -164,31 +200,72 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                         
                         // Metin VEYA ek varsa işle
                         if ((msgContent && typeof msgContent === 'string') || msgAttachments.length > 0) {
+                            // Backend artık tüm mesajlara room_id ekliyor.
                             if (msgRoomId.startsWith('dm_')) {
                                 // DM ise diğer bileşenlerin (FloatingChat gibi) yakalaması için bir event fırlat
+                                // Data içindeki content/text alanlarını her ihtimale karşı senkronla
+                                data.content = msgContent;
+                                data.text = msgContent;
                                 window.dispatchEvent(new CustomEvent('mufyard:new_message', { detail: data }));
                                 
                                 // Okunmamış mesaj sayısını artır (Eğer gönderen ben değilsem)
-                                if (data.sender_id !== user?.uid) {
+                                const senderId = data.sender_id || data.author_id;
+                                if (senderId !== user?.uid) {
                                     setUnreadMessages(prev => ({
                                         ...prev,
                                         [msgRoomId]: (prev[msgRoomId] || 0) + 1
                                     }));
 
                                     // Toast bildirimi göster
-                                    toast.success(`${data.sender_name}: ${msgContent || 'Bir dosya gönderdi'}`, {
+                                    toast.success(`${data.sender_name || data.author_name || 'Bir Müfettiş'}: ${msgContent || 'Bir dosya gönderdi'}`, {
                                         icon: '💬',
                                         duration: 4000,
                                         position: 'top-center'
                                     });
 
                                     // SOHBET KUTUSUNU OTOMATİK AÇ (Kullanıcının isteği üzerine)
-                                    openChat(msgRoomId, data.sender_name, 'dm');
-                                }
-                                return;
+                                    openChat(msgRoomId, data.sender_name || data.author_name, 'dm', senderId);
                             }
+                            return;
+                        }
 
-                            // Global mesaj ise listeye ekle (Canlı Müzakere)
+                        // Handle Message Updates (Edits)
+                        if (data.type === 'update_message') {
+                            const updatedMsg = data.message || data;
+                            setMessages(prev => prev.map(m => m.id === data.message_id || m.id === updatedMsg.id ? { 
+                                ...m, 
+                                text: updatedMsg.text || updatedMsg.content || m.text 
+                            } : m));
+                            
+                            // Ayrıca DM ise FloatingChat'e bildir (Event üzerinden)
+                            if (data.room_id?.startsWith('dm_')) {
+                                window.dispatchEvent(new CustomEvent('mufyard:message_updated', { detail: data }));
+                            }
+                            return;
+                        }
+
+                        // Handle Message Deletions
+                        if (data.type === 'delete_message') {
+                            setMessages(prev => prev.filter(m => m.id !== data.message_id));
+                            
+                            // Ayrıca DM ise FloatingChat'e bildir (Event üzerinden)
+                            if (data.room_id?.startsWith('dm_')) {
+                                window.dispatchEvent(new CustomEvent('mufyard:message_deleted', { detail: data }));
+                            }
+                            return;
+                        }
+
+                        // Handle Clear Messages
+                        if (data.type === 'clear_messages') {
+                            if (data.room_id === 'global') {
+                                setMessages([]);
+                            } else if (data.room_id?.startsWith('dm_')) {
+                                window.dispatchEvent(new CustomEvent('mufyard:messages_cleared', { detail: data }));
+                            }
+                            return;
+                        }
+
+                        // Global mesaj ise listeye ekle (Canlı Müzakere)
                             const newMsg: Message = {
                                 id: data.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
                                 text: msgContent,
@@ -199,10 +276,12 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                             };
 
                             setMessages(prev => {
+                                // ID kontrolü ile mükerrer mesajı önle
                                 if (prev.some(m => m.id === newMsg.id)) return prev;
                                 return [...prev, newMsg];
                             });
                         }
+
                     } catch (err) {
                         console.error('WS Message parsing error:', err);
                     }
@@ -265,14 +344,15 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         });
     }, []);
 
-    const sendMessage = useCallback((text: string, attachments: any[] = []): string => {
+    const sendMessage = useCallback((content: string, attachments: any[] = []): string => {
         const msgId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             const payload = {
                 type: 'message',
                 room_id: 'global', // Explicitly set for public space
                 id: msgId,
-                text,
+                content, // Use content to match DM schema
+                text: content, // Fallback for legacy
                 attachments,
                 author_id: user?.uid,
                 author_name: activeNameRef.current || resolvePresenceName(user),
@@ -285,14 +365,37 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         return msgId;
     }, [user?.uid]);
 
+
+    const clearGlobalMessages = useCallback(async () => {
+        try {
+            const res = await fetch(`${API_URL}/collaboration/messages?uid=${user?.uid}&role=${profile?.role || 'user'}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                setMessages([]);
+                toast.success("Sohbet geçmişi temizlendi.");
+            }
+        } catch (err) {
+            console.error("Clear messages error:", err);
+            toast.error("Sohbet temizlenemedi.");
+        }
+    }, [user?.uid, profile?.role]);
+
+    const clearLocalMessages = useCallback(() => {
+        setMessages([]);
+        toast.success("Görünüm temizlendi.");
+    }, []);
+
+
     return (
         <PresenceContext.Provider value={{ 
             onlineUsers, wsConnected, isUserOnline, messages, unreadMessages, markAsRead, 
-            sendMessage 
+            sendMessage, clearGlobalMessages, clearLocalMessages
         }}>
             {children}
         </PresenceContext.Provider>
     );
+
 }
 
 export function usePresence() {
@@ -305,8 +408,11 @@ export function usePresence() {
             messages: [],
             unreadMessages: {},
             markAsRead: () => {},
-            sendMessage: () => ""
+            sendMessage: () => "",
+            clearGlobalMessages: async () => {},
+            clearLocalMessages: () => {}
         } as PresenceContextType;
+
     }
     return context;
 }

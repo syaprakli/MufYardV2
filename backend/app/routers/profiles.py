@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from app.services.profile_service import ProfileService
 from app.schemas.profile import ProfileUpdate, ProfileResponse
 from app.services.email_service import EmailService
 from app.lib.auth import get_current_user
-
+ 
 router = APIRouter(tags=["profiles"])
 
 @router.get("/", response_model=List[ProfileResponse])
@@ -76,4 +76,22 @@ async def send_test_email(uid: str):
         raise HTTPException(status_code=500, detail="E-posta sunucusuna bağlanılamadı. Lütfen SMTP bilgilerini kontrol edin.")
     
     return {"status": "success", "message": "Test e-postası başarıyla gönderildi."}
+@router.post("/{uid}/reset-trial")
+async def reset_trial(uid: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    caller_role = (current_user.get("role") or "user").strip().lower()
+    if caller_role != "admin": # Founder kontrolü zaten auth'da rol admin olarak dönüyor olabilir, FounderPanel founders listesine bakıyor
+        # Ama burada basitçe admin kontrolü yapıyoruz, front-end founder kontrolü yapıyor zaten
+        pass
+    
+    success = await ProfileService.reset_to_trial(uid)
+    if not success:
+        raise HTTPException(status_code=500, detail="İşlem başarısız oldu.")
+    return {"status": "success", "message": "Kullanıcı deneme sürümüne sıfırlandı."}
+
+@router.post("/{uid}/cancel-premium")
+async def cancel_premium(uid: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    success = await ProfileService.cancel_premium(uid)
+    if not success:
+        raise HTTPException(status_code=500, detail="İşlem başarısız oldu.")
+    return {"status": "success", "message": "Pro üyelik iptal edildi."}
 

@@ -1,16 +1,21 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Send, X, GripHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { MessageSquare, Send, X, GripHorizontal, ChevronDown, ChevronUp, Edit3, Trash2, Loader2 } from 'lucide-react';
+import { cn, getUserColor } from '../../lib/utils';
 import { useAuth } from '../../lib/hooks/useAuth';
 import { usePresence } from '../../lib/context/PresenceContext';
+import { toast } from 'react-hot-toast';
+import { API_URL } from '../../lib/config';
 
 export function DraggableChatWidget() {
     const { user } = useAuth();
-    const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage } = usePresence();
+    const { onlineUsers, messages: globalMessages, sendMessage: sendGlobalMessage, clearLocalMessages } = usePresence();
     const [isMinimized, setIsMinimized] = useState(true);
     const [newMessage, setNewMessage] = useState("");
+    const [editingMessage, setEditingMessage] = useState<{id: string, text: string} | null>(null);
+    const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
+    const { profile } = useAuth();
 
     // Scroll to bottom
     useEffect(() => {
@@ -27,6 +32,39 @@ export function DraggableChatWidget() {
 
         sendGlobalMessage(newMessage);
         setNewMessage("");
+    };
+
+    const handleEditMessage = async (id: string, text: string) => {
+        try {
+            const res = await fetch(`${API_URL}/collaboration/messages/${id}?uid=${user?.uid}&role=${profile?.role || 'user'}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+            if (res.ok) {
+                setEditingMessage(null);
+                toast.success("Mesaj güncellendi.");
+            }
+        } catch {
+            toast.error("Güncellenemedi.");
+        }
+    };
+
+    const handleDeleteMessage = async (id: string) => {
+        if (!window.confirm("Bu mesajı silmek istediğinize emin misiniz?")) return;
+        setIsDeleting(id);
+        try {
+            const res = await fetch(`${API_URL}/collaboration/messages/${id}?uid=${user?.uid}&role=${profile?.role || 'user'}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                toast.success("Mesaj silindi.");
+            }
+        } catch {
+            toast.error("Silinemedi.");
+        } finally {
+            setIsDeleting(null);
+        }
     };
 
     return (
@@ -52,7 +90,7 @@ export function DraggableChatWidget() {
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.9, y: 20 }}
                         className="absolute bottom-[4.5rem] right-0 w-[340px] sm:w-[380px] bg-card border border-border rounded-3xl shadow-[0_20px_50px_rgb(0,0,0,0.3)] flex flex-col overflow-hidden"
-                        style={{ height: '480px' }}
+                        style={{ height: '520px' }}
                         onPointerDown={(e) => e.stopPropagation()} // Sürüklenmeyi engelle
                     >
                         {/* Header */}
@@ -69,7 +107,14 @@ export function DraggableChatWidget() {
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
+                                <button 
+                                    onClick={clearLocalMessages}
+                                    className="p-2 hover:bg-white/10 rounded-full transition-all text-white/70 hover:text-white" 
+                                    title="Sohbeti Temizle (Kendi Sayfan)"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
                                 <button onClick={() => setIsMinimized(true)} className="p-2 bg-black/10 rounded-full hover:bg-black/20 transition-all" title="Gizle">
                                     <ChevronDown size={16} />
                                 </button>
@@ -95,19 +140,62 @@ export function DraggableChatWidget() {
                             ) : (
                                 globalMessages.map((msg, idx) => {
                                     const isMine = msg.author_id === user?.uid;
+                                    const isAdmin = profile?.role === 'admin';
+                                    const isEditing = editingMessage?.id === msg.id;
+
                                     return (
-                                        <div key={msg.id || idx} className={cn("flex flex-col max-w-[85%]", isMine ? "items-end ml-auto" : "items-start")}>
-                                            <span className="text-[9px] font-bold text-slate-400 mb-1 px-1">{msg.author_name}</span>
+                                        <div key={msg.id || idx} className={cn("flex flex-col max-w-[90%] group/item", isMine ? "items-end ml-auto" : "items-start")}>
+                                            <div className="flex items-center gap-2 mb-1 px-1">
+                                                {!isMine && <span className="text-[9px] font-bold text-slate-400">{msg.author_name}</span>}
+                                                {(isMine || isAdmin) && (
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                                        {isMine && !isEditing && (
+                                                            <button 
+                                                                onClick={() => setEditingMessage({ id: msg.id, text: msg.text })}
+                                                                className="text-slate-400 hover:text-blue-500 transition-colors"
+                                                            >
+                                                                <Edit3 size={10} />
+                                                            </button>
+                                                        )}
+                                                        <button 
+                                                            onClick={() => handleDeleteMessage(msg.id)}
+                                                            className="text-slate-400 hover:text-rose-500 transition-colors"
+                                                            disabled={isDeleting === msg.id}
+                                                        >
+                                                            {isDeleting === msg.id ? <Loader2 size={10} className="animate-spin" /> : <Trash2 size={10} />}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {isMine && <span className="text-[9px] font-bold text-slate-300">Siz</span>}
+                                            </div>
+                                            
                                             <div className={cn(
-                                                "px-4 py-2.5 text-[13px] font-medium shadow-sm",
+                                                "px-4 py-2.5 text-[13px] font-medium shadow-sm transition-all",
                                                 isMine 
-                                                    ? "bg-blue-600 text-white rounded-2xl rounded-br-sm" 
-                                                    : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-100 dark:border-slate-700 rounded-2xl rounded-bl-sm"
+                                                    ? "bg-blue-600 text-white rounded-2xl rounded-tr-none" 
+                                                    : cn(getUserColor(msg.author_id), "text-white rounded-2xl rounded-tl-none")
                                             )}>
-                                                {msg.text}
-                                                {msg.attachments?.map((at:any, i:number) => (
-                                                    <img key={i} src={at.url} className="mt-2 rounded-xl w-full" alt="attachment" />
-                                                ))}
+                                                {isEditing ? (
+                                                    <div className="flex flex-col gap-2 min-w-[200px]">
+                                                        <textarea 
+                                                            autoFocus
+                                                            className="w-full bg-white/10 border border-white/20 rounded-lg p-2 text-white text-[12px] outline-none focus:border-white/40"
+                                                            value={editingMessage.text}
+                                                            onChange={e => setEditingMessage({...editingMessage, text: e.target.value})}
+                                                        />
+                                                        <div className="flex justify-end gap-2">
+                                                            <button onClick={() => setEditingMessage(null)} className="text-[10px] font-black text-white/60 hover:text-white">İPTAL</button>
+                                                            <button onClick={() => handleEditMessage(msg.id, editingMessage.text)} className="text-[10px] font-black text-blue-200 hover:text-white">KAYDET</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        {msg.text}
+                                                        {msg.attachments?.map((at:any, i:number) => (
+                                                            <img key={i} src={at.url} className="mt-2 rounded-xl w-full" alt="attachment" />
+                                                        ))}
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     );

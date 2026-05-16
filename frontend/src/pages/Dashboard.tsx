@@ -1,4 +1,4 @@
-import { FileText, Loader2, AlertCircle, Clock, CheckCircle2, TrendingUp, Filter, FileSpreadsheet, Zap, Bell, ArrowUpRight, BarChart3, PieChart as PieIcon, Shield, ChevronRight, X, Download, Bot, Sparkles, Globe, BookOpen, Cake, Megaphone, Plus, MessageCircle, ExternalLink } from "lucide-react";
+import { FileText, Loader2, AlertCircle, Clock, CheckCircle2, TrendingUp, Filter, FileSpreadsheet, Zap, Bell, ArrowUpRight, BarChart3, PieChart as PieIcon, Shield, ChevronRight, X, Download, Bot, Sparkles, Globe, BookOpen, Cake, Megaphone, Plus, MessageCircle, ExternalLink, WifiOff } from "lucide-react";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -96,7 +96,7 @@ export default function Dashboard() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { theme } = useTheme();
-    const { data: cachedData, refreshAll } = useGlobalData();
+    const { data: cachedData, refreshAll, isOffline, trialDaysLeft, isTrialExpired } = useGlobalData();
     
     const currentUser = user;
     const effectiveUid = currentUser?.uid;
@@ -213,6 +213,7 @@ export default function Dashboard() {
                              ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz"].includes(profile.full_name);
             const isSpecialUser = currentUser?.email === "sefayaprakli@hotmail.com" || 
                                 currentUser?.email === "sefa.yaprakli@gsb.gov.tr" ||
+                                currentUser?.email === "syaprakli@gmail.com" ||
                                 effectiveUid === "sefa-yaprakli-gsb-unique-id";
 
             if (!isSpecialUser && !isVerified && isGeneric && !localStorage.getItem(`id_skip_${effectiveUid}`)) {
@@ -497,6 +498,95 @@ Lütfen şunları analiz et:
             )}
 
             {/* Standardized Page Header */}
+            {/* ─── Trial Status Banner ─── */}
+            {/* ─── Trial Status Banner ─── */}
+            {!profile?.has_premium_ai && profile?.role !== 'admin' && (
+                <>
+                    {/* Durum 1: Deneme Henüz Başlatılmamış (Sıfırlanmış hesaplar dahil) */}
+                    {!profile?.trial_started ? (
+                        <div className="mb-6 p-6 rounded-[2.5rem] bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 flex flex-col md:flex-row items-center justify-between gap-6 animate-in fade-in zoom-in duration-500 shadow-xl shadow-primary/5">
+                            <div className="flex items-center gap-5">
+                                <div className="w-16 h-16 rounded-[2rem] bg-primary text-white flex items-center justify-center shrink-0 shadow-2xl shadow-primary/40">
+                                    <Sparkles size={32} className="animate-pulse" />
+                                </div>
+                                <div>
+                                    <h4 className="font-black text-xl text-slate-900 dark:text-white tracking-tight uppercase">MufYard PRO'yu Keşfedin</h4>
+                                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 max-w-md">
+                                        Yapay zeka destekli analizler ve sınırsız raporlama için 30 günlük ücretsiz denemenizi hemen başlatın.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                <Button 
+                                    onClick={() => navigate('/settings/billing')}
+                                    variant="outline"
+                                    className="flex-1 md:flex-none rounded-2xl font-black uppercase tracking-widest text-[10px] px-8 h-14 border-primary/30 text-primary hover:bg-primary/5"
+                                >
+                                    Lisans Anahtarım Var
+                                </Button>
+                                <Button 
+                                    onClick={async () => {
+                                        try {
+                                            const headers = await getAuthHeaders({ "Content-Type": "application/json" });
+                                            await fetchWithTimeout(`${API_URL}/profiles/${effectiveUid}`, {
+                                                method: "PATCH",
+                                                headers,
+                                                body: JSON.stringify({ trial_started: true, trial_start_date: new Date().toISOString() }),
+                                            });
+                                            toast.success("30 Günlük deneme süreniz başladı! Keyifli kullanımlar.");
+                                            if (effectiveUid) refreshAll(effectiveUid, undefined, undefined, true);
+                                        } catch {
+                                            toast.error("Deneme başlatılamadı.");
+                                        }
+                                    }}
+                                    className="flex-1 md:flex-none rounded-2xl font-black uppercase tracking-widest text-[10px] px-10 h-14 bg-primary text-white shadow-2xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all"
+                                >
+                                    DENEMEYİ BAŞLAT
+                                </Button>
+                            </div>
+                        </div>
+                    ) : (
+                        /* Durum 2: Deneme Başlamış ve Süre Azalmış veya Dolmuş */
+                        (isTrialExpired || trialDaysLeft <= 7) && (
+                            <div className={cn(
+                                "mb-6 p-4 rounded-3xl border flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500",
+                                isTrialExpired 
+                                    ? "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400" 
+                                    : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                            )}>
+                                <div className="flex items-center gap-4">
+                                    <div className={cn(
+                                        "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg",
+                                        isTrialExpired ? "bg-rose-500 text-white" : "bg-amber-500 text-white"
+                                    )}>
+                                        {isTrialExpired ? <AlertCircle size={24} /> : <Zap size={24} />}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-black uppercase tracking-tight text-sm">
+                                            {isTrialExpired ? "Deneme Süreniz Doldu" : "Deneme Süreniz Azalıyor"}
+                                        </h4>
+                                        <p className="text-xs font-semibold opacity-80 max-w-md">
+                                            {isTrialExpired 
+                                                ? "30 günlük ücretsiz deneme süreniz sona ermiştir. Tüm özelliklere erişmeye devam etmek için lütfen PRO sürüme geçin."
+                                                : `Ücretsiz deneme sürenizin bitmesine ${trialDaysLeft} gün kaldı. Kesintisiz hizmet için şimdiden PRO'ya geçebilirsiniz.`}
+                                        </p>
+                                    </div>
+                                </div>
+                                <Button 
+                                    onClick={() => navigate('/settings/billing')}
+                                    className={cn(
+                                        "rounded-2xl font-black uppercase tracking-widest text-[10px] px-6 h-12 shadow-xl hover:scale-105 active:scale-95 transition-all w-full md:w-auto",
+                                        isTrialExpired ? "bg-rose-500 hover:bg-rose-600 text-white" : "bg-amber-500 hover:bg-amber-600 text-white"
+                                    )}
+                                >
+                                    {isTrialExpired ? "Lisans Anahtarı Gir" : "Premium'a Geç"}
+                                </Button>
+                            </div>
+                        )
+                    )}
+                </>
+            )}
+
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="space-y-1">
                     <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1 lg:mb-2">
@@ -513,8 +603,10 @@ Lütfen şunları analiz et:
                             <Clock size={14} className="text-primary/40" /> {todayStr}
                          </span>
                          <div className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <span className="text-[9px] lg:text-[10px] font-black text-emerald-600 uppercase tracking-widest">Sistem Aktif</span>
+                            <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isOffline ? "bg-rose-500" : "bg-emerald-500")}></span>
+                            <span className={cn("text-[9px] lg:text-[10px] font-black uppercase tracking-widest flex items-center gap-1", isOffline ? "text-rose-600" : "text-emerald-600")}>
+                                {isOffline ? <><WifiOff size={10} /> Çevrimdışı Mod</> : "Sistem Aktif"}
+                            </span>
                          </div>
                     </div>
                 </div>

@@ -65,29 +65,36 @@ export default function Contacts() {
     // Memoized derived data from global cache
     const { contacts, invitations } = useMemo(() => {
         if (!user) return { contacts: [], invitations: [] };
-        const userEmail = user.email?.toLowerCase();
-        const userKeys = [user.uid, userEmail].filter(Boolean) as string[];
+        const userEmail = user.email?.toLowerCase().trim();
+        const userUid = user.uid;
+        const userKeys = [userUid, userEmail].filter(Boolean) as string[];
 
         if (activeTab === "personal") {
-            const data = cachedData.contactsPersonal || [];
+            const data = (cachedData.contactsPersonal || []);
             // Kendi eklediklerim + kabul ettiklerim
             const accepted = data.filter(c => {
-                const isOwner = c.owner_id === user.uid || (userEmail && c.owner_id === userEmail);
-                const isAcceptedCollab = (c as any).accepted_collaborators?.some((v: string) => userKeys.includes(v.toLowerCase()));
+                const cEmail = c.email?.toLowerCase().trim();
+                const isOwner = c.owner_id === userUid || (userEmail && cEmail === userEmail);
+                const isAcceptedCollab = (c as any).accepted_collaborators?.some((v: string) => userKeys.includes(v.toLowerCase().trim()));
                 return isOwner || isAcceptedCollab;
             });
 
             // Henüz bekleyen davetler
             const pending = data.filter(c => {
-                const isOwner = c.owner_id === user.uid || (userEmail && c.owner_id === userEmail);
-                const isPendingCollab = (c as any).pending_collaborators?.some((v: string) => userKeys.includes(v.toLowerCase()));
+                const cEmail = c.email?.toLowerCase().trim();
+                const isOwner = c.owner_id === userUid || (userEmail && cEmail === userEmail);
+                const isPendingCollab = (c as any).pending_collaborators?.some((v: string) => userKeys.includes(v.toLowerCase().trim()));
                 return !isOwner && isPendingCollab;
             });
 
-            const acceptedContacts = accepted.length > 0 ? accepted : (data.length > 0 ? data.filter(c => c.owner_id === user.uid) : []);
+            const acceptedContacts = accepted.length > 0 ? accepted : (data.length > 0 ? data.filter(c => c.owner_id === userUid) : []);
             return { contacts: acceptedContacts, invitations: pending };
         } else {
-            return { contacts: cachedData.contactsCorporate || [], invitations: [] };
+            const corp = (cachedData.contactsCorporate || []).filter(c => {
+                const cEmail = c.email?.toLowerCase().trim();
+                return cEmail !== userEmail;
+            });
+            return { contacts: corp, invitations: [] };
         }
     }, [activeTab, cachedData.contactsPersonal, cachedData.contactsCorporate, user]);
 
@@ -443,8 +450,9 @@ export default function Contacts() {
                                                 onDelete={() => handleDelete(contact.id)}
                                                 onChat={() => {
                                                     if (!user) return;
-                                                    const roomId = ["dm", ...[user.uid, contact.id].sort()].join("_");
-                                                    openChat(roomId, contact.name, "dm");
+                                                    const targetId = contact.uid || contact.id;
+                                                    const roomId = ["dm", ...[user.uid, targetId].sort()].join("_");
+                                                    openChat(roomId, contact.name, "dm", targetId);
                                                 }}
                                             />
                                     ))}
@@ -467,8 +475,9 @@ export default function Contacts() {
                                 onDelete={() => handleDelete(contact.id)}
                                 onChat={() => {
                                     if (!user) return;
-                                    const roomId = ["dm", ...[user.uid, contact.id].sort()].join("_");
-                                    openChat(roomId, contact.name, "dm");
+                                    const targetId = contact.uid || contact.id;
+                                    const roomId = ["dm", ...[user.uid, targetId].sort()].join("_");
+                                    openChat(roomId, contact.name, "dm", targetId);
                                 }}
                             />
 

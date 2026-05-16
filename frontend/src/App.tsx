@@ -11,6 +11,8 @@ import { auth, isElectron } from "./lib/firebase";
 import AdminFeedback from "./pages/AdminFeedback";
 import AdminInspectors from "./pages/AdminInspectors";
 import AdminRoleSettings from "./pages/AdminRoleSettings";
+import AdminLicenses from "./pages/AdminLicenses";
+import FounderHub from "./pages/FounderHub";
 import { Toaster } from "react-hot-toast";
 import { Loader2 } from "lucide-react";
 
@@ -36,10 +38,10 @@ import Feedback from "./pages/Feedback";
 import ReportAnalytics from "./pages/ReportAnalytics";
 import ChatContainer from "./components/ChatContainer";
 import IntroPresentation from "./components/IntroPresentation";
+import ScrollToTop from "./components/ScrollToTop";
 
 import { useVersionCheck } from "./lib/hooks/useVersionCheck";
 import { UpdateModal } from "./components/ui/UpdateModal";
-import { GlobalDataProvider } from "./lib/context/GlobalDataContext";
 
 function App() {
   const { updateAvailable, currentVersion } = useVersionCheck();
@@ -49,10 +51,14 @@ function App() {
 
   useEffect(() => {
     // Sadece giriş yapmış kullanıcılar için intro göster
+    // Eğer deneme süresi başlatılmadıysa (ve admin değilse) intro zorunlu olsun
     if (user) {
+      // Global data yüklendikten sonra kontrol et (MainLayout veya burası fark etmez ama App'te kalabilir)
       const hasSeenIntro = localStorage.getItem(`mufyard_intro_seen_${user.uid}`);
+      
+      // NOT: Gerçek kontrolü IntroPresentation içinde yapıyoruz zaten, 
+      // burası sadece otomatik tetikleme için.
       if (!hasSeenIntro) {
-        // Küçük bir gecikme ile göster
         const timer = setTimeout(() => setShowIntro(true), 1500);
         return () => clearTimeout(timer);
       }
@@ -100,7 +106,8 @@ function App() {
           const localUserRaw = localStorage.getItem('demo_user');
           const localUser = localUserRaw ? JSON.parse(localUserRaw) : null;
           
-          if (localUser && localUser.uid === "mufettis-gsb-unique-id") {
+          const bypassUids = ["mufettis-gsb-unique-id", "test-user-trial-99", "sefa-yaprakli-gsb-unique-id", "expired-user-trial-99"];
+          if (localUser && bypassUids.includes(localUser.uid)) {
              setUser(localUser as FirebaseUser);
           } else {
              setUser(null);
@@ -130,8 +137,7 @@ function App() {
   }
 
   return (
-    <GlobalDataProvider>
-      <ChatProvider>
+    <ChatProvider>
         <PresenceProvider>
           <ThemeProvider>
             <ConfirmProvider>
@@ -153,6 +159,7 @@ function App() {
                 )}
                 {showIntro && <IntroPresentation onClose={handleCloseIntro} />}
                 <Router>
+                  <ScrollToTop />
                   <Routes>
                     <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
 
@@ -168,6 +175,7 @@ function App() {
                       <Route path="notes" element={<Notes />} />
                       <Route path="files" element={<Files />} />
                       <Route path="settings" element={<Settings />} />
+                      <Route path="settings/billing" element={<Settings initialTab="Lisans & Abonelik" />} />
                       <Route path="calendar" element={<Calendar />} />
                       <Route path="audit/:id/report" element={<ReportEditor />} />
                       <Route path="public-space" element={<PublicSpace />} />
@@ -176,9 +184,11 @@ function App() {
                       <Route path="messages" element={<Messages />} />
                       <Route path="feedback" element={<Feedback />} />
                       <Route path="report-analytics" element={<ReportAnalytics />} />
+                      <Route path="admin" element={<FounderHub />} />
                       <Route path="admin/feedback" element={<AdminFeedback />} />
                       <Route path="admin/inspectors" element={<AdminInspectors />} />
                       <Route path="admin/roles" element={<AdminRoleSettings />} />
+                      <Route path="admin/licenses" element={<AdminLicenses />} />
                     </Route>
                     <Route path="*" element={<Navigate to="/" />} />
                   </Routes>
@@ -189,7 +199,6 @@ function App() {
         </ThemeProvider>
       </PresenceProvider>
     </ChatProvider>
-    </GlobalDataProvider>
   );
 }
 

@@ -1,5 +1,6 @@
 import { API_URL as API_BASE_URL } from "../config";
 import { fetchWithTimeout } from "./utils";
+import { addToQueue } from "./syncQueue";
 
 export interface Note {
     id: string;
@@ -39,64 +40,82 @@ export async function fetchNotes(uid: string, email?: string): Promise<Note[]> {
 }
 
 export async function createNote(note: NoteCreate): Promise<Note> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/notes/`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(note),
-    });
+    try {
+        const response = await fetchWithTimeout(`${API_BASE_URL}/notes/`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(note),
+        });
 
-    if (!response.ok) {
-        throw new Error("Not oluşturulamadı.");
+        if (!response.ok) {
+            throw new Error("Not oluşturulamadı.");
+        }
+        return response.json();
+    } catch (error) {
+        if (!navigator.onLine || error instanceof Error && (error.message.includes("Failed to fetch") || error.message.includes("timeout"))) {
+            console.warn("Offline detected in createNote, queueing action.");
+            addToQueue('createNote', [note]);
+            return { id: `temp_${Date.now()}`, ...note, created_at: new Date().toISOString() } as any;
+        }
+        throw error;
     }
-    return response.json();
 }
 
 export async function updateNote(id: string, update: Partial<NoteCreate>): Promise<Note> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/notes/${id}`, {
-        method: "PATCH",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(update),
-    });
-
-    if (!response.ok && Object.prototype.hasOwnProperty.call(update, "is_done")) {
-        const fallbackResponse = await fetchWithTimeout(`${API_BASE_URL}/notes/${id}`, {
+    try {
+        const response = await fetchWithTimeout(`${API_BASE_URL}/notes/${id}`, {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({ is_completed: (update as any).is_done }),
+            body: JSON.stringify(update),
         });
 
-        if (fallbackResponse.ok) {
-            return fallbackResponse.json();
+        if (!response.ok && Object.prototype.hasOwnProperty.call(update, "is_done")) {
+            const fallbackResponse = await fetchWithTimeout(`${API_BASE_URL}/notes/${id}`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ is_completed: (update as any).is_done }),
+            });
+
+            if (fallbackResponse.ok) {
+                return fallbackResponse.json();
+            }
+
+            let fallbackDetail = "";
+            try {
+                const body = await fallbackResponse.json();
+                fallbackDetail = body?.detail ? ` (${body.detail})` : "";
+            } catch {
+                fallbackDetail = "";
+            }
+            throw new Error(`Not güncellenemedi${fallbackDetail}`);
         }
 
-        let fallbackDetail = "";
-        try {
-            const body = await fallbackResponse.json();
-            fallbackDetail = body?.detail ? ` (${body.detail})` : "";
-        } catch {
-            fallbackDetail = "";
+        if (!response.ok) {
+            let detail = "";
+            try {
+                const body = await response.json();
+                detail = body?.detail ? ` (${body.detail})` : "";
+            } catch {
+                detail = "";
+            }
+            throw new Error(`Not güncellenemedi${detail}`);
         }
-        throw new Error(`Not güncellenemedi${fallbackDetail}`);
+
+        return response.json();
+    } catch (error) {
+        if (!navigator.onLine || error instanceof Error && (error.message.includes("Failed to fetch") || error.message.includes("timeout"))) {
+            console.warn("Offline detected in updateNote, queueing action.");
+            addToQueue('updateNote', [id, update]);
+            return { id, ...update } as any;
+        }
+        throw error;
     }
-
-    if (!response.ok) {
-        let detail = "";
-        try {
-            const body = await response.json();
-            detail = body?.detail ? ` (${body.detail})` : "";
-        } catch {
-            detail = "";
-        }
-        throw new Error(`Not güncellenemedi${detail}`);
-    }
-
-    return response.json();
 }
 
 export async function deleteNote(id: string): Promise<{status: string, message: string}> {

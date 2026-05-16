@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Star, Clock, User, Mail, MessageSquare, Loader2, Trash2 } from 'lucide-react';
+import { Star, Clock, User, Mail, MessageSquare, Loader2, Trash2, ArrowLeft } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { API_URL } from '../lib/config';
 import { fetchWithTimeout } from '../lib/api/utils';
 import toast from 'react-hot-toast';
 import { useConfirm } from '../lib/context/ConfirmContext';
+import { useAuth } from '../lib/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 interface Feedback {
     id: string;
@@ -16,6 +18,20 @@ interface Feedback {
 }
 
 export default function AdminFeedback() {
+    const { user } = useAuth();
+    const navigate = useNavigate();
+
+    const isFounder = user?.email === "sefayaprakli@hotmail.com" || 
+                      user?.email === "sefa.yaprakli@gsb.gov.tr" ||
+                      user?.email === "syaprakli@gmail.com";
+
+    useEffect(() => {
+        if (!isFounder && user) {
+            toast.error("Bu sayfaya erişim yetkiniz bulunmamaktadır.");
+            navigate("/");
+        }
+    }, [isFounder, user, navigate]);
+
     const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
     const [loading, setLoading] = useState(true);
     const confirm = useConfirm();
@@ -68,6 +84,13 @@ export default function AdminFeedback() {
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             <div className="flex flex-col gap-1">
+                <button 
+                    onClick={() => navigate('/admin')}
+                    className="flex items-center gap-1.5 text-slate-400 hover:text-primary transition-colors mb-2 group w-fit"
+                >
+                    <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+                    <span className="text-xs font-black uppercase tracking-widest">Kurucu Paneline Dön</span>
+                </button>
                 <h1 className="text-3xl font-black text-slate-900 tracking-tight font-outfit">Kullanıcı Değerlendirmeleri</h1>
                 <p className="text-slate-500 font-medium font-inter">Uygulama hakkında gelen tüm geri bildirimler.</p>
             </div>

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History, ArrowUpDown, FolderOpen
+    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History, ArrowUpDown, FolderOpen, WifiOff, Zap, Mail, Phone
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -93,7 +93,7 @@ export default function Tasks() {
     const modalBoxStyle: React.CSSProperties = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: "1.5rem", boxShadow: "var(--shadow-lg)", width: "100%", maxWidth: "550px", padding: "2rem" };
 
     const { user, profile } = useAuth();
-    const { data: cachedData, refreshAll, refreshTasks } = useGlobalData();
+    const { data: cachedData, refreshAll, refreshTasks, isOffline, trialDaysLeft, isTrialExpired } = useGlobalData();
     
     const [loading, setLoading] = useState(false);
     
@@ -147,13 +147,23 @@ export default function Tasks() {
             try {
                 const { fetchAllProfiles } = await import("../lib/api/profiles");
                 const profiles = await fetchAllProfiles();
-                setRegisteredProfiles(profiles);
+                
+                // Filter out current user from registered profiles
+                const myUid = currentUser?.uid;
+                const myEmail = currentUser?.email?.toLowerCase().trim();
+                const filtered = profiles.filter(p => {
+                    const pUid = p.uid;
+                    const pEmail = p.email?.toLowerCase().trim();
+                    return pUid !== myUid && pEmail !== myEmail;
+                });
+
+                setRegisteredProfiles(filtered);
             } catch (err) {
                 console.error("Profiller yüklenemedi:", err);
             }
         };
         loadProfiles();
-    }, []);
+    }, [currentUser?.uid, currentUser?.email]);
 
     // Memoized derived data from global cache
     const { tasks, invitations } = useMemo(() => {
@@ -176,13 +186,20 @@ export default function Tasks() {
         if (!cachedData.contactsCorporate) return [];
         
         // Sadece kayıtlı profili olan kişileri filtrele
-        const registeredEmails = new Set(registeredProfiles.map(p => p.email?.toLowerCase()));
+        const registeredEmails = new Set(registeredProfiles.map(p => p.email?.toLowerCase().trim()));
         const registeredUids = new Set(registeredProfiles.map(p => p.uid));
+
+        const myUid = currentUser?.uid;
+        const myEmail = currentUser?.email?.toLowerCase().trim();
 
         return cachedData.contactsCorporate
             .filter((p: any) => {
-                const email = p.email?.toLowerCase();
+                const email = p.email?.toLowerCase().trim();
                 const uid = p.uid || p.id;
+                
+                // Exclude me
+                if (uid === myUid || (email && email === myEmail)) return false;
+
                 return registeredEmails.has(email) || registeredUids.has(uid);
             })
             .map((p: any) => ({
@@ -192,7 +209,7 @@ export default function Tasks() {
                 title: p.title || "Müfettiş",
                 created_at: new Date().toISOString()
             }));
-    }, [cachedData.contactsCorporate, registeredProfiles]);
+    }, [cachedData.contactsCorporate, registeredProfiles, currentUser?.uid, currentUser?.email]);
 
     const raporOnek = localStorage.getItem('raporKoduOnek') || 'S.Y.64';
     const currentYear = new Date().getFullYear();
@@ -225,25 +242,9 @@ export default function Tasks() {
     }, [searchParams, activeTab]);
 
 
-    // Web sürümü uyarısı
+    // Web sürümü uyarısı - Kullanıcı isteğiyle kaldırıldı
     useEffect(() => {
-        if (!isElectron) {
-            const hasShownToast = sessionStorage.getItem('tasks_web_warning_shown');
-            if (!hasShownToast) {
-                toast("Web sürümünde görev yönetimi kısıtlıdır. Tam erişim için masaüstü uygulamasını kullanın.", {
-                    icon: '🚀',
-                    duration: 5000,
-                    style: {
-                        borderRadius: '12px',
-                        background: '#333',
-                        color: '#fff',
-                        fontSize: '12px',
-                        fontWeight: 'bold'
-                    }
-                });
-                sessionStorage.setItem('tasks_web_warning_shown', 'true');
-            }
-        }
+        // Uyarı kaldırıldı
     }, []);
 
     // Close dropdown when clicking outside
@@ -396,7 +397,7 @@ export default function Tasks() {
         try {
             // 1. Dosyayı yükle
             const { uploadFile } = await import("../lib/api/files");
-            const uploadResult = await uploadFile(file, `raporlar/${showReportSelector.rapor_kodu}`);
+            const uploadResult = await uploadFile(file, `raporlar/${showReportSelector.rapor_kodu}`, effectiveUid);
             
             // 2. Audit kaydı oluştur
             const nextSeq = Math.max(0, ...taskAudits.map(a => a.report_seq || 0)) + 1;
@@ -797,6 +798,52 @@ export default function Tasks() {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 max-w-full overflow-x-hidden">
+            {/* ─── Trial Status Banner ─── */}
+            {(isTrialExpired || (trialDaysLeft <= 7 && !profile?.has_premium_ai && profile?.role !== 'admin')) && (
+                <div className={cn(
+                    "mb-6 p-4 rounded-3xl border flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500",
+                    isTrialExpired 
+                        ? "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400" 
+                        : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                )}>
+                    <div className="flex items-center gap-4">
+                        <div className={cn(
+                            "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg",
+                            isTrialExpired ? "bg-rose-500 text-white" : "bg-amber-500 text-white"
+                        )}>
+                            {isTrialExpired ? <FileText size={24} /> : <Zap size={24} />}
+                        </div>
+                        <div>
+                            <h4 className="font-black uppercase tracking-tight text-sm">
+                                {isTrialExpired ? "Deneme Süreniz Doldu" : "Deneme Süreniz Azalıyor"}
+                            </h4>
+                            <p className="text-xs font-semibold opacity-80 max-w-md">
+                                {isTrialExpired 
+                                    ? "30 günlük ücretsiz deneme süreniz sona ermiştir. Görev yönetimine devam etmek için lütfen üyeliğinizi yükseltin veya aktivasyon anahtarı için bizimle iletişime geçin."
+                                    : `Ücretsiz deneme sürenizin bitmesine ${trialDaysLeft} gün kaldı. Tüm özelliklere erişim için Premium'a geçebilirsiniz.`}
+                            </p>
+                            <div className="flex flex-wrap gap-x-6 gap-y-2 mt-2">
+                                <a href="mailto:sefayaprakli@hotmail.com" className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest hover:text-primary transition-colors">
+                                    <Mail size={12} className="shrink-0" /> sefayaprakli@hotmail.com
+                                </a>
+                                <a href="tel:05368318846" className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest hover:text-primary transition-colors">
+                                    <Phone size={12} className="shrink-0" /> 0536 831 88 46
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <Button 
+                        onClick={() => navigate('/settings/billing')}
+                        className={cn(
+                            "rounded-2xl font-black uppercase tracking-widest text-[10px] px-6 h-12 shadow-xl hover:scale-105 active:scale-95 transition-all w-full md:w-auto",
+                            isTrialExpired ? "bg-rose-500 hover:bg-rose-600 text-white" : "bg-amber-500 hover:bg-amber-600 text-white"
+                        )}
+                    >
+                        {isTrialExpired ? "Şimdi Yükselt" : "Premium'a Geç"}
+                    </Button>
+                </div>
+            )}
+
             {/* Standardized Page Header */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6 font-outfit">
                 <div>
@@ -806,9 +853,17 @@ export default function Tasks() {
                         <ChevronRight size={10} className="hidden xs:inline" />
                         <span className="text-primary opacity-80 uppercase tracking-widest">GÖREVLER</span>
                     </div>
-                    <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-tight">
-                        Görev Yönetimi
-                    </h1>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-tight">
+                            Görev Yönetimi
+                        </h1>
+                        {isOffline && (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-500/10 text-rose-500 rounded-lg border border-rose-500/20 animate-pulse shadow-sm">
+                                <WifiOff size={12} className="shrink-0" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Çevrimdışı Mod</span>
+                            </div>
+                        )}
+                    </div>
                     <p className="text-slate-500 text-[13px] font-medium mt-1 flex items-center gap-2">
                         <Calendar size={14} className="text-primary/40 shrink-0" />
                         <span className="truncate">{new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' })}</span>
@@ -820,7 +875,7 @@ export default function Tasks() {
                         onClick={() => { setActiveTab("kisisel"); setIsLegacyMode(false); }}
                         className={`flex-1 lg:flex-none px-4 md:px-6 rounded-lg font-black text-[10px] uppercase transition-all tracking-widest whitespace-nowrap ${activeTab === 'kisisel' ? 'bg-card text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
-                        Mevcut Görevler
+                        Aktif Görevler
                     </button>
                     <button 
                         onClick={() => { setActiveTab("ortak"); setIsLegacyMode(true); }}
@@ -1318,7 +1373,7 @@ export default function Tasks() {
                                                     </select>
                                                 </td>
                                                 <td className="px-4 lg:px-6 py-4">
-                                                    <div className="grid grid-cols-3 gap-1.5 w-fit">
+                                                    <div className="grid grid-cols-3 xl:flex xl:flex-row gap-1.5 w-fit">
                                                         <ActionBtn title="Dosya Aç" color="#64748b" onClick={() => handleOpenTaskFolder(task)}>
                                                             <FolderOpen size={16} />
                                                         </ActionBtn>

@@ -60,7 +60,9 @@ interface FloatingChatProps {
   type?: 'dm' | 'audit' | 'global';
   inline?: boolean;
   isOnline?: boolean;
+  recipientId?: string; // Target user's UID for DMs
 }
+
 
 function getDirectRoomUserIds(roomId: string, currentUid: string) {
   const normalized = roomId.startsWith('dm_') ? roomId.slice(3) : roomId;
@@ -83,7 +85,16 @@ function normalizeRoomId(roomId: string, type: FloatingChatProps['type']) {
 }
 
 // ─── COMPONENT ──────────────────────────────────────────────────────────────
-export default function FloatingChat({ roomId, title, onClose, type = 'dm', inline = false, isOnline }: FloatingChatProps) {
+export default function FloatingChat({ 
+  roomId, 
+  title, 
+  onClose, 
+  type = 'dm', 
+  inline = false, 
+  isOnline = false,
+  recipientId 
+}: FloatingChatProps) {
+
   const { user, profile } = useAuth();
   const { markAsRead } = usePresence();
   const { theme } = useTheme();
@@ -334,11 +345,13 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
       ws.current.send(JSON.stringify({
         type: 'message',
         room_id: normalizedRoomId,
-        sender_id: msg.sender_id,
+        sender_id: user?.uid,
         sender_name: msg.sender_name,
+        recipient_id: recipientId, // Explicit recipient UID
         content: msg.content,
         attachment: msg.attachment,
       }));
+
     }
   }, [normalizedRoomId]);
 
@@ -368,7 +381,7 @@ export default function FloatingChat({ roomId, title, onClose, type = 'dm', inli
 
     const loadingToast = toast.loading(`${file.name} yükleniyor...`);
     try {
-      const result = await uploadFile(file, "chats");
+      const result = await uploadFile(file, "chats", user?.uid);
       const senderName = profile?.full_name || user?.displayName || user?.email?.split('@')[0] || 'Müfettiş';
       pushMessage({
         id: `local_${Date.now()}`,

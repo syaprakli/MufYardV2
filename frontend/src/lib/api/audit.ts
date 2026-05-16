@@ -1,5 +1,6 @@
 import { API_URL as API_BASE_URL } from "../config";
 import { fetchWithTimeout } from "./utils";
+import { addToQueue } from "./syncQueue";
 
 export interface Audit {
     id: string;
@@ -35,23 +36,48 @@ const CACHE_DURATION = 60 * 1000;
 
 export async function fetchAudits(userId?: string, userEmail?: string, forceRefresh: boolean = false): Promise<Audit[]> {
     const key = `${userId || 'anon'}_${userEmail || 'anon'}`;
+    const storageKey = `mufyard_audits_cache_${userId || 'guest'}`;
     const now = Date.now();
     
     if (!forceRefresh && auditCache[key] && (now - auditCache[key].timestamp < CACHE_DURATION)) {
         return auditCache[key].data;
     }
 
-    let url = `${API_BASE_URL}/audit/?`;
-    if (userId) url += `user_id=${userId}&`;
-    if (userEmail) url += `user_email=${userEmail}`;
-    
-    const response = await fetchWithTimeout(url);
-    if (!response.ok) {
-        throw new Error("Denetimler yüklenemedi.");
+    try {
+        let url = `${API_BASE_URL}/audit/?`;
+        if (userId) url += `user_id=${userId}&`;
+        if (userEmail) url += `user_email=${userEmail}`;
+        
+        const response = await fetchWithTimeout(url);
+        if (!response.ok) {
+            throw new Error("Denetimler yüklenemedi.");
+        }
+        const data = await response.json();
+        
+        // Update both memory and persistent cache
+        auditCache[key] = { data, timestamp: now };
+        localStorage.setItem(storageKey, JSON.stringify({
+            data,
+            timestamp: now
+        }));
+        
+        return data;
+    } catch (error) {
+        console.warn("Network error fetching audits, attempting local fallback:", error);
+        
+        const localData = localStorage.getItem(storageKey);
+        if (localData) {
+            try {
+                const parsed = JSON.parse(localData);
+                console.log("Loaded audits from local storage fallback.");
+                return parsed.data;
+            } catch (e) {
+                console.error("Error parsing local audits cache:", e);
+            }
+        }
+        
+        throw error;
     }
-    const data = await response.json();
-    auditCache[key] = { data, timestamp: now };
-    return data;
 }
 
 export function invalidateAuditCache(): void {
@@ -59,11 +85,38 @@ export function invalidateAuditCache(): void {
 }
 
 export async function fetchAuditById(id: string): Promise<Audit> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}`);
-    if (!response.ok) {
-        throw new Error("Denetim bulunamadı.");
+    const storageKey = `mufyard_audit_detail_${id}`;
+    
+    try {
+        const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}`);
+        if (!response.ok) {
+            throw new Error("Denetim bulunamadı.");
+        }
+        const data = await response.json();
+        
+        // Cache the individual audit report
+        localStorage.setItem(storageKey, JSON.stringify({
+            data,
+            timestamp: Date.now()
+        }));
+        
+        return data;
+    } catch (error) {
+        console.warn(`Network error fetching audit ${id}, attempting local fallback:`, error);
+        
+        const localData = localStorage.getItem(storageKey);
+        if (localData) {
+            try {
+                const parsed = JSON.parse(localData);
+                console.log(`Loaded audit ${id} from local storage fallback.`);
+                return parsed.data;
+            } catch (e) {
+                console.error("Error parsing local audit detail cache:", e);
+            }
+        }
+        
+        throw error;
     }
-    return response.json();
 }
 
 export async function createAudit(audit: Partial<Audit>): Promise<Audit> {
@@ -82,18 +135,27 @@ export async function createAudit(audit: Partial<Audit>): Promise<Audit> {
 }
 
 export async function updateAudit(id: string, update: Partial<Audit>): Promise<Audit> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}`, {
-        method: "PATCH",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(update),
-    });
-    if (!response.ok) {
-        throw new Error("Güncelleme başarısız.");
+    try {
+        const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(update),
+        });
+        if (!response.ok) {
+            throw new Error("Güncelleme başarısız.");
+        }
+        auditCache = {}; // Invalidate cache
+        return response.json();
+    } catch (error) {
+        if (!navigator.onLine || error instanceof Error && (error.message.includes("Failed to fetch") || error.message.includes("timeout"))) {
+            console.warn("Offline detected in updateAudit, queueing action.");
+            addToQueue('updateAudit', [id, update]);
+            return { id, ...update } as any;
+        }
+        throw error;
     }
-    auditCache = {}; // Invalidate cache
-    return response.json();
 }
 
 export async function deleteAudit(id: string): Promise<{status: string, message: string}> {

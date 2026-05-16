@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Users, Search, ChevronLeft, ChevronRight, UserCheck, UserX, Loader2, MoreVertical, ShieldAlert, Shield, Link2, X } from "lucide-react";
+import { Users, Search, ChevronLeft, ChevronRight, UserCheck, UserX, Loader2, MoreVertical, ShieldAlert, Shield, Link2, X, Sparkles } from "lucide-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { fetchInspectors, linkInspectorToProfile, type Inspector } from "../lib/api/inspectors";
@@ -9,15 +9,32 @@ import { useConfirm } from "../lib/context/ConfirmContext";
 import { cn } from "../lib/utils";
 import { API_URL } from "../lib/config";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
+import { useAuth } from "../lib/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 export default function AdminInspectors() {
+    const { user, profile: userProfile } = useAuth();
+    const navigate = useNavigate();
+
+    const FOUNDER_EMAILS = ["sefayaprakli@hotmail.com", "sefa.yaprakli@gsb.gov.tr", "syaprakli@gmail.com"];
+
+    const isFounder = user?.email && FOUNDER_EMAILS.includes(user.email);
+
+    useEffect(() => {
+        const isAdmin = userProfile?.role === "admin" || isFounder;
+        if (!isAdmin && user) {
+            toast.error("Bu sayfaya erişim yetkiniz bulunmamaktadır.");
+            navigate("/");
+        }
+    }, [isFounder, user, userProfile, navigate]);
+
     const confirm = useConfirm();
     const [inspectors, setInspectors] = useState<Inspector[]>([]);
     const [profiles, setProfiles] = useState<Profile[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
-    const [filterMode, setFilterMode] = useState<"all" | "registered" | "unregistered">("all");
+    const [filterMode, setFilterMode] = useState<"all" | "registered" | "unregistered" | "external">("all");
     const [currentPage, setCurrentPage] = useState(1);
     const [openRoleMenu, setOpenRoleMenu] = useState<string | null>(null);
     const [linkModal, setLinkModal] = useState<{ inspectorId: string; inspectorName: string } | null>(null);
@@ -122,16 +139,35 @@ export default function AdminInspectors() {
         (p.email || "").toLowerCase().includes(linkSearch.toLowerCase())
     );
 
-    const filtered = inspectors
-        .filter(ins => {
-            if (filterMode === "registered") return isRegistered(ins);
-            if (filterMode === "unregistered") return !isRegistered(ins);
+    // Müfettiş listesi ile kayıtlı olmayan diğer profilleri birleştiriyoruz
+    const combinedList = [
+        ...inspectors.map(ins => ({ ...ins, type: 'inspector' as const })),
+        ...profiles
+            .filter(p => !inspectors.some(ins => ins.uid === p.uid || (ins.email && ins.email.toLowerCase() === p.email?.toLowerCase())))
+            .map(p => ({
+                id: p.uid,
+                uid: p.uid,
+                name: p.full_name || "İsimsiz Kullanıcı",
+                email: p.email,
+                type: 'external' as const,
+                profile: p
+            }))
+    ];
+
+    const filtered = combinedList
+        .filter(item => {
+            const isMatchedInspector = item.type === 'inspector' && isRegistered(item as any);
+            const isUnregisteredInspector = item.type === 'inspector' && !isRegistered(item as any);
+            const isExternal = item.type === 'external';
+
+            if (filterMode === "registered") return isMatchedInspector;
+            if (filterMode === "unregistered") return isUnregisteredInspector;
+            if (filterMode === "external") return isExternal;
             return true;
         })
-        .filter(ins =>
-            (ins.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (ins.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (ins.title || "").toLowerCase().includes(searchTerm.toLowerCase())
+        .filter(item =>
+            (item.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (item.email || "").toLowerCase().includes(searchTerm.toLowerCase())
         );
 
     const totalPages = Math.ceil(filtered.length / itemsPerPage);
@@ -143,13 +179,19 @@ export default function AdminInspectors() {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
                     <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+                        <button 
+                            onClick={() => navigate('/admin')}
+                            className="flex items-center gap-1 hover:text-primary transition-colors mr-2 group"
+                        >
+                            <ChevronLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+                            <span>Geri</span>
+                        </button>
                         <ShieldAlert size={10} className="text-amber-500" />
                         <span>Kurucu Paneli</span>
                     </div>
-                    <h1 className="text-2xl font-black text-foreground tracking-tight">Müfettiş Listesi</h1>
+                    <h1 className="text-2xl font-black text-foreground tracking-tight">Kullanıcı Yönetimi</h1>
                     <p className="text-sm text-slate-400 font-medium mt-1">
-                        Toplam <strong>{inspectors.length}</strong> müfettiş •{" "}
-                        <span className="text-emerald-500 font-bold">{registeredCount} kişi sisteme kayıtlı</span>
+                        Sistemde toplam <strong>{profiles.length}</strong> kayıtlı kullanıcı var.
                     </p>
                 </div>
                 <div className="relative w-full lg:w-72">
@@ -167,15 +209,19 @@ export default function AdminInspectors() {
             <div className="flex items-center gap-2 flex-wrap">
                 <button onClick={() => { setFilterMode("all"); setCurrentPage(1); }} className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all border", filterMode === "all" ? "bg-primary text-white border-primary shadow-md shadow-primary/20" : "border-border text-slate-400 hover:bg-muted")}>
                     <Users size={14} />
-                    Tümü <span className="ml-1 bg-white/20 px-1.5 py-0.5 rounded-md">{inspectors.length}</span>
+                    Tüm Liste <span className="ml-1 bg-white/20 px-1.5 py-0.5 rounded-md">{combinedList.length}</span>
                 </button>
                 <button onClick={() => { setFilterMode("registered"); setCurrentPage(1); }} className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all border", filterMode === "registered" ? "bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20" : "border-border text-slate-400 hover:bg-muted")}>
                     <UserCheck size={14} />
-                    Kayıtlı <span className="ml-1 bg-white/20 px-1.5 py-0.5 rounded-md">{registeredCount}</span>
+                    Rehber (Kayıtlı) <span className="ml-1 bg-white/20 px-1.5 py-0.5 rounded-md">{registeredCount}</span>
                 </button>
-                <button onClick={() => { setFilterMode("unregistered"); setCurrentPage(1); }} className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all border", filterMode === "unregistered" ? "bg-slate-600 text-white border-slate-600 shadow-md" : "border-border text-slate-400 hover:bg-muted")}>
+                <button onClick={() => { setFilterMode("unregistered"); setCurrentPage(1); }} className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all border", filterMode === "unregistered" ? "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20" : "border-border text-slate-400 hover:bg-muted")}>
                     <UserX size={14} />
-                    Kayıtsız <span className="ml-1 bg-white/20 px-1.5 py-0.5 rounded-md">{inspectors.length - registeredCount}</span>
+                    Rehber (Kayıtsız) <span className="ml-1 bg-white/20 px-1.5 py-0.5 rounded-md">{inspectors.length - registeredCount}</span>
+                </button>
+                <button onClick={() => { setFilterMode("external"); setCurrentPage(1); }} className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all border", filterMode === "external" ? "bg-blue-600 text-white border-blue-600 shadow-md" : "border-border text-slate-400 hover:bg-muted")}>
+                    <Shield size={14} />
+                    Dış Kayıtlar <span className="ml-1 bg-white/20 px-1.5 py-0.5 rounded-md">{profiles.length - registeredCount}</span>
                 </button>
             </div>
 
@@ -187,22 +233,39 @@ export default function AdminInspectors() {
                     </div>
                 ) : (
                     <div className="divide-y divide-border">
-                        {paginated.map((ins) => {
-                            const registered = isRegistered(ins);
-                            const profile = getMatchedProfile(ins);
+                        {paginated.map((item) => {
+                            const registered = item.type === 'inspector' ? isRegistered(item as any) : true;
+                            const profile = item.type === 'inspector' ? getMatchedProfile(item as any) : item.profile;
+                            
                             return (
-                                <div key={ins.id} className={cn("flex items-center justify-between p-5 transition-all group", registered ? "hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10" : "hover:bg-slate-50 dark:hover:bg-slate-800/30")}>
+                                <div key={item.id} className={cn("flex items-center justify-between p-5 transition-all group", registered ? "hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10" : "hover:bg-slate-50 dark:hover:bg-slate-800/30")}>
                                     <div className="flex items-center gap-4 flex-1 min-w-0">
                                         <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center font-black text-sm shrink-0", registered ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500")}>
                                             {profile?.avatar_url
                                                 ? <img src={profile.avatar_url} alt="" className="w-full h-full rounded-xl object-cover" />
-                                                : ins.name.charAt(0).toUpperCase()
+                                                : (item.name || "?").charAt(0).toUpperCase()
                                             }
                                         </div>
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <p className={cn("font-bold text-sm truncate", registered ? "text-emerald-700 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300")}>{ins.name}</p>
-                                                {registered && <span className="text-[9px] bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-black uppercase tracking-widest whitespace-nowrap">✓ Kayıtlı</span>}
+                                                <p className={cn("font-bold text-sm truncate", registered ? "text-emerald-700 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300")}>{item.name || "İsimsiz Kullanıcı"}</p>
+                                                
+                                                {profile?.has_premium_ai && (
+                                                    <span className="text-[9px] bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-black uppercase tracking-widest whitespace-nowrap flex items-center gap-1 shadow-sm animate-in zoom-in duration-300">
+                                                        <Sparkles size={8} className="fill-current" /> PRO
+                                                    </span>
+                                                )}
+                                                
+                                                {item.type === 'inspector' ? (
+                                                    registered ? (
+                                                        <span className="text-[9px] bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-black uppercase tracking-widest whitespace-nowrap">✓ Rehberde Kayıtlı</span>
+                                                    ) : (
+                                                        <span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full font-black uppercase tracking-widest whitespace-nowrap">Rehberde (Kayıtsız)</span>
+                                                    )
+                                                ) : (
+                                                    <span className="text-[9px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-black uppercase tracking-widest whitespace-nowrap">Dış Kayıt (Rehber Dışı)</span>
+                                                )}
+                                                
                                                 {profile?.role && profile.role !== "user" && (
                                                     <span className="text-[9px] bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-black uppercase tracking-widest whitespace-nowrap flex items-center gap-1">
                                                         <Shield size={8} /> {profile.role}
@@ -210,36 +273,114 @@ export default function AdminInspectors() {
                                                 )}
                                             </div>
                                             <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                                                <p className="text-[11px] text-slate-400 font-medium truncate">{ins.email || "-"}</p>
-                                                {ins.title && <span className="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-bold text-slate-500">{ins.title}</span>}
-                                                {ins.extension && <span className="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-bold text-slate-500">Dahili: {ins.extension}</span>}
-                                                {ins.phone && <span className="text-[9px] bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded font-bold text-emerald-600">{ins.phone}</span>}
+                                                <p className="text-[11px] text-slate-400 font-medium truncate">{item.email || "-"}</p>
+                                                {(item as any).title && <span className="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-bold text-slate-500">{(item as any).title}</span>}
+                                                {(item as any).phone && <span className="text-[9px] bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded font-bold text-emerald-600">{(item as any).phone}</span>}
                                             </div>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1 ml-3 shrink-0">
-                                        {registered ? (
-                                            <button onClick={() => handleUnlink(ins.id, ins.name)} title="Eşleştirmeyi Kaldır" className="p-2 text-emerald-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-all">
-                                                <Link2 size={15} />
-                                            </button>
-                                        ) : (
-                                            <button onClick={() => setLinkModal({ inspectorId: ins.id, inspectorName: ins.name })} className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black text-primary border border-primary/30 hover:bg-primary/10 rounded-xl transition-all whitespace-nowrap">
-                                                <Link2 size={12} /> Eşleştir
-                                            </button>
-                                        )}
-                                        {registered && profile && (
-                                            <div className="relative">
-                                                <button onClick={() => setOpenRoleMenu(openRoleMenu === ins.id ? null : ins.id)} className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-xl transition-all">
-                                                    <MoreVertical size={16} />
+                                        {item.type === 'inspector' ? (
+                                            registered ? (
+                                                <button onClick={() => handleUnlink(item.id, item.name)} title="Eşleştirmeyi Kaldır" className="p-2 text-emerald-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-all">
+                                                    <Link2 size={15} />
                                                 </button>
-                                                {openRoleMenu === ins.id && (
+                                            ) : (
+                                                <button onClick={() => setLinkModal({ inspectorId: item.id, inspectorName: item.name || "" })} className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black text-primary border border-primary/30 hover:bg-primary/10 rounded-xl transition-all whitespace-nowrap">
+                                                    <Link2 size={12} /> Müfettişle Eşleştir
+                                                </button>
+                                            )
+                                        ) : null}
+                                        
+                                        {profile && (
+                                            <div className="relative">
+                                                {!FOUNDER_EMAILS.includes(profile.email || "") && (
+                                                    <button onClick={() => setOpenRoleMenu(openRoleMenu === profile.uid ? null : profile.uid)} className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-xl transition-all">
+                                                        <MoreVertical size={16} />
+                                                    </button>
+                                                )}
+                                                {openRoleMenu === profile.uid && (
                                                     <div className="absolute right-0 top-10 w-52 bg-card border border-border rounded-2xl shadow-2xl z-50 py-2 animate-in fade-in zoom-in-95 duration-200">
-                                                        <div className="px-4 py-2 border-b border-border mb-1">
-                                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Rol Değiştir</p>
+                                                        <div className="px-4 py-2 border-b border-border mb-1 bg-slate-50 dark:bg-slate-900/50">
+                                                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">YETKİ SEVİYESİ</p>
                                                         </div>
                                                         <button onClick={() => handleUpdateRole(profile.uid, "admin")} className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-amber-50 dark:hover:bg-amber-950/20 text-amber-600 transition-colors">Yönetici Yap</button>
                                                         <button onClick={() => handleUpdateRole(profile.uid, "moderator")} className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-blue-50 dark:hover:bg-blue-950/20 text-blue-600 transition-colors">Moderatör Yap</button>
-                                                        <button onClick={() => handleUpdateRole(profile.uid, "user")} className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-muted transition-colors text-slate-600 dark:text-slate-300">Standart Kullanıcı</button>
+                                                        <button onClick={() => handleUpdateRole(profile.uid, "user")} className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-muted transition-colors text-slate-600 dark:text-slate-300">Standart Kullanıcı Yap</button>
+                                                        
+                                                        <div className="px-4 py-2 border-b border-t border-border my-1 bg-slate-50 dark:bg-slate-900/50">
+                                                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">KULLANIM SÜRESİ</p>
+                                                        </div>
+                                                        
+                                                        <button 
+                                                            onClick={async () => {
+                                                                try {
+                                                                    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
+                                                                    await fetchWithTimeout(`${API_URL}/profiles/${profile.uid}`, {
+                                                                        method: "PATCH",
+                                                                        headers,
+                                                                        body: JSON.stringify({ 
+                                                                            role: "user", 
+                                                                            has_premium_ai: false,
+                                                                            trial_started: false 
+                                                                        }),
+                                                                    });
+                                                                    toast.success("Kullanıcı tamamen sıfırlandı (Deneme Sürümü).");
+                                                                    setOpenRoleMenu(null);
+                                                                    loadData();
+                                                                } catch {
+                                                                    toast.error("İşlem başarısız.");
+                                                                }
+                                                            }}
+                                                            className="w-full text-left px-4 py-2.5 text-[10px] font-black hover:bg-rose-100 text-rose-600 transition-colors"
+                                                        >
+                                                            SIFIRLA (DENEME SÜRÜMÜ YAP)
+                                                        </button>
+                                                        
+                                                        {profile.has_premium_ai ? (
+                                                            <button 
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const headers = await getAuthHeaders({ "Content-Type": "application/json" });
+                                                                        await fetchWithTimeout(`${API_URL}/profiles/${profile.uid}`, {
+                                                                            method: "PATCH",
+                                                                            headers,
+                                                                            body: JSON.stringify({ has_premium_ai: false }),
+                                                                        });
+                                                                        toast.success("PRO üyelik iptal edildi.");
+                                                                        setOpenRoleMenu(null);
+                                                                        loadData();
+                                                                    } catch {
+                                                                        toast.error("İşlem başarısız.");
+                                                                    }
+                                                                }} 
+                                                                className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-500 transition-colors"
+                                                            >
+                                                                PRO Üyeliği İptal Et
+                                                            </button>
+                                                        ) : (
+                                                            <button 
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const headers = await getAuthHeaders({ "Content-Type": "application/json" });
+                                                                        await fetchWithTimeout(`${API_URL}/profiles/${profile.uid}`, {
+                                                                            method: "PATCH",
+                                                                            headers,
+                                                                            body: JSON.stringify({ has_premium_ai: true, trial_started: true }),
+                                                                        });
+                                                                        toast.success("Kullanıcı PRO sürüme yükseltildi.");
+                                                                        setOpenRoleMenu(null);
+                                                                        loadData();
+                                                                    } catch {
+                                                                        toast.error("İşlem başarısız.");
+                                                                    }
+                                                                }} 
+                                                                className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-emerald-50 dark:hover:bg-emerald-950/20 text-emerald-600 transition-colors"
+                                                            >
+                                                                PRO Sürüme Yükselt
+                                                            </button>
+                                                        )}
+
                                                         <div className="h-px bg-border my-1" />
                                                         <button onClick={() => handleDeleteProfile(profile.uid)} className="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-500 transition-colors">Sistemden Sil</button>
                                                     </div>

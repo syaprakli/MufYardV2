@@ -88,25 +88,9 @@ export default function Audit() {
         }
     }, [user, refreshAll]);
 
-    // Web sürümü uyarısı (Tasks sayfasındaki ile uyumlu)
+    // Web sürümü uyarısı - Kullanıcı isteğiyle kaldırıldı
     useEffect(() => {
-        if (!isElectron) {
-            const hasShownToast = sessionStorage.getItem('audits_web_warning_shown');
-            if (!hasShownToast) {
-                toast("Web sürümünde rapor oluşturma ve düzenleme kısıtlıdır.", {
-                    icon: '🚀',
-                    duration: 5000,
-                    style: {
-                        borderRadius: '12px',
-                        background: '#333',
-                        color: '#fff',
-                        fontSize: '12px',
-                        fontWeight: 'bold'
-                    }
-                });
-                sessionStorage.setItem('audits_web_warning_shown', 'true');
-            }
-        }
+        // Uyarı kaldırıldı
     }, []);
 
     const loadData = async (silent = false) => {
@@ -155,7 +139,7 @@ export default function Audit() {
             if (activeTab === 'ortak' && selectedFile) {
                 const { uploadFile } = await import("../lib/api/files");
                 const path = `audits/${newAudit.task_id}`;
-                const uploaded = await uploadFile(selectedFile, path);
+                const uploaded = await uploadFile(selectedFile, path, currentUser.uid);
                 fileUrl = uploaded.url;
             }
 
@@ -226,6 +210,28 @@ export default function Audit() {
             setNewAudit({ ...newAudit, task_id: taskId, report_seq: 1 });
         }
     };
+
+    const availableTasks = useMemo(() => {
+        const TWO_YEARS_MS = 730 * 24 * 60 * 60 * 1000;
+        return tasks.filter(t => {
+            const isOld = t.baslama_tarihi ? (Date.now() - new Date(t.baslama_tarihi).getTime() > TWO_YEARS_MS) : false;
+            // Arşiv Şartı: Görev Tamamlandı VE 2 yıl geçmiş
+            const isArchived = (t.rapor_durumu === "Tamamlandı") && isOld;
+            
+            if (activeTab === 'ortak') {
+                return isArchived;
+            } else {
+                // Aktif sekmesinde sadece arşivlenmemişleri göster
+                return !isArchived;
+            }
+        }).sort((a, b) => {
+            // Yeni görevleri (yılına göre) üste alalım
+            const aYear = a.rapor_kodu?.split('/')[1]?.split('-')[0] || "0";
+            const bYear = b.rapor_kodu?.split('/')[1]?.split('-')[0] || "0";
+            if (aYear !== bYear) return bYear.localeCompare(aYear);
+            return (b.rapor_kodu || "").localeCompare(a.rapor_kodu || "", "tr", { numeric: true });
+        });
+    }, [tasks, activeTab]);
 
     const handleExportExcel = () => {
         exportAuditsToExcel();
@@ -338,11 +344,23 @@ export default function Audit() {
                                   a.location.toLowerCase().includes(debouncedSearch.toLowerCase());
             const relatedTask = tasks.find(t => String(t.id).trim() === String(a.task_id).trim());
             
-            // 2 yıl kuralı (İlişkili görev üzerinden)
-            const isOld = relatedTask?.baslama_tarihi ? (Date.now() - new Date(relatedTask.baslama_tarihi).getTime() > 730 * 24 * 60 * 60 * 1000) : false;
+            // 2 yıl kuralı (İlişkili görev üzerinden veya raporun kendi tarihi üzerinden)
+            let isOld = false;
+            if (relatedTask?.baslama_tarihi) {
+                isOld = (Date.now() - new Date(relatedTask.baslama_tarihi).getTime() > 730 * 24 * 60 * 60 * 1000);
+            } else if (a.date) {
+                // Raporun kendi tarihi üzerinden kontrol (GG.AA.YYYY formatını da destekleyelim)
+                try {
+                    const parts = a.date.split('.');
+                    const auditDate = parts.length === 3 
+                        ? new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]))
+                        : new Date(a.date);
+                    isOld = (Date.now() - auditDate.getTime() > 730 * 24 * 60 * 60 * 1000);
+                } catch { isOld = false; }
+            }
             
-            // Arşiv Şartı: Görev Tamamlandı VE 2 yıl geçmiş
-            const isArchived = (relatedTask?.rapor_durumu === "Tamamlandı") && isOld;
+            // Arşiv Şartı: Görev Tamamlandı VE 2 yıl geçmiş (Veya görev yoksa ve 2 yıl geçmişse de arşive atalım)
+            const isArchived = ((relatedTask?.rapor_durumu === "Tamamlandı" || !relatedTask) && isOld);
             
             const matchesTab = activeTab === 'ortak' ? isArchived : !isArchived;
 
@@ -647,8 +665,10 @@ export default function Audit() {
                             onChange={(e) => handleTaskSelect(e.target.value)}
                         >
                             <option value="">Görev Seçiniz...</option>
-                            {tasks.map(t => (
-                                <option key={t.id} value={t.id} className="bg-card">{t.rapor_kodu} - {t.rapor_adi}</option>
+                            {availableTasks.map(t => (
+                                <option key={t.id} value={t.id} className="bg-card">
+                                    {t.rapor_kodu} - {t.rapor_adi} {t.rapor_durumu === 'Tamamlandı' ? '(Tamamlandı)' : ''}
+                                </option>
                             ))}
                         </select>
                     </div>

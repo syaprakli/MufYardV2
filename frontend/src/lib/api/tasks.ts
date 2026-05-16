@@ -1,5 +1,6 @@
 import { API_URL as API_BASE_URL } from "../config";
 import { fetchWithTimeout } from "./utils";
+import { addToQueue } from "./syncQueue";
 
 export interface TaskStep {
     text: string;
@@ -64,20 +65,49 @@ const CACHE_DURATION = 60 * 1000;
 
 export async function fetchTasks(userId?: string, userEmail?: string): Promise<Task[]> {
     const cacheKey = `${userId || ""}|${userEmail || ""}`;
+    const storageKey = `mufyard_tasks_cache_${userId || 'guest'}`;
+    
+    // 1. Memory Cache Check
     const cached = taskCache[cacheKey];
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
         return cached.data;
     }
 
-    let url = `${API_BASE_URL}/tasks/?`;
-    if (userId) url += `user_id=${userId}&`;
-    if (userEmail) url += `user_email=${userEmail}`;
+    try {
+        let url = `${API_BASE_URL}/tasks/?`;
+        if (userId) url += `user_id=${userId}&`;
+        if (userEmail) url += `user_email=${userEmail}`;
 
-    const response = await fetchWithTimeout(url);
-    if (!response.ok) throw new Error("Görevler yüklenemedi.");
-    const data = await response.json();
-    taskCache[cacheKey] = { data, timestamp: Date.now() };
-    return data;
+        const response = await fetchWithTimeout(url);
+        if (!response.ok) throw new Error("Görevler yüklenemedi.");
+        
+        const data = await response.json();
+        
+        // Update both memory and persistent cache
+        taskCache[cacheKey] = { data, timestamp: Date.now() };
+        localStorage.setItem(storageKey, JSON.stringify({
+            data,
+            timestamp: Date.now()
+        }));
+        
+        return data;
+    } catch (error) {
+        console.warn("Network error fetching tasks, attempting to load from local storage:", error);
+        
+        // 2. Persistent Cache Fallback (Offline Mode)
+        const localData = localStorage.getItem(storageKey);
+        if (localData) {
+            try {
+                const parsed = JSON.parse(localData);
+                console.log("Loaded tasks from local storage fallback.");
+                return parsed.data;
+            } catch (e) {
+                console.error("Error parsing local tasks cache:", e);
+            }
+        }
+        
+        throw error;
+    }
 }
 
 export async function createTask(task: TaskCreate): Promise<Task> {
@@ -92,14 +122,26 @@ export async function createTask(task: TaskCreate): Promise<Task> {
 }
 
 export async function updateTask(id: string, update: Partial<TaskCreate & { steps: TaskStep[], rapor_durumu: string, shared_with: string[] }>): Promise<Task> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(update),
-    });
-    if (!response.ok) throw new Error("Görev güncellenemedi.");
-    taskCache = {}; // Invalidate
-    return response.json();
+    try {
+        const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(update),
+        });
+        if (!response.ok) throw new Error("Görev güncellenemedi.");
+        taskCache = {}; // Invalidate
+        return response.json();
+    } catch (error) {
+        // Check if it's a network error
+        if (!navigator.onLine || error instanceof Error && (error.message.includes("Failed to fetch") || error.message.includes("timeout"))) {
+            console.warn("Offline detected in updateTask, queueing action.");
+            addToQueue('updateTask', [id, update]);
+            
+            // Return a partial object so UI can update immediately (Optimistic UI)
+            return { id, ...update } as any;
+        }
+        throw error;
+    }
 }
 
 export async function deleteTask(id: string): Promise<{ status: string; message: string }> {

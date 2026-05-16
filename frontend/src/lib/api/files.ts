@@ -20,12 +20,13 @@ export const fetchFileTree = async (path?: string): Promise<FileItem[]> => {
     return response.json();
 };
 
-export const uploadFile = async (file: File, path?: string): Promise<any> => {
+export const uploadFile = async (file: File, path?: string, uid?: string): Promise<any> => {
     const formData = new FormData();
     formData.append("file", file);
     
     const url = new URL(`${CURRENT_FILES_API}/files/upload`);
     if (path) url.searchParams.append("path", path);
+    if (uid) url.searchParams.append("uid", uid);
     
     const response = await fetchWithTimeout(url.toString(), {
         method: "POST",
@@ -36,11 +37,14 @@ export const uploadFile = async (file: File, path?: string): Promise<any> => {
     return response.json();
 };
 
-export const createFolder = async (name: string, path: string, parentId?: string): Promise<any> => {
-    const response = await fetchWithTimeout(`${CURRENT_FILES_API}/files/folder?path=${path}`, {
+export const createFolder = async (name: string, path: string, parentId?: string, uid?: string): Promise<any> => {
+    const url = new URL(`${CURRENT_FILES_API}/files/create-folder`);
+    if (uid) url.searchParams.append("uid", uid);
+
+    const response = await fetchWithTimeout(url.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, parentId })
+        body: JSON.stringify({ name, parentId: parentId || path })
     });
     
     if (!response.ok) throw new Error("Klasör oluşturulamadı");
