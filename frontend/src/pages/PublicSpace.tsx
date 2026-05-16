@@ -158,7 +158,7 @@ export default function PublicSpace() {
         onlineUsers, 
         messages: globalMessages, 
         sendMessage: sendGlobalMessage, 
-        clearLocalMessages 
+        clearGlobalMessages 
     } = usePresence();
 
     const [chatInput, setChatInput] = useState("");
