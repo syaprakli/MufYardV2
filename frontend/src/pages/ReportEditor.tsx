@@ -641,35 +641,39 @@ export default function ReportEditor() {
                         <div className="w-px h-6 bg-slate-200 mx-1" />
                         {/* ── COLOR ── */}
                         <span className="ql-formats">
-                            <select className="ql-color" title="Yazı Rengi" defaultValue="">
-                                <option value="#000000">Siyah</option>
-                                <option value="#ff0000">Kırmızı</option>
-                                <option value="#800000">Koyu Kırmızı</option>
-                                <option value="#0000ff">Mavi</option>
-                                <option value="#000080">Koyu Mavi</option>
-                                <option value="#008000">Yeşil</option>
-                                <option value="#800080">Mor</option>
-                                <option value="#808000">Zeytin Yeşili</option>
-                                <option value="#808080">Gri</option>
-                                <option value="#ffffff">Beyaz</option>
-                            </select>
-                            <select className="ql-background" title="Metin Vurgu Rengi (Asetatlı Kalem)" defaultValue="">
-                                <option value="#ffff00">Sarı</option>
-                                <option value="#00ff00">Parlak Yeşil</option>
-                                <option value="#00ffff">Turkuaz</option>
-                                <option value="#ff00ff">Pembe</option>
-                                <option value="#ff0000">Kırmızı</option>
-                                <option value="#0000ff">Mavi</option>
-                                <option value="#000080">Koyu Mavi</option>
-                                <option value="#008080">Firuze</option>
-                                <option value="#008000">Koyu Yeşil</option>
-                                <option value="#800080">Mor</option>
-                                <option value="#800000">Bordo</option>
-                                <option value="#808000">Koyu Sarı</option>
-                                <option value="#808080">Koyu Gri</option>
-                                <option value="#c0c0c0">Açık Gri</option>
-                                <option value="">Renk Yok</option>
-                            </select>
+                            <span title="Yazı Rengi" className="inline-block">
+                                <select className="ql-color" title="Yazı Rengi" defaultValue="">
+                                    <option value="#000000">Siyah</option>
+                                    <option value="#ff0000">Kırmızı</option>
+                                    <option value="#800000">Koyu Kırmızı</option>
+                                    <option value="#0000ff">Mavi</option>
+                                    <option value="#000080">Koyu Mavi</option>
+                                    <option value="#008000">Yeşil</option>
+                                    <option value="#800080">Mor</option>
+                                    <option value="#808000">Zeytin Yeşili</option>
+                                    <option value="#808080">Gri</option>
+                                    <option value="#ffffff">Beyaz</option>
+                                </select>
+                            </span>
+                            <span title="Asetatlı Kalem (Fosforlu Vurgu)" className="inline-block">
+                                <select className="ql-background" title="Metin Vurgu Rengi (Asetatlı Kalem)" defaultValue="">
+                                    <option value="#ffff00">Sarı</option>
+                                    <option value="#00ff00">Parlak Yeşil</option>
+                                    <option value="#00ffff">Turkuaz</option>
+                                    <option value="#ff00ff">Pembe</option>
+                                    <option value="#ff0000">Kırmızı</option>
+                                    <option value="#0000ff">Mavi</option>
+                                    <option value="#000080">Koyu Mavi</option>
+                                    <option value="#008080">Firuze</option>
+                                    <option value="#008000">Koyu Yeşil</option>
+                                    <option value="#800080">Mor</option>
+                                    <option value="#800000">Bordo</option>
+                                    <option value="#808000">Koyu Sarı</option>
+                                    <option value="#808080">Koyu Gri</option>
+                                    <option value="#c0c0c0">Açık Gri</option>
+                                    <option value="">Renk Yok</option>
+                                </select>
+                            </span>
                         </span>
                         <div className="w-px h-6 bg-slate-200 mx-1" />
                         {/* ── CASE CONVERSION ── */}
@@ -838,6 +842,24 @@ export default function ReportEditor() {
             />
 
             <style>{`
+                /* ── Custom Highlighter Pen (Asetatlı Kalem) Icon ── */
+                .ql-snow .ql-picker.ql-background .ql-picker-label svg {
+                    display: none !important;
+                }
+                .ql-snow .ql-picker.ql-background .ql-picker-label::before {
+                    content: "🖍️" !important;
+                    font-size: 14px !important;
+                    display: inline-block !important;
+                    line-height: 1 !important;
+                    vertical-align: middle !important;
+                }
+                .ql-snow .ql-picker.ql-background .ql-picker-label {
+                    padding-left: 6px !important;
+                    padding-right: 6px !important;
+                    background: none !important;
+                    background-image: none !important;
+                }
+
                 /* ── Base Container ── */
                 .ql-container.ql-snow { border: none !important; font-family: 'Times New Roman', Times, serif !important; font-size: 12pt !important; }
                 .ql-toolbar.ql-snow { border: 1px solid #e2e8f0 !important; background: #fff !important; position: static !important; margin-bottom: 0; border-radius: 12px; box-shadow: 0 1px 3px -1px rgb(0 0 0 / 0.08); }
