@@ -327,7 +327,7 @@ export default function ReportEditor() {
         return () => editor.off('selection-change', handleSelection);
     }, [loading]);
 
-    // Add native tooltips to Quill's dynamically generated picker elements
+    // Add native tooltips and prevent focus loss on Quill's dynamically generated picker elements
     useEffect(() => {
         if (loading) return;
         const colorPicker = document.querySelector('.ql-picker.ql-color');
@@ -339,19 +339,31 @@ export default function ReportEditor() {
             bgPicker.setAttribute('title', 'Asetatlı Kalem (Fosforlu Vurgu)');
         }
 
-        // --- Quill picker/dropdown'dan seçim sonrası editöre focus ---
+        // --- Quill picker/dropdown'dan seçim sonrası editör selection koruma ---
         if (!quillRef.current) return;
         const editor = quillRef.current.getEditor();
-        // Tüm Quill picker'ları için
-        const pickers = document.querySelectorAll('.ql-picker, .ql-picker-options, .ql-picker-item');
-        const focusEditor = () => setTimeout(() => editor.focus(), 0);
+        
+        // Tüm Quill picker'ları, seçenekleri ve etiketleri için seçimin kaybolmasını önleme
+        const pickers = document.querySelectorAll('.ql-picker, .ql-picker-options, .ql-picker-item, .ql-picker-label');
+        
+        const handlePickerMouseDown = (e: Event) => {
+            // Odağın editörden çalınmasını ve seçimin kaybolmasını önler
+            e.preventDefault();
+            setTimeout(() => {
+                if (!editor.hasFocus()) {
+                    editor.focus();
+                }
+            }, 0);
+        };
+
         pickers.forEach(picker => {
-            picker.addEventListener('mousedown', focusEditor);
+            picker.addEventListener('mousedown', handlePickerMouseDown);
         });
+
         // Temizlik
         return () => {
             pickers.forEach(picker => {
-                picker.removeEventListener('mousedown', focusEditor);
+                picker.removeEventListener('mousedown', handlePickerMouseDown);
             });
         };
     }, [loading]);
@@ -720,11 +732,10 @@ export default function ReportEditor() {
                             </select>
                         </span>
                         <div className="w-px h-6 bg-slate-200 mx-1" />
-                        {/* ── CASE CONVERSION ── */}
                         <span className="ql-formats">
-                            <button type="button" title="BÜYÜK HARF" className="!text-[10px] !font-black !w-auto !px-1.5" onClick={() => handleCaseConvert("upper")}>AA</button>
-                            <button type="button" title="küçük harf" className="!text-[10px] !font-black !w-auto !px-1.5" onClick={() => handleCaseConvert("lower")}>aa</button>
-                            <button type="button" title="Her Kelimenin Başı Büyük" className="!text-[10px] !font-black !w-auto !px-1.5" onClick={() => handleCaseConvert("title")}>Aa</button>
+                            <button type="button" title="BÜYÜK HARF" className="!text-[10px] !font-black !w-auto !px-1.5" onMouseDown={(e) => e.preventDefault()} onClick={() => handleCaseConvert("upper")}>AA</button>
+                            <button type="button" title="küçük harf" className="!text-[10px] !font-black !w-auto !px-1.5" onMouseDown={(e) => e.preventDefault()} onClick={() => handleCaseConvert("lower")}>aa</button>
+                            <button type="button" title="Her Kelimenin Başı Büyük" className="!text-[10px] !font-black !w-auto !px-1.5" onMouseDown={(e) => e.preventDefault()} onClick={() => handleCaseConvert("title")}>Aa</button>
                         </span>
                         <div className="w-px h-6 bg-slate-200 mx-1" />
                         {/* ── ALIGNMENT ── */}
@@ -766,7 +777,7 @@ export default function ReportEditor() {
                             <button type="button" className="ql-blockquote" title="Alıntı" />
                             <button type="button" className="ql-link" title="Bağlantı" />
                             <button type="button" className="ql-image" title="Resim" />
-                            <button type="button" title="Sayfa Sonu" className="!text-[10px] !font-black !w-auto !px-1.5" onClick={handlePageBreak}>⏎</button>
+                            <button type="button" title="Sayfa Sonu" className="!text-[10px] !font-black !w-auto !px-1.5" onMouseDown={(e) => e.preventDefault()} onClick={handlePageBreak}>⏎</button>
                             <button type="button" className="ql-clean" title="Biçimlendirmeyi Temizle" />
                         </span>
                     </div>
