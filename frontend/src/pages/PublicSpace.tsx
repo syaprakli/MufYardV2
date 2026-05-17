@@ -1512,8 +1512,7 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                 {/* Reply input — inline after comments, not sticky */}
                 {!isStatic && (
                     <div className="pt-2 pb-4">
-                        <div className="max-w-2xl mx-auto">
-                            <div className="bg-card border border-border/60 p-3 rounded-2xl shadow-sm flex flex-col gap-2">
+                        <div className="bg-card border border-border/60 p-5 md:p-6 rounded-[32px] shadow-sm flex flex-col gap-3">
                                 {attachments.length > 0 && (
                                     <div className="flex gap-2 p-2 overflow-x-auto no-scrollbar">
                                         {attachments.map((at: any, i: number) => (
@@ -1561,7 +1560,6 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                                 </div>
                             </div>
                         </div>
-                    </div>
                 )}
             </div>
         </div>
