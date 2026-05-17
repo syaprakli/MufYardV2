@@ -326,6 +326,19 @@ export default function ReportEditor() {
         return () => editor.off('selection-change', handleSelection);
     }, [loading]);
 
+    // Add native tooltips to Quill's dynamically generated picker elements
+    useEffect(() => {
+        if (loading) return;
+        const colorPicker = document.querySelector('.ql-picker.ql-color');
+        if (colorPicker) {
+            colorPicker.setAttribute('title', 'Yazı Rengi');
+        }
+        const bgPicker = document.querySelector('.ql-picker.ql-background');
+        if (bgPicker) {
+            bgPicker.setAttribute('title', 'Asetatlı Kalem (Fosforlu Vurgu)');
+        }
+    }, [loading]);
+
     const handleAIProcess = async (type: "improve" | "formalize" | "shorten") => {
         if (!selectedText || !selectionRange) return;
         
@@ -641,39 +654,35 @@ export default function ReportEditor() {
                         <div className="w-px h-6 bg-slate-200 mx-1" />
                         {/* ── COLOR ── */}
                         <span className="ql-formats">
-                            <span title="Yazı Rengi" className="inline-block">
-                                <select className="ql-color" title="Yazı Rengi" defaultValue="">
-                                    <option value="#000000">Siyah</option>
-                                    <option value="#ff0000">Kırmızı</option>
-                                    <option value="#800000">Koyu Kırmızı</option>
-                                    <option value="#0000ff">Mavi</option>
-                                    <option value="#000080">Koyu Mavi</option>
-                                    <option value="#008000">Yeşil</option>
-                                    <option value="#800080">Mor</option>
-                                    <option value="#808000">Zeytin Yeşili</option>
-                                    <option value="#808080">Gri</option>
-                                    <option value="#ffffff">Beyaz</option>
-                                </select>
-                            </span>
-                            <span title="Asetatlı Kalem (Fosforlu Vurgu)" className="inline-block">
-                                <select className="ql-background" title="Metin Vurgu Rengi (Asetatlı Kalem)" defaultValue="">
-                                    <option value="#ffff00">Sarı</option>
-                                    <option value="#00ff00">Parlak Yeşil</option>
-                                    <option value="#00ffff">Turkuaz</option>
-                                    <option value="#ff00ff">Pembe</option>
-                                    <option value="#ff0000">Kırmızı</option>
-                                    <option value="#0000ff">Mavi</option>
-                                    <option value="#000080">Koyu Mavi</option>
-                                    <option value="#008080">Firuze</option>
-                                    <option value="#008000">Koyu Yeşil</option>
-                                    <option value="#800080">Mor</option>
-                                    <option value="#800000">Bordo</option>
-                                    <option value="#808000">Koyu Sarı</option>
-                                    <option value="#808080">Koyu Gri</option>
-                                    <option value="#c0c0c0">Açık Gri</option>
-                                    <option value="">Renk Yok</option>
-                                </select>
-                            </span>
+                            <select className="ql-color" title="Yazı Rengi" defaultValue="">
+                                <option value="#000000">Siyah</option>
+                                <option value="#ff0000">Kırmızı</option>
+                                <option value="#800000">Koyu Kırmızı</option>
+                                <option value="#0000ff">Mavi</option>
+                                <option value="#000080">Koyu Mavi</option>
+                                <option value="#008000">Yeşil</option>
+                                <option value="#800080">Mor</option>
+                                <option value="#808000">Zeytin Yeşili</option>
+                                <option value="#808080">Gri</option>
+                                <option value="#ffffff">Beyaz</option>
+                            </select>
+                            <select className="ql-background" title="Metin Vurgu Rengi (Asetatlı Kalem)" defaultValue="">
+                                <option value="#ffff00">Sarı</option>
+                                <option value="#00ff00">Parlak Yeşil</option>
+                                <option value="#00ffff">Turkuaz</option>
+                                <option value="#ff00ff">Pembe</option>
+                                <option value="#ff0000">Kırmızı</option>
+                                <option value="#0000ff">Mavi</option>
+                                <option value="#000080">Koyu Mavi</option>
+                                <option value="#008080">Firuze</option>
+                                <option value="#008000">Koyu Yeşil</option>
+                                <option value="#800080">Mor</option>
+                                <option value="#800000">Bordo</option>
+                                <option value="#808000">Koyu Sarı</option>
+                                <option value="#808080">Koyu Gri</option>
+                                <option value="#c0c0c0">Açık Gri</option>
+                                <option value="">Renk Yok</option>
+                            </select>
                         </span>
                         <div className="w-px h-6 bg-slate-200 mx-1" />
                         {/* ── CASE CONVERSION ── */}
