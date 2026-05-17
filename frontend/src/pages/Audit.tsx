@@ -24,6 +24,7 @@ const RAPOR_SABLONLARI: Record<string, string> = {
 };
 
 import { useGlobalData } from "../lib/context/GlobalDataContext";
+import { REPORT_TEMPLATES } from "../lib/reportTemplates";
 
 export default function Audit() {
     const { user } = useAuth();
@@ -143,6 +144,18 @@ export default function Audit() {
                 fileUrl = uploaded.url;
             }
 
+            let selectedTemplateHtml = "";
+            if (newAudit.template) {
+                if (RAPOR_SABLONLARI[newAudit.template] !== undefined) {
+                    selectedTemplateHtml = RAPOR_SABLONLARI[newAudit.template];
+                } else {
+                    const found = REPORT_TEMPLATES.find(t => t.id === newAudit.template);
+                    if (found) {
+                        selectedTemplateHtml = found.html;
+                    }
+                }
+            }
+
             const auditPayload: any = {
                 task_id: newAudit.task_id,
                 title: newAudit.title,
@@ -150,7 +163,7 @@ export default function Audit() {
                 date: newAudit.date,
                 inspector: newAudit.inspector,
                 status: activeTab === 'ortak' ? "Tamamlandı" : newAudit.status,
-                report_content: activeTab === 'ortak' ? "" : (RAPOR_SABLONLARI[newAudit.template] || ""),
+                report_content: activeTab === 'ortak' ? "" : selectedTemplateHtml,
                 file_url: fileUrl,
                 owner_id: currentUser.uid,
                 assigned_to: combinedAssigned,
@@ -704,10 +717,18 @@ export default function Audit() {
                                     onChange={(e) => setNewAudit({...newAudit, template: e.target.value})}
                                 >
                                     <option value="Boş Rapor" className="bg-card">Boş Rapor</option>
-                                    <option value="Genel Teftiş" className="bg-card">Genel Teftiş</option>
-                                    <option value="İnceleme-Soruşturma" className="bg-card">İnceleme-Soruşturma</option>
-                                    <option value="Ön İnceleme" className="bg-card">Ön İnceleme</option>
-                                    <option value="Spor Kulüpleri" className="bg-card">Spor Kulüpleri</option>
+                                    {["Genel Teftiş", "Spor Kulüpleri", "Ön İnceleme", "İnceleme-Soruşturma"].map((cat) => {
+                                        const templates = REPORT_TEMPLATES.filter((t) => t.category === cat);
+                                        return (
+                                            <optgroup key={cat} label={cat} className="bg-card font-bold text-xs text-primary/80">
+                                                {templates.map((t) => (
+                                                    <option key={t.id} value={t.id} className="bg-card text-foreground font-normal text-xs">
+                                                        {t.name}
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        );
+                                    })}
                                 </select>
                             </div>
                         )}
