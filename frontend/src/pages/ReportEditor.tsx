@@ -51,6 +51,8 @@ import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
 import { useChat } from "../lib/context/ChatContext";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useGlobalData } from "../lib/context/GlobalDataContext";
+import { REPORT_TEMPLATES, type ReportTemplate } from "../lib/reportTemplates";
+import { LayoutGrid } from "lucide-react";
 
 
 export default function ReportEditor() {
@@ -90,6 +92,7 @@ export default function ReportEditor() {
     const [aiSection, setAiSection] = useState<string>("tamamini");
     const [aiInsertMode, setAiInsertMode] = useState<"replace" | "append">("append");
     const AI_REPORT_ASSISTANT_ENABLED = false;
+    const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
 
     const focusEditorToEnd = () => {
         if (!quillRef.current) return;
@@ -97,6 +100,24 @@ export default function ReportEditor() {
         editor.focus();
         const len = editor.getLength();
         editor.setSelection(Math.max(0, len - 1), 0, 'user');
+    };
+
+    const handleSelectTemplate = async (template: ReportTemplate) => {
+        const isConfirmed = await confirm({
+            title: "Şablon Yüklensin mi?",
+            message: `"${template.name}" şablonu yüklendiğinde editördeki tüm içeriğiniz temizlenecek ve şablon içeriği yazılacaktır. Devam etmek istiyor musunuz?`,
+            confirmText: "Evet, Şablonu Yükle",
+            cancelText: "Vazgeç"
+        });
+        if (!isConfirmed) return;
+        
+        if (quillRef.current) {
+            const editor = quillRef.current.getEditor();
+            editor.setContents([]);
+            editor.clipboard.dangerouslyPasteHTML(0, template.html, "user");
+            setIsTemplateModalOpen(false);
+            toast.success(`"${template.name}" şablonu başarıyla yüklendi!`);
+        }
     };
 
     // ── Word-like Features State ──
@@ -544,6 +565,9 @@ export default function ReportEditor() {
                             >
                                 <Wand2 size={14} className="mr-1.5" /> AI (Yakında)
                             </Button>
+                            <Button variant="outline" onClick={() => setIsTemplateModalOpen(true)} className="h-8 px-3 text-[11px] font-bold border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg">
+                                <LayoutGrid size={14} className="mr-1.5" /> Şablon Seç
+                            </Button>
                             <Button variant="outline" onClick={handleSave} disabled={saving} className="h-8 px-3 text-[11px] font-bold border-primary/20 rounded-lg">
                                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="mr-1.5" />} Kaydet
                             </Button>
@@ -559,8 +583,7 @@ export default function ReportEditor() {
             </div>
 
             <div className="bg-white border-b border-slate-200 px-4 md:px-8 py-2 shrink-0">
-                <div className="overflow-x-auto">
-                    <div id="report-editor-toolbar" className="ql-toolbar ql-snow rounded-xl border border-slate-200 bg-white min-w-max flex flex-wrap items-center gap-0.5 px-2 py-1.5">
+                <div id="report-editor-toolbar" className="ql-toolbar ql-snow rounded-xl border border-slate-200 bg-white flex flex-wrap items-center gap-y-2 gap-x-0.5 px-2 py-1.5">
                         {/* ── FONT ── */}
                         <span className="ql-formats">
                             <select className="ql-font" defaultValue="times-new-roman">
@@ -694,7 +717,6 @@ export default function ReportEditor() {
                             <button type="button" className="ql-clean" title="Biçimlendirmeyi Temizle" />
                         </span>
                     </div>
-                </div>
             </div>
 
 
@@ -1069,6 +1091,77 @@ export default function ReportEditor() {
                                 </div>
                             ))
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Şablon Seçim Modali */}
+            {isTemplateModalOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <LayoutGrid className="text-violet-600" size={20} /> Resmi Rapor Taslakları & Şablonları
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-1">Müfettişlik rehberi standartlarına uygun 2025 yılı resmi rapor kapak ve içerik taslakları.</p>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={() => setIsTemplateModalOpen(false)} className="rounded-full w-8 h-8 p-0 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 flex items-center justify-center">
+                                <X size={18} />
+                            </Button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                            {/* Group by category */}
+                            {["Genel Teftiş", "Spor Kulüpleri", "Ön İnceleme", "İnceleme-Soruşturma"].map((cat) => {
+                                const templates = REPORT_TEMPLATES.filter((t) => t.category === cat);
+                                if (templates.length === 0) return null;
+
+                                let catIcon = <BookOpen className="text-blue-500" size={16} />;
+                                if (cat === "Spor Kulüpleri") catIcon = <Users className="text-emerald-500" size={16} />;
+                                if (cat === "Ön İnceleme") catIcon = <FileText className="text-amber-500" size={16} />;
+                                if (cat === "İnceleme-Soruşturma") catIcon = <CheckCircle className="text-rose-500" size={16} />;
+
+                                return (
+                                    <div key={cat} className="space-y-3">
+                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2 border-b border-slate-100 pb-2">
+                                            {catIcon} {cat} ({templates.length} Taslak)
+                                        </h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {templates.map((template) => (
+                                                <div 
+                                                    key={template.id}
+                                                    onClick={() => handleSelectTemplate(template)}
+                                                    className="p-4 rounded-2xl border border-slate-200 hover:border-violet-300 bg-white hover:bg-violet-50/10 cursor-pointer group transition-all duration-200 shadow-sm hover:shadow-md flex flex-col justify-between"
+                                                >
+                                                    <div>
+                                                        <h5 className="font-bold text-sm text-slate-800 group-hover:text-violet-700 transition-colors">
+                                                            {template.name}
+                                                        </h5>
+                                                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                                                            T.C. Gençlik ve Spor Bakanlığı resmi formatında düzenlenmiş Word uyumlu taslak.
+                                                        </p>
+                                                    </div>
+                                                    <div className="mt-4 flex items-center justify-end text-[10px] font-bold text-violet-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        ŞABLONU SEÇ ➔
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                            <span className="text-[10px] font-semibold text-slate-400">Toplam 14 resmi Word şablonu yüklü.</span>
+                            <Button variant="outline" size="sm" onClick={() => setIsTemplateModalOpen(false)} className="rounded-xl h-9 text-xs">
+                                Kapat
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}
