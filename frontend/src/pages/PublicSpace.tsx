@@ -1362,7 +1362,7 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                 </button>
                 <div className="px-3 py-1 bg-primary/5 text-primary rounded-lg text-[9px] font-black capitalize tracking-widest">{post.category}</div>
             </div>
-            <div className="flex-1 overflow-y-auto pr-2 space-y-8 no-scrollbar pb-32">
+            <div className="flex-1 overflow-y-auto pr-2 space-y-8 no-scrollbar pb-8">
                 <div className="bg-card border border-border/60 p-8 rounded-[32px] shadow-sm space-y-6">
                     <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
@@ -1509,60 +1509,61 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                         </div>
                     )}
                 </div>
-            </div>
-            {!isStatic && (
-                <div className="sticky bottom-0 mt-auto pt-6 bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent pb-8 z-50">
-                    <div className="max-w-2xl mx-auto relative">
-                        <div className="bg-card/80 backdrop-blur-xl border border-border/50 p-2 rounded-2xl shadow-2xl flex flex-col gap-2">
-                            {attachments.length > 0 && (
-                                <div className="flex gap-2 p-2 overflow-x-auto no-scrollbar">
-                                    {attachments.map((at: any, i: number) => (
-                                         <div 
-                                            key={i} 
-                                            className={cn("relative w-16 h-16 shrink-0 rounded-xl overflow-hidden border border-border bg-card flex items-center justify-center group/cat")}
-                                            title={at.name || "Dosya"}
-                                        >
-                                            {at.type === 'image' ? (
-                                                <img src={resolveUrl(at.url)} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="flex flex-col items-center justify-center w-full h-full p-1">
-                                                    <FileText size={18} className="text-slate-400 transition-colors" />
-                                                    <span className="text-[7px] font-black mt-1 text-muted-foreground text-center truncate w-full">{at.name || "Dosya"}</span>
-                                                </div>
-                                            )}
-                                            <button type="button" onClick={(e) => { e.stopPropagation(); setAttachments((prev: any[]) => prev.filter((_, idx) => idx !== i)); }} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 z-10"><X size={8} /></button>
-                                        </div>
-                                    ))}
+                {/* Reply input — inline after comments, not sticky */}
+                {!isStatic && (
+                    <div className="pt-2 pb-4">
+                        <div className="max-w-2xl mx-auto">
+                            <div className="bg-card border border-border/60 p-3 rounded-2xl shadow-sm flex flex-col gap-2">
+                                {attachments.length > 0 && (
+                                    <div className="flex gap-2 p-2 overflow-x-auto no-scrollbar">
+                                        {attachments.map((at: any, i: number) => (
+                                             <div 
+                                                key={i} 
+                                                className={cn("relative w-16 h-16 shrink-0 rounded-xl overflow-hidden border border-border bg-card flex items-center justify-center group/cat")}
+                                                title={at.name || "Dosya"}
+                                            >
+                                                {at.type === 'image' ? (
+                                                    <img src={resolveUrl(at.url)} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="flex flex-col items-center justify-center w-full h-full p-1">
+                                                        <FileText size={18} className="text-slate-400 transition-colors" />
+                                                        <span className="text-[7px] font-black mt-1 text-muted-foreground text-center truncate w-full">{at.name || "Dosya"}</span>
+                                                    </div>
+                                                )}
+                                                <button type="button" onClick={(e) => { e.stopPropagation(); setAttachments((prev: any[]) => prev.filter((_, idx) => idx !== i)); }} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 z-10"><X size={8} /></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                <div className="flex flex-col sm:flex-row items-center gap-2">
+                                    <div className="flex-1 w-full flex items-center gap-2">
+                                        <button onClick={onAttach} className="p-3 text-slate-400 hover:text-primary transition-all shrink-0"><Paperclip size={20} /></button>
+                                        <input 
+                                            value={commentText} 
+                                            onChange={e => setCommentText(e.target.value)} 
+                                            placeholder="Cevap yaz..." 
+                                            className="flex-1 bg-muted border-none rounded-xl px-4 h-12 text-sm font-bold outline-none" 
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    onComment();
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <button 
+                                        disabled={isCommenting || (!commentText.trim() && attachments.length === 0)} 
+                                        onClick={onComment} 
+                                        className="w-full sm:w-auto bg-primary text-white h-12 px-8 rounded-xl font-black text-xs shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
+                                    >
+                                        {isCommenting ? <Loader2 className="animate-spin mx-auto" /> : "GÖNDER"}
+                                    </button>
                                 </div>
-                            )}
-                            <div className="flex flex-col sm:flex-row items-center gap-2">
-                                <div className="flex-1 w-full flex items-center gap-2">
-                                    <button onClick={onAttach} className="p-3 text-slate-400 hover:text-primary transition-all shrink-0"><Paperclip size={20} /></button>
-                                    <input 
-                                        value={commentText} 
-                                        onChange={e => setCommentText(e.target.value)} 
-                                        placeholder="Cevap yaz..." 
-                                        className="flex-1 bg-muted border-none rounded-xl px-4 h-12 text-sm font-bold outline-none" 
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault();
-                                                onComment();
-                                            }
-                                        }}
-                                    />
-                                </div>
-                                <button 
-                                    disabled={isCommenting || (!commentText.trim() && attachments.length === 0)} 
-                                    onClick={onComment} 
-                                    className="w-full sm:w-auto bg-primary text-white h-12 px-8 rounded-xl font-black text-xs shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
-                                >
-                                    {isCommenting ? <Loader2 className="animate-spin mx-auto" /> : "GÖNDER"}
-                                </button>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 }
