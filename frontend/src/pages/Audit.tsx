@@ -895,22 +895,20 @@ function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect
 
                     <div className="flex items-center gap-2 w-full md:w-auto">
                         <div className="flex items-center gap-1 shrink-0">
-                            {isElectron && (
-                                <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    onClick={(audit as any).file_url ? () => window.open((audit as any).file_url, '_blank') : onEdit}
-                                    className={cn(
-                                        "w-10 h-10 rounded-xl",
-                                        (audit as any).file_url 
-                                            ? "text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50"
-                                            : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-                                    )}
-                                    title={(audit as any).file_url ? "Dosyayı Aç" : "Düzenle"}
-                                >
-                                    {(audit as any).file_url ? <Download size={18} /> : <Edit3 size={18} />}
-                                </Button>
-                            )}
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={(audit as any).file_url ? () => window.open((audit as any).file_url, '_blank') : onEdit}
+                                className={cn(
+                                    "w-10 h-10 rounded-xl",
+                                    (audit as any).file_url 
+                                        ? "text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50"
+                                        : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                                )}
+                                title={(audit as any).file_url ? "Dosyayı Aç" : "Düzenle"}
+                            >
+                                {(audit as any).file_url ? <Download size={18} /> : <Edit3 size={18} />}
+                            </Button>
                             {isElectron && (
                                 <Button 
                                     variant="ghost" 
