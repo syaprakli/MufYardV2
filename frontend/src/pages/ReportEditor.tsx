@@ -95,7 +95,8 @@ export default function ReportEditor() {
     const AI_REPORT_ASSISTANT_ENABLED = false;
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
 
-    const focusEditorToEnd = () => {
+    const focusEditorToEnd = (e: React.MouseEvent) => {
+        if (e.target !== e.currentTarget) return;
         if (!quillRef.current) return;
         const editor = quillRef.current.getEditor();
         editor.focus();
