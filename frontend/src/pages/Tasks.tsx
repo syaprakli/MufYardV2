@@ -464,15 +464,6 @@ export default function Tasks() {
             const associated = allAudits.filter(a => String(a.task_id).trim() === String(task.id).trim());
             setTaskAudits(associated);
 
-            if (!isElectron) {
-                if (associated.length > 0) {
-                    setShowReportSelector(task);
-                } else {
-                    toast.error("Web sürümünde rapor oluşturma kapalıdır. Lütfen masaüstü programından açınız.");
-                }
-                return;
-            }
-            
             const nextSeq = getNextReportSequence(allAudits);
 
             if (associated.length > 0) {

@@ -108,7 +108,7 @@ export default function Audit() {
 
     const handleCreateAudit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!isElectron) {
             toast.error("Rapor oluşturma işlemi sadece masaüstü uygulamasında tam fonksiyonel olarak gerçekleştirilebilir.");
             return;
@@ -441,27 +441,6 @@ export default function Audit() {
                 </div>
             </div>
 
-            {/* Web Sürümü Kısıtlama Uyarısı */}
-            {!isElectron && (
-                <div className="mb-8 animate-in slide-in-from-top-4 duration-700">
-                    <Card className="p-6 border-l-4 border-l-amber-500 border-amber-200 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-900/30">
-                        <div className="flex items-center gap-5 text-amber-800 dark:text-amber-400">
-                            <div className="p-3.5 bg-amber-500/20 rounded-2xl shadow-inner">
-                                <Shield size={28} className="animate-pulse" />
-                            </div>
-                            <div>
-                                <h3 className="text-base font-black uppercase tracking-tight mb-1 font-outfit">Sınırlı Web Erişimi</h3>
-                                <p className="text-xs font-medium opacity-90 leading-relaxed max-w-2xl">
-                                    Güvenlik ve yerel dosya sistemi erişimi kısıtlamaları nedeniyle rapor yazma ve düzenleme işlemleri sadece 
-                                    <strong className="text-amber-900 dark:text-amber-200 mx-1">MufYard Masaüstü Uygulaması</strong> üzerinden yapılabilir. 
-                                    Web sürümünde sadece mevcut raporları inceleyebilir ve Excel çıktısı alabilirsiniz.
-                                </p>
-                            </div>
-                        </div>
-                    </Card>
-                </div>
-            )}
-
             <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3 bg-card h-12 px-4 rounded-xl border border-border shadow-sm">
                     <input 
@@ -617,7 +596,7 @@ export default function Audit() {
                             task={tasks.find(t => String(t.id).trim() === String(audit.task_id).trim())}
                             isSelected={selectedIds.includes(audit.id)}
                             onToggleSelect={() => handleToggleSelect(audit.id)}
-                            onExportWord={() => exportAuditToWord(audit.id)}
+                            onExportWord={() => isElectron ? exportAuditToWord(audit.id) : toast.error("Rapor indirme ve dışa aktarma işlemleri sadece masaüstü uygulamasında aktiftir.")}
                             onEdit={() => navigate(`/audit/${audit.id}/report`)}
                             onUpdate={handleUpdateAudit}
                             onDelete={() => handleSingleDelete(audit.id)}

@@ -9,6 +9,7 @@ import { QuillBinding } from "y-quill";
 import QuillCursors from "quill-cursors";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
+import { isElectron } from "../lib/firebase";
 
 
 
@@ -468,6 +469,10 @@ export default function ReportEditor() {
 
     const handleExportWord = async () => {
         if (!id) return;
+        if (!isElectron) {
+            toast.error("Rapor indirme ve dışa aktarma işlemleri güvenlik kuralları gereği sadece masaüstü uygulamasında aktiftir.");
+            return;
+        }
         await handleSave();
         exportAuditToWord(id);
     };
