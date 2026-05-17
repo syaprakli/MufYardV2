@@ -337,6 +337,22 @@ export default function ReportEditor() {
         if (bgPicker) {
             bgPicker.setAttribute('title', 'Asetatlı Kalem (Fosforlu Vurgu)');
         }
+
+        // --- Quill picker/dropdown'dan seçim sonrası editöre focus ---
+        if (!quillRef.current) return;
+        const editor = quillRef.current.getEditor();
+        // Tüm Quill picker'ları için
+        const pickers = document.querySelectorAll('.ql-picker, .ql-picker-options, .ql-picker-item');
+        const focusEditor = () => setTimeout(() => editor.focus(), 0);
+        pickers.forEach(picker => {
+            picker.addEventListener('mousedown', focusEditor);
+        });
+        // Temizlik
+        return () => {
+            pickers.forEach(picker => {
+                picker.removeEventListener('mousedown', focusEditor);
+            });
+        };
     }, [loading]);
 
     const handleAIProcess = async (type: "improve" | "formalize" | "shorten") => {
@@ -517,7 +533,7 @@ export default function ReportEditor() {
                 className={`h-full border-none ${pageMode ? 'editor-page-mode' : ''}`}
             />
         );
-    }, [content]);
+    }, [pageMode]);
 
     if (loading) {
         return (
