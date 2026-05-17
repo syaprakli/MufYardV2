@@ -474,7 +474,7 @@ export default function FloatingChat({
 
   const resolveAttachmentUrl = (url: string) => {
     if (!url) return '';
-    const raw = String(url).trim();
+    const raw = String(url).trim().replace(/\\/g, '/');
     if (!raw) return '';
     if (/^https?:\/\//i.test(raw)) return encodeURI(raw);
     return encodeURI(`${BACKEND_BASE_URL}${raw.startsWith('/') ? '' : '/'}${raw}`);

@@ -90,7 +90,7 @@ import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { DraggableChatWidget } from "../components/layout/DraggableChatWidget";
 import { usePresence } from "../lib/context/PresenceContext";
-import { API_URL, BASE_URL, IS_ELECTRON } from "../lib/config";
+import { API_URL } from "../lib/config";
 import { fetchWithTimeout } from "../lib/api/utils";
 import toast from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
@@ -203,7 +203,7 @@ export default function PublicSpace() {
     // URL Resolution Helper
     const resolveAttachmentUrl = (url: string | null | undefined) => {
         if (!url) return '';
-        const raw = String(url).trim();
+        const raw = String(url).trim().replace(/\\/g, '/');
         
         if (raw.startsWith('http') || raw.startsWith('blob:') || raw.startsWith('data:')) return raw;
         
