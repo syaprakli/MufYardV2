@@ -23,6 +23,24 @@ Quill.register(FontAttributor, true);
 const SizeAttributor = Quill.import("attributors/style/size") as any;
 SizeAttributor.whitelist = ["8pt","9pt","10pt","10.5pt","11pt","12pt","14pt","16pt","18pt","20pt","22pt","24pt","26pt","28pt","36pt","48pt","72pt"];
 Quill.register(SizeAttributor, true);
+
+// ── Custom Page Break Blot ──
+const BlockEmbed = Quill.import("blots/block/embed") as any;
+class PageBreakBlot extends BlockEmbed {
+    static create() {
+        const node = super.create();
+        node.setAttribute("class", "page-break-divider");
+        node.setAttribute("contenteditable", "false");
+        node.innerHTML = '<span class="page-break-text">SAYFA SONU (PAGE BREAK)</span>';
+        return node;
+    }
+    static value() {
+        return true;
+    }
+}
+PageBreakBlot.blotName = "pagebreak";
+PageBreakBlot.tagName = "hr";
+Quill.register(PageBreakBlot, true);
 import { Save, Download, ArrowLeft, Loader2, FileText, CheckCircle, History, Clock, Users, Sparkles, MessageSquare, Wand2, BookOpen, X } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -114,7 +132,7 @@ export default function ReportEditor() {
         const editor = quillRef.current.getEditor();
         const range = editor.getSelection(true);
         editor.insertText(range.index, "\n", "user");
-        editor.insertEmbed(range.index + 1, "divider", true, "user");
+        editor.insertEmbed(range.index + 1, "pagebreak", true, "user");
         editor.setSelection(range.index + 2, 0, "user");
     };
 
@@ -829,6 +847,44 @@ export default function ReportEditor() {
                 /* ── Line Spacing Dropdown ── */
                 .ql-snow .ql-picker.ql-lineheight { width: 60px !important; }
                 .ql-snow .ql-picker.ql-lineheight .ql-picker-label::before { content: "↕" !important; }
+
+                /* ── Page Break Styling ── */
+                .page-break-divider {
+                    border: none !important;
+                    border-bottom: 2px dashed #94a3b8 !important;
+                    height: 24px !important;
+                    position: relative !important;
+                    margin: 24px 0 !important;
+                    text-align: center !important;
+                    cursor: default !important;
+                    user-select: none !important;
+                }
+                .page-break-text {
+                    position: absolute !important;
+                    top: 12px !important;
+                    left: 50% !important;
+                    transform: translateX(-50%) !important;
+                    background: #ffffff !important;
+                    padding: 2px 10px !important;
+                    font-size: 8pt !important;
+                    font-weight: 800 !important;
+                    color: #64748b !important;
+                    border: 1px dashed #cbd5e1 !important;
+                    border-radius: 4px !important;
+                    letter-spacing: 0.1em !important;
+                }
+                @media print {
+                    .page-break-divider {
+                        page-break-after: always !important;
+                        break-after: page !important;
+                        border: none !important;
+                        height: 0 !important;
+                        margin: 0 !important;
+                    }
+                    .page-break-text {
+                        display: none !important;
+                    }
+                }
             `}</style>
             {/* AI Rapor Üretme Paneli */}
             {isAIPanelOpen && (
@@ -1017,5 +1073,5 @@ const editorFormats = [
     'color', 'background',
     'list', 'indent',
     'script',
-    'link', 'image', 'align', 'divider'
+    'link', 'image', 'align', 'pagebreak'
 ];
