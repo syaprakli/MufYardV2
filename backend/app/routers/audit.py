@@ -37,8 +37,8 @@ async def get_audit(id: str):
     return audit
 
 @router.patch("/{id}", response_model=AuditResponse)
-async def update_audit(id: str, audit: AuditUpdate):
-    updated = await AuditService.update_audit(id, audit)
+async def update_audit(id: str, audit: AuditUpdate, force_version: Optional[bool] = None):
+    updated = await AuditService.update_audit(id, audit, force_version)
     if not updated:
         raise HTTPException(status_code=404, detail="Denetim güncellenemedi.")
     return updated

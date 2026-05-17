@@ -76,6 +76,7 @@ export default function ReportEditor() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const [autoSaveStatus, setAutoSaveStatus] = useState<"saved" | "saving" | "error">("saved");
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [versions, setVersions] = useState<AuditVersion[]>([]);
@@ -199,7 +200,7 @@ export default function ReportEditor() {
         }
     }, [id]);
 
-    // Premium Auto-Save Hook: Saves silently every 30 seconds if changes are detected
+    // Premium Word-Style Auto-Save Hook: Saves silently every 10 seconds if changes are detected, showing live cloud save status
     useEffect(() => {
         if (!id || loading) return;
 
@@ -214,16 +215,19 @@ export default function ReportEditor() {
                 // Only auto-save if content has changed and is not empty
                 if (currentHTML !== content && !isEmpty) {
                     try {
-                        await updateAudit(id, { report_content: currentHTML });
+                        setAutoSaveStatus("saving");
+                        await updateAudit(id, { report_content: currentHTML }); // Silent background save (uses 30-min smart threshold backend logic)
                         setContent(currentHTML);
                         setLastSaved(new Date());
-                        console.log("MufYard Auto-Save: Success.");
+                        setAutoSaveStatus("saved");
+                        console.log("MufYard Live Auto-Save: Success.");
                     } catch (e) {
-                        console.warn("MufYard Auto-Save: Silent failure.", e);
+                        console.warn("MufYard Live Auto-Save: Failure.", e);
+                        setAutoSaveStatus("error");
                     }
                 }
             }
-        }, 30000); // 30 seconds
+        }, 10000); // Word-style 10 seconds background loop
 
         return () => clearInterval(interval);
     }, [id, loading, content, saving]);
@@ -489,17 +493,19 @@ export default function ReportEditor() {
                 latestContent = content;
             }
 
-            await updateAudit(id, { report_content: latestContent });
+            // PASS TRUE AS THIRD PARAMETER TO FORCE VERSION CREATION ON Firestore!
+            await updateAudit(id, { report_content: latestContent }, true);
             
             // Sync local React state
             setContent(latestContent);
+            setAutoSaveStatus("saved");
 
             if (user?.uid) {
                 refreshAudits(user.uid, user?.email || undefined);
             }
             setLastSaved(new Date());
             loadVersions(id);
-            toast.success("Rapor başarıyla kaydedildi.");
+            toast.success("Rapor başarıyla kaydedildi ve yeni sürüm oluşturuldu.");
         } catch (error) {
             toast.error("Kaydedilirken hata oluştu.");
         } finally {
@@ -607,11 +613,23 @@ export default function ReportEditor() {
                                 </span>
                             )}
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-bold tracking-wide">
-                            <FileText size={10} /> Rapor Düzenleyici
-                            {lastSaved && (
-                                <span className="flex items-center gap-1 text-success font-black">
-                                    <CheckCircle size={10} /> {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-bold tracking-wide flex-wrap">
+                            <span className="flex items-center gap-1"><FileText size={10} /> Rapor Düzenleyici</span>
+                            <span className="text-slate-300">•</span>
+                            {autoSaveStatus === "saving" && (
+                                <span className="flex items-center gap-1.5 text-amber-500 font-extrabold animate-pulse">
+                                    <Loader2 size={10} className="animate-spin" /> Buluta Kaydediliyor...
+                                </span>
+                            )}
+                            {autoSaveStatus === "saved" && (
+                                <span className="flex items-center gap-1.5 text-emerald-600 font-extrabold">
+                                    <CheckCircle size={10} className="text-emerald-500" /> Buluta Kaydedildi
+                                    {lastSaved && <span className="text-slate-400 font-normal">({lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })})</span>}
+                                </span>
+                            )}
+                            {autoSaveStatus === "error" && (
+                                <span className="flex items-center gap-1.5 text-rose-500 font-extrabold">
+                                    <span>⚠️</span> Bağlantı Kesildi (Kayıt Bekliyor)
                                 </span>
                             )}
                         </div>
@@ -828,6 +846,51 @@ export default function ReportEditor() {
                             {showRuler ? "Cetveli Gizle" : "Cetveli Göster"}
                         </button>
                     </div>
+                        {/* Floating AI Bar (Positioned outside zoomed Card for perfect viewport coordinates in Electron & Web) */}
+                        {showAIBar && selectionRect && (
+                            <div 
+                                className="fixed z-[1000] flex items-center gap-1 bg-[#1e293b] text-white p-1.5 rounded-xl shadow-2xl border border-white/10 animate-in zoom-in-95 fade-in duration-200"
+                                style={{ 
+                                    top: `${selectionRect.top}px`, 
+                                    left: `${Math.max(20, selectionRect.left + (selectionRect.width / 2) - 150)}px` 
+                                }}
+                            >
+                                <div className="px-3 py-1.5 border-r border-white/10 flex items-center gap-2">
+                                    <Sparkles size={14} className="text-blue-400" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">AI Asistan</span>
+                                </div>
+                                <button 
+                                    disabled={processingAI}
+                                    type="button"
+                                    onClick={() => handleAIProcess("improve")}
+                                    className="px-3 py-1.5 hover:bg-white/10 rounded-lg text-[10px] font-bold transition-colors disabled:opacity-50"
+                                >
+                                    GELIŞTIR
+                                </button>
+                                <button 
+                                    disabled={processingAI}
+                                    type="button"
+                                    onClick={() => handleAIProcess("formalize")}
+                                    className="px-3 py-1.5 hover:bg-white/10 rounded-lg text-[10px] font-bold transition-colors disabled:opacity-50"
+                                >
+                                    RESMILEŞTIR
+                                </button>
+                                <button 
+                                    disabled={processingAI}
+                                    type="button"
+                                    onClick={() => handleAIProcess("shorten")}
+                                    className="px-3 py-1.5 hover:bg-white/10 rounded-lg text-[10px] font-bold transition-colors disabled:opacity-50"
+                                >
+                                    KISALT
+                                </button>
+                                {processingAI && (
+                                    <div className="px-3 py-1.5">
+                                        <Loader2 size={12} className="animate-spin" />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                     <Card onClick={focusEditorToEnd} style={{ zoom: `${zoom}%` }} className="p-4 md:p-16 min-h-[1100px] bg-white shadow-2xl border-none rounded-none prose max-w-none relative mb-20 overflow-visible cursor-text">
                         {/* Word A4 Impression */}
                         <div className="absolute -top-1 left-0 w-full h-1 bg-primary/10" />
@@ -849,48 +912,6 @@ export default function ReportEditor() {
                                     <span className="absolute left-[76%] top-0 text-[9px] font-bold text-slate-400">10</span>
                                     <span className="absolute left-[93%] top-0 text-[9px] font-bold text-slate-400">12</span>
                                 </div>
-                            </div>
-                        )}
-                        
-                        {/* Floating AI Bar */}
-                        {showAIBar && selectionRect && (
-                            <div 
-                                className="fixed z-[1000] flex items-center gap-1 bg-[#1e293b] text-white p-1.5 rounded-xl shadow-2xl border border-white/10 animate-in zoom-in-95 fade-in duration-200"
-                                style={{ 
-                                    top: `${selectionRect.top}px`, 
-                                    left: `${Math.max(20, selectionRect.left + (selectionRect.width / 2) - 150)}px` 
-                                }}
-                            >
-                                <div className="px-3 py-1.5 border-r border-white/10 flex items-center gap-2">
-                                    <Sparkles size={14} className="text-blue-400" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">AI Asistan</span>
-                                </div>
-                                <button 
-                                    disabled={processingAI}
-                                    onClick={() => handleAIProcess("improve")}
-                                    className="px-3 py-1.5 hover:bg-white/10 rounded-lg text-[10px] font-bold transition-colors disabled:opacity-50"
-                                >
-                                    GELIŞTIR
-                                </button>
-                                <button 
-                                    disabled={processingAI}
-                                    onClick={() => handleAIProcess("formalize")}
-                                    className="px-3 py-1.5 hover:bg-white/10 rounded-lg text-[10px] font-bold transition-colors disabled:opacity-50"
-                                >
-                                    RESMILEŞTIR
-                                </button>
-                                <button 
-                                    disabled={processingAI}
-                                    onClick={() => handleAIProcess("shorten")}
-                                    className="px-3 py-1.5 hover:bg-white/10 rounded-lg text-[10px] font-bold transition-colors disabled:opacity-50"
-                                >
-                                    KISALT
-                                </button>
-                                {processingAI && (
-                                    <div className="px-3 py-1.5">
-                                        <Loader2 size={12} className="animate-spin" />
-                                    </div>
-                                )}
                             </div>
                         )}
 
@@ -922,6 +943,12 @@ export default function ReportEditor() {
                 .ql-container, .ql-editor, .ql-editor * {
                     -webkit-user-select: text !important;
                     user-select: text !important;
+                }
+
+                /* ── Toolbar Selection Fix for Electron/Desktop (Prevents Selection Loss on Click) ── */
+                #report-editor-toolbar, #report-editor-toolbar *, .ql-toolbar, .ql-toolbar * {
+                    -webkit-user-select: auto !important;
+                    user-select: auto !important;
                 }
 
                 /* ── Custom Highlighter Pen (Asetatlı Kalem) Icon ── */

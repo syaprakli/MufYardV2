@@ -134,9 +134,13 @@ export async function createAudit(audit: Partial<Audit>): Promise<Audit> {
     return response.json();
 }
 
-export async function updateAudit(id: string, update: Partial<Audit>): Promise<Audit> {
+export async function updateAudit(id: string, update: Partial<Audit>, forceVersion?: boolean): Promise<Audit> {
     try {
-        const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}`, {
+        let url = `${API_BASE_URL}/audit/${id}`;
+        if (forceVersion) {
+            url += `?force_version=true`;
+        }
+        const response = await fetchWithTimeout(url, {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json",

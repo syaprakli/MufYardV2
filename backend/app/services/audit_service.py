@@ -138,7 +138,7 @@ class AuditService:
         return audit_data
 
     @staticmethod
-    async def update_audit(audit_id: str, audit: AuditUpdate) -> Optional[Dict[str, Any]]:
+    async def update_audit(audit_id: str, audit: AuditUpdate, force_version: Optional[bool] = None) -> Optional[Dict[str, Any]]:
         doc_ref = db.collection('audits').document(audit_id)
         current_doc = await asyncio.to_thread(doc_ref.get)
         if not current_doc.exists:
@@ -152,23 +152,24 @@ class AuditService:
         # --- Smart Versioning Logic ---
         if 'report_content' in update_data:
             versions_ref = doc_ref.collection('versions')
-            # blocking queries wrapped in thread
-            last_version_docs = await asyncio.to_thread(lambda: list(versions_ref.order_by('created_at', direction='DESCENDING').limit(1).get()))
             
             should_create_version = True
-            if last_version_docs:
-                last_v = last_version_docs[0].to_dict()
-                last_time_raw = last_v.get('created_at')
-                try:
-                    if isinstance(last_time_raw, str):
-                        last_time = datetime.fromisoformat(last_time_raw)
-                    else:
-                        last_time = last_time_raw # Firestore Timestamp if exists
-                    
-                    if (now - last_time) < timedelta(minutes=30):
-                        should_create_version = False
-                except Exception:
-                    pass
+            if force_version is not True:
+                # blocking queries wrapped in thread
+                last_version_docs = await asyncio.to_thread(lambda: list(versions_ref.order_by('created_at', direction='DESCENDING').limit(1).get()))
+                if last_version_docs:
+                    last_v = last_version_docs[0].to_dict()
+                    last_time_raw = last_v.get('created_at')
+                    try:
+                        if isinstance(last_time_raw, str):
+                            last_time = datetime.fromisoformat(last_time_raw)
+                        else:
+                            last_time = last_time_raw # Firestore Timestamp if exists
+                        
+                        if (now - last_time) < timedelta(minutes=30):
+                            should_create_version = False
+                    except Exception:
+                        pass
             
             if should_create_version:
                 version_data = {
@@ -178,7 +179,7 @@ class AuditService:
                     "user": "Müfettiş"
                 }
                 await asyncio.to_thread(versions_ref.add, version_data)
-
+ 
         await asyncio.to_thread(doc_ref.update, update_data)
         
         updated_doc_res = await asyncio.to_thread(doc_ref.get)
