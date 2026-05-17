@@ -501,15 +501,6 @@ export default function ReportEditor() {
         }
     };
 
-    if (loading) {
-        return (
-            <div className="h-full flex flex-col items-center justify-center space-y-4">
-                <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                <p className="text-muted-foreground font-medium italic">Rapor düzenleyici hazırlanıyor...</p>
-            </div>
-        );
-    }
-
     const memoizedEditor = useMemo(() => {
         return (
             <ReactQuill 
@@ -527,6 +518,15 @@ export default function ReportEditor() {
             />
         );
     }, [content]);
+
+    if (loading) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center space-y-4">
+                <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                <p className="text-muted-foreground font-medium italic">Rapor düzenleyici hazırlanıyor...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="h-screen flex flex-col bg-[#f3f4f6]">
