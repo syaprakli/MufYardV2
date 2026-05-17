@@ -25,6 +25,13 @@ const SizeAttributor = Quill.import("attributors/style/size") as any;
 SizeAttributor.whitelist = ["8pt","9pt","10pt","10.5pt","11pt","12pt","14pt","16pt","18pt","20pt","22pt","24pt","26pt","28pt","36pt","48pt","72pt"];
 Quill.register(SizeAttributor, true);
 
+// ── Color and Background Color Style Registration (Enables inline styles instead of class styles) ──
+const ColorAttributor = Quill.import("attributors/style/color") as any;
+Quill.register(ColorAttributor, true);
+
+const BackgroundAttributor = Quill.import("attributors/style/background") as any;
+Quill.register(BackgroundAttributor, true);
+
 // ── Custom Page Break Blot ──
 const BlockEmbed = Quill.import("blots/block/embed") as any;
 class PageBreakBlot extends BlockEmbed {
@@ -191,6 +198,35 @@ export default function ReportEditor() {
             loadVersions(id);
         }
     }, [id]);
+
+    // Premium Auto-Save Hook: Saves silently every 30 seconds if changes are detected
+    useEffect(() => {
+        if (!id || loading) return;
+
+        const interval = setInterval(async () => {
+            if (quillRef.current && !saving) {
+                const editor = quillRef.current.getEditor();
+                const currentHTML = editor.root.innerHTML;
+                
+                // Normal empty editor is "<h1></h1>" or "<p><br></p>"
+                const isEmpty = currentHTML.trim() === "" || currentHTML === "<h1></h1>" || currentHTML === "<p><br></p>";
+                
+                // Only auto-save if content has changed and is not empty
+                if (currentHTML !== content && !isEmpty) {
+                    try {
+                        await updateAudit(id, { report_content: currentHTML });
+                        setContent(currentHTML);
+                        setLastSaved(new Date());
+                        console.log("MufYard Auto-Save: Success.");
+                    } catch (e) {
+                        console.warn("MufYard Auto-Save: Silent failure.", e);
+                    }
+                }
+            }
+        }, 30000); // 30 seconds
+
+        return () => clearInterval(interval);
+    }, [id, loading, content, saving]);
 
     const loadVersions = async (auditId: string) => {
         try {
@@ -444,7 +480,20 @@ export default function ReportEditor() {
         if (!id) return;
         try {
             setSaving(true);
-            await updateAudit(id, { report_content: content });
+            
+            // Get the absolute latest HTML content directly from the Quill editor instance!
+            let latestContent = "";
+            if (quillRef.current) {
+                latestContent = quillRef.current.getEditor().root.innerHTML;
+            } else {
+                latestContent = content;
+            }
+
+            await updateAudit(id, { report_content: latestContent });
+            
+            // Sync local React state
+            setContent(latestContent);
+
             if (user?.uid) {
                 refreshAudits(user.uid, user?.email || undefined);
             }
