@@ -327,7 +327,7 @@ export default function ReportEditor() {
         return () => editor.off('selection-change', handleSelection);
     }, [loading]);
 
-    // Add native tooltips and prevent focus loss on Quill's dynamically generated picker elements
+    // Add native tooltips to Quill's dynamically generated picker elements
     useEffect(() => {
         if (loading) return;
         const colorPicker = document.querySelector('.ql-picker.ql-color');
@@ -338,34 +338,6 @@ export default function ReportEditor() {
         if (bgPicker) {
             bgPicker.setAttribute('title', 'Asetatlı Kalem (Fosforlu Vurgu)');
         }
-
-        // --- Quill picker/dropdown'dan seçim sonrası editör selection koruma ---
-        if (!quillRef.current) return;
-        const editor = quillRef.current.getEditor();
-        
-        // Tüm Quill picker'ları, seçenekleri ve etiketleri için seçimin kaybolmasını önleme
-        const pickers = document.querySelectorAll('.ql-picker, .ql-picker-options, .ql-picker-item, .ql-picker-label');
-        
-        const handlePickerMouseDown = (e: Event) => {
-            // Odağın editörden çalınmasını ve seçimin kaybolmasını önler
-            e.preventDefault();
-            setTimeout(() => {
-                if (!editor.hasFocus()) {
-                    editor.focus();
-                }
-            }, 0);
-        };
-
-        pickers.forEach(picker => {
-            picker.addEventListener('mousedown', handlePickerMouseDown);
-        });
-
-        // Temizlik
-        return () => {
-            pickers.forEach(picker => {
-                picker.removeEventListener('mousedown', handlePickerMouseDown);
-            });
-        };
     }, [loading]);
 
     const handleAIProcess = async (type: "improve" | "formalize" | "shorten") => {
@@ -496,8 +468,8 @@ export default function ReportEditor() {
         });
         if (!confirmed) return;
         
+        const toastId = toast.loading("Sürüm geri yükleniyor...");
         try {
-            setLoading(true);
             const restoredAudit = await restoreAuditVersion(id, versionId);
             const restoredContent = restoredAudit.report_content || "";
             
@@ -513,13 +485,11 @@ export default function ReportEditor() {
                 setContent(restoredContent);
             }
             
-            toast.success("Rapor sürümü başarıyla geri yüklendi!");
+            toast.success("Rapor sürümü başarıyla geri yüklendi!", { id: toastId });
             setIsHistoryOpen(false); // Sürüm geçmişi çekmecesini kapat
         } catch (error) {
             console.error(error);
-            toast.error("Sürüm yükleme başarısız");
-        } finally {
-            setLoading(false);
+            toast.error("Sürüm yükleme başarısız", { id: toastId });
         }
     };
 
