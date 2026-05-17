@@ -613,8 +613,35 @@ export default function ReportEditor() {
                         <div className="w-px h-6 bg-slate-200 mx-1" />
                         {/* ── COLOR ── */}
                         <span className="ql-formats">
-                            <select className="ql-color" title="Yazı Rengi" defaultValue="" />
-                            <select className="ql-background" title="Vurgu Rengi" defaultValue="" />
+                            <select className="ql-color" title="Yazı Rengi" defaultValue="">
+                                <option value="#000000">Siyah</option>
+                                <option value="#ff0000">Kırmızı</option>
+                                <option value="#800000">Koyu Kırmızı</option>
+                                <option value="#0000ff">Mavi</option>
+                                <option value="#000080">Koyu Mavi</option>
+                                <option value="#008000">Yeşil</option>
+                                <option value="#800080">Mor</option>
+                                <option value="#808000">Zeytin Yeşili</option>
+                                <option value="#808080">Gri</option>
+                                <option value="#ffffff">Beyaz</option>
+                            </select>
+                            <select className="ql-background" title="Metin Vurgu Rengi (Asetatlı Kalem)" defaultValue="">
+                                <option value="#ffff00">Sarı</option>
+                                <option value="#00ff00">Parlak Yeşil</option>
+                                <option value="#00ffff">Turkuaz</option>
+                                <option value="#ff00ff">Pembe</option>
+                                <option value="#ff0000">Kırmızı</option>
+                                <option value="#0000ff">Mavi</option>
+                                <option value="#000080">Koyu Mavi</option>
+                                <option value="#008080">Firuze</option>
+                                <option value="#008000">Koyu Yeşil</option>
+                                <option value="#800080">Mor</option>
+                                <option value="#800000">Bordo</option>
+                                <option value="#808000">Koyu Sarı</option>
+                                <option value="#808080">Koyu Gri</option>
+                                <option value="#c0c0c0">Açık Gri</option>
+                                <option value="">Renk Yok</option>
+                            </select>
                         </span>
                         <div className="w-px h-6 bg-slate-200 mx-1" />
                         {/* ── CASE CONVERSION ── */}
@@ -626,7 +653,10 @@ export default function ReportEditor() {
                         <div className="w-px h-6 bg-slate-200 mx-1" />
                         {/* ── ALIGNMENT ── */}
                         <span className="ql-formats">
-                            <select className="ql-align" title="Hizalama" defaultValue="" />
+                            <button type="button" className="ql-align" value="" title="Sola Hizala" />
+                            <button type="button" className="ql-align" value="center" title="Ortala" />
+                            <button type="button" className="ql-align" value="right" title="Sağa Hizala" />
+                            <button type="button" className="ql-align" value="justify" title="İki Yana Yasla" />
                         </span>
                         <div className="w-px h-6 bg-slate-200 mx-1" />
                         {/* ── LIST / INDENT ── */}
@@ -669,7 +699,7 @@ export default function ReportEditor() {
 
 
             {/* Editor Area */}
-            <div className="flex-1 overflow-y-auto p-12 flex justify-center gap-6">
+            <div className="flex-1 overflow-y-auto p-2 md:p-12 flex justify-center gap-6">
                 <div className="w-full max-w-[850px]">
                     <div className="mb-3 flex items-center justify-between px-2">
                         <div className="text-xs font-semibold text-slate-500">
@@ -679,7 +709,7 @@ export default function ReportEditor() {
                             {showRuler ? "Cetveli Gizle" : "Cetveli Göster"}
                         </button>
                     </div>
-                    <Card onClick={focusEditorToEnd} style={{ zoom: `${zoom}%` }} className="p-16 min-h-[1100px] bg-white shadow-2xl border-none rounded-none prose max-w-none relative mb-20 overflow-visible cursor-text">
+                    <Card onClick={focusEditorToEnd} style={{ zoom: `${zoom}%` }} className="p-4 md:p-16 min-h-[1100px] bg-white shadow-2xl border-none rounded-none prose max-w-none relative mb-20 overflow-visible cursor-text">
                         {/* Word A4 Impression */}
                         <div className="absolute -top-1 left-0 w-full h-1 bg-primary/10" />
                         <div className="mb-4 pb-2 border-b border-dashed border-slate-300">
@@ -691,7 +721,7 @@ export default function ReportEditor() {
                             />
                         </div>
                         {showRuler && (
-                            <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-6 py-2">
+                            <div className="hidden md:block mb-5 rounded-lg border border-slate-200 bg-slate-50 px-6 py-2">
                                 <div className="h-5 relative overflow-hidden rounded bg-white/70 border border-slate-200" style={{ backgroundImage: "repeating-linear-gradient(to right, transparent 0 39px, #dbe2ea 39px 40px)" }}>
                                     <span className="absolute left-[8%] top-0 text-[9px] font-bold text-slate-400">2</span>
                                     <span className="absolute left-[25%] top-0 text-[9px] font-bold text-slate-400">4</span>
