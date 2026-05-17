@@ -13,9 +13,16 @@ import { useConfirm } from "../lib/context/ConfirmContext";
 
 
 Quill.register("modules/cursors", QuillCursors);
+
+// ── Font Family Registration ──
 const FontAttributor = Quill.import("formats/font") as any;
-FontAttributor.whitelist = ["sans-serif", "serif", "monospace", "times-new-roman"];
+FontAttributor.whitelist = ["times-new-roman", "sans-serif", "serif", "monospace", "arial", "calibri", "courier-new"];
 Quill.register(FontAttributor, true);
+
+// ── Font Size Registration (Word-standard pt values) ──
+const SizeAttributor = Quill.import("attributors/style/size") as any;
+SizeAttributor.whitelist = ["8pt","9pt","10pt","10.5pt","11pt","12pt","14pt","16pt","18pt","20pt","22pt","24pt","26pt","28pt","36pt","48pt","72pt"];
+Quill.register(SizeAttributor, true);
 import { Save, Download, ArrowLeft, Loader2, FileText, CheckCircle, History, Clock, Users, Sparkles, MessageSquare, Wand2, BookOpen, X } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -74,7 +81,67 @@ export default function ReportEditor() {
         editor.setSelection(Math.max(0, len - 1), 0, 'user');
     };
 
+    // ── Word-like Features State ──
+    const [lineSpacing, setLineSpacing] = useState("1.5");
 
+    // ── Case Conversion ──
+    const handleCaseConvert = (mode: "upper" | "lower" | "title") => {
+        if (!quillRef.current) return;
+        const editor = quillRef.current.getEditor();
+        const range = editor.getSelection();
+        if (!range || range.length === 0) { toast.error("Önce metin seçin."); return; }
+        const text = editor.getText(range.index, range.length);
+        let converted = text;
+        if (mode === "upper") converted = text.toUpperCase();
+        else if (mode === "lower") converted = text.toLowerCase();
+        else converted = text.replace(/\b\w/g, (c: string) => c.toUpperCase());
+        editor.deleteText(range.index, range.length);
+        editor.insertText(range.index, converted);
+        editor.setSelection(range.index, converted.length);
+    };
+
+    // ── Line Spacing ──
+    const handleLineSpacing = (value: string) => {
+        setLineSpacing(value);
+        if (!quillRef.current) return;
+        const editorEl = quillRef.current.getEditor().root as HTMLElement;
+        editorEl.style.lineHeight = value;
+    };
+
+    // ── Page Break ──
+    const handlePageBreak = () => {
+        if (!quillRef.current) return;
+        const editor = quillRef.current.getEditor();
+        const range = editor.getSelection(true);
+        editor.insertText(range.index, "\n", "user");
+        editor.insertEmbed(range.index + 1, "divider", true, "user");
+        editor.setSelection(range.index + 2, 0, "user");
+    };
+
+    // ── Print Preview ──
+    const handlePrintPreview = () => {
+        if (!quillRef.current) return;
+        const editorContent = quillRef.current.getEditor().root.innerHTML;
+        const printWindow = window.open("", "_blank");
+        if (!printWindow) return;
+        printWindow.document.write(`<!DOCTYPE html><html><head><title>${audit?.title || "Rapor"}</title>
+        <style>
+            @page { size: A4; margin: 2.5cm; }
+            body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: ${lineSpacing}; color: #000; }
+            h1 { font-size: 18pt; text-align: center; margin-bottom: 1em; }
+            h2 { font-size: 14pt; margin-top: 1em; }
+            p { margin-bottom: 0.5em; text-indent: 1.25cm; }
+            .header { text-align: center; font-size: 10pt; border-bottom: 1px solid #ccc; padding-bottom: 8px; margin-bottom: 20px; }
+            .footer { text-align: center; font-size: 9pt; border-top: 1px solid #ccc; padding-top: 8px; margin-top: 20px; position: fixed; bottom: 0; left: 0; right: 0; }
+        </style></head><body>
+        <div class="header">${docHeader}</div>
+        ${editorContent}
+        <div class="footer">${docFooter}</div>
+        </body></html>`);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 500);
+    };
 
 
     useEffect(() => {
@@ -465,65 +532,118 @@ export default function ReportEditor() {
                             <Button onClick={handleExportWord} className="h-8 px-3 text-[11px] font-black bg-slate-900 text-white rounded-lg shadow-sm">
                                 <Download size={14} className="mr-1.5" /> Word
                             </Button>
+                            <Button variant="outline" onClick={handlePrintPreview} className="h-8 px-3 text-[11px] font-bold rounded-lg border-slate-300">
+                                🖨️ Önizleme
+                            </Button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white border-b border-slate-200 px-8 py-2 shrink-0">
+            <div className="bg-white border-b border-slate-200 px-4 md:px-8 py-2 shrink-0">
                 <div className="overflow-x-auto">
-                    <div id="report-editor-toolbar" className="ql-toolbar ql-snow rounded-xl border border-slate-200 bg-white min-w-max">
+                    <div id="report-editor-toolbar" className="ql-toolbar ql-snow rounded-xl border border-slate-200 bg-white min-w-max flex flex-wrap items-center gap-0.5 px-2 py-1.5">
+                        {/* ── FONT ── */}
                         <span className="ql-formats">
-                            <select className="ql-font" defaultValue="sans-serif">
-                                <option value="sans-serif">Sans Serif</option>
-                                <option value="serif"></option>
-                                <option value="monospace"></option>
+                            <select className="ql-font" defaultValue="times-new-roman">
                                 <option value="times-new-roman">Times New Roman</option>
+                                <option value="arial">Arial</option>
+                                <option value="calibri">Calibri</option>
+                                <option value="sans-serif">Sans Serif</option>
+                                <option value="serif">Serif</option>
+                                <option value="courier-new">Courier New</option>
+                                <option value="monospace">Monospace</option>
                             </select>
-                            <select className="ql-size" defaultValue="">
-                                <option value="small"></option>
-                                <option value=""></option>
-                                <option value="large"></option>
-                                <option value="huge"></option>
+                            <select className="ql-size" defaultValue="12pt">
+                                <option value="8pt">8</option>
+                                <option value="9pt">9</option>
+                                <option value="10pt">10</option>
+                                <option value="10.5pt">10.5</option>
+                                <option value="11pt">11</option>
+                                <option value="12pt">12</option>
+                                <option value="14pt">14</option>
+                                <option value="16pt">16</option>
+                                <option value="18pt">18</option>
+                                <option value="20pt">20</option>
+                                <option value="22pt">22</option>
+                                <option value="24pt">24</option>
+                                <option value="26pt">26</option>
+                                <option value="28pt">28</option>
+                                <option value="36pt">36</option>
+                                <option value="48pt">48</option>
+                                <option value="72pt">72</option>
                             </select>
                         </span>
+                        <div className="w-px h-6 bg-slate-200 mx-1" />
+                        {/* ── HEADER ── */}
                         <span className="ql-formats">
                             <select className="ql-header" defaultValue="">
-                                <option value="1"></option>
-                                <option value="2"></option>
-                                <option value="3"></option>
-                                <option value=""></option>
+                                <option value="1">Başlık 1</option>
+                                <option value="2">Başlık 2</option>
+                                <option value="3">Başlık 3</option>
+                                <option value="">Normal</option>
                             </select>
                         </span>
+                        <div className="w-px h-6 bg-slate-200 mx-1" />
+                        {/* ── FORMAT ── */}
                         <span className="ql-formats">
-                            <button type="button" className="ql-bold" aria-label="bold"></button>
-                            <button type="button" className="ql-italic" aria-label="italic"></button>
-                            <button type="button" className="ql-underline" aria-label="underline"></button>
-                            <button type="button" className="ql-strike" aria-label="strike"></button>
-                            <button type="button" className="ql-blockquote" aria-label="blockquote"></button>
-                            <button type="button" className="ql-code-block" aria-label="code-block"></button>
+                            <button type="button" className="ql-bold" title="Kalın (Ctrl+B)" />
+                            <button type="button" className="ql-italic" title="İtalik (Ctrl+I)" />
+                            <button type="button" className="ql-underline" title="Altı Çizili (Ctrl+U)" />
+                            <button type="button" className="ql-strike" title="Üstü Çizili" />
                         </span>
+                        <div className="w-px h-6 bg-slate-200 mx-1" />
+                        {/* ── COLOR ── */}
                         <span className="ql-formats">
-                            <select className="ql-color" defaultValue=""></select>
-                            <select className="ql-background" defaultValue=""></select>
+                            <select className="ql-color" title="Yazı Rengi" defaultValue="" />
+                            <select className="ql-background" title="Vurgu Rengi" defaultValue="" />
                         </span>
+                        <div className="w-px h-6 bg-slate-200 mx-1" />
+                        {/* ── CASE CONVERSION ── */}
                         <span className="ql-formats">
-                            <button type="button" className="ql-list" value="ordered" aria-label="list ordered"></button>
-                            <button type="button" className="ql-list" value="bullet" aria-label="list bullet"></button>
-                            <button type="button" className="ql-indent" value="-1" aria-label="indent -1"></button>
-                            <button type="button" className="ql-indent" value="+1" aria-label="indent +1"></button>
+                            <button type="button" title="BÜYÜK HARF" className="!text-[10px] !font-black !w-auto !px-1.5" onClick={() => handleCaseConvert("upper")}>AA</button>
+                            <button type="button" title="küçük harf" className="!text-[10px] !font-black !w-auto !px-1.5" onClick={() => handleCaseConvert("lower")}>aa</button>
+                            <button type="button" title="Her Kelimenin Başı Büyük" className="!text-[10px] !font-black !w-auto !px-1.5" onClick={() => handleCaseConvert("title")}>Aa</button>
                         </span>
+                        <div className="w-px h-6 bg-slate-200 mx-1" />
+                        {/* ── ALIGNMENT ── */}
                         <span className="ql-formats">
-                            <button type="button" className="ql-script" value="sub" aria-label="script sub"></button>
-                            <button type="button" className="ql-script" value="super" aria-label="script super"></button>
+                            <select className="ql-align" title="Hizalama" defaultValue="" />
                         </span>
+                        <div className="w-px h-6 bg-slate-200 mx-1" />
+                        {/* ── LIST / INDENT ── */}
                         <span className="ql-formats">
-                            <button type="button" className="ql-link" aria-label="link"></button>
-                            <button type="button" className="ql-image" aria-label="image"></button>
-                            <button type="button" className="ql-clean" aria-label="clean"></button>
+                            <button type="button" className="ql-list" value="bullet" title="Madde İşareti" />
+                            <button type="button" className="ql-list" value="ordered" title="Numaralı Liste" />
+                            <button type="button" className="ql-indent" value="-1" title="Girintiyi Azalt" />
+                            <button type="button" className="ql-indent" value="+1" title="Girintiyi Artır" />
                         </span>
+                        <div className="w-px h-6 bg-slate-200 mx-1" />
+                        {/* ── LINE SPACING ── */}
                         <span className="ql-formats">
-                            <select className="ql-align" defaultValue=""></select>
+                            <select className="ql-lineheight" title="Satır Aralığı" value={lineSpacing} onChange={(e) => handleLineSpacing(e.target.value)}>
+                                <option value="1">1.0</option>
+                                <option value="1.15">1.15</option>
+                                <option value="1.5">1.5</option>
+                                <option value="2">2.0</option>
+                                <option value="2.5">2.5</option>
+                                <option value="3">3.0</option>
+                            </select>
+                        </span>
+                        <div className="w-px h-6 bg-slate-200 mx-1" />
+                        {/* ── SUB/SUPER ── */}
+                        <span className="ql-formats">
+                            <button type="button" className="ql-script" value="sub" title="Alt Simge" />
+                            <button type="button" className="ql-script" value="super" title="Üst Simge" />
+                        </span>
+                        <div className="w-px h-6 bg-slate-200 mx-1" />
+                        {/* ── INSERT ── */}
+                        <span className="ql-formats">
+                            <button type="button" className="ql-blockquote" title="Alıntı" />
+                            <button type="button" className="ql-link" title="Bağlantı" />
+                            <button type="button" className="ql-image" title="Resim" />
+                            <button type="button" title="Sayfa Sonu" className="!text-[10px] !font-black !w-auto !px-1.5" onClick={handlePageBreak}>⏎</button>
+                            <button type="button" className="ql-clean" title="Biçimlendirmeyi Temizle" />
                         </span>
                     </div>
                 </div>
@@ -643,34 +763,72 @@ export default function ReportEditor() {
             />
 
             <style>{`
-                .ql-container.ql-snow { border: none !important; font-family: 'Inter', sans-serif !important; font-size: 16px !important; }
-                .ql-toolbar.ql-snow { border: 1px solid #e2e8f0 !important; background: #fff !important; position: static !important; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 2px 6px -3px rgb(0 0 0 / 0.12); }
+                /* ── Base Container ── */
+                .ql-container.ql-snow { border: none !important; font-family: 'Times New Roman', Times, serif !important; font-size: 12pt !important; }
+                .ql-toolbar.ql-snow { border: 1px solid #e2e8f0 !important; background: #fff !important; position: static !important; margin-bottom: 0; border-radius: 12px; box-shadow: 0 1px 3px -1px rgb(0 0 0 / 0.08); }
+
+                /* ── Font Family Labels (Toolbar Dropdowns) ── */
+                .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="times-new-roman"]::before,
+                .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="times-new-roman"]::before { content: "Times New Roman"; font-family: 'Times New Roman', Times, serif; }
+                .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="arial"]::before,
+                .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="arial"]::before { content: "Arial"; font-family: Arial, Helvetica, sans-serif; }
+                .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="calibri"]::before,
+                .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="calibri"]::before { content: "Calibri"; font-family: Calibri, 'Segoe UI', sans-serif; }
                 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="sans-serif"]::before,
                 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="sans-serif"]::before { content: "Sans Serif"; font-family: Arial, Helvetica, sans-serif; }
                 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="serif"]::before,
                 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="serif"]::before { content: "Serif"; font-family: Georgia, 'Times New Roman', serif; }
+                .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="courier-new"]::before,
+                .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="courier-new"]::before { content: "Courier New"; font-family: 'Courier New', Courier, monospace; }
                 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="monospace"]::before,
                 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="monospace"]::before { content: "Monospace"; font-family: 'Courier New', monospace; }
-                .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="times-new-roman"]::before,
-                .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="times-new-roman"]::before { content: "Times New Roman"; font-family: 'Times New Roman', Times, serif; }
-                .ql-font-sans-serif { font-family: Arial, Helvetica, sans-serif; }
-                .ql-font-times-new-roman { font-family: 'Times New Roman', Times, serif; }
-                .ql-container { min-height: 880px !important; }
+
+                /* ── Font Family Applied in Editor ── */
+                .ql-font-times-new-roman { font-family: 'Times New Roman', Times, serif !important; }
+                .ql-font-arial { font-family: Arial, Helvetica, sans-serif !important; }
+                .ql-font-calibri { font-family: Calibri, 'Segoe UI', sans-serif !important; }
+                .ql-font-sans-serif { font-family: Arial, Helvetica, sans-serif !important; }
+                .ql-font-serif { font-family: Georgia, 'Times New Roman', serif !important; }
+                .ql-font-courier-new { font-family: 'Courier New', Courier, monospace !important; }
+                .ql-font-monospace { font-family: 'Courier New', monospace !important; }
+
+                /* ── Font Size Dropdown Labels ── */
+                .ql-snow .ql-picker.ql-size .ql-picker-label::before,
+                .ql-snow .ql-picker.ql-size .ql-picker-item::before { content: attr(data-value) !important; }
+                .ql-snow .ql-picker.ql-size { width: 55px !important; }
+                .ql-snow .ql-picker.ql-font { width: 160px !important; }
+
+                /* ── Editor Area (A4 Page Style) ── */
+                .ql-container { min-height: 1000px !important; }
                 .ql-editor {
-                    padding: 8px 0 96px 0 !important;
-                    min-height: 860px !important;
-                    line-height: 1.8 !important;
-                    color: #1e293b !important;
-                    font-size: 16px !important;
+                    padding: 0 !important;
+                    min-height: 980px !important;
+                    line-height: 1.5 !important;
+                    color: #000 !important;
+                    font-size: 12pt !important;
+                    font-family: 'Times New Roman', Times, serif !important;
+                    tab-size: 4;
+                    -moz-tab-size: 4;
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
                 }
-                .ql-editor h1 { font-size: 2.5rem !important; font-weight: 800 !important; margin-bottom: 2rem !important; color: #0f172a !important; text-align: center; }
-                .ql-editor p { margin-bottom: 1rem !important; }
-                .ql-editor.ql-blank::before { left: 0 !important; font-style: italic !important; color: #94a3b8 !important; }
+                .ql-editor h1 { font-size: 18pt !important; font-weight: 700 !important; margin-bottom: 12pt !important; color: #000 !important; }
+                .ql-editor h2 { font-size: 14pt !important; font-weight: 700 !important; margin-bottom: 6pt !important; color: #000 !important; }
+                .ql-editor h3 { font-size: 12pt !important; font-weight: 700 !important; margin-bottom: 6pt !important; color: #000 !important; }
+                .ql-editor p { margin-bottom: 6pt !important; }
+                .ql-editor ol, .ql-editor ul { padding-left: 1.5em !important; }
+                .ql-editor.ql-blank::before { left: 0 !important; font-style: italic !important; color: #999 !important; font-family: 'Times New Roman', Times, serif !important; }
+                
+                /* ── Page Mode (A4 page break lines) ── */
                 .editor-page-mode .ql-editor {
-                    background-image: linear-gradient(to bottom, transparent 0, transparent 1118px, #e2e8f0 1118px, #e2e8f0 1120px);
+                    background-image: linear-gradient(to bottom, transparent 0, transparent 1118px, #cbd5e1 1118px, #cbd5e1 1120px);
                     background-size: 100% 1120px;
                     background-repeat: repeat-y;
                 }
+
+                /* ── Line Spacing Dropdown ── */
+                .ql-snow .ql-picker.ql-lineheight { width: 60px !important; }
+                .ql-snow .ql-picker.ql-lineheight .ql-picker-label::before { content: "↕" !important; }
             `}</style>
             {/* AI Rapor Üretme Paneli */}
             {isAIPanelOpen && (
@@ -836,6 +994,20 @@ const editorModules = {
     toolbar: {
         container: '#report-editor-toolbar',
     },
+    keyboard: {
+        bindings: {
+            tab: {
+                key: 9,
+                handler: function(this: any) {
+                    const quill = this.quill;
+                    const range = quill.getSelection(true);
+                    quill.insertText(range.index, '\t', 'user');
+                    quill.setSelection(range.index + 1, 0, 'user');
+                    return false;
+                }
+            }
+        }
+    }
 };
 
 const editorFormats = [
@@ -845,5 +1017,5 @@ const editorFormats = [
     'color', 'background',
     'list', 'indent',
     'script',
-    'link', 'image', 'align'
+    'link', 'image', 'align', 'divider'
 ];
