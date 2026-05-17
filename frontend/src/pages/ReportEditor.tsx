@@ -728,7 +728,7 @@ export default function ReportEditor() {
                         <div className="w-px h-6 bg-slate-200 mx-1" />
                         {/* ── LINE SPACING ── */}
                         <span className="ql-formats">
-                            <select className="ql-lineheight" title="Satır Aralığı" value={lineSpacing} onChange={(e) => handleLineSpacing(e.target.value)}>
+                            <select className="custom-lineheight" title="Satır Aralığı (Satır Boşluğu)" value={lineSpacing} onChange={(e) => handleLineSpacing(e.target.value)}>
                                 <option value="1">1.0</option>
                                 <option value="1.15">1.15</option>
                                 <option value="1.5">1.5</option>
@@ -945,8 +945,25 @@ export default function ReportEditor() {
                 }
 
                 /* ── Line Spacing Dropdown ── */
-                .ql-snow .ql-picker.ql-lineheight { width: 60px !important; }
-                .ql-snow .ql-picker.ql-lineheight .ql-picker-label::before { content: "↕" !important; }
+                .custom-lineheight {
+                    font-size: 11px !important;
+                    font-weight: 700 !important;
+                    color: #475569 !important;
+                    border: 1px solid #cbd5e1 !important;
+                    border-radius: 6px !important;
+                    padding: 2px 6px !important;
+                    height: 24px !important;
+                    background: #ffffff !important;
+                    cursor: pointer !important;
+                    outline: none !important;
+                    transition: all 0.15s ease !important;
+                    vertical-align: middle !important;
+                }
+                .custom-lineheight:hover {
+                    border-color: #94a3b8 !important;
+                    background: #f8fafc !important;
+                    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+                }
 
                 /* ── Page Break Styling ── */
                 .page-break-divider {
