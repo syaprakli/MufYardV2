@@ -498,12 +498,26 @@ export default function ReportEditor() {
         
         try {
             setLoading(true);
-            await restoreAuditVersion(id, versionId);
-            toast.success("Rapor başarıyla geri yüklendi.");
-            window.location.reload();
+            const restoredAudit = await restoreAuditVersion(id, versionId);
+            const restoredContent = restoredAudit.report_content || "";
+            
+            // Editörü ve Yjs belgesini doğrudan güncelle (Sayfa yenilemeye gerek yok!)
+            if (quillRef.current) {
+                const editor = quillRef.current.getEditor();
+                
+                // Mevcut içeriği temizle ve yeni sürüm içeriğini yerleştir
+                editor.setContents([]);
+                editor.clipboard.dangerouslyPasteHTML(0, restoredContent, "user");
+                
+                // Yerel React state'i güncelle
+                setContent(restoredContent);
+            }
+            
+            toast.success("Rapor sürümü başarıyla geri yüklendi!");
+            setIsHistoryOpen(false); // Sürüm geçmişi çekmecesini kapat
         } catch (error) {
             console.error(error);
-            toast.error("Yükleme başarısız");
+            toast.error("Sürüm yükleme başarısız");
         } finally {
             setLoading(false);
         }
