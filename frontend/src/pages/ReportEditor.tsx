@@ -510,6 +510,24 @@ export default function ReportEditor() {
         );
     }
 
+    const memoizedEditor = useMemo(() => {
+        return (
+            <ReactQuill 
+                ref={quillRef}
+                theme="snow"
+                defaultValue={content}
+                onChange={(val) => { setContent(val); }}
+                placeholder="Raporunuzu buraya yazın..."
+                modules={{
+                    ...editorModules,
+                    cursors: true
+                }}
+                formats={editorFormats}
+                className={`h-full border-none ${pageMode ? 'editor-page-mode' : ''}`}
+            />
+        );
+    }, [content]);
+
     return (
         <div className="h-screen flex flex-col bg-[#f3f4f6]">
             {/* Toolbar */}
@@ -815,19 +833,7 @@ export default function ReportEditor() {
                             </div>
                         )}
 
-                        <ReactQuill 
-                            ref={quillRef}
-                            theme="snow"
-                            defaultValue={content}
-                            onChange={(content) => { setContent(content); } }
-                            placeholder="Raporunuzu buraya yazın..."
-                            modules={{
-                                ...editorModules,
-                                cursors: true // Enable cursors plugin
-                            }}
-                            formats={editorFormats}
-                            className={`h-full border-none ${pageMode ? 'editor-page-mode' : ''}`}
-                        />
+                        {memoizedEditor}
                         <div className="mt-8 pt-2 border-t border-dashed border-slate-300 flex items-center justify-between">
                             <input
                                 value={docFooter}
@@ -851,6 +857,12 @@ export default function ReportEditor() {
             />
 
             <style>{`
+                /* ── Selection Fix for Electron/Desktop ── */
+                .ql-container, .ql-editor, .ql-editor * {
+                    -webkit-user-select: text !important;
+                    user-select: text !important;
+                }
+
                 /* ── Custom Highlighter Pen (Asetatlı Kalem) Icon ── */
                 .ql-snow .ql-picker.ql-background .ql-picker-label svg {
                     display: none !important;
