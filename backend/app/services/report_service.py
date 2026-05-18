@@ -6,6 +6,8 @@ from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_COLOR_INDEX
 from docx.shared import RGBColor
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from typing import List, Dict, Any
 from datetime import datetime
 import re
@@ -51,6 +53,92 @@ class ReportService:
                 section.bottom_margin = Inches(1)
                 section.left_margin = Inches(1)
                 section.right_margin = Inches(1)
+
+                # ── Word Header & Footer Integration ──
+                # Dynamic page number XML builder
+                def add_page_number_fields(paragraph):
+                    # PAGE number field
+                    run = paragraph.add_run()
+                    run.font.name = 'Times New Roman'
+                    run.font.size = Pt(8.5)
+                    run.font.color.rgb = RGBColor(128, 128, 128)
+                    
+                    fldChar1 = OxmlElement('w:fldChar')
+                    fldChar1.set(qn('w:fldCharType'), 'begin')
+                    instrText = OxmlElement('w:instrText')
+                    instrText.set(qn('xml:space'), 'preserve')
+                    instrText.text = "PAGE"
+                    fldChar2 = OxmlElement('w:fldChar')
+                    fldChar2.set(qn('w:fldCharType'), 'separate')
+                    fldChar3 = OxmlElement('w:fldChar')
+                    fldChar3.set(qn('w:fldCharType'), 'end')
+                    
+                    run._r.append(fldChar1)
+                    run._r.append(instrText)
+                    run._r.append(fldChar2)
+                    run._r.append(fldChar3)
+                    
+                    # Separator
+                    run_sep = paragraph.add_run(" / ")
+                    run_sep.font.name = 'Times New Roman'
+                    run_sep.font.size = Pt(8.5)
+                    run_sep.font.color.rgb = RGBColor(128, 128, 128)
+                    
+                    # NUMPAGES total field
+                    run_tot = paragraph.add_run()
+                    run_tot.font.name = 'Times New Roman'
+                    run_tot.font.size = Pt(8.5)
+                    run_tot.font.color.rgb = RGBColor(128, 128, 128)
+                    
+                    fldChar4 = OxmlElement('w:fldChar')
+                    fldChar4.set(qn('w:fldCharType'), 'begin')
+                    instrText2 = OxmlElement('w:instrText')
+                    instrText2.set(qn('xml:space'), 'preserve')
+                    instrText2.text = "NUMPAGES"
+                    fldChar5 = OxmlElement('w:fldChar')
+                    fldChar5.set(qn('w:fldCharType'), 'separate')
+                    fldChar6 = OxmlElement('w:fldChar')
+                    fldChar6.set(qn('w:fldCharType'), 'end')
+                    
+                    run_tot._r.append(fldChar4)
+                    run_tot._r.append(instrText2)
+                    run_tot._r.append(fldChar5)
+                    run_tot._r.append(fldChar6)
+
+                # Set Header (Üst Bilgi)
+                header = section.header
+                header_para = header.paragraphs[0]
+                header_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                doc_header_text = audit.get("doc_header") or "T.C. GENÇLİK VE SPOR BAKANLIĞI"
+                hrun = header_para.add_run(doc_header_text)
+                hrun.font.name = 'Times New Roman'
+                hrun.font.size = Pt(8.5)
+                hrun.font.color.rgb = RGBColor(128, 128, 128)
+
+                # Set Footer (Alt Bilgi)
+                footer = section.footer
+                footer_para = footer.paragraphs[0]
+                
+                # Check page numbers visibility
+                show_pages = audit.get("show_page_numbers")
+                if show_pages is None:
+                    show_pages = True
+                
+                if show_pages:
+                    footer_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                    doc_footer_text = audit.get("doc_footer") or "Müfettişlik Raporu"
+                    frun1 = footer_para.add_run(doc_footer_text + "  |  Sayfa ")
+                    frun1.font.name = 'Times New Roman'
+                    frun1.font.size = Pt(8.5)
+                    frun1.font.color.rgb = RGBColor(128, 128, 128)
+                    add_page_number_fields(footer_para)
+                else:
+                    footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    doc_footer_text = audit.get("doc_footer") or "Müfettişlik Raporu"
+                    frun1 = footer_para.add_run(doc_footer_text)
+                    frun1.font.name = 'Times New Roman'
+                    frun1.font.size = Pt(8.5)
+                    frun1.font.color.rgb = RGBColor(128, 128, 128)
 
             # Helpers for HTML parsing
             def parse_style(style_str: str) -> dict:

@@ -13,46 +13,81 @@ import { isElectron } from "../lib/firebase";
 
 
 
-Quill.register("modules/cursors", QuillCursors);
+const registeredImports = (Quill as any).imports || {};
+
+if (!registeredImports["modules/cursors"]) {
+    Quill.register("modules/cursors", QuillCursors);
+}
 
 // ── Font Family Registration ──
 const FontAttributor = Quill.import("formats/font") as any;
-FontAttributor.whitelist = ["times-new-roman", "sans-serif", "serif", "monospace", "arial", "calibri", "courier-new"];
-Quill.register(FontAttributor, true);
+if (FontAttributor) {
+    FontAttributor.whitelist = ["times-new-roman", "sans-serif", "serif", "monospace", "arial", "calibri", "courier-new"];
+    Quill.register(FontAttributor, true);
+}
 
 // ── Font Size Registration (Word-standard pt values) ──
 const SizeAttributor = Quill.import("attributors/style/size") as any;
-SizeAttributor.whitelist = ["8pt","9pt","10pt","10.5pt","11pt","12pt","14pt","16pt","18pt","20pt","22pt","24pt","26pt","28pt","36pt","48pt","72pt"];
-Quill.register(SizeAttributor, true);
+if (SizeAttributor) {
+    SizeAttributor.whitelist = ["8pt","9pt","10pt","10.5pt","11pt","12pt","14pt","16pt","18pt","20pt","22pt","24pt","26pt","28pt","36pt","48pt","72pt"];
+    Quill.register(SizeAttributor, true);
+}
 
 // ── Color and Background Color Style Registration (Enables inline styles instead of class styles) ──
 const ColorAttributor = Quill.import("attributors/style/color") as any;
-Quill.register(ColorAttributor, true);
+if (ColorAttributor) {
+    Quill.register(ColorAttributor, true);
+}
 
 const BackgroundAttributor = Quill.import("attributors/style/background") as any;
-Quill.register(BackgroundAttributor, true);
+if (BackgroundAttributor) {
+    Quill.register(BackgroundAttributor, true);
+}
+
+// ── Line Height Block Style Registration ──
+try {
+    const Parchment = Quill.import("parchment") as any;
+    if (Parchment) {
+        // Quill 2.0 uses Parchment.StyleAttributor, older versions use Parchment.Attributor.Style or legacy attributors/style
+        const StyleAttributor = Parchment.StyleAttributor || Parchment.Attributor?.Style || registeredImports["attributors/style"];
+        
+        if (StyleAttributor) {
+            const LineHeightAttributor = new StyleAttributor("lineheight", "line-height", {
+                scope: Parchment.Scope?.BLOCK || 3, // BLOCK level scope
+                whitelist: ["1", "1.15", "1.5", "2", "2.5", "3"]
+            });
+            Quill.register(LineHeightAttributor, true);
+        } else {
+            console.warn("Could not find StyleAttributor class for custom lineheight.");
+        }
+    }
+} catch (e) {
+    console.error("Failed to register custom LineHeightAttributor:", e);
+}
 
 // ── Custom Page Break Blot ──
 const BlockEmbed = Quill.import("blots/block/embed") as any;
-class PageBreakBlot extends BlockEmbed {
-    static create() {
-        const node = super.create();
-        node.setAttribute("class", "page-break-divider");
-        node.setAttribute("contenteditable", "false");
-        node.innerHTML = '<span class="page-break-text">SAYFA SONU (PAGE BREAK)</span>';
-        return node;
+if (BlockEmbed && !registeredImports["formats/pagebreak"]) {
+    class PageBreakBlot extends BlockEmbed {
+        static create() {
+            const node = super.create();
+            node.setAttribute("class", "page-break-divider");
+            node.setAttribute("contenteditable", "false");
+            node.innerHTML = '<span class="page-break-text">SAYFA SONU (PAGE BREAK)</span>';
+            return node;
+        }
+        static value() {
+            return true;
+        }
     }
-    static value() {
-        return true;
-    }
+    PageBreakBlot.blotName = "pagebreak";
+    PageBreakBlot.tagName = "hr";
+    Quill.register(PageBreakBlot, true);
 }
-PageBreakBlot.blotName = "pagebreak";
-PageBreakBlot.tagName = "hr";
-Quill.register(PageBreakBlot, true);
-import { Save, Download, ArrowLeft, Loader2, FileText, CheckCircle, History, Clock, Users, Sparkles, MessageSquare, Wand2, BookOpen, X } from "lucide-react";
+import { Save, Download, ArrowLeft, Loader2, FileText, CheckCircle, History, Clock, Users, Sparkles, MessageSquare, Wand2, BookOpen, X, Trash2 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { fetchAuditById, updateAudit, exportAuditToWord, fetchAuditVersions, restoreAuditVersion, type Audit, type AuditVersion } from "../lib/api/audit";
+import { fetchAuditById, updateAudit, exportAuditToWord, fetchAuditVersions, restoreAuditVersion, deleteAuditVersion, type Audit, type AuditVersion } from "../lib/api/audit";
 import ShareModal from "../components/ShareModal";
 import { WS_URL, API_URL } from "../lib/config";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
@@ -72,7 +107,13 @@ export default function ReportEditor() {
     const { refreshAudits } = useGlobalData();
     const [audit, setAudit] = useState<Audit | null>(null);
     const quillRef = useRef<any>(null);
+    const lastSelectionRange = useRef<any>(null);
     const [content, setContent] = useState("");
+    const contentRef = useRef("");
+    const databaseContentRef = useRef("");
+    useEffect(() => {
+        contentRef.current = content;
+    }, [content]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -82,9 +123,14 @@ export default function ReportEditor() {
     const [versions, setVersions] = useState<AuditVersion[]>([]);
     const [zoom, setZoom] = useState(100);
     const [showRuler, setShowRuler] = useState(true);
+    const [isTableModalOpen, setIsTableModalOpen] = useState(false);
+    const [isTableEditModalOpen, setIsTableEditModalOpen] = useState(false);
+    const [tableRows, setTableRows] = useState("3");
+    const [tableCols, setTableCols] = useState("3");
     const pageMode = true;
     const [docHeader, setDocHeader] = useState("T.C. GENÇLİK VE SPOR BAKANLIĞI");
     const [docFooter, setDocFooter] = useState("Müfettişlik Raporu");
+    const [showPageNumbers, setShowPageNumbers] = useState(true);
 
     // AI Bubble Menu State
     const [selectionRect, setSelectionRect] = useState<DOMRect | null>(null);
@@ -131,7 +177,6 @@ export default function ReportEditor() {
     };
 
     // ── Word-like Features State ──
-    const [lineSpacing, setLineSpacing] = useState("1.5");
 
     // ── Case Conversion ──
     const handleCaseConvert = (mode: "upper" | "lower" | "title") => {
@@ -149,13 +194,6 @@ export default function ReportEditor() {
         editor.setSelection(range.index, converted.length);
     };
 
-    // ── Line Spacing ──
-    const handleLineSpacing = (value: string) => {
-        setLineSpacing(value);
-        if (!quillRef.current) return;
-        const editorEl = quillRef.current.getEditor().root as HTMLElement;
-        editorEl.style.lineHeight = value;
-    };
 
     // ── Page Break ──
     const handlePageBreak = () => {
@@ -167,6 +205,107 @@ export default function ReportEditor() {
         editor.setSelection(range.index + 2, 0, "user");
     };
 
+    // ── Table Insertion (Word Style) ──
+    const handleInsertTable = () => {
+        if (!quillRef.current) return;
+        const editor = quillRef.current.getEditor();
+        
+        // Capture range before opening modal to preserve insertion focus
+        const range = editor.getSelection() || lastSelectionRange.current || { index: 0, length: 0 };
+        lastSelectionRange.current = range;
+        
+        // Contextually inspect active formats at active index to detect active table
+        const formats = editor.getFormat(range.index, range.length);
+        const isCurrentlyInTable = !!(formats.table || formats['table-cell'] || formats['table-row'] || formats['table-cell-line']);
+        
+        if (isCurrentlyInTable) {
+            setIsTableEditModalOpen(true);
+        } else {
+            setTableRows("3");
+            setTableCols("3");
+            setIsTableModalOpen(true);
+        }
+    };
+
+    const handleConfirmInsertTable = () => {
+        const rows = parseInt(tableRows);
+        const cols = parseInt(tableCols);
+        
+        if (isNaN(rows) || isNaN(cols) || rows <= 0 || cols <= 0) {
+            toast.error("Geçersiz satır veya sütun sayısı!");
+            return;
+        }
+        
+        if (!quillRef.current) return;
+        const editor = quillRef.current.getEditor();
+        const range = lastSelectionRange.current || editor.getSelection(true) || { index: 0 };
+        
+        // Generate a beautiful, Word-compatible HTML table with light slate borders and subtle head background
+        let tableHTML = `<table style="width:100%; border-collapse:collapse; border:1px solid #cbd5e1; margin:15px 0;">`;
+        
+        // Header Row
+        tableHTML += `<tr style="background-color:#f8fafc;">`;
+        for (let c = 1; c <= cols; c++) {
+            tableHTML += `<th style="border:1px solid #cbd5e1; padding:10px; text-align:left; font-weight:bold; font-family:'Times New Roman',Times,serif; font-size:11pt; color:#1e293b;">Başlık ${c}</th>`;
+        }
+        tableHTML += `</tr>`;
+        
+        // Data Rows
+        for (let r = 1; r <= rows; r++) {
+            tableHTML += `<tr>`;
+            for (let c = 1; c <= cols; c++) {
+                tableHTML += `<td style="border:1px solid #cbd5e1; padding:10px; font-family:'Times New Roman',Times,serif; font-size:11pt; color:#334155; min-width:80px; min-height:30px;">Metin</td>`;
+            }
+            tableHTML += `</tr>`;
+        }
+        
+        tableHTML += `</table><p><br></p>`;
+        
+        // Paste the table HTML at the current range index
+        editor.clipboard.dangerouslyPasteHTML(range.index, tableHTML, "user");
+        editor.setSelection(range.index + 1, 0, "user");
+        setIsTableModalOpen(false);
+        toast.success(`${rows}x${cols} boyutunda tablo başarıyla oluşturuldu!`);
+    };
+
+    // ── Table Actions (Insert/Delete Row/Col) ──
+    const handleTableAction = (action: "insert-row" | "delete-row" | "insert-col" | "delete-col" | "delete-table") => {
+        if (!quillRef.current) return;
+        const editor = quillRef.current.getEditor();
+        const tableModule = editor.getModule('table');
+        if (!tableModule) {
+            toast.error("Tablo modülü yüklenemedi.");
+            return;
+        }
+        
+        try {
+            switch (action) {
+                case "insert-row":
+                    tableModule.insertRowBelow();
+                    toast.success("Yeni satır eklendi.");
+                    break;
+                case "delete-row":
+                    tableModule.deleteRow();
+                    toast.success("Satır silindi.");
+                    break;
+                case "insert-col":
+                    tableModule.insertColumnRight();
+                    toast.success("Yeni sütun eklendi.");
+                    break;
+                case "delete-col":
+                    tableModule.deleteColumn();
+                    toast.success("Sütun silindi.");
+                    break;
+                case "delete-table":
+                    tableModule.deleteTable();
+                    toast.success("Tablo silindi.");
+                    break;
+            }
+        } catch (e) {
+            toast.error("Bu işlem sadece imleç bir tablo hücresindeyken yapılabilir.");
+        }
+    };
+
     // ── Print Preview ──
     const handlePrintPreview = () => {
         if (!quillRef.current) return;
@@ -176,22 +315,28 @@ export default function ReportEditor() {
         printWindow.document.write(`<!DOCTYPE html><html><head><title>${audit?.title || "Rapor"}</title>
         <style>
             @page { size: A4; margin: 2.5cm; }
-            body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: ${lineSpacing}; color: #000; }
+            body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: #000; }
             h1 { font-size: 18pt; text-align: center; margin-bottom: 1em; }
             h2 { font-size: 14pt; margin-top: 1em; }
             p { margin-bottom: 0.5em; text-indent: 1.25cm; }
-            .header { text-align: center; font-size: 10pt; border-bottom: 1px solid #ccc; padding-bottom: 8px; margin-bottom: 20px; }
-            .footer { text-align: center; font-size: 9pt; border-top: 1px solid #ccc; padding-top: 8px; margin-top: 20px; position: fixed; bottom: 0; left: 0; right: 0; }
+            .header { text-align: center; font-size: 10pt; border-bottom: 1px solid #ccc; padding-bottom: 8px; margin-bottom: 20px; color: #555; }
+            .footer { text-align: right; font-size: 9pt; border-top: 1px solid #ccc; padding-top: 8px; margin-top: 20px; position: fixed; bottom: 0; left: 0; right: 0; color: #555; }
+            @media print {
+                .footer-text::after {
+                    content: "${showPageNumbers ? "  |  Sayfa " + "counter(page)" : ""}";
+                }
+            }
         </style></head><body>
         <div class="header">${docHeader}</div>
         ${editorContent}
-        <div class="footer">${docFooter}</div>
+        <div class="footer"><span class="footer-text">${docFooter}</span></div>
         </body></html>`);
+        // We write counter(page) literally as a CSS string
+        printWindow.document.body.innerHTML = printWindow.document.body.innerHTML.replace("counter(page)", "counter(page)");
         printWindow.document.close();
         printWindow.focus();
         setTimeout(() => printWindow.print(), 500);
     };
-
 
     useEffect(() => {
         if (id) {
@@ -199,6 +344,29 @@ export default function ReportEditor() {
             loadVersions(id);
         }
     }, [id]);
+
+    // Unmount and beforeunload auto-save to guarantee 100% data retention when closing window or navigating away
+    useEffect(() => {
+        const handleUnloadSave = () => {
+            if (quillRef.current && id && !loading) {
+                const editor = quillRef.current.getEditor();
+                const currentHTML = editor.root.innerHTML;
+                const isEmpty = currentHTML.trim() === "" || currentHTML === "<h1></h1>" || currentHTML === "<p><br></p>";
+                if (!isEmpty) {
+                    // Fire-and-forget sync save via updateAudit
+                    updateAudit(id, { report_content: currentHTML }).catch(err => {
+                        console.warn("Beforeunload auto-save failed", err);
+                    });
+                }
+            }
+        };
+
+        window.addEventListener('beforeunload', handleUnloadSave);
+        return () => {
+            window.removeEventListener('beforeunload', handleUnloadSave);
+            handleUnloadSave(); // Fire-and-forget save when React component unmounts (e.g. sidebar navigation)
+        };
+    }, [id, loading]);
 
     // Premium Word-Style Auto-Save Hook: Saves silently every 10 seconds if changes are detected, showing live cloud save status
     useEffect(() => {
@@ -288,6 +456,45 @@ export default function ReportEditor() {
         if (quillRef.current) {
             const editor = quillRef.current.getEditor();
             
+            // ── Electron Selection Loss Prevention Patch (Quill Core API Override) ──
+            const originalGetSelection = editor.getSelection.bind(editor);
+            editor.getSelection = (focus = false) => {
+                const sel = originalGetSelection(focus);
+                if (sel) {
+                    lastSelectionRange.current = sel;
+                    return sel;
+                }
+                return lastSelectionRange.current || { index: 0, length: 0 };
+            };
+
+            if (editor.selection) {
+                // Hook into internal Selection getRange method
+                const originalGetRange = editor.selection.getRange.bind(editor.selection);
+                editor.selection.getRange = () => {
+                    const res = originalGetRange();
+                    const range = res && res[0];
+                    if (range) {
+                        lastSelectionRange.current = range;
+                        return res;
+                    }
+                    const fallback = lastSelectionRange.current || { index: 0, length: 0 };
+                    return [fallback, []];
+                };
+
+                // Hook into internal Selection update method to preserve savedRange on blur
+                const originalUpdate = editor.selection.update.bind(editor.selection);
+                editor.selection.update = (source = "api") => {
+                    originalUpdate(source);
+                    const range = originalGetSelection(false);
+                    if (range) {
+                        lastSelectionRange.current = range;
+                        editor.selection.savedRange = range;
+                    } else if (lastSelectionRange.current) {
+                        editor.selection.savedRange = lastSelectionRange.current;
+                    }
+                };
+            }
+            
             // Get user info from Firebase Auth
             const userName = user?.displayName
                 || user?.email?.split('@')[0]
@@ -313,13 +520,31 @@ export default function ReportEditor() {
 
             provider.awareness.on('change', updateUsers);
             updateUsers();
-
-            binding = new QuillBinding(ytext, editor, provider.awareness);
             
             provider.on('sync', (isSynced: boolean) => {
-                if (isSynced && ytext.toString().trim() === "" && content) {
-                     // Initial push from DB if document is empty
-                     editor.clipboard.dangerouslyPasteHTML(content);
+                const latestDbContent = databaseContentRef.current;
+                if (isSynced && latestDbContent) {
+                    const states = provider.awareness.getStates();
+                    // Filter out the current user's own active/stale connections
+                    const otherCollaborators = Array.from(states.values()).filter(
+                        (s: any) => s.user && s.user.uid !== user?.uid
+                    );
+                    
+                    // Destroy any existing binding to prevent duplicates
+                    if (binding) {
+                        binding.destroy();
+                    }
+                    
+                    // Instantiate QuillBinding ONLY after successful sync!
+                    // This preserves the defaultValue locally even if connection is slow or offline.
+                    binding = new QuillBinding(ytext, editor, provider.awareness);
+                    
+                    // If ytext is empty, OR if there are no OTHER distinct collaborators editing,
+                    // ALWAYS initialize the editor and Yjs text with the latest database content!
+                    if (ytext.toString().trim() === "" || otherCollaborators.length === 0) {
+                        editor.setContents([]);
+                        editor.clipboard.dangerouslyPasteHTML(0, latestDbContent, "user");
+                    }
                 }
             });
         }
@@ -337,6 +562,15 @@ export default function ReportEditor() {
         const editor = quillRef.current.getEditor();
 
         const handleSelection = (range: any) => {
+            if (range) {
+                // If it's a real selection (length > 0), always save it!
+                // If it's just a cursor position (length === 0), only save it if the editor actually has focus.
+                // This prevents losing the text selection when the editor blurs or when clicking toolbar items!
+                const hasFocus = editor.hasFocus();
+                if (range.length > 0 || hasFocus) {
+                    lastSelectionRange.current = range;
+                }
+            }
             if (range && range.length > 0) {
                 const text = editor.getText(range.index, range.length);
                 setSelectedText(text);
@@ -367,9 +601,10 @@ export default function ReportEditor() {
         return () => editor.off('selection-change', handleSelection);
     }, [loading]);
 
-    // Add native tooltips to Quill's dynamically generated picker elements
+    // Add native tooltips and prevent selection/focus conflicts on Quill picker and button elements
     useEffect(() => {
         if (loading) return;
+        
         const colorPicker = document.querySelector('.ql-picker.ql-color');
         if (colorPicker) {
             colorPicker.setAttribute('title', 'Yazı Rengi');
@@ -472,6 +707,10 @@ export default function ReportEditor() {
             setLoading(true);
             const data = await fetchAuditById(auditId);
             setAudit(data);
+            if (data.doc_header !== undefined) setDocHeader(data.doc_header || "T.C. GENÇLİK VE SPOR BAKANLIĞI");
+            if (data.doc_footer !== undefined) setDocFooter(data.doc_footer || "Müfettişlik Raporu");
+            if (data.show_page_numbers !== undefined) setShowPageNumbers(data.show_page_numbers ?? true);
+            databaseContentRef.current = data.report_content || "<h1></h1>";
             setContent(data.report_content || "<h1></h1>");
         } catch (error) {
             console.error("Denetim yüklenemedi:", error);
@@ -494,7 +733,12 @@ export default function ReportEditor() {
             }
 
             // PASS TRUE AS THIRD PARAMETER TO FORCE VERSION CREATION ON Firestore!
-            await updateAudit(id, { report_content: latestContent }, true);
+            await updateAudit(id, { 
+                report_content: latestContent,
+                doc_header: docHeader,
+                doc_footer: docFooter,
+                show_page_numbers: showPageNumbers
+            }, true);
             
             // Sync local React state
             setContent(latestContent);
@@ -525,6 +769,22 @@ export default function ReportEditor() {
         
         const toastId = toast.loading("Sürüm geri yükleniyor...");
         try {
+            // 1. Önce kullanıcının mevcut taslağını kayıpsızca yedekle! (Force create version = true)
+            if (quillRef.current) {
+                const editor = quillRef.current.getEditor();
+                const currentHTML = editor.root.innerHTML;
+                const isEmpty = currentHTML.trim() === "" || currentHTML === "<h1></h1>" || currentHTML === "<p><br></p>";
+                
+                if (!isEmpty) {
+                    try {
+                        // Force save current draft as a backup version
+                        await updateAudit(id, { report_content: currentHTML }, true);
+                    } catch (e) {
+                        console.error("Mevcut taslak yedeklenirken hata oluştu", e);
+                    }
+                }
+            }
+
             const restoredAudit = await restoreAuditVersion(id, versionId);
             const restoredContent = restoredAudit.report_content || "";
             
@@ -541,10 +801,35 @@ export default function ReportEditor() {
             }
             
             toast.success("Rapor sürümü başarıyla geri yüklendi!", { id: toastId });
+            loadVersions(id); // Sürüm listesini yenile ki son yedeklenen sürüm de listede görünsün!
             setIsHistoryOpen(false); // Sürüm geçmişi çekmecesini kapat
         } catch (error) {
             console.error(error);
             toast.error("Sürüm yükleme başarısız", { id: toastId });
+        }
+    };
+
+    const handleDeleteVersion = async (e: React.MouseEvent, versionId: string, versionName: string) => {
+        // Prevent event from bubbling up to trigger version restore
+        e.stopPropagation();
+        
+        if (!id) return;
+        const confirmed = await confirm({
+            title: "Sürümü Sil",
+            message: `"${versionName}" sürümünü kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`,
+            confirmText: "Sil",
+            variant: "danger"
+        });
+        if (!confirmed) return;
+        
+        const toastId = toast.loading("Sürüm siliniyor...");
+        try {
+            await deleteAuditVersion(id, versionId);
+            toast.success("Sürüm başarıyla silindi!", { id: toastId });
+            loadVersions(id);
+        } catch (error) {
+            console.error(error);
+            toast.error("Sürüm silinemedi", { id: toastId });
         }
     };
 
@@ -569,135 +854,8 @@ export default function ReportEditor() {
         }
     };
 
-    const memoizedEditor = useMemo(() => {
+    const memoizedToolbar = useMemo(() => {
         return (
-            <ReactQuill 
-                ref={quillRef}
-                theme="snow"
-                defaultValue={content}
-                onChange={(val) => { setContent(val); }}
-                placeholder="Raporunuzu buraya yazın..."
-                modules={{
-                    ...editorModules,
-                    cursors: true
-                }}
-                formats={editorFormats}
-                className={`h-full border-none ${pageMode ? 'editor-page-mode' : ''}`}
-            />
-        );
-    }, [pageMode]);
-
-    if (loading) {
-        return (
-            <div className="h-full flex flex-col items-center justify-center space-y-4">
-                <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                <p className="text-muted-foreground font-medium italic">Rapor düzenleyici hazırlanıyor...</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="h-screen flex flex-col bg-[#f3f4f6]">
-            {/* Toolbar */}
-            <div className="bg-white border-b border-border px-3 md:px-6 py-2 flex flex-wrap items-center gap-2 md:gap-4 shadow-sm shrink-0 z-50">
-                <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1 flex-wrap">
-                    <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="rounded-full w-8 h-8 p-0">
-                        <ArrowLeft size={18} />
-                    </Button>
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-nowrap">
-                            <h2 className="font-bold text-base text-primary font-outfit truncate max-w-[200px] md:max-w-[400px]">{audit?.title}</h2>
-                            {providerStatus === "connected" && (
-                                <span className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase rounded-full border border-emerald-100">
-                                    <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" /> Canlı
-                                </span>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-bold tracking-wide flex-wrap">
-                            <span className="flex items-center gap-1"><FileText size={10} /> Rapor Düzenleyici</span>
-                            <span className="text-slate-300">•</span>
-                            {autoSaveStatus === "saving" && (
-                                <span className="flex items-center gap-1.5 text-amber-500 font-extrabold animate-pulse">
-                                    <Loader2 size={10} className="animate-spin" /> Buluta Kaydediliyor...
-                                </span>
-                            )}
-                            {autoSaveStatus === "saved" && (
-                                <span className="flex items-center gap-1.5 text-emerald-600 font-extrabold">
-                                    <CheckCircle size={10} className="text-emerald-500" /> Buluta Kaydedildi
-                                    {lastSaved && <span className="text-slate-400 font-normal">({lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })})</span>}
-                                </span>
-                            )}
-                            {autoSaveStatus === "error" && (
-                                <span className="flex items-center gap-1.5 text-rose-500 font-extrabold">
-                                    <span>⚠️</span> Bağlantı Kesildi (Kayıt Bekliyor)
-                                </span>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="hidden lg:flex items-center gap-2 ml-0 md:ml-2">
-                        <div className="flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1 bg-slate-50/50">
-                            <button type="button" onClick={() => setZoom((z) => Math.max(70, z - 10))} className="text-[10px] font-black text-slate-400 hover:text-slate-800 px-1">-</button>
-                            <span className="text-[10px] font-black text-slate-600 min-w-[32px] text-center">{zoom}%</span>
-                            <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="text-[10px] font-black text-slate-400 hover:text-slate-800 px-1">+</button>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-wrap">
-                        {providerStatus === 'connected' && onlineUsers.length > 0 && (
-                            <div className="flex -space-x-1.5 mr-2">
-                                {onlineUsers.map((u, i) => (
-                                    <div
-                                        key={i}
-                                        title={u.name}
-                                        className="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[9px] font-black text-white shadow-sm"
-                                        style={{ backgroundColor: u.color }}
-                                    >
-                                        {u.name.substring(0, 2).toUpperCase()}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        
-                        <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100 overflow-x-auto max-w-full">
-                            <Button variant="ghost" onClick={() => setIsShareModalOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all">
-                                <Users size={14} className="mr-1.5" /> <span className="hidden xl:inline">Paylaşım</span>
-                            </Button>
-                            <Button variant="ghost" onClick={() => setIsHistoryOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all">
-                                <History size={14} className="mr-1.5" /> <span className="hidden xl:inline">Sürümler</span>
-                            </Button>
-                            <Button variant="ghost" onClick={() => openChat(`audit_${id}`, audit?.title || "Denetim Raporu", "audit")} className="h-8 px-3 text-[11px] font-bold text-primary rounded-lg hover:bg-white hover:shadow-sm transition-all">
-                                <MessageSquare size={14} className="mr-1.5" /> <span className="hidden xl:inline">Sohbet</span>
-                            </Button>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                            <Button
-                                variant="ghost"
-                                disabled={!AI_REPORT_ASSISTANT_ENABLED}
-                                title={AI_REPORT_ASSISTANT_ENABLED ? "AI rapor asistanını aç" : "Yakında"}
-                                onClick={() => AI_REPORT_ASSISTANT_ENABLED && setIsAIPanelOpen(true)}
-                                className="h-8 px-3 text-[11px] font-black text-slate-500 bg-slate-100 hover:bg-slate-100 rounded-lg disabled:opacity-100 disabled:cursor-not-allowed"
-                            >
-                                <Wand2 size={14} className="mr-1.5" /> AI (Yakında)
-                            </Button>
-                            <Button variant="outline" onClick={() => setIsTemplateModalOpen(true)} className="h-8 px-3 text-[11px] font-bold border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg">
-                                <LayoutGrid size={14} className="mr-1.5" /> Şablon Seç
-                            </Button>
-                            <Button variant="outline" onClick={handleSave} disabled={saving} className="h-8 px-3 text-[11px] font-bold border-primary/20 rounded-lg">
-                                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="mr-1.5" />} Kaydet
-                            </Button>
-                            <Button onClick={handleExportWord} className="h-8 px-3 text-[11px] font-black bg-slate-900 text-white rounded-lg shadow-sm">
-                                <Download size={14} className="mr-1.5" /> Word
-                            </Button>
-                            <Button variant="outline" onClick={handlePrintPreview} className="h-8 px-3 text-[11px] font-bold rounded-lg border-slate-300">
-                                🖨️ Önizleme
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div className="bg-white border-b border-slate-200 px-4 md:px-8 py-2 shrink-0">
                 <div id="report-editor-toolbar" className="ql-toolbar ql-snow rounded-xl border border-slate-200 bg-white flex flex-wrap items-center gap-y-2 gap-x-0.5 px-2 py-1.5">
                         {/* ── FONT ── */}
@@ -804,18 +962,7 @@ export default function ReportEditor() {
                             <button type="button" className="ql-indent" value="-1" title="Girintiyi Azalt" />
                             <button type="button" className="ql-indent" value="+1" title="Girintiyi Artır" />
                         </span>
-                        <div className="w-px h-6 bg-slate-200 mx-1" />
-                        {/* ── LINE SPACING ── */}
-                        <span className="ql-formats">
-                            <select className="custom-lineheight" title="Satır Aralığı (Satır Boşluğu)" value={lineSpacing} onChange={(e) => handleLineSpacing(e.target.value)}>
-                                <option value="1">1.0</option>
-                                <option value="1.15">1.15</option>
-                                <option value="1.5">1.5</option>
-                                <option value="2">2.0</option>
-                                <option value="2.5">2.5</option>
-                                <option value="3">3.0</option>
-                            </select>
-                        </span>
+
                         <div className="w-px h-6 bg-slate-200 mx-1" />
                         {/* ── SUB/SUPER ── */}
                         <span className="ql-formats">
@@ -827,12 +974,173 @@ export default function ReportEditor() {
                         <span className="ql-formats">
                             <button type="button" className="ql-blockquote" title="Alıntı" />
                             <button type="button" className="ql-link" title="Bağlantı" />
-                            <button type="button" className="ql-image" title="Resim" />
+                            <button type="button" title="Tablo Ekle veya Tabloyu Yönet" className="!w-auto !px-2 flex items-center justify-center gap-1 hover:text-violet-600 transition-colors" onMouseDown={(e) => e.preventDefault()} onClick={handleInsertTable}>
+                                <span className="text-[11px]">📊</span>
+                                <span className="text-[9px] font-black uppercase tracking-wider text-slate-600">Tablo</span>
+                            </button>
                             <button type="button" title="Sayfa Sonu" className="!text-[10px] !font-black !w-auto !px-1.5" onMouseDown={(e) => e.preventDefault()} onClick={handlePageBreak}>⏎</button>
                             <button type="button" className="ql-clean" title="Biçimlendirmeyi Temizle" />
                         </span>
-                    </div>
+                </div>
             </div>
+        );
+    }, []);
+
+    const memoizedEditor = useMemo(() => {
+        return (
+            <ReactQuill 
+                ref={quillRef}
+                theme="snow"
+                defaultValue={content}
+                onChange={(val) => { setContent(val); }}
+                placeholder="Raporunuzu buraya yazın..."
+                modules={{
+                    ...editorModules,
+                    cursors: true
+                }}
+                formats={editorFormats}
+                className={`h-full border-none ${pageMode ? 'editor-page-mode' : ''}`}
+            />
+        );
+    }, [pageMode, loading]);
+
+    if (loading) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center space-y-4">
+                <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                <p className="text-muted-foreground font-medium italic">Rapor düzenleyici hazırlanıyor...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="h-screen flex flex-col bg-[#f3f4f6]">
+            {/* Toolbar */}
+            <div className="bg-white border-b border-border px-3 md:px-6 py-2 flex flex-wrap items-center gap-2 md:gap-4 shadow-sm shrink-0 z-50">
+                <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1 flex-wrap">
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={async () => {
+                            if (quillRef.current && id) {
+                                const editor = quillRef.current.getEditor();
+                                const currentHTML = editor.root.innerHTML;
+                                try {
+                                    await updateAudit(id, { 
+                                        report_content: currentHTML,
+                                        doc_header: docHeader,
+                                        doc_footer: docFooter,
+                                        show_page_numbers: showPageNumbers
+                                    });
+                                } catch (e) {
+                                    console.error("Back button save failed", e);
+                                }
+                            }
+                            navigate(-1);
+                        }} 
+                        className="rounded-full w-8 h-8 p-0"
+                    >
+                        <ArrowLeft size={18} />
+                    </Button>
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-nowrap">
+                            <h2 className="font-bold text-base text-primary font-outfit truncate max-w-[200px] md:max-w-[400px]">{audit?.title}</h2>
+                            {providerStatus === "connected" && (
+                                <span className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase rounded-full border border-emerald-100">
+                                    <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" /> Canlı
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-bold tracking-wide flex-wrap">
+                            <span className="flex items-center gap-1"><FileText size={10} /> Rapor Düzenleyici</span>
+                            <span className="text-slate-300">•</span>
+                            {autoSaveStatus === "saving" && (
+                                <span className="flex items-center gap-1.5 text-amber-500 font-extrabold animate-pulse">
+                                    <Loader2 size={10} className="animate-spin" /> Buluta Kaydediliyor...
+                                </span>
+                            )}
+                            {autoSaveStatus === "saved" && (
+                                <span className="flex items-center gap-1.5 text-emerald-600 font-extrabold">
+                                    <CheckCircle size={10} className="text-emerald-500" /> Buluta Kaydedildi
+                                    {lastSaved && <span className="text-slate-400 font-normal">({lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })})</span>}
+                                </span>
+                            )}
+                            {autoSaveStatus === "error" && (
+                                <span className="flex items-center gap-1.5 text-rose-500 font-extrabold">
+                                    <span>⚠️</span> Bağlantı Kesildi (Kayıt Bekliyor)
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="hidden lg:flex items-center gap-2 ml-0 md:ml-2">
+                        <div className="flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1 bg-slate-50/50">
+                            <button type="button" onClick={() => setZoom((z) => Math.max(70, z - 10))} className="text-[10px] font-black text-slate-400 hover:text-slate-800 px-1">-</button>
+                            <span className="text-[10px] font-black text-slate-600 min-w-[32px] text-center">{zoom}%</span>
+                            <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="text-[10px] font-black text-slate-400 hover:text-slate-800 px-1">+</button>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {providerStatus === 'connected' && onlineUsers.length > 0 && (
+                            <div className="flex -space-x-1.5 mr-2">
+                                {onlineUsers.map((u, i) => (
+                                    <div
+                                        key={i}
+                                        title={u.name}
+                                        className="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[9px] font-black text-white shadow-sm"
+                                        style={{ backgroundColor: u.color }}
+                                    >
+                                        {u.name.substring(0, 2).toUpperCase()}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        
+                        <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100 overflow-x-auto max-w-full">
+                            <Button variant="ghost" onClick={() => setIsShareModalOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all">
+                                <Users size={14} className="mr-1.5" /> <span className="hidden xl:inline">Paylaşım</span>
+                            </Button>
+                            <Button variant="ghost" onClick={() => setIsHistoryOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all">
+                                <History size={14} className="mr-1.5" /> <span className="hidden xl:inline">Sürümler</span>
+                            </Button>
+                            <Button variant="ghost" onClick={() => openChat(`audit_${id}`, audit?.title || "Denetim Raporu", "audit")} className="h-8 px-3 text-[11px] font-bold text-primary rounded-lg hover:bg-white hover:shadow-sm transition-all">
+                                <MessageSquare size={14} className="mr-1.5" /> <span className="hidden xl:inline">Sohbet</span>
+                            </Button>
+                        </div>
+
+                        <div className="flex items-center gap-1 flex-wrap">
+                            <Button
+                                variant="ghost"
+                                disabled={!AI_REPORT_ASSISTANT_ENABLED}
+                                title={AI_REPORT_ASSISTANT_ENABLED ? "AI Rapor Asistanını Aç" : "Yakında"}
+                                onClick={() => AI_REPORT_ASSISTANT_ENABLED && setIsAIPanelOpen(true)}
+                                className={`h-8 px-2 md:px-3 text-[11px] font-black rounded-lg ${
+                                    AI_REPORT_ASSISTANT_ENABLED 
+                                        ? "text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200"
+                                        : "text-slate-500 bg-slate-100 hover:bg-slate-100 disabled:opacity-100 disabled:cursor-not-allowed"
+                                }`}
+                            >
+                                <Wand2 size={14} className="md:mr-1.5" /> <span className="hidden md:inline">{AI_REPORT_ASSISTANT_ENABLED ? "AI Asistanı" : "AI Asistanı (Yakında)"}</span>
+                            </Button>
+                            <Button variant="outline" onClick={() => setIsTemplateModalOpen(true)} className="h-8 px-2 md:px-3 text-[11px] font-bold border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-lg">
+                                <LayoutGrid size={14} className="md:mr-1.5" /> <span className="hidden md:inline">Şablon Seç</span>
+                            </Button>
+                            <Button variant="outline" onClick={handleSave} disabled={saving} className="h-8 px-2 md:px-3 text-[11px] font-bold border-primary/20 rounded-lg">
+                                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="md:mr-1.5" />} <span className="hidden md:inline">Kaydet</span>
+                            </Button>
+                            <Button onClick={handleExportWord} className="h-8 px-2 md:px-3 text-[11px] font-black bg-slate-900 text-white rounded-lg shadow-sm">
+                                <Download size={14} className="md:mr-1.5" /> <span className="hidden md:inline">Word</span>
+                            </Button>
+                            <Button variant="outline" onClick={handlePrintPreview} className="h-8 px-2 md:px-3 text-[11px] font-bold rounded-lg border-slate-300">
+                                <span className="mr-0 md:mr-1.5">🖨️</span> <span className="hidden md:inline">Önizleme</span>
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {memoizedToolbar}
 
 
             {/* Editor Area */}
@@ -847,9 +1155,10 @@ export default function ReportEditor() {
                         </button>
                     </div>
                         {/* Floating AI Bar (Positioned outside zoomed Card for perfect viewport coordinates in Electron & Web) */}
-                        {showAIBar && selectionRect && (
+                        {AI_REPORT_ASSISTANT_ENABLED && showAIBar && selectionRect && (
                             <div 
-                                className="fixed z-[1000] flex items-center gap-1 bg-[#1e293b] text-white p-1.5 rounded-xl shadow-2xl border border-white/10 animate-in zoom-in-95 fade-in duration-200"
+                                onMouseDown={(e) => e.preventDefault()}
+                                className="fixed z-[1000] flex items-center gap-1 bg-[#1e293b] text-white p-1.5 rounded-xl shadow-2xl border border-white/10 animate-in zoom-in-95 fade-in duration-200 select-none"
                                 style={{ 
                                     top: `${selectionRect.top}px`, 
                                     left: `${Math.max(20, selectionRect.left + (selectionRect.width / 2) - 150)}px` 
@@ -862,6 +1171,7 @@ export default function ReportEditor() {
                                 <button 
                                     disabled={processingAI}
                                     type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
                                     onClick={() => handleAIProcess("improve")}
                                     className="px-3 py-1.5 hover:bg-white/10 rounded-lg text-[10px] font-bold transition-colors disabled:opacity-50"
                                 >
@@ -870,6 +1180,7 @@ export default function ReportEditor() {
                                 <button 
                                     disabled={processingAI}
                                     type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
                                     onClick={() => handleAIProcess("formalize")}
                                     className="px-3 py-1.5 hover:bg-white/10 rounded-lg text-[10px] font-bold transition-colors disabled:opacity-50"
                                 >
@@ -878,6 +1189,7 @@ export default function ReportEditor() {
                                 <button 
                                     disabled={processingAI}
                                     type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
                                     onClick={() => handleAIProcess("shorten")}
                                     className="px-3 py-1.5 hover:bg-white/10 rounded-lg text-[10px] font-bold transition-colors disabled:opacity-50"
                                 >
@@ -894,12 +1206,13 @@ export default function ReportEditor() {
                     <Card onClick={focusEditorToEnd} style={{ zoom: `${zoom}%` }} className="p-4 md:p-16 min-h-[1100px] bg-white shadow-2xl border-none rounded-none prose max-w-none relative mb-20 overflow-visible cursor-text">
                         {/* Word A4 Impression */}
                         <div className="absolute -top-1 left-0 w-full h-1 bg-primary/10" />
-                        <div className="mb-4 pb-2 border-b border-dashed border-slate-300">
+                        <div className="mb-4 pb-2 border border-dashed border-slate-200 hover:border-violet-300 hover:bg-slate-50/50 rounded-lg p-2 transition-all group relative">
+                            <span className="absolute -top-2 left-3 bg-white px-1 text-[9px] font-bold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">✍️ RAPOR ÜST BİLGİSİ (ÇIFT TIKLA DÜZENLE)</span>
                             <input
                                 value={docHeader}
                                 onChange={(e) => setDocHeader(e.target.value)}
-                                className="w-full text-center text-xs font-semibold text-slate-500 bg-transparent outline-none"
-                                placeholder="Üst bilgi"
+                                className="w-full text-center text-xs font-semibold text-slate-500 bg-transparent outline-none cursor-pointer focus:cursor-text"
+                                placeholder="Rapor Üst Bilgisi Eklemek İçin Buraya Tıklayın..."
                             />
                         </div>
                         {showRuler && (
@@ -916,14 +1229,26 @@ export default function ReportEditor() {
                         )}
 
                         {memoizedEditor}
-                        <div className="mt-8 pt-2 border-t border-dashed border-slate-300 flex items-center justify-between">
+                        <div className="mt-8 pt-2 border border-dashed border-slate-200 hover:border-violet-300 hover:bg-slate-50/50 rounded-lg p-2.5 transition-all group relative flex items-center justify-between">
+                            <span className="absolute -top-2 left-3 bg-white px-1 text-[9px] font-bold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">✍️ RAPOR ALT BİLGİSİ (ÇIFT TIKLA DÜZENLE)</span>
                             <input
                                 value={docFooter}
                                 onChange={(e) => setDocFooter(e.target.value)}
-                                className="w-[70%] text-xs font-semibold text-slate-500 bg-transparent outline-none"
-                                placeholder="Alt bilgi"
+                                className="w-[50%] text-xs font-semibold text-slate-500 bg-transparent outline-none cursor-pointer focus:cursor-text"
+                                placeholder="Rapor Alt Bilgisi Eklemek İçin Buraya Tıklayın..."
                             />
-                            <span className="text-xs font-bold text-slate-400">Sayfa 1 / {estimatedPages}</span>
+                            <div className="flex items-center gap-4">
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-bold text-slate-400 hover:text-slate-600 transition-colors">
+                                    <input
+                                        type="checkbox"
+                                        checked={showPageNumbers}
+                                        onChange={(e) => setShowPageNumbers(e.target.checked)}
+                                        className="rounded text-violet-600 focus:ring-violet-400 w-3.5 h-3.5 cursor-pointer border-slate-300"
+                                    />
+                                    Sayfa No Ekle
+                                </label>
+                                <span className="text-xs font-bold text-slate-400">Sayfa 1 / {estimatedPages}</span>
+                            </div>
                         </div>
                     </Card>
                 </div>
@@ -947,8 +1272,8 @@ export default function ReportEditor() {
 
                 /* ── Toolbar Selection Fix for Electron/Desktop (Prevents Selection Loss on Click) ── */
                 #report-editor-toolbar, #report-editor-toolbar *, .ql-toolbar, .ql-toolbar * {
-                    -webkit-user-select: auto !important;
-                    user-select: auto !important;
+                    -webkit-user-select: none !important;
+                    user-select: none !important;
                 }
 
                 /* ── Custom Highlighter Pen (Asetatlı Kalem) Icon ── */
@@ -1009,18 +1334,18 @@ export default function ReportEditor() {
                 .ql-editor {
                     padding: 0 !important;
                     min-height: 980px !important;
-                    line-height: 1.5 !important;
-                    color: #000 !important;
-                    font-size: 12pt !important;
-                    font-family: 'Times New Roman', Times, serif !important;
+                    line-height: 1.5;
+                    color: #000;
+                    font-size: 12pt;
+                    font-family: 'Times New Roman', Times, serif;
                     tab-size: 4;
                     -moz-tab-size: 4;
                     white-space: pre-wrap;
                     word-wrap: break-word;
                 }
-                .ql-editor h1 { font-size: 18pt !important; font-weight: 700 !important; margin-bottom: 12pt !important; color: #000 !important; }
-                .ql-editor h2 { font-size: 14pt !important; font-weight: 700 !important; margin-bottom: 6pt !important; color: #000 !important; }
-                .ql-editor h3 { font-size: 12pt !important; font-weight: 700 !important; margin-bottom: 6pt !important; color: #000 !important; }
+                .ql-editor h1 { font-size: 18pt; font-weight: 700; margin-bottom: 12pt !important; color: #000; }
+                .ql-editor h2 { font-size: 14pt; font-weight: 700; margin-bottom: 6pt !important; color: #000; }
+                .ql-editor h3 { font-size: 12pt; font-weight: 700; margin-bottom: 6pt !important; color: #000; }
                 .ql-editor p { margin-bottom: 6pt !important; }
                 .ql-editor ol, .ql-editor ul { padding-left: 1.5em !important; }
                 .ql-editor.ql-blank::before { left: 0 !important; font-style: italic !important; color: #999 !important; font-family: 'Times New Roman', Times, serif !important; }
@@ -1051,6 +1376,29 @@ export default function ReportEditor() {
                     border-color: #94a3b8 !important;
                     background: #f8fafc !important;
                     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+                }
+                .ql-snow .ql-picker.custom-lineheight {
+                    width: 75px !important;
+                    height: 24px !important;
+                    line-height: 20px !important;
+                }
+                .ql-snow .ql-picker.custom-lineheight .ql-picker-label {
+                    padding: 0 4px !important;
+                    border: none !important;
+                    height: 100% !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    font-size: 11px !important;
+                    font-weight: 700 !important;
+                    color: #475569 !important;
+                }
+                .ql-snow .ql-picker.custom-lineheight .ql-picker-label::before,
+                .ql-snow .ql-picker.custom-lineheight .ql-picker-item::before {
+                    content: attr(data-label) !important;
+                    font-size: 11px !important;
+                }
+                .ql-snow .ql-picker.custom-lineheight .ql-picker-options {
+                    min-width: 75px !important;
                 }
 
                 /* ── Page Break Styling ── */
@@ -1225,24 +1573,46 @@ export default function ReportEditor() {
                         {versions.length === 0 ? (
                             <p className="text-center text-xs text-muted-foreground mt-10 italic">Henüz bir sürüm kaydı bulunmuyor.</p>
                         ) : (
-                            versions.map((v, i) => (
-                                <div key={v.id} className={`p-4 rounded-xl border ${i === 0 ? 'bg-primary/5 border-primary/20' : 'bg-white hover:border-slate-300'} cursor-pointer group transition-all`}>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="font-bold text-sm text-primary">{v.version_name}</span>
-                                        <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock size={12}/> {new Date(v.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            versions.map((v, i) => {
+                                const rawDateStr = v.created_at || "";
+                                // If the date string has no timezone indicator, treat it as UTC and append 'Z'
+                                const formattedDateStr = (rawDateStr && !rawDateStr.includes('Z') && !rawDateStr.includes('+')) 
+                                    ? `${rawDateStr}Z` 
+                                    : rawDateStr;
+                                const d = new Date(formattedDateStr);
+                                const dateStr = d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                                const timeStr = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+                                return (
+                                    <div key={v.id} className={`p-4 rounded-xl border ${i === 0 ? 'bg-primary/5 border-primary/20' : 'bg-white hover:border-slate-300'} cursor-pointer group transition-all`}>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-sm text-primary">{v.version_name}</span>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="sm" 
+                                                    onClick={(e) => handleDeleteVersion(e, v.id, v.version_name)}
+                                                    className="h-6 w-6 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    title="Sürümü Sil"
+                                                >
+                                                    <Trash2 size={13} />
+                                                </Button>
+                                            </div>
+                                            <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium bg-slate-100 px-2 py-0.5 rounded-full" title={`${dateStr} ${timeStr}`}>
+                                                <Clock size={10} className="text-slate-400" /> {dateStr} - {timeStr}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 mb-2">Kaydeden: <span className="font-semibold text-slate-700">{v.user}</span></p>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            onClick={() => handleRestoreVersion(v.id)}
+                                            className="w-full h-7 text-xs rounded-lg mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            Bu Sürüme Dön
+                                        </Button>
                                     </div>
-                                    <p className="text-xs text-slate-500 mb-2">Kaydeden: <span className="font-semibold text-slate-700">{v.user}</span></p>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        onClick={() => handleRestoreVersion(v.id)}
-
-                                        className="w-full h-7 text-xs rounded-lg mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                        Bu Sürüme Dön
-                                    </Button>
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </div>
@@ -1318,6 +1688,168 @@ export default function ReportEditor() {
                     </div>
                 </div>
             )}
+
+            {/* ── CUSTOM TABLE GENERATOR MODAL (Word Style & Electron Safe) ── */}
+            {isTableModalOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md flex flex-col border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                                    📊 Word Tarzı Tablo Oluştur
+                                </h3>
+                                <p className="text-[11px] text-slate-500 mt-1">Eklemek istediğiniz tablonun boyutlarını giriniz.</p>
+                            </div>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setIsTableModalOpen(false)} 
+                                className="rounded-full w-8 h-8 p-0 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 flex items-center justify-center"
+                            >
+                                <X size={18} />
+                            </Button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-6 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-black uppercase tracking-wider text-slate-500 block mb-1.5">Satır Sayısı</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="50"
+                                        value={tableRows}
+                                        onChange={(e) => setTableRows(e.target.value)}
+                                        className="w-full h-10 px-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-400 text-sm font-bold text-slate-700 bg-slate-50/50"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-black uppercase tracking-wider text-slate-500 block mb-1.5">Sütun Sayısı</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="20"
+                                        value={tableCols}
+                                        onChange={(e) => setTableCols(e.target.value)}
+                                        className="w-full h-10 px-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-400 text-sm font-bold text-slate-700 bg-slate-50/50"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setIsTableModalOpen(false)} 
+                                className="rounded-xl h-9 text-xs"
+                            >
+                                İptal
+                            </Button>
+                            <Button 
+                                onClick={handleConfirmInsertTable} 
+                                className="rounded-xl h-9 px-4 text-xs bg-violet-600 hover:bg-violet-700 text-white font-bold shadow-md shadow-violet-200"
+                            >
+                                Tabloyu Ekle
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── CONTEXTUAL TABLE EDIT WIZARD MODAL ── */}
+            {isTableEditModalOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md flex flex-col border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                                    📊 Tablo Düzenleme Sihirbazı
+                                </h3>
+                                <p className="text-[11px] text-slate-500 mt-1">İmlecinizin bulunduğu tablo üzerinde işlemler yapın.</p>
+                            </div>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setIsTableEditModalOpen(false)} 
+                                className="rounded-full w-8 h-8 p-0 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 flex items-center justify-center"
+                            >
+                                <X size={18} />
+                            </Button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-6 space-y-3.5">
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={() => {
+                                        handleTableAction("insert-row");
+                                        setIsTableEditModalOpen(false);
+                                    }}
+                                    className="h-12 px-4 rounded-2xl bg-slate-50 hover:bg-violet-50 border border-slate-200/60 hover:border-violet-200 text-xs font-black uppercase text-slate-600 hover:text-violet-600 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                                >
+                                    <span>➕</span> Satır Ekle
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        handleTableAction("delete-row");
+                                        setIsTableEditModalOpen(false);
+                                    }}
+                                    className="h-12 px-4 rounded-2xl bg-slate-50 hover:bg-red-50 border border-slate-200/60 hover:border-red-200 text-xs font-black uppercase text-slate-600 hover:text-red-600 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                                >
+                                    <span>❌</span> Satır Sil
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        handleTableAction("insert-col");
+                                        setIsTableEditModalOpen(false);
+                                    }}
+                                    className="h-12 px-4 rounded-2xl bg-slate-50 hover:bg-violet-50 border border-slate-200/60 hover:border-violet-200 text-xs font-black uppercase text-slate-600 hover:text-violet-600 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                                >
+                                    <span>➕</span> Sütun Ekle
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        handleTableAction("delete-col");
+                                        setIsTableEditModalOpen(false);
+                                    }}
+                                    className="h-12 px-4 rounded-2xl bg-slate-50 hover:bg-red-50 border border-slate-200/60 hover:border-red-200 text-xs font-black uppercase text-slate-600 hover:text-red-600 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                                >
+                                    <span>❌</span> Sütun Sil
+                                </button>
+                            </div>
+                            
+                            <div className="pt-2">
+                                <button
+                                    onClick={() => {
+                                        handleTableAction("delete-table");
+                                        setIsTableEditModalOpen(false);
+                                    }}
+                                    className="w-full h-12 rounded-2xl bg-red-50 hover:bg-red-600 border border-red-200/40 hover:border-red-600 text-xs font-black uppercase text-red-600 hover:text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-sm hover:shadow-md shadow-red-100"
+                                >
+                                    <span>🗑️</span> Tüm Tabloyu Kaldır
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setIsTableEditModalOpen(false)} 
+                                className="rounded-xl h-9 text-xs"
+                            >
+                                Kapat
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -1326,6 +1858,7 @@ const editorModules = {
     toolbar: {
         container: '#report-editor-toolbar',
     },
+    table: true, // Enable Quill's built-in table support
     keyboard: {
         bindings: {
             tab: {
@@ -1349,5 +1882,6 @@ const editorFormats = [
     'color', 'background',
     'list', 'indent',
     'script',
-    'link', 'image', 'align', 'pagebreak'
+    'link', 'image', 'align', 'pagebreak', 'lineheight',
+    'table'
 ];

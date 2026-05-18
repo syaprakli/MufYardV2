@@ -13,6 +13,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useGlobalData } from '../lib/context/GlobalDataContext';
+import { useAuth } from '../lib/hooks/useAuth';
 import { updateProfile } from '../lib/api/profiles';
 import { toast } from 'react-hot-toast';
 
@@ -64,6 +65,7 @@ const slides: SlideProps[] = [
 ];
 
 export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const { user, profile: authProfile } = useAuth();
   const { data, refreshProfile } = useGlobalData();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -77,24 +79,33 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
   };
 
   const handleStartTrial = async () => {
+    const activeProfile = authProfile || data.profile;
+    const uid = activeProfile?.uid || user?.uid;
+    const email = activeProfile?.email || user?.email || undefined;
+    const isFounder = ["sefayaprakli@hotmail.com", "syaprakli@gmail.com", "sefa.yaprakli@gsb.gov.tr"].includes((email || "").toLowerCase().trim());
+    const isAdmin = activeProfile?.role === 'admin' || isFounder;
+
     // Eğer zaten adminse veya trial başladıysa kapat gitsin
-    if (data.profile?.role === 'admin' || data.profile?.trial_started) {
+    if (isAdmin || activeProfile?.trial_started) {
         onClose();
         return;
     }
 
-    if (!data.profile?.uid) return;
+    if (!uid) {
+        toast.error("Kullanıcı kimliği alınamadı, lütfen sayfayı yenileyip tekrar deneyin.");
+        return;
+    }
     
     setLoading(true);
     try {
-        await updateProfile(data.profile.uid, { trial_started: true });
+        await updateProfile(uid, { trial_started: true });
         // Tarayıcı hafızasına da işaret koy ki reload sonrası tekrar gelmesin
-        localStorage.setItem(`mufyard_intro_seen_${data.profile.uid}`, 'true');
+        localStorage.setItem(`mufyard_intro_seen_${uid}`, 'true');
         
         toast.success("30 Günlük deneme süreniz başarıyla başlatıldı! Keyifli kullanımlar.");
         
         // Veriyi tazele ve kapat
-        await refreshProfile(data.profile.uid, data.profile.email);
+        await refreshProfile(uid, email);
         setTimeout(() => {
             window.location.reload();
         }, 1000);
@@ -111,8 +122,13 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
   };
 
   const handleClose = () => {
+    const activeProfile = authProfile || data.profile;
+    const email = activeProfile?.email || user?.email || undefined;
+    const isFounder = ["sefayaprakli@hotmail.com", "syaprakli@gmail.com", "sefa.yaprakli@gsb.gov.tr"].includes((email || "").toLowerCase().trim());
+    const isAdmin = activeProfile?.role === 'admin' || isFounder;
+
     // Eğer trial başlamadıysa ve admin değilse kapatmaya izin verme
-    if (data.profile?.role !== 'admin' && !data.profile?.trial_started) {
+    if (!isAdmin && !activeProfile?.trial_started) {
         toast.error("Devam etmek için deneme süresini başlatmalısınız.");
         return;
     }
@@ -120,11 +136,16 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
   };
 
   const slide = slides[currentSlide];
+  const activeProfile = authProfile || data.profile;
+  const email = activeProfile?.email || user?.email || undefined;
+  const isFounder = ["sefayaprakli@hotmail.com", "syaprakli@gmail.com", "sefa.yaprakli@gsb.gov.tr"].includes((email || "").toLowerCase().trim());
+  const isAdmin = activeProfile?.role === 'admin' || isFounder;
+  const isTrialStarted = activeProfile?.trial_started === true;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0f172a]/95 backdrop-blur-md overflow-hidden p-4">
-      {/* KESİN KONTROL: Sadece admin veya denemesi zaten başlamış olanlar X butonunu görebilir */}
-      {(data.profile?.role === 'admin' || data.profile?.trial_started === true) ? (
+      {/* KESİN KONTROL: Sadece admin, kurucu veya denemesi zaten başlamış olanlar X butonunu görebilir */}
+      {(isAdmin || isTrialStarted) ? (
         <motion.button
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

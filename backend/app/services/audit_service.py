@@ -115,7 +115,7 @@ class AuditService:
     @staticmethod
     async def create_audit(audit: AuditCreate) -> Dict[str, Any]:
         audit_data = audit.dict()
-        audit_data['created_at'] = datetime.utcnow().isoformat()
+        audit_data['created_at'] = datetime.utcnow().isoformat() + "Z"
         
         try:
             # Add to Firestore (returns (update_time, doc_ref) tuple)
@@ -125,7 +125,7 @@ class AuditService:
                 if doc and doc.exists:
                     new_audit = doc.to_dict() or {}
                     new_audit['id'] = result[1].id
-                    new_audit.setdefault('created_at', datetime.utcnow().isoformat())
+                    new_audit.setdefault('created_at', datetime.utcnow().isoformat() + "Z")
                     await AuditService._ensure_report_subfolder_for_audit(new_audit)
                     return new_audit
         except Exception:
@@ -147,7 +147,7 @@ class AuditService:
             
         update_data = {k: v for k, v in audit.dict().items() if v is not None}
         now = datetime.utcnow()
-        update_data['updated_at'] = now.isoformat()
+        update_data['updated_at'] = now.isoformat() + "Z"
         
         # --- Smart Versioning Logic ---
         if 'report_content' in update_data:
@@ -162,21 +162,31 @@ class AuditService:
                     last_time_raw = last_v.get('created_at')
                     try:
                         if isinstance(last_time_raw, str):
-                            last_time = datetime.fromisoformat(last_time_raw)
+                            # Remove optional trailing Z if present to parse with fromisoformat
+                            raw_str = last_time_raw.rstrip('Z')
+                            last_time = datetime.fromisoformat(raw_str)
                         else:
                             last_time = last_time_raw # Firestore Timestamp if exists
                         
-                        if (now - last_time) < timedelta(minutes=30):
+                        time_diff = now - last_time
+                        new_content = update_data.get('report_content', '')
+                        last_content = last_v.get('report_content', '')
+                        char_diff = abs(len(new_content) - len(last_content))
+                        
+                        # Eger 1 saat gecmediyse VE karakter farki 1000'den az ise yeni surum olusturma
+                        if time_diff < timedelta(hours=1) and char_diff < 1000:
                             should_create_version = False
                     except Exception:
                         pass
             
             if should_create_version:
+                existing_versions = await asyncio.to_thread(lambda: list(versions_ref.get()))
+                v_num = len(existing_versions) + 1
                 version_data = {
-                    "version_name": f"v.{now.strftime('%H:%M')}",
+                    "version_name": f"v.{v_num:02d}",
                     "report_content": current_data.get('report_content', ''),
-                    "created_at": now.isoformat(),
-                    "user": "Müfettiş"
+                    "created_at": now.isoformat() + "Z",
+                    "user": update_data.get('inspector') or current_data.get('inspector') or "Müfettiş"
                 }
                 await asyncio.to_thread(versions_ref.add, version_data)
  
@@ -218,10 +228,20 @@ class AuditService:
         
         await asyncio.to_thread(audit_ref.update, {
             "report_content": restore_content,
-            "updated_at": datetime.utcnow().isoformat()
+            "updated_at": datetime.utcnow().isoformat() + "Z"
         })
         
         return await AuditService.get_audit(audit_id)
+        
+    @staticmethod
+    async def delete_audit_version(audit_id: str, version_id: str) -> bool:
+        doc_ref = db.collection('audits').document(audit_id).collection('versions').document(version_id)
+        exists = await asyncio.to_thread(lambda: doc_ref.get().exists)
+        if not exists:
+            return False
+            
+        await asyncio.to_thread(doc_ref.delete)
+        return True
 
     @staticmethod
     async def delete_audit(audit_id: str) -> bool:

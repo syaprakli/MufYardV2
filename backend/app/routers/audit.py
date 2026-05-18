@@ -88,6 +88,13 @@ async def restore_audit_version(id: str, version_id: str):
         raise HTTPException(status_code=404, detail="Sürüm geri yüklenemedi.")
     return restored
 
+@router.delete("/{id}/versions/{version_id}")
+async def delete_audit_version(id: str, version_id: str):
+    success = await AuditService.delete_audit_version(id, version_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Sürüm silinemedi veya bulunamadı.")
+    return {"status": "success", "message": "Sürüm silindi"}
+
 @router.get("/export/excel")
 async def export_excel():
     try:

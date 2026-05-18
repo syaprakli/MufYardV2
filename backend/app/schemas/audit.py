@@ -21,6 +21,9 @@ class AuditBase(BaseModel):
     report_seq: Optional[int] = 1
     attachment_url: Optional[str] = None
     file_name: Optional[str] = None
+    doc_header: Optional[str] = Field(default="T.C. GENÇLİK VE SPOR BAKANLIĞI")
+    doc_footer: Optional[str] = Field(default="Müfettişlik Raporu")
+    show_page_numbers: Optional[bool] = Field(default=True)
 
 class AuditCreate(AuditBase):
     pass
@@ -42,6 +45,9 @@ class AuditUpdate(BaseModel):
     is_public: Optional[bool] = None
     attachment_url: Optional[str] = None
     file_name: Optional[str] = None
+    doc_header: Optional[str] = None
+    doc_footer: Optional[str] = None
+    show_page_numbers: Optional[bool] = None
 
 
 class AuditResponse(AuditBase):

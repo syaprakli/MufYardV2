@@ -17,9 +17,11 @@ export interface Audit {
     assigned_to?: string[];
     shared_with?: string[];
     pending_collaborators?: string[];
-    accepted_collaborators?: string[];
     is_public?: boolean;
     report_seq?: number;
+    doc_header?: string;
+    doc_footer?: string;
+    show_page_numbers?: boolean;
 }
 
 export interface AuditVersion {
@@ -213,6 +215,16 @@ export async function restoreAuditVersion(id: string, versionId: string): Promis
         throw new Error("Sürüm geri yüklenemedi.");
     }
     auditCache = {}; // Invalidate cache
+    return response.json();
+}
+
+export async function deleteAuditVersion(id: string, versionId: string): Promise<{status: string, message: string}> {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}/versions/${versionId}`, {
+        method: "DELETE"
+    });
+    if (!response.ok) {
+        throw new Error("Sürüm silinemedi.");
+    }
     return response.json();
 }
 
