@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { User, Bell, Shield, Wand2, Database, LogOut, FileText, Users, Zap, Loader2 } from "lucide-react";
+import { User, Bell, Shield, Wand2, Database, LogOut, FileText, Zap, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "../components/ui/Button";
 import { useAuth } from "../lib/hooks/useAuth";
@@ -145,7 +145,6 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
                     <SettingsNav icon={Shield} label="Güvenlik" active={activeTab === "Güvenlik"} onClick={() => setActiveTab("Güvenlik")} />
                     <SettingsNav icon={Zap} label="Lisans" active={activeTab === "Lisans"} onClick={() => setActiveTab("Lisans")} />
                     {profile?.role === 'admin' && <SettingsNav icon={Database} label="Veri" active={activeTab === "Veri"} onClick={() => setActiveTab("Veri")} />}
-                    {profile?.role === 'admin' && <SettingsNav icon={Users} label="Müfettişler" active={activeTab === "Müfettiş Listesi"} onClick={() => setActiveTab("Müfettiş Listesi")} />}
                 </div>
 
                 <div className="md:col-span-9 space-y-6">

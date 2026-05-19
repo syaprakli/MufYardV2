@@ -88,7 +88,11 @@ export default function Contacts() {
             });
 
             const acceptedContacts = accepted.length > 0 ? accepted : (data.length > 0 ? data.filter(c => c.owner_id === userUid) : []);
-            return { contacts: acceptedContacts, invitations: pending };
+            
+            // Deduplicate contacts by id to prevent 'kişi 2 defa yazıyor' bug
+            const uniqueContacts = Array.from(new Map(acceptedContacts.map(c => [c.id, c])).values());
+            
+            return { contacts: uniqueContacts, invitations: pending };
         } else {
             const corp = (cachedData.contactsCorporate || []).filter(c => {
                 const cEmail = c.email?.toLowerCase().trim();

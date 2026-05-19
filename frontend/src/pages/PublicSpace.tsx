@@ -203,7 +203,11 @@ export default function PublicSpace() {
     // URL Resolution Helper
     const resolveAttachmentUrl = (url: string | null | undefined) => {
         if (!url) return '';
-        const raw = String(url).trim().replace(/\\/g, '/');
+        let raw = String(url).trim().replace(/\\/g, '/');
+        
+        // Önceki sürümlerde kaydedilmiş localhost URL'lerini düzelt
+        raw = raw.replace(/https?:\/\/localhost:\d+/g, '');
+        raw = raw.replace(/https?:\/\/127\.0\.0\.1:\d+/g, '');
         
         if (raw.startsWith('http') || raw.startsWith('blob:') || raw.startsWith('data:')) return raw;
         
@@ -587,8 +591,8 @@ export default function PublicSpace() {
 
     return (
         <div className="flex h-full w-full bg-card relative font-outfit overflow-hidden flex-col md:flex-row">
-            {/* Mobile only: floating bubble chat */}
-            <div className="md:hidden">
+            {/* Mobile/Tablet: floating bubble chat */}
+            <div className="xl:hidden">
                 <DraggableChatWidget />
             </div>
             <div className="flex-1 flex flex-col overflow-hidden bg-muted/30 min-w-0">
@@ -886,7 +890,7 @@ export default function PublicSpace() {
             <motion.div 
                 initial={false}
                 animate={{ width: desktopChatOpen ? 384 : 0 }}
-                className="hidden md:flex flex-col shrink-0 border-l border-slate-200 bg-white relative"
+                className="hidden xl:flex flex-col shrink-0 border-l border-slate-200 bg-white relative"
             >
                 {/* Floating Toggle Button */}
                 <button 

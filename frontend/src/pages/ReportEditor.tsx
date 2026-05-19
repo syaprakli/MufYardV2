@@ -131,6 +131,7 @@ export default function ReportEditor() {
     const [docHeader, setDocHeader] = useState("T.C. GENÇLİK VE SPOR BAKANLIĞI");
     const [docFooter, setDocFooter] = useState("Müfettişlik Raporu");
     const [showPageNumbers, setShowPageNumbers] = useState(true);
+    const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
 
     // AI Bubble Menu State
     const [selectionRect, setSelectionRect] = useState<DOMRect | null>(null);
@@ -147,7 +148,6 @@ export default function ReportEditor() {
     const [aiSection, setAiSection] = useState<string>("tamamini");
     const [aiInsertMode, setAiInsertMode] = useState<"replace" | "append">("append");
     const AI_REPORT_ASSISTANT_ENABLED = false;
-    const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
 
     const focusEditorToEnd = (e: React.MouseEvent) => {
         if (e.target !== e.currentTarget) return;
@@ -456,44 +456,8 @@ export default function ReportEditor() {
         if (quillRef.current) {
             const editor = quillRef.current.getEditor();
             
-            // ── Electron Selection Loss Prevention Patch (Quill Core API Override) ──
-            const originalGetSelection = editor.getSelection.bind(editor);
-            editor.getSelection = (focus = false) => {
-                const sel = originalGetSelection(focus);
-                if (sel) {
-                    lastSelectionRange.current = sel;
-                    return sel;
-                }
-                return lastSelectionRange.current || { index: 0, length: 0 };
-            };
-
-            if (editor.selection) {
-                // Hook into internal Selection getRange method
-                const originalGetRange = editor.selection.getRange.bind(editor.selection);
-                editor.selection.getRange = () => {
-                    const res = originalGetRange();
-                    const range = res && res[0];
-                    if (range) {
-                        lastSelectionRange.current = range;
-                        return res;
-                    }
-                    const fallback = lastSelectionRange.current || { index: 0, length: 0 };
-                    return [fallback, []];
-                };
-
-                // Hook into internal Selection update method to preserve savedRange on blur
-                const originalUpdate = editor.selection.update.bind(editor.selection);
-                editor.selection.update = (source = "api") => {
-                    originalUpdate(source);
-                    const range = originalGetSelection(false);
-                    if (range) {
-                        lastSelectionRange.current = range;
-                        editor.selection.savedRange = range;
-                    } else if (lastSelectionRange.current) {
-                        editor.selection.savedRange = lastSelectionRange.current;
-                    }
-                };
-            }
+            // Quill Selection and Formatting Engine works natively on Web.
+            // We only apply the mousedown preventDefault for Electron in a separate useEffect.
             
             // Get user info from Firebase Auth
             const userName = user?.displayName
@@ -612,6 +576,39 @@ export default function ReportEditor() {
         const bgPicker = document.querySelector('.ql-picker.ql-background');
         if (bgPicker) {
             bgPicker.setAttribute('title', 'Asetatlı Kalem (Fosforlu Vurgu)');
+        }
+
+        // Only apply this aggressive mousedown interceptor in Electron to prevent focus loss.
+        // On Web, native Quill handles this perfectly.
+        if (isElectron) {
+            const handleGlobalMouseDown = (e: MouseEvent) => {
+                const target = e.target as HTMLElement;
+                if (!target || !quillRef.current) return;
+                
+                const editor = quillRef.current.getEditor();
+                
+                const isPickerOrButton = target.closest('.ql-picker') || 
+                                         target.closest('.ql-picker-options') || 
+                                         target.closest('.ql-picker-item') || 
+                                         target.closest('.ql-picker-label') ||
+                                         target.closest('.ql-formats button');
+                
+                if (isPickerOrButton) {
+                    // In Electron, clicking these elements causes contenteditable to blur immediately.
+                    // We must prevent default to keep the selection range alive.
+                    e.preventDefault();
+                    
+                    // Delay focus restore slightly to let picker open/close logic execute
+                    setTimeout(() => {
+                        if (!editor.hasFocus()) {
+                            editor.focus();
+                        }
+                    }, 50);
+                }
+            };
+            
+            document.addEventListener('mousedown', handleGlobalMouseDown, true);
+            return () => document.removeEventListener('mousedown', handleGlobalMouseDown, true);
         }
     }, [loading]);
 
@@ -786,15 +783,25 @@ export default function ReportEditor() {
             }
 
             const restoredAudit = await restoreAuditVersion(id, versionId);
-            const restoredContent = restoredAudit.report_content || "";
+            let restoredContent = restoredAudit.report_content || "";
             
-            // Editörü ve Yjs belgesini doğrudan güncelle (Sayfa yenilemeye gerek yok!)
+            // Eğer eski sürüm Delta (JSON) formatında kalmışsa, doğrudan setContent ile çözemeyiz.
+            // ReactQuill HTML bekler. Ancak Delta ops array ise, Quill setContents ile yükleyebiliriz.
             if (quillRef.current) {
                 const editor = quillRef.current.getEditor();
                 
-                // Mevcut içeriği temizle ve yeni sürüm içeriğini yerleştir
-                editor.setContents([]);
-                editor.clipboard.dangerouslyPasteHTML(0, restoredContent, "user");
+                if (restoredContent.trim().startsWith('{"ops":')) {
+                    try {
+                        const delta = JSON.parse(restoredContent);
+                        editor.setContents(delta, "user");
+                        restoredContent = editor.root.innerHTML; // Update local state string to HTML representation
+                    } catch (e) {
+                        editor.clipboard.dangerouslyPasteHTML(0, restoredContent, "user");
+                    }
+                } else {
+                    editor.setContents([]);
+                    editor.clipboard.dangerouslyPasteHTML(0, restoredContent, "user");
+                }
                 
                 // Yerel React state'i güncelle
                 setContent(restoredContent);
@@ -1838,12 +1845,7 @@ export default function ReportEditor() {
 
                         {/* Footer */}
                         <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end">
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => setIsTableEditModalOpen(false)} 
-                                className="rounded-xl h-9 text-xs"
-                            >
+                            <Button variant="outline" onClick={() => setIsTableEditModalOpen(false)} className="rounded-xl h-9 text-xs">
                                 Kapat
                             </Button>
                         </div>

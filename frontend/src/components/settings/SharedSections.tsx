@@ -1,4 +1,5 @@
 import { Bell, Shield, Key, FileText, AlertTriangle, Database, Zap, HardDrive, Globe } from "lucide-react";
+import { toast } from "react-hot-toast";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { cn } from "../../lib/utils";
@@ -131,11 +132,16 @@ export const DataSection = ({
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="p-6 bg-muted rounded-3xl space-y-4">
-                <div className="flex items-center gap-3 text-primary"><HardDrive size={20} /><span className="font-bold text-sm">Yerel Yedekleme</span></div>
-                <p className="text-xs text-slate-500">Tüm verilerinizi JSON formatında bilgisayarınıza indirin.</p>
-                <Button variant="outline" className="w-full h-12 font-bold" onClick={handleLocalBackup} disabled={backupLoading}>
-                    {backupLoading ? "Hazırlanıyor..." : "Şimdi İndir"}
-                </Button>
+                <div className="flex items-center gap-3 text-primary"><HardDrive size={20} /><span className="font-bold text-sm">Yerel Yedekleme & Geri Yükleme</span></div>
+                <p className="text-xs text-slate-500">Tüm verilerinizi bilgisayarınıza indirin veya geri yükleyin.</p>
+                <div className="flex gap-2">
+                    <Button variant="outline" className="w-full h-12 font-bold" onClick={handleLocalBackup} disabled={backupLoading}>
+                        {backupLoading ? "İndiriliyor..." : "Veri İndir"}
+                    </Button>
+                    <Button variant="outline" className="w-full h-12 font-bold" onClick={() => toast.error("Henüz geliştirme aşamasındadır.")}>
+                        Veri Yükle
+                    </Button>
+                </div>
             </div>
             <div className="p-6 bg-primary/5 rounded-3xl space-y-4 border border-primary/10">
                 <div className="flex items-center gap-3 text-primary"><Globe size={20} /><span className="font-bold text-sm">Bulut Yedekleme</span></div>

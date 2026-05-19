@@ -224,7 +224,8 @@ class AuditService:
             return None
             
         v_data = v_doc.to_dict()
-        restore_content = v_data.get('report_content', '')
+        # Fallback to 'content' for legacy versions before schema change
+        restore_content = v_data.get('report_content', v_data.get('content', ''))
         
         await asyncio.to_thread(audit_ref.update, {
             "report_content": restore_content,

@@ -9,8 +9,8 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['run_backend.py'],
-    pathex=['.'],
+    ['C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF YARD\\MufYardV2\\backend\\run_backend.py'],
+    pathex=['C:\\Users\\sefa\\.gemini\\antigravity\\playground\\TAMAMLANANLAR\\MUF YARD\\MufYardV2\\backend'],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
