@@ -1205,7 +1205,9 @@ export default function ReportEditor() {
                         </div>
                         <div className="text-[11px] font-bold">
                             {checklistSummary.criticalFailures === 0 ? (
-                                <span className="text-emerald-600">Teslim kontrolü hazır</span>
+                                <button type="button" onClick={() => setIsChecklistOpen(true)} className="text-emerald-600 hover:text-emerald-700">
+                                    Teslim kontrolü hazır
+                                </button>
                             ) : (
                                 <button type="button" onClick={() => setIsChecklistOpen(true)} className="text-amber-600 hover:text-amber-700">
                                     {checklistSummary.criticalFailures} kritik eksik var
