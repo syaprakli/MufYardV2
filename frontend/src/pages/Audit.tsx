@@ -1,30 +1,38 @@
-import { Plus, Search, Filter, FileText, Download, Loader2, FileSpreadsheet, Edit3, Shield, MapPin, Clock, Trash2, CheckCircle2, ChevronRight, Share2, UserPlus, Upload, Archive, RotateCcw } from "lucide-react";
+import { Plus, Search, Filter, FileText, Loader2, FileSpreadsheet, Shield, ChevronRight, UserPlus, Upload, Trash2, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
-import { useEffect, useState, useMemo } from "react";
+import { API_URL as API_BASE_URL } from "../lib/config";
+import { Suspense, lazy, useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { Modal } from "../components/ui/Modal";
 import { createAudit, deleteAudit, updateAudit, exportAuditsToExcel, exportAuditToWord, acceptAudit, type Audit as AuditType } from "../lib/api/audit";
-import { updateTask, type Task } from "../lib/api/tasks";
+import { updateTask } from "../lib/api/tasks";
 import { useAuth } from "../lib/hooks/useAuth";
 import { isElectron } from "../lib/firebase";
 import { cn } from "../lib/utils";
-import ShareModal from "../components/ShareModal";
-
-const RAPOR_DURUMLARI = ["Başlanmadı", "Devam Ediyor", "Evrak Bekleniyor", "İncelemede", "Rapor Yazılıyor", "Tamamlandı"];
-
-const RAPOR_SABLONLARI: Record<string, string> = {
-    "Boş Rapor": "",
-    "Genel Teftiş": "<h1 style=\"text-align: center;\">GENEL TEFTİŞ RAPORU</h1><p><br></p><p><strong>1. GİRİŞ</strong></p><p>....... tarihli ve ....... sayılı Makam Onayı üzerine ....... İl Müdürlüğü ve bağlı birimlerinde yürütülen Genel Teftiş çalışmaları sonucunda bu rapor düzenlenmiştir.</p><p><br></p><p><strong>2. YAPILAN İNCELEME VE TESPİTLER</strong></p><p>Kurumun mevzuata uygunluk, mali ve idari işlemleri incelenmiş olup, tespit edilen hususlar aşağıda maddeler halinde açıklanmıştır:</p><ul><li>İlk tespit...</li></ul><p><br></p><p><strong>3. SONUÇ VE ÖNERİLER</strong></p><p>Yapılan genel teftiş neticesinde ....... kanaatine varılmıştır.</p>",
-    "İnceleme-Soruşturma": "<h1 style=\"text-align: center;\">İNCELEME VE SORUŞTURMA RAPORU</h1><p><br></p><p><strong>1. İNCELEME/SORUŞTURMA EMRİ</strong></p><p>....... tarihli ve ....... sayılı görevlendirme emri.</p><p><br></p><p><strong>2. İDDİA KONUSU</strong></p><p>Şikayet/İhbar dilekçesinde belirtilen iddialar: .......</p><p><br></p><p><strong>3. İFADE VE BEYANLAR</strong></p><p>Müşteki, şüpheli ve bilgi sahiplerinin beyanları...</p><p><br></p><p><strong>4. TAHLİL VE DEĞERLENDİRME</strong></p><p>Elde edilen bilgi, belge ve ifadeler ışığında iddiaların değerlendirilmesi.</p><p><br></p><p><strong>5. SONUÇ VE TEKLİF</strong></p><p>İddiaların sübuta erip ermediği ve getirilen disiplin/mali teklifler.</p>",
-    "Ön İnceleme": "<h1 style=\"text-align: center;\">ÖN İNCELEME RAPORU</h1><p><br></p><p><strong>1. ÖN İNCELEME EMRİ</strong></p><p>.......</p><p><br></p><p><strong>2. HAKKINDA ÖN İNCELEME YAPILANLAR</strong></p><p>Adı Soyadı, Unvanı, Görev Yeri</p><p><br></p><p><strong>3. ÖN İNCELEME KONUSU</strong></p><p>.......</p><p><br></p><p><strong>4. İNCELEME VE DEĞERLENDİRME</strong></p><p>.......</p><p><br></p><p><strong>5. SONUÇ VE TEKLİF</strong></p><p>4483 sayılı Kanun kapsamında Soruşturma İzni Verilmesi / Verilmemesi teklifi.</p>",
-    "Spor Kulüpleri": "<h1 style=\"text-align: center;\">SPOR KULÜBÜ DENETİM RAPORU</h1><p><br></p><p><strong>1. GİRİŞ</strong></p><p>7405 sayılı Spor Kulüpleri ve Spor Federasyonları Kanunu kapsamında ....... Spor Kulübü'nün idari ve mali denetimi hakkındadır.</p><p><br></p><p><strong>2. İDARİ YAPI VE İŞLEYİŞ</strong></p><p>Tüzük uygunluğu, üye kayıt defteri, yönetim kurulu karar defterinin incelenmesi.</p><p><br></p><p><strong>3. MALİ İNCELEME</strong></p><p>Gelir-gider tabloları, bağış makbuzları ve bilanço değerleri.</p><p><br></p><p><strong>4. SONUÇ</strong></p><p>İyileştirilmesi gereken alanlar ve mevzuata aykırı eylemlere ilişkin bildirimler.</p>"
-};
 
 import { useGlobalData } from "../lib/context/GlobalDataContext";
-import { REPORT_TEMPLATES } from "../lib/reportTemplates";
+
+const toPlainSearchText = (value?: string) =>
+    String(value || "")
+        .replace(/<br\s*\/?>/gi, " ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLocaleLowerCase("tr-TR");
+
+const AuditList = lazy(() => import("../components/audit/AuditList"));
+const ShareModalLazy = lazy(() => import("../components/ShareModal"));
+const ModalLazy = lazy(() => import("../components/ui/Modal").then((module) => ({ default: module.Modal })));
+
+type ReportTemplateItem = {
+    id: string;
+    name: string;
+    category: string;
+    html: string;
+};
 
 export default function Audit() {
     const { user } = useAuth();
@@ -41,11 +49,41 @@ export default function Audit() {
     const [filterStatus, setFilterStatus] = useState("Tümü");
     const [filterInspector, setFilterInspector] = useState("Tümü");
     const [filterTaskType, setFilterTaskType] = useState("Tümü");
+    const [filterRole, setFilterRole] = useState("Tümü");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [shareAudit, setShareAudit] = useState<AuditType | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
+    const [reportTemplates, setReportTemplates] = useState<ReportTemplateItem[]>([]);
+    const [templatesLoading, setTemplatesLoading] = useState(false);
     
+    // Gelişmiş Arama States
+    const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
+    const [globalSearchQuery, setGlobalSearchQuery] = useState("");
+    const [globalSearchResults, setGlobalSearchResults] = useState<any[]>([]);
+    const [globalSearchLoading, setGlobalSearchLoading] = useState(false);
+
+    const handleGlobalSearch = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (globalSearchQuery.trim().length < 2) {
+            toast.error("Lütfen en az 2 karakter giriniz.");
+            return;
+        }
+
+        setGlobalSearchLoading(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/search/search-reports?q=${encodeURIComponent(globalSearchQuery.trim())}`);
+            if (!res.ok) throw new Error("Arama servisinde hata oluştu.");
+            const data = await res.json();
+            setGlobalSearchResults(data.results || []);
+        } catch (error: any) {
+            console.error(error);
+            toast.error(error.message || "Arama yapılamadı.");
+        } finally {
+            setGlobalSearchLoading(false);
+        }
+    };
+
     const [newAudit, setNewAudit] = useState({
         task_id: "",
         title: "",
@@ -88,6 +126,36 @@ export default function Audit() {
             refreshAll(user.uid, user.email || undefined, user.displayName || undefined);
         }
     }, [user, refreshAll]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadTemplates = async () => {
+            if (!isModalOpen || activeTab === "ortak") return;
+            if (reportTemplates.length > 0) return;
+
+            try {
+                setTemplatesLoading(true);
+                const module = await import("../lib/reportTemplates");
+                if (!cancelled) {
+                    setReportTemplates(module.REPORT_TEMPLATES || []);
+                }
+            } catch {
+                if (!cancelled) {
+                    setReportTemplates([]);
+                }
+            } finally {
+                if (!cancelled) {
+                    setTemplatesLoading(false);
+                }
+            }
+        };
+
+        loadTemplates();
+        return () => {
+            cancelled = true;
+        };
+    }, [isModalOpen, activeTab, reportTemplates.length]);
 
     // Web sürümü uyarısı - Kullanıcı isteğiyle kaldırıldı
     useEffect(() => {
@@ -146,10 +214,12 @@ export default function Audit() {
 
             let selectedTemplateHtml = "";
             if (newAudit.template) {
-                if (RAPOR_SABLONLARI[newAudit.template] !== undefined) {
-                    selectedTemplateHtml = RAPOR_SABLONLARI[newAudit.template];
+                const { AUDIT_DRAFT_TEMPLATES } = await import("../lib/auditDraftTemplates");
+                if (AUDIT_DRAFT_TEMPLATES[newAudit.template] !== undefined) {
+                    selectedTemplateHtml = AUDIT_DRAFT_TEMPLATES[newAudit.template];
                 } else {
-                    const found = REPORT_TEMPLATES.find(t => t.id === newAudit.template);
+                    const pool = reportTemplates.length > 0 ? reportTemplates : (await import("../lib/reportTemplates")).REPORT_TEMPLATES;
+                    const found = pool.find(t => t.id === newAudit.template);
                     if (found) {
                         selectedTemplateHtml = found.html;
                     }
@@ -350,12 +420,52 @@ export default function Audit() {
         } catch { toast.error("Paylaşım güncellenemedi."); }
     };
 
+    const currentUserKeys = useMemo(() => {
+        const keys = [user?.uid, user?.email?.toLowerCase()].filter(Boolean) as string[];
+        return Array.from(new Set(keys));
+    }, [user?.uid, user?.email]);
+
     const filteredAudits = useMemo(() => {
+        const resolveAuditRoleForUser = (audit: AuditType) => {
+            const normalizedUserKeys = currentUserKeys.map((k) => String(k).toLowerCase());
+            const owner = String((audit as any).owner_id || "").toLowerCase();
+            if (owner && normalizedUserKeys.includes(owner)) return "Sahip";
+
+            const sharedRoles = ((audit as any).shared_roles || {}) as Record<string, "view" | "comment" | "edit">;
+            const explicitRole = Object.entries(sharedRoles).find(([k]) => normalizedUserKeys.includes(String(k).toLowerCase()))?.[1];
+            if (explicitRole === "edit") return "Düzenle";
+            if (explicitRole === "comment") return "Yorumla";
+            if (explicitRole === "view") return "Görüntüle";
+
+            const sharedWith = (((audit as any).shared_with || []) as string[]).map((k) => String(k).toLowerCase());
+            if (normalizedUserKeys.some((k) => sharedWith.includes(k))) return "Düzenle";
+
+            const pending = (((audit as any).pending_collaborators || []) as string[]).map((k) => String(k).toLowerCase());
+            if (normalizedUserKeys.some((k) => pending.includes(k))) return "Davet";
+
+            return "Yok";
+        };
+
         return audits.filter(a => {
-            const matchesSearch = !debouncedSearch || 
-                                  a.title.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                                  a.location.toLowerCase().includes(debouncedSearch.toLowerCase());
             const relatedTask = tasks.find(t => String(t.id).trim() === String(a.task_id).trim());
+            const normalizedSearch = debouncedSearch.trim().toLocaleLowerCase("tr-TR");
+            const searchHaystack = [
+                a.title,
+                a.location,
+                a.date,
+                a.inspector,
+                a.status,
+                a.description,
+                a.report_content,
+                relatedTask?.rapor_adi,
+                relatedTask?.rapor_kodu,
+                relatedTask?.rapor_turu,
+                relatedTask?.rapor_durumu
+            ]
+                .map((value) => toPlainSearchText(value))
+                .filter(Boolean)
+                .join(" ");
+            const matchesSearch = !normalizedSearch || searchHaystack.includes(normalizedSearch);
             
             // 2 yıl kuralı (İlişkili görev üzerinden veya raporun kendi tarihi üzerinden)
             let isOld = false;
@@ -381,15 +491,16 @@ export default function Audit() {
             const matchesStatus = filterStatus === "Tümü" || effectiveStatus === filterStatus;
             const matchesInspector = filterInspector === "Tümü" || a.inspector === filterInspector;
             const matchesTaskType = filterTaskType === "Tümü" || relatedTask?.rapor_turu === filterTaskType;
+            const matchesRole = filterRole === "Tümü" || resolveAuditRoleForUser(a) === filterRole;
 
-            return matchesSearch && matchesTab && matchesStatus && matchesInspector && matchesTaskType;
+            return matchesSearch && matchesTab && matchesStatus && matchesInspector && matchesTaskType && matchesRole;
         }).sort((a, b) => {
             if (a.task_id !== b.task_id) {
                 return (a.task_id || "").localeCompare(b.task_id || "");
             }
             return (a.report_seq || 0) - (b.report_seq || 0);
         });
-    }, [audits, tasks, debouncedSearch, activeTab, filterStatus, filterInspector, filterTaskType]);
+    }, [audits, tasks, currentUserKeys, debouncedSearch, activeTab, filterStatus, filterInspector, filterTaskType, filterRole]);
 
     const uniqueStatuses = useMemo(() => {
         return Array.from(new Set(audits.map((a) => {
@@ -484,18 +595,37 @@ export default function Audit() {
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Denetim adı, yeri veya tarihine göre ara..."
+                        placeholder="Tam metin ara: başlık, içerik, görev kodu, müfettiş, tarih..."
                         className="bg-transparent border-none outline-none text-sm w-full font-outfit font-medium"
                     />
+                    {debouncedSearch && (
+                        <span className="hidden lg:inline text-[10px] font-black uppercase tracking-widest text-primary whitespace-nowrap">
+                            Tam Metin
+                        </span>
+                    )}
                 </div>
                 <Button variant="outline" className="h-12 rounded-xl px-6" onClick={() => setIsFilterOpen((v) => !v)}>
                     <Filter className="mr-2" size={18} /> Filtrele
                 </Button>
+                <Button 
+                    variant="outline" 
+                    className="h-12 rounded-xl px-6 border-violet-100 text-violet-700 bg-violet-50/50 hover:bg-violet-50 transition-all font-bold"
+                    onClick={() => setIsGlobalSearchOpen(true)}
+                    title="Rapor içeriklerinde detaylı kelime araması yapın"
+                >
+                    <Search className="mr-2" size={18} /> İçeriklerde Ara
+                </Button>
             </div>
+
+            {debouncedSearch && (
+                <div className="px-1 text-[11px] font-bold text-slate-500">
+                    "{debouncedSearch}" için tam metin arama yapılıyor. {filteredAudits.length} rapor eşleşti.
+                </div>
+            )}
 
             {isFilterOpen && (
                 <Card className="p-5 border border-border rounded-2xl bg-card shadow-sm">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Durum</label>
                             <select
@@ -537,6 +667,22 @@ export default function Audit() {
                                 ))}
                             </select>
                         </div>
+
+                        <div>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rol</label>
+                            <select
+                                value={filterRole}
+                                onChange={(e) => setFilterRole(e.target.value)}
+                                className="mt-2 w-full h-11 px-3 rounded-xl border border-slate-200 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20"
+                            >
+                                <option value="Tümü">Tümü</option>
+                                <option value="Sahip">Sahip</option>
+                                <option value="Düzenle">Düzenle</option>
+                                <option value="Yorumla">Yorumla</option>
+                                <option value="Görüntüle">Görüntüle</option>
+                                <option value="Davet">Davet</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div className="flex justify-end mt-4">
@@ -546,6 +692,7 @@ export default function Audit() {
                                 setFilterStatus("Tümü");
                                 setFilterInspector("Tümü");
                                 setFilterTaskType("Tümü");
+                                setFilterRole("Tümü");
                             }}
                             className="rounded-xl px-5"
                         >
@@ -601,23 +748,41 @@ export default function Audit() {
             )}
 
             {filteredAudits.length > 0 ? (
-                <div className="space-y-4">
-                    {filteredAudits.map((audit) => (
-                        <AuditListItem
-                            key={audit.id}
-                            audit={audit}
-                            task={tasks.find(t => String(t.id).trim() === String(audit.task_id).trim())}
-                            isSelected={selectedIds.includes(audit.id)}
-                            onToggleSelect={() => handleToggleSelect(audit.id)}
-                            onExportWord={() => isElectron ? exportAuditToWord(audit.id) : toast.error("Rapor indirme ve dışa aktarma işlemleri sadece masaüstü uygulamasında aktiftir.")}
-                            onEdit={() => navigate(`/audit/${audit.id}/report`)}
-                            onUpdate={handleUpdateAudit}
-                            onDelete={() => handleSingleDelete(audit.id)}
-                            onShare={() => setShareAudit(audit)}
-                            onRefresh={() => loadData(true)}
-                        />
-                    ))}
-                </div>
+                <Suspense
+                    fallback={
+                        <div className="space-y-4">
+                            {Array.from({ length: 4 }).map((_, idx) => (
+                                <Card key={`audit-skeleton-${idx}`} className="p-6 rounded-2xl border border-border/60 bg-card">
+                                    <div className="h-20 w-full animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
+                                </Card>
+                            ))}
+                        </div>
+                    }
+                >
+                    <AuditList
+                        audits={filteredAudits}
+                        tasks={tasks}
+                        currentUserKeys={currentUserKeys}
+                        selectedIds={selectedIds}
+                        isElectron={isElectron}
+                        onToggleSelect={handleToggleSelect}
+                        onExportWord={(auditId: string) => {
+                            if (isElectron) {
+                                exportAuditToWord(auditId);
+                            } else {
+                                toast.error("Rapor indirme ve dışa aktarma işlemleri sadece masaüstü uygulamasında aktiftir.");
+                            }
+                        }}
+                        onEdit={(auditId: string) => navigate(`/audit/${auditId}/report`)}
+                        onUpdate={handleUpdateAudit}
+                        onDelete={handleSingleDelete}
+                        onShare={(auditId: string) => {
+                            const targetAudit = filteredAudits.find((a) => a.id === auditId);
+                            if (targetAudit) setShareAudit(targetAudit);
+                        }}
+                        onRefresh={() => loadData(true)}
+                    />
+                </Suspense>
             ) : (
                 <Card className="p-20 flex flex-col items-center justify-center text-center space-y-5 border-dashed border-2 rounded-3xl bg-card/50 border-border/50">
                     <div className="w-20 h-20 rounded-3xl bg-muted flex items-center justify-center text-muted-foreground/30">
@@ -642,7 +807,8 @@ export default function Audit() {
             )}
 
             {isModalOpen && (
-            <Modal
+            <Suspense fallback={null}>
+            <ModalLazy
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 title={activeTab === 'ortak' ? "Arşiv Rapor Ekle (Dosya Yükle)" : "Yeni Rapor Başlat"}
@@ -718,7 +884,7 @@ export default function Audit() {
                                 >
                                     <option value="Boş Rapor" className="bg-card">Boş Rapor</option>
                                     {["Genel Teftiş", "Spor Kulüpleri", "Ön İnceleme", "İnceleme-Soruşturma"].map((cat) => {
-                                        const templates = REPORT_TEMPLATES.filter((t) => t.category === cat);
+                                        const templates = reportTemplates.filter((t) => t.category === cat);
                                         return (
                                             <optgroup key={cat} label={cat} className="bg-card font-bold text-xs text-primary/80">
                                                 {templates.map((t) => (
@@ -729,6 +895,7 @@ export default function Audit() {
                                             </optgroup>
                                         );
                                     })}
+                                    {templatesLoading && <option disabled>Şablonlar yükleniyor...</option>}
                                 </select>
                             </div>
                         )}
@@ -755,218 +922,118 @@ export default function Audit() {
                         </Button>
                     </div>
                 </form>
-            </Modal>
+            </ModalLazy>
+            </Suspense>
             )}
             
             {shareAudit && (
-                <ShareModal
-                    isOpen={!!shareAudit}
-                    onClose={() => setShareAudit(null)}
-                    title="Raporu Paylaş"
-                    sharedWith={(shareAudit as any).pending_collaborators || []}
-                    onShare={handleShareAuditUpdate}
-                />
+                <Suspense fallback={null}>
+                    <ShareModalLazy
+                        isOpen={!!shareAudit}
+                        onClose={() => setShareAudit(null)}
+                        title="Raporu Paylaş"
+                        sharedWith={(shareAudit as any).pending_collaborators || []}
+                        onShare={handleShareAuditUpdate}
+                    />
+                </Suspense>
+            )}
+
+            {/* Gelişmiş Arama Modali */}
+            {isGlobalSearchOpen && (
+                <div 
+                    onClick={() => setIsGlobalSearchOpen(false)}
+                    className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/40 backdrop-blur-md p-4 animate-in fade-in duration-200"
+                >
+                    <div 
+                        onClick={(e) => e.stopPropagation()}
+                        className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col border border-slate-100 dark:border-slate-800/80 overflow-hidden animate-in zoom-in-95 duration-200"
+                    >
+                        {/* Header */}
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                    <Search className="text-violet-600 dark:text-violet-400" size={20} /> Tüm Rapor İçeriklerinde Ara
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Sistemdeki tüm raporların içindeki metinleri kelime kelime tarayın.</p>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={() => setIsGlobalSearchOpen(false)} className="rounded-full w-8 h-8 p-0 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 flex items-center justify-center">
+                                <X size={18} />
+                            </Button>
+                        </div>
+
+                        {/* Search Input Area */}
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20">
+                            <form onSubmit={handleGlobalSearch} className="flex gap-2">
+                                <div className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-11 rounded-xl px-4 flex items-center focus-within:ring-2 focus-within:ring-violet-500/20 transition-all">
+                                    <Search size={16} className="text-slate-400 mr-2" />
+                                    <input
+                                        type="text"
+                                        value={globalSearchQuery}
+                                        onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                                        placeholder="Aranacak kelime veya ifadeyi yazın..."
+                                        className="bg-transparent border-none outline-none text-sm w-full font-medium text-slate-800 dark:text-slate-100"
+                                        autoFocus
+                                    />
+                                </div>
+                                <Button 
+                                    type="submit" 
+                                    disabled={globalSearchLoading}
+                                    className="h-11 px-5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold"
+                                >
+                                    {globalSearchLoading ? <Loader2 size={16} className="animate-spin" /> : "Ara"}
+                                </Button>
+                            </form>
+                        </div>
+
+                        {/* Results list */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                            {globalSearchLoading ? (
+                                <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                                    <Loader2 className="w-8 h-8 text-violet-600 animate-spin" />
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">İçerikler taranıyor...</p>
+                                </div>
+                            ) : globalSearchResults.length === 0 ? (
+                                <div className="text-center py-12 text-slate-400 dark:text-slate-500 italic text-sm">
+                                    {globalSearchQuery ? "Aramanıza uygun sonuç bulunamadı." : "Kelime arayarak raporlarınızın içindeki eşleşen cümleleri görebilirsiniz."}
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{globalSearchResults.length} Eşleşen Rapor Bulundu</p>
+                                    {globalSearchResults.map((result) => (
+                                        <div
+                                            key={result.id}
+                                            onClick={() => {
+                                                setIsGlobalSearchOpen(false);
+                                                navigate(`/audit/${result.id}/report`);
+                                            }}
+                                            className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-violet-300 dark:hover:border-violet-700 bg-white dark:bg-slate-900 hover:bg-violet-50/10 cursor-pointer group transition-all shadow-sm hover:shadow-md flex flex-col gap-2 animate-in fade-in duration-200"
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <h5 className="font-bold text-sm text-slate-800 dark:text-slate-100 group-hover:text-violet-700 dark:group-hover:text-violet-400 transition-colors">
+                                                    {result.title}
+                                                </h5>
+                                                <span className="text-[9px] font-black uppercase tracking-widest bg-violet-50 dark:bg-violet-950/30 text-violet-700 dark:text-violet-400 px-2 py-0.5 rounded-md">Editöre Git ➔</span>
+                                            </div>
+                                            {result.snippet && (
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium bg-slate-50 dark:bg-slate-950/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/50">
+                                                    ... <span dangerouslySetInnerHTML={{ __html: result.snippet.replace(new RegExp(`(${globalSearchQuery})`, 'gi'), '<mark class="bg-yellow-100 dark:bg-yellow-950/60 text-slate-800 dark:text-yellow-250 px-0.5 rounded">$1</mark>') }} /> ...
+                                                </p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 flex items-center justify-end">
+                            <Button variant="outline" size="sm" onClick={() => setIsGlobalSearchOpen(false)} className="rounded-xl h-9 text-xs">
+                                Kapat
+                            </Button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
-    );
-}
-
-function AuditListItem({ audit, onExportWord, onEdit, isSelected, onToggleSelect, task, onUpdate, onDelete, onShare, onRefresh }: { audit: AuditType, onExportWord: () => void, onEdit: () => void, isSelected: boolean, onToggleSelect: () => void, task?: Task, onUpdate: (id: string, updates: Partial<AuditType>) => void, onDelete: () => void, onShare: () => void, onRefresh: () => void }) {
-    const { title, date, status, inspector, location } = audit;
-    const statusColors: any = {
-        "Başlanmadı": "bg-slate-500/10 text-slate-600 border-slate-500/20",
-        "Devam Ediyor": "bg-blue-500/10 text-blue-600 border-blue-500/20",
-        "Evrak Bekleniyor": "bg-purple-500/10 text-purple-600 border-purple-500/20",
-        "İncelemede": "bg-amber-500/10 text-amber-600 border-amber-500/20",
-        "Rapor Yazılıyor": "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
-        "Tamamlandı": "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-    };
-
-    useEffect(() => {
-        // cleanup - no longer needed
-    }, []);
-
-    return (
-        <Card className={cn(
-            "p-4 md:p-6 transition-all group shadow-sm bg-card border-border/60 rounded-2xl relative",
-            isSelected ? 'border-red-500/50 ring-2 ring-red-500/20' : 'hover:border-primary/50 hover:shadow-xl'
-        )}>
-            {/* Decorative background */}
-            <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none hidden md:block">
-                <div className="absolute top-0 right-0 w-24 h-full bg-primary/5 -skew-x-12 translate-x-12 group-hover:translate-x-6 transition-transform opacity-50" />
-            </div>
-
-            <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 relative z-10 w-full">
-                <div className="flex items-center justify-between w-full md:w-auto">
-                    <div className="flex items-center gap-4">
-                        <div className="relative flex items-center z-20 cursor-pointer" onClick={(e) => e.stopPropagation()}>
-                            <input 
-                                type="checkbox" 
-                                title="Seç"
-                                checked={isSelected}
-                                onChange={onToggleSelect}
-                                className="w-5 h-5 rounded-md border-slate-300 text-red-500 cursor-pointer shadow-sm focus:ring-red-500"
-                            />
-                        </div>
-                        <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-muted flex items-center justify-center text-primary/40 group-hover:bg-primary group-hover:text-white transition-all transform group-hover:rotate-6 shadow-inner shrink-0">
-                            <FileText size={28} className="md:hidden" />
-                            <FileText size={32} className="hidden md:block" />
-                        </div>
-                    </div>
-                    {/* Status Badge - Mobile only in top right */}
-                    <div className="md:hidden">
-                        <select
-                            value={task?.rapor_durumu || status}
-                            onChange={async (e) => {
-                                const newStatus = e.target.value;
-                                try {
-                                    if (task) {
-                                        await updateTask(task.id, { rapor_durumu: newStatus });
-                                        toast.success("Görev durumu güncellendi.");
-                                    } else {
-                                        await onUpdate(audit.id, { status: newStatus });
-                                    }
-                                    await onRefresh();
-                                } catch (error) {
-                                    toast.error("Durum güncellenemedi.");
-                                }
-                            }}
-                            className={cn(
-                                "px-2 py-1.5 rounded-lg text-[9px] font-black tracking-widest border shadow-sm outline-none bg-transparent",
-                                statusColors[task?.rapor_durumu || status] || 'bg-slate-100 text-slate-500'
-                            )}
-                        >
-                            {RAPOR_DURUMLARI.map(d => (
-                                <option key={d} value={d} className="text-slate-900 bg-white">{d}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-
-                <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 mb-1">
-                        <h4 className="font-bold text-lg md:text-xl text-secondary group-hover:text-primary transition-colors font-outfit uppercase tracking-tight truncate">{title}</h4>
-                        {task && (
-                            <span className="w-fit px-2 py-0.5 bg-primary/5 text-primary text-[9px] md:text-[10px] font-black rounded-lg border border-primary/10 uppercase tracking-widest whitespace-nowrap">
-                                Görev: {task.rapor_kodu}{audit.report_seq && audit.report_seq > 1 ? `-${audit.report_seq}` : ''}
-                            </span>
-                        )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] md:text-[11px] text-muted-foreground font-bold uppercase tracking-widest">
-                        <span className="flex items-center gap-1.5"><Clock size={12} className="text-primary/60" /> {date}</span>
-                        <span className="hidden md:block w-1.5 h-1.5 rounded-full bg-border" />
-                        <span className="flex items-center gap-1.5"><Shield size={12} className="text-primary/60" /> {inspector}</span>
-                        {(location && location !== "Merkez / Yerinde" && location !== "Merkez / Yerinde ") && (
-                            <>
-                                <span className="hidden md:block w-1.5 h-1.5 rounded-full bg-border" />
-                                <span className="flex items-center gap-1.5"><MapPin size={12} className="text-primary/60" /> {location}</span>
-                            </>
-                        )}
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between md:justify-end gap-3 pt-4 md:pt-0 border-t md:border-t-0 border-border/40 w-full md:w-auto">
-                    {/* Status Badge - Desktop only */}
-                    <select
-                        value={task?.rapor_durumu || status}
-                        onChange={async (e) => {
-                            const newStatus = e.target.value;
-                            try {
-                                if (task) {
-                                    await updateTask(task.id, { rapor_durumu: newStatus });
-                                    toast.success("Görev durumu güncellendi.");
-                                } else {
-                                    await onUpdate(audit.id, { status: newStatus });
-                                }
-                                    await onRefresh();
-                            } catch (error) {
-                                toast.error("Durum güncellenemedi.");
-                            }
-                        }}
-                        className={cn(
-                            "hidden md:block px-5 py-2 rounded-xl text-[10px] font-bold tracking-[0.1em] border shadow-sm outline-none cursor-pointer hover:bg-slate-50 transition-colors",
-                            statusColors[task?.rapor_durumu || status] || 'bg-slate-100 text-slate-500'
-                        )}
-                    >
-                        {RAPOR_DURUMLARI.map(d => (
-                            <option key={d} value={d} className="text-slate-900 bg-white">{d}</option>
-                        ))}
-                    </select>
-
-                    <div className="flex items-center gap-2 w-full md:w-auto">
-                        <div className="flex items-center gap-1 shrink-0">
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={(audit as any).file_url ? () => window.open((audit as any).file_url, '_blank') : onEdit}
-                                className={cn(
-                                    "w-10 h-10 rounded-xl",
-                                    (audit as any).file_url 
-                                        ? "text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50"
-                                        : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-                                )}
-                                title={(audit as any).file_url ? "Dosyayı Aç" : "Düzenle"}
-                            >
-                                {(audit as any).file_url ? <Download size={18} /> : <Edit3 size={18} />}
-                            </Button>
-                            {isElectron && (
-                                <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    onClick={onExportWord}
-                                    className="w-10 h-10 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-xl"
-                                    title="Word olarak indir"
-                                >
-                                    <Download size={18} />
-                                </Button>
-                            )}
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => onShare()}
-                                className="w-10 h-10 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-xl"
-                                title="Kişilerle Paylaş"
-                            >
-                                <Share2 size={18} />
-                            </Button>
-                            {!task && (
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => onUpdate(audit.id, { status: status === 'Devam Ediyor' ? 'Tamamlandı' : 'Devam Ediyor' })}
-                                    className={cn(
-                                        "w-10 h-10 rounded-xl",
-                                        status === 'Devam Ediyor'
-                                            ? "text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50"
-                                            : "text-emerald-500 hover:text-orange-500 hover:bg-orange-50"
-                                    )}
-                                    title={status === 'Devam Ediyor' ? 'Tamamlandı Yap' : 'Devam Ediyor Yap'}
-                                >
-                                    {status === 'Devam Ediyor' ? <CheckCircle2 size={18} /> : <RotateCcw size={18} />}
-                                </Button>
-                            )}
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => onUpdate(audit.id, { is_public: !(audit as any).is_public })}
-                                className="w-10 h-10 text-muted-foreground hover:text-amber-600 hover:bg-amber-50 rounded-xl"
-                                title={(audit as any).is_public ? 'Arşivden Çıkar' : 'Arşive Ekle'}
-                            >
-                                <Archive size={18} />
-                            </Button>
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={onDelete}
-                                className="w-10 h-10 text-muted-foreground hover:text-red-500 hover:bg-red-50 rounded-xl"
-                                title="Kaydı Sil"
-                            >
-                                <Trash2 size={18} />
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </Card>
     );
 }

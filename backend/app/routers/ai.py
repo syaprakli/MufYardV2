@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
 from pydantic import BaseModel
 from typing import List, Optional
 from app.services.ai_service import AIService
@@ -306,3 +306,116 @@ async def test_gemini_connection(
         status_code, message = _normalize_gemini_error(e)
         message = f"HATA DETAYI: {type(e).__name__} - {str(e)}"
         return {"connected": False, "message": message, "code": status_code}
+
+@router.post("/transcribe")
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Ses dosyasını (audio/webm veya audio/wav) alır, Gemini API ile Türkçe metne dönüştürür.
+    """
+    import shutil
+    import tempfile
+    import google.generativeai as genai
+    from app.config import get_settings
+    
+    api_key, model_name, _, _, is_premium = await _get_user_ai_settings(current_user["uid"])
+    
+    if not api_key:
+        settings_val = get_settings()
+        if is_premium and settings_val.GEMINI_API_KEY:
+            api_key = settings_val.GEMINI_API_KEY
+        else:
+            raise HTTPException(
+                status_code=400, 
+                detail="Henüz bir Gemini API anahtarı tanımlanmamış. Ayarlar sayfasından kendi anahtarınızı girin."
+            )
+
+    suffix = os.path.splitext(file.filename)[1] or ".webm"
+    mime_type = file.content_type or "audio/webm"
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+        try:
+            shutil.copyfileobj(file.file, temp_file)
+            temp_path = temp_file.name
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Ses dosyası kaydedilemedi: {e}")
+
+    try:
+        genai.configure(api_key=api_key)
+        
+        logger.info(f"[TRANSCRIBE] Uploading audio file: {temp_path} ({mime_type})")
+        audio_file = genai.upload_file(path=temp_path, mime_type=mime_type)
+        
+        # Ses deşifre için flash modeli mükemmel çalışır.
+        model = genai.GenerativeModel("models/gemini-2.5-flash")
+        
+        prompt = (
+            "Sana bir ses dosyası veriyorum. Bu ses dosyasında konuşulanları BİREBİR Türkçe metin olarak deşifre (transcribe) et. "
+            "Ekstra yorum ekleme, sadece konuşulanları yaz."
+        )
+        
+        response = model.generate_content([audio_file, prompt])
+        
+        try:
+            audio_file.delete()
+        except Exception as del_err:
+            logger.warning(f"[TRANSCRIBE] Google file deletion failed: {del_err}")
+            
+        transcription = response.text.strip() if response and response.text else ""
+        return {"text": transcription}
+        
+    except Exception as e:
+        logger.error(f"[TRANSCRIBE] Transcription failed: {e}")
+        logger.error(traceback.format_exc())
+        status_code, message = _normalize_gemini_error(e)
+        raise HTTPException(status_code=status_code, detail=f"Ses deşifre edilemedi: {message}")
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+class ProofreadRequest(BaseModel):
+    text: str
+
+@router.post("/proofread")
+async def proofread_text(
+    req: ProofreadRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Rapor metnini AI ile Türkçe dil bilgisi ve imla kontrolünden geçirir.
+    """
+    try:
+        return await ai_service.proofread(req.text, current_user)
+    except ValueError as e:
+        logger.error(f"[AI PROOFREAD] ValueError: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[AI PROOFREAD] Exception type={type(e).__name__}: {e}")
+        logger.error(traceback.format_exc())
+        status_code, message = _normalize_gemini_error(e)
+        raise HTTPException(status_code=status_code, detail=message)
+
+class SuggestLegislationRequest(BaseModel):
+    text: str
+
+@router.post("/suggest-legislation")
+async def suggest_legislation_endpoint(
+    req: SuggestLegislationRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Yazılan rapora göre GSB mevzuat önerileri ve referansları getirir.
+    """
+    try:
+        recommendations = await ai_service.suggest_legislation(req.text, current_user)
+        return {"recommendations": recommendations}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[AI LEGISLATION SUGGEST] Exception: {e}")
+        status_code, message = _normalize_gemini_error(e)
+        raise HTTPException(status_code=status_code, detail=message)
+
+

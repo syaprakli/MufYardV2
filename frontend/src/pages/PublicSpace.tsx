@@ -14,7 +14,9 @@ function renderPostContent(raw: string, resolveUrl: (url: string) => string) {
     
     // Markdown Images: ![alt](url)
     safe = safe.replace(/!\[(.*?)\]\((.*?)\)/g, (_, alt, url) => {
-        const fullUrl = resolveUrl(url);
+        // HTML kaçış yapıldıktan sonra URL'de &amp; vs. oluşmuş olabilir, çöz
+        const decodedUrl = url.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+        const fullUrl = resolveUrl(decodedUrl);
         // Escape single quotes for the onclick JS handler to prevent crashes with filenames like "L'image.png"
         const escapedUrl = fullUrl.replace(/'/g, "\\'");
         return `<div class="my-4 rounded-3xl overflow-hidden border border-border shadow-sm group/inline-img relative">
@@ -70,7 +72,7 @@ function renderPostContent(raw: string, resolveUrl: (url: string) => string) {
     return html;
 }
 
-import { useState, useRef, useEffect } from "react";
+import { Suspense, lazy, useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { 
@@ -80,7 +82,7 @@ import {
     Plus, Eye, Edit3,
     ArrowLeft, Image as ImageIcon, Paperclip, 
     Shield, Bell, HelpCircle, Check, X, Lock as LockIcon,
-    ChevronRight, ChevronLeft, FolderTree, Reply,
+    ChevronRight, ChevronLeft, FolderTree, Reply, MapPin,
     Bold, Italic, List, ListOrdered, AlignJustify, Minus as HR,
     FileText, Download
 } from "lucide-react";
@@ -88,13 +90,16 @@ import { cn, getUserColor } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { DraggableChatWidget } from "../components/layout/DraggableChatWidget";
 import { usePresence } from "../lib/context/PresenceContext";
+import { VirtualizedList } from "../components/ui/VirtualizedList";
 import { API_URL } from "../lib/config";
 import { fetchWithTimeout } from "../lib/api/utils";
 import toast from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { motion, AnimatePresence } from "framer-motion";
+
+const DraggableChatWidgetLazy = lazy(() => import("../components/layout/DraggableChatWidget").then((module) => ({ default: module.DraggableChatWidget })));
+import { TurkeyMap } from "../components/report/TurkeyMap";
 
 export interface Post {
     id: string;
@@ -164,6 +169,9 @@ export default function PublicSpace() {
     const [chatInput, setChatInput] = useState("");
     const [editingMessage, setEditingMessage] = useState<{id: string, text: string} | null>(null);
     const [desktopChatOpen, setDesktopChatOpen] = useState(true);
+    const [isMobileViewport, setIsMobileViewport] = useState(() =>
+        typeof window !== "undefined" ? window.innerWidth < 1280 : true
+    );
 
     const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -241,6 +249,15 @@ export default function PublicSpace() {
     }, [user]);
 
     useEffect(() => {
+        const handleResize = () => {
+            setIsMobileViewport(window.innerWidth < 1280);
+        };
+
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    useEffect(() => {
         const loadPosts = async () => {
 
 
@@ -252,8 +269,39 @@ export default function PublicSpace() {
                 
                 const postsRes = await fetchWithTimeout(url.toString());
                 const postsData = await postsRes.json();
+                const fetchedPosts = Array.isArray(postsData) ? postsData : [];
+
+                // Check for Interactive Map post
+                const mapPostTitle = "İnteraktif Denetim Haritası (Otel, Yurt ve Mekanlar)";
+                const hasMapPost = fetchedPosts.some((p: any) => p.title === mapPostTitle);
+
+                if (!hasMapPost && (selectedCategory === "Hepsi" || selectedCategory === "Genel") && user?.uid) {
+                    try {
+                        const seedRes = await fetchWithTimeout(`${API_URL}/collaboration/posts?role=${encodeURIComponent(userRole)}`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                title: mapPostTitle,
+                                content: "Müfettişler için interaktif konaklama ve yemek haritası.",
+                                category: "Genel",
+                                author_id: "system_map",
+                                author_name: "Sistem",
+                                author_role: "ADMIN",
+                                is_public: true,
+                                shared_with: [],
+                                attachments: []
+                            })
+                        });
+                        if (seedRes.ok) {
+                            const newSeedPost = await seedRes.json();
+                            fetchedPosts.unshift(newSeedPost);
+                        }
+                    } catch (seedErr) {
+                        console.error("Map post seeding failed", seedErr);
+                    }
+                }
                 
-                setPosts(Array.isArray(postsData) ? postsData : []);
+                setPosts(fetchedPosts);
             } catch (err: any) {
                 console.error("Data load error", err);
             } finally {
@@ -263,7 +311,7 @@ export default function PublicSpace() {
         };
 
         if (user) loadPosts();
-    }, [selectedCategory, user]);
+    }, [selectedCategory, user, userRole]);
 
 
     useEffect(() => {
@@ -303,6 +351,77 @@ export default function PublicSpace() {
             toast.success("Yorum silindi.");
         } catch {
             toast.error("Yorum silinemedi.");
+        }
+    };
+
+    const handleAddMapPlace = async (place: any) => {
+        if (!selectedPost || !user?.uid) return;
+        setIsCommenting(true);
+        try {
+            const res = await fetchWithTimeout(`${API_URL}/collaboration/posts/${selectedPost.id}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: `[MAP_PLACE]:${JSON.stringify(place)}`,
+                    author_id: user.uid,
+                    author_name: userProfile?.full_name ? `${userProfile.full_name} (${userProfile.email})` : (user.displayName || user.email || "Müfettiş"),
+                    author_role: userRole.toUpperCase(),
+                    attachments: []
+                })
+            });
+            if (!res.ok) throw new Error();
+            const created = await res.json();
+            setComments(prev => [...prev, created]);
+            toast.success("Mekan önerisi eklendi!");
+        } catch {
+            toast.error("Mekan önerisi eklenemedi.");
+        } finally {
+            setIsCommenting(false);
+        }
+    };
+
+    const handleDeleteMapPlace = async (commentId: string) => {
+        if (!selectedPost) return;
+        try {
+            await fetchWithTimeout(`${API_URL}/collaboration/posts/${selectedPost.id}/comments/${commentId}`, { method: 'DELETE' });
+            setComments(prev => prev.filter(c => c.id !== commentId));
+            toast.success("Mekan silindi.");
+        } catch {
+            toast.error("Mekan silinemedi.");
+        }
+    };
+
+    const handleAddMapReview = async (review: any) => {
+        if (!selectedPost || !user?.uid) return;
+        try {
+            const res = await fetchWithTimeout(`${API_URL}/collaboration/posts/${selectedPost.id}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: `[MAP_REVIEW]:${JSON.stringify(review)}`,
+                    author_id: user.uid,
+                    author_name: userProfile?.full_name ? `${userProfile.full_name} (${userProfile.email})` : (user.displayName || user.email || "Müfettiş"),
+                    author_role: userRole.toUpperCase(),
+                    attachments: []
+                })
+            });
+            if (!res.ok) throw new Error();
+            const created = await res.json();
+            setComments(prev => [...prev, created]);
+            toast.success("Değerlendirmeniz eklendi!");
+        } catch {
+            toast.error("Değerlendirme eklenemedi.");
+        }
+    };
+
+    const handleDeleteMapReview = async (commentId: string) => {
+        if (!selectedPost) return;
+        try {
+            await fetchWithTimeout(`${API_URL}/collaboration/posts/${selectedPost.id}/comments/${commentId}`, { method: 'DELETE' });
+            setComments(prev => prev.filter(c => c.id !== commentId));
+            toast.success("Değerlendirme silindi.");
+        } catch {
+            toast.error("Değerlendirme silinemedi.");
         }
     };
 
@@ -590,10 +709,14 @@ export default function PublicSpace() {
 
 
     return (
-        <div className="flex h-full w-full bg-card relative font-outfit overflow-hidden flex-col md:flex-row">
+        <div className="flex h-full w-full bg-card relative font-outfit overflow-hidden flex-col lg:flex-row">
             {/* Mobile/Tablet: floating bubble chat */}
             <div className="xl:hidden">
-                <DraggableChatWidget />
+                {isMobileViewport && (
+                    <Suspense fallback={null}>
+                        <DraggableChatWidgetLazy />
+                    </Suspense>
+                )}
             </div>
             <div className="flex-1 flex flex-col overflow-hidden bg-muted/30 min-w-0">
                 <div className="px-4 md:px-8 pt-6 md:pt-10 pb-4 bg-card/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-30 shadow-sm">
@@ -691,6 +814,11 @@ export default function PublicSpace() {
                                     onZoom={setZoomedAttachment}
                                     isStatic={false}
                                     resolveUrl={resolveAttachmentUrl}
+                                    userRole={userRole}
+                                    onAddMapPlace={handleAddMapPlace}
+                                    onDeleteMapPlace={handleDeleteMapPlace}
+                                    onAddMapReview={handleAddMapReview}
+                                    onDeleteMapReview={handleDeleteMapReview}
                                 />
                             </motion.div>
                         ) : (
@@ -903,6 +1031,7 @@ export default function PublicSpace() {
                     </div>
                 </button>
 
+                {desktopChatOpen && (
                 <div className={cn("w-[384px] h-full flex flex-col transition-opacity duration-300", !desktopChatOpen && "opacity-0 invisible")}>
                     <div className="p-6 border-b border-white/10 bg-[#002B4B] text-white">
                         <div className="flex items-center justify-between">
@@ -953,113 +1082,117 @@ export default function PublicSpace() {
                     </div>
 
 
-                    <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar bg-white">
-                        {globalMessages.length === 0 ? (
+                    <VirtualizedList
+                        items={globalMessages}
+                        itemKey={(msg: any, idx: number) => msg.id || `global-msg-${idx}`}
+                        estimatedItemHeight={124}
+                        minCountToVirtualize={18}
+                        className="flex-1 overflow-y-auto p-6 no-scrollbar bg-white"
+                        itemClassName="space-y-4"
+                        emptyState={(
                             <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-3 py-16">
                                 <MessageSquare size={36} className="opacity-20" />
                                 <p className="text-xs font-bold">Müzakereye ilk mesajı siz yazın.</p>
                             </div>
-                        ) : (
-                            globalMessages.map((msg, idx) => {
-                                const isMine = msg.author_id === user?.uid;
-                                return (
-                                    <div key={msg.id || idx} className={cn("flex flex-col group/msg", isMine ? "items-end" : "items-start")}>
-                                        <div className="flex items-center gap-2 mb-1 px-1">
-                                            {!isMine && <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{msg.author_name}</span>}
-                                            <span className="text-[9px] font-bold text-slate-300">
-                                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </span>
-                                        </div>
-                                        
-                                        <div className="relative max-w-[90%] flex items-center gap-2">
-                                            {/* Action Buttons for Messages */}
-                                            {isMine && (
-                                                <div className="opacity-50 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1">
-                                                    <button 
-                                                        onClick={() => setEditingMessage({ id: msg.id, text: msg.text })}
-                                                        className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary transition-colors"
-                                                        title="Düzenle"
-                                                    >
-                                                        <Edit3 size={12} />
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleDeleteSingleMessage(msg.id)}
-                                                        className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-colors"
-                                                        title="Sil"
-                                                    >
-                                                        <Trash2 size={12} />
-                                                    </button>
-                                                </div>
-                                            )}
+                        )}
+                        renderItem={(msg: any) => {
+                            const isMine = msg.author_id === user?.uid;
+                            const currentEditingMessage = editingMessage?.id === msg.id ? editingMessage : null;
+                            return (
+                                <div className={cn("flex flex-col group/msg", isMine ? "items-end" : "items-start")}>
+                                    <div className="flex items-center gap-2 mb-1 px-1">
+                                        {!isMine && <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{msg.author_name}</span>}
+                                        <span className="text-[9px] font-bold text-slate-300">
+                                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                    </div>
 
-                                             <div className={cn(
-                                                "p-4 rounded-2xl text-[13px] font-medium shadow-sm transition-all border-l-4",
-                                                isMine 
-                                                    ? cn(getUserColor(msg.author_id), "text-white rounded-tr-none border-white/20")
-                                                    : cn(getUserColor(msg.author_id), "text-white rounded-tl-none border-transparent")
-                                            )}>
-                                                {editingMessage?.id === msg.id ? (
-                                                    <div className="flex flex-col gap-2 min-w-[200px]">
-                                                        <textarea 
-                                                            className="w-full bg-white/10 border border-white/20 rounded-lg p-2 text-white text-[12px] focus:outline-none focus:border-blue-400"
-                                                            value={editingMessage.text}
-                                                            onChange={(e) => setEditingMessage({...editingMessage, text: e.target.value})}
-                                                            autoFocus
-                                                        />
-                                                        <div className="flex justify-end gap-2">
-                                                            <button onClick={() => setEditingMessage(null)} className="text-[10px] font-black text-white/50 hover:text-white">İPTAL</button>
-                                                            <button onClick={() => handleEditMessage(msg.id, editingMessage.text)} className="text-[10px] font-black text-blue-400 hover:text-blue-300">KAYDET</button>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        {msg.text && <div className="leading-relaxed">{msg.text}</div>}
-                                                        {msg.attachments && msg.attachments.length > 0 && (
-                                                            <div className="flex flex-wrap gap-2 mt-2">
-                                                                {msg.attachments.map((at, i) => {
-                                                                    const resolvedUrl = resolveAttachmentUrl(at.url);
-                                                                    return (
-                                                                    <div 
-                                                                        key={i} 
-                                                                        className={cn(
-                                                                            "relative rounded-xl overflow-hidden border border-white/10",
-                                                                            at.type === 'image' ? "w-24 h-24 cursor-pointer" : "p-2 bg-white/5 border-white/10"
-                                                                        )}
-                                                                        onClick={() => at.type === 'image' && setZoomedAttachment({ ...at, url: resolvedUrl })}
-                                                                    >
-                                                                        {at.type === 'image' ? (
-                                                                            <img src={resolvedUrl} className="w-full h-full object-cover" />
-                                                                        ) : (
-                                                                            <a href={resolvedUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[10px] text-white/70 hover:text-white">
-                                                                                <FileText size={12} /> Dosya
-                                                                            </a>
-                                                                        )}
-                                                                    </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </div>
-                                            
-                                            {!isMine && (userRole === 'admin' || userRole === 'moderator') && (
+                                    <div className="relative max-w-[90%] flex items-center gap-2">
+                                        {isMine && (
+                                            <div className="opacity-50 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1">
+                                                <button 
+                                                    onClick={() => setEditingMessage({ id: msg.id, text: msg.text })}
+                                                    className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-primary transition-colors"
+                                                    title="Düzenle"
+                                                >
+                                                    <Edit3 size={12} />
+                                                </button>
                                                 <button 
                                                     onClick={() => handleDeleteSingleMessage(msg.id)}
-                                                    className="opacity-50 group-hover/msg:opacity-100 p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-all"
-                                                    title="Yönetici Olarak Sil"
+                                                    className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-colors"
+                                                    title="Sil"
                                                 >
                                                     <Trash2 size={12} />
                                                 </button>
+                                            </div>
+                                        )}
+
+                                        <div className={cn(
+                                            "p-4 rounded-2xl text-[13px] font-medium shadow-sm transition-all border-l-4",
+                                            isMine 
+                                                ? cn(getUserColor(msg.author_id), "text-white rounded-tr-none border-white/20")
+                                                : cn(getUserColor(msg.author_id), "text-white rounded-tl-none border-transparent")
+                                        )}>
+                                            {currentEditingMessage ? (
+                                                <div className="flex flex-col gap-2 min-w-[200px]">
+                                                    <textarea 
+                                                        className="w-full bg-white/10 border border-white/20 rounded-lg p-2 text-white text-[12px] focus:outline-none focus:border-blue-400"
+                                                        value={currentEditingMessage.text}
+                                                        onChange={(e) => setEditingMessage((prev) => prev ? { ...prev, text: e.target.value } : prev)}
+                                                        autoFocus
+                                                    />
+                                                    <div className="flex justify-end gap-2">
+                                                        <button onClick={() => setEditingMessage(null)} className="text-[10px] font-black text-white/50 hover:text-white">İPTAL</button>
+                                                        <button onClick={() => handleEditMessage(msg.id, currentEditingMessage.text)} className="text-[10px] font-black text-blue-400 hover:text-blue-300">KAYDET</button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    {msg.text && <div className="leading-relaxed">{msg.text}</div>}
+                                                    {msg.attachments && msg.attachments.length > 0 && (
+                                                        <div className="flex flex-wrap gap-2 mt-2">
+                                                            {msg.attachments.map((at: any, i: number) => {
+                                                                const resolvedUrl = resolveAttachmentUrl(at.url);
+                                                                return (
+                                                                <div 
+                                                                    key={i} 
+                                                                    className={cn(
+                                                                        "relative rounded-xl overflow-hidden border border-white/10",
+                                                                        at.type === 'image' ? "w-24 h-24 cursor-pointer" : "p-2 bg-white/5 border-white/10"
+                                                                    )}
+                                                                    onClick={() => at.type === 'image' && setZoomedAttachment({ ...at, url: resolvedUrl })}
+                                                                >
+                                                                    {at.type === 'image' ? (
+                                                                        <img src={resolvedUrl} className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        <a href={resolvedUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[10px] text-white/70 hover:text-white">
+                                                                            <FileText size={12} /> Dosya
+                                                                        </a>
+                                                                    )}
+                                                                </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
-                                    </div>
-                                );
-                            })
 
-                        )}
-                        <div ref={chatEndRef} />
-                    </div>
+                                        {!isMine && (userRole === 'admin' || userRole === 'moderator') && (
+                                            <button 
+                                                onClick={() => handleDeleteSingleMessage(msg.id)}
+                                                className="opacity-50 group-hover/msg:opacity-100 p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-all"
+                                                title="Yönetici Olarak Sil"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        }}
+                    />
+                    <div ref={chatEndRef} />
 
                     <form onSubmit={handleSendChat} className="p-6 border-t border-slate-100 bg-white flex flex-col gap-3 relative">
                         {chatAttachments.length > 0 && (
@@ -1111,20 +1244,25 @@ export default function PublicSpace() {
                         </div>
                     </form>
                 </div>
+                )}
             </motion.div>
         </div>
     );
 }
 
 function TopicRow({ post, onClick, onDelete, onEdit, onApprove, onReject, canDelete, canEdit, isAdmin }: any) {
+    const isMapPost = post.title?.includes("İnteraktif Denetim Haritası");
     return (
         <div onClick={onClick} className="group p-4 md:p-5 bg-card border border-border/60 rounded-3xl shadow-sm hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center gap-4 md:gap-6 relative overflow-hidden">
             <div className="w-12 h-12 md:w-14 md:h-14 bg-muted rounded-2xl flex items-center justify-center text-primary/40 group-hover:bg-primary/5 group-hover:text-primary transition-all shrink-0 mx-auto sm:mx-0">
-                <MessageSquare size={24} />
+                {isMapPost ? <MapPin size={24} className="text-violet-500" /> : <MessageSquare size={24} />}
             </div>
             <div className="flex-1 space-y-1 text-center sm:text-left min-w-0">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-1 sm:mb-0">
                     <span className="inline-block self-center sm:self-start px-2.5 py-1 bg-muted/80 text-muted-foreground rounded-lg text-[9px] font-black capitalize tracking-widest w-fit">{post.category}</span>
+                    {isMapPost && (
+                        <span className="inline-block self-center sm:self-start px-2.5 py-1 bg-violet-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest w-fit shadow-md">İNTERAKTİF HARİTA</span>
+                    )}
                     {post.is_approved === false && (
                         <span className="inline-block self-center sm:self-start px-2.5 py-1 bg-amber-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest w-fit animate-pulse">Onay Bekliyor</span>
                     )}
@@ -1154,12 +1292,12 @@ function TopicRow({ post, onClick, onDelete, onEdit, onApprove, onReject, canDel
                             </button>
                         </>
                     )}
-                    {canEdit && (
+                    {canEdit && !isMapPost && (
                         <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-2.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-xl transition-all">
                             <Edit3 size={18} />
                         </button>
                     )}
-                    {canDelete && (
+                    {canDelete && !isMapPost && (
                         <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-2.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-all">
                             <Trash2 size={18} />
                         </button>
@@ -1356,7 +1494,56 @@ function PostCreator({ onClose, onSubmit, post, setPost, categories, isPosting, 
     , document.body);
 }
 
-function ThreadView({ post, comments, onBack, onComment, commentText, setCommentText, isCommenting, user, onReply, onDeleteComment, onUpdateComment, editingCommentId, setEditingCommentId, editCommentText, setEditCommentText, onEditPost, onDeletePost, onAttach, onFileUpload, attachments, setAttachments, onZoom, isStatic, resolveUrl }: any) {
+function ThreadView({ post, comments, onBack, onComment, commentText, setCommentText, isCommenting, user, onReply, onDeleteComment, onUpdateComment, editingCommentId, setEditingCommentId, editCommentText, setEditCommentText, onEditPost, onDeletePost, onAttach, onFileUpload, attachments, setAttachments, onZoom, isStatic, resolveUrl, userRole, onAddMapPlace, onDeleteMapPlace, onAddMapReview, onDeleteMapReview }: any) {
+    const isMapPost = post?.title?.includes("İnteraktif Denetim Haritası");
+
+    const mapPlaces = useMemo(() => {
+        if (!isMapPost) return [];
+        return comments
+            .filter((c: any) => c.content?.startsWith("[MAP_PLACE]:"))
+            .map((c: any) => {
+                try {
+                    const data = JSON.parse(c.content.slice("[MAP_PLACE]:".length));
+                    return {
+                        id: c.id,
+                        authorId: c.author_id,
+                        author: c.author_name || "Müfettiş",
+                        date: c.created_at,
+                        ...data
+                    };
+                } catch (e) {
+                    return null;
+                }
+            })
+            .filter(Boolean);
+    }, [comments, isMapPost]);
+
+    const mapReviews = useMemo(() => {
+        if (!isMapPost) return [];
+        return comments
+            .filter((c: any) => c.content?.startsWith("[MAP_REVIEW]:"))
+            .map((c: any) => {
+                try {
+                    const data = JSON.parse(c.content.slice("[MAP_REVIEW]:".length));
+                    return {
+                        id: c.id,
+                        authorId: c.author_id,
+                        author: c.author_name || "Müfettiş",
+                        date: c.created_at,
+                        ...data
+                    };
+                } catch (e) {
+                    return null;
+                }
+            })
+            .filter(Boolean);
+    }, [comments, isMapPost]);
+
+    const nonMapComments = useMemo(() => {
+        if (!isMapPost) return comments;
+        return comments.filter((c: any) => !c.content?.startsWith("[MAP_PLACE]:") && !c.content?.startsWith("[MAP_REVIEW]:"));
+    }, [comments, isMapPost]);
+
     return (
         <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-500">
             <input id="comment-file-input" type="file" hidden onChange={(e) => onFileUpload(e, true)} />
@@ -1378,7 +1565,7 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                                 <p className="text-[10px] font-bold text-slate-400 capitalize tracking-widest">{new Date(post.created_at).toLocaleString('tr-TR')}</p>
                             </div>
                         </div>
-                        {user?.uid === post.author_id && (
+                        {user?.uid === post.author_id && !isMapPost && (
                             <div className="flex gap-2 shrink-0">
                                 <button onClick={() => onEditPost(post)} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl transition-all hover:bg-blue-100" title="Düzenle">
                                     <Edit3 size={15} />
@@ -1391,12 +1578,27 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                     </div>
                     <div className="space-y-4">
                         <h1 className="text-xl font-black text-foreground leading-tight tracking-tight">{post.title}</h1>
-                        <div
-                            className="text-slate-600 font-medium leading-relaxed text-sm [&_strong]:font-black [&_strong]:text-foreground [&_em]:italic [&_ul]:list-disc [&_ol]:list-decimal [&_li]:ml-2"
-                            dangerouslySetInnerHTML={{ __html: renderPostContent(post.content, resolveUrl) }}
-                        />
+                        {isMapPost ? (
+                            <div className="w-full pt-2">
+                                <TurkeyMap
+                                    places={mapPlaces}
+                                    reviews={mapReviews}
+                                    onAddPlace={onAddMapPlace}
+                                    onDeletePlace={onDeleteMapPlace}
+                                    onAddReview={onAddMapReview}
+                                    onDeleteReview={onDeleteMapReview}
+                                    submitting={isCommenting}
+                                    currentUser={{ uid: user?.uid, role: userRole }}
+                                />
+                            </div>
+                        ) : (
+                            <div
+                                className="text-slate-600 font-medium leading-relaxed text-sm [&_strong]:font-black [&_strong]:text-foreground [&_em]:italic [&_ul]:list-disc [&_ol]:list-decimal [&_li]:ml-2"
+                                dangerouslySetInnerHTML={{ __html: renderPostContent(post.content, resolveUrl) }}
+                            />
+                        )}
                     </div>
-                    {post.attachments && post.attachments.length > 0 && (
+                    {post.attachments && post.attachments.length > 0 && !isMapPost && (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4">
                             {post.attachments.map((at: any, i: number) => {
                                 const resolvedUrl = resolveUrl(at.url);
@@ -1432,81 +1634,90 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                 <div className="space-y-6">
                     <div className="flex items-center gap-4">
                         <div className="h-px flex-1 bg-muted/80"></div>
-                        <span className="text-[10px] font-black text-slate-400 capitalize tracking-[0.2em]">Cevaplar ({comments.length})</span>
+                        <span className="text-[10px] font-black text-slate-400 capitalize tracking-[0.2em]">Cevaplar ({isMapPost ? nonMapComments.length : comments.length})</span>
                         <div className="h-px flex-1 bg-muted/80"></div>
                     </div>
-                    {!isStatic ? comments.map((comment: any) => (
-                        <div key={comment.id} className="flex gap-4 group/reply">
-                            <div className="w-10 h-10 bg-muted rounded-xl flex shrink-0 items-center justify-center font-black text-slate-300 text-sm">
-                                {comment.author_name?.charAt(0)}
-                            </div>
-                            <div className="flex-1 space-y-2 bg-card/50 p-4 rounded-2xl border border-transparent hover:border-border hover:bg-card transition-all">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs font-black text-foreground">{comment.author_name}</span>
-                                        <span className="text-[9px] font-bold text-slate-300">{new Date(comment.created_at).toLocaleTimeString('tr-TR')}</span>
+                    {!isStatic ? (
+                        <VirtualizedList
+                            items={isMapPost ? nonMapComments : comments}
+                            itemKey={(comment: any, idx: number) => comment.id || `comment-${idx}`}
+                            estimatedItemHeight={178}
+                            minCountToVirtualize={14}
+                            className="max-h-[48vh] overflow-y-auto pr-2 no-scrollbar"
+                            itemClassName="space-y-6"
+                            emptyState={null}
+                            renderItem={(comment: any) => (
+                                <div className="flex gap-4 group/reply">
+                                    <div className="w-10 h-10 bg-muted rounded-xl flex shrink-0 items-center justify-center font-black text-slate-300 text-sm">
+                                        {comment.author_name?.charAt(0)}
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        {!isStatic && (
-                                            <button onClick={() => onReply(comment.author_name)} className="p-2 text-slate-400 hover:text-primary transition-all bg-muted rounded-xl">
-                                                <Reply size={18} />
-                                            </button>
-                                        )}
-                                        {(user?.uid === comment.author_id || user?.role === 'admin') && (
-                                            <>
-                                                <button onClick={() => { setEditingCommentId(comment.id); setEditCommentText(comment.content); }} className="p-2 text-slate-300 hover:text-blue-500 transition-all bg-muted rounded-xl"><Edit3 size={18} /></button>
-                                                <button onClick={() => onDeleteComment(comment.id)} className="p-2 text-slate-300 hover:text-red-500 transition-all bg-muted rounded-xl"><Trash2 size={18} /></button>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                                {editingCommentId === comment.id ? (
-                                    <div className="space-y-3 py-2">
-                                        <textarea autoFocus value={editCommentText} onChange={(e) => setEditCommentText(e.target.value)} className="w-full p-4 bg-muted border-2 border-primary/10 rounded-2xl text-sm font-medium outline-none min-h-[100px] resize-none" />
-                                        <div className="flex gap-2 justify-end">
-                                            <Button onClick={() => setEditingCommentId(null)} variant="ghost">İptal</Button>
-                                            <Button onClick={() => onUpdateComment(comment.id)}>Kaydet</Button>
+                                    <div className="flex-1 space-y-2 bg-card/50 p-4 rounded-2xl border border-transparent hover:border-border hover:bg-card transition-all">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-black text-foreground">{comment.author_name}</span>
+                                                <span className="text-[9px] font-bold text-slate-300">{new Date(comment.created_at).toLocaleTimeString('tr-TR')}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {!isStatic && (
+                                                    <button onClick={() => onReply(comment.author_name)} className="p-2 text-slate-400 hover:text-primary transition-all bg-muted rounded-xl">
+                                                        <Reply size={18} />
+                                                    </button>
+                                                )}
+                                                {(user?.uid === comment.author_id || user?.role === 'admin') && (
+                                                    <>
+                                                        <button onClick={() => { setEditingCommentId(comment.id); setEditCommentText(comment.content); }} className="p-2 text-slate-300 hover:text-blue-500 transition-all bg-muted rounded-xl"><Edit3 size={18} /></button>
+                                                        <button onClick={() => onDeleteComment(comment.id)} className="p-2 text-slate-300 hover:text-red-500 transition-all bg-muted rounded-xl"><Trash2 size={18} /></button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        <p className="text-sm text-slate-600 font-medium leading-relaxed">{comment.content}</p>
-                                        
-                                        {/* Comment Attachments */}
-                                        {comment.attachments && comment.attachments.length > 0 && (
-                                            <div className="flex flex-wrap gap-2 pt-2">
-                                                {comment.attachments.map((at: any, i: number) => {
-                                                    const resolvedUrl = resolveUrl(at.url);
-                                                    return (
-                                                        <div 
-                                                            key={i} 
-                                                            onClick={() => {
-                                                                if (at.type === 'image') onZoom({ ...at, url: resolvedUrl });
-                                                                else window.open(resolvedUrl, '_blank');
-                                                            }}
-                                                            className="relative w-16 h-16 rounded-xl overflow-hidden border border-border bg-muted/30 cursor-pointer group/cat"
-                                                        >
-                                                            {at.type === 'image' ? (
-                                                                <img src={resolvedUrl} className="w-full h-full object-cover transition-transform group-hover/cat:scale-110" />
-                                                            ) : (
-                                                                <div className="flex flex-col items-center justify-center w-full h-full p-1 text-center">
-                                                                    <FileText size={18} className="text-slate-400 group-hover/cat:text-primary transition-colors" />
-                                                                    <span className="text-[7px] font-black mt-1 text-muted-foreground truncate w-full px-1">{at.name || "Dosya"}</span>
+                                        {editingCommentId === comment.id ? (
+                                            <div className="space-y-3 py-2">
+                                                <textarea autoFocus value={editCommentText} onChange={(e) => setEditCommentText(e.target.value)} className="w-full p-4 bg-muted border-2 border-primary/10 rounded-2xl text-sm font-medium outline-none min-h-[100px] resize-none" />
+                                                <div className="flex gap-2 justify-end">
+                                                    <Button onClick={() => setEditingCommentId(null)} variant="ghost">İptal</Button>
+                                                    <Button onClick={() => onUpdateComment(comment.id)}>Kaydet</Button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <p className="text-sm text-slate-600 font-medium leading-relaxed">{comment.content}</p>
+                                                {comment.attachments && comment.attachments.length > 0 && (
+                                                    <div className="flex flex-wrap gap-2 pt-2">
+                                                        {comment.attachments.map((at: any, i: number) => {
+                                                            const resolvedUrl = resolveUrl(at.url);
+                                                            return (
+                                                                <div 
+                                                                    key={i} 
+                                                                    onClick={() => {
+                                                                        if (at.type === 'image') onZoom({ ...at, url: resolvedUrl });
+                                                                        else window.open(resolvedUrl, '_blank');
+                                                                    }}
+                                                                    className="relative w-16 h-16 rounded-xl overflow-hidden border border-border bg-muted/30 cursor-pointer group/cat"
+                                                                >
+                                                                    {at.type === 'image' ? (
+                                                                        <img src={resolvedUrl} className="w-full h-full object-cover transition-transform group-hover/cat:scale-110" />
+                                                                    ) : (
+                                                                        <div className="flex flex-col items-center justify-center w-full h-full p-1 text-center">
+                                                                            <FileText size={18} className="text-slate-400 group-hover/cat:text-primary transition-colors" />
+                                                                            <span className="text-[7px] font-black mt-1 text-muted-foreground truncate w-full px-1">{at.name || "Dosya"}</span>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover/cat:opacity-100 transition-opacity flex items-center justify-center">
+                                                                        {at.type === 'image' ? <Eye size={16} className="text-white" /> : <Download size={16} className="text-white" />}
+                                                                    </div>
                                                                 </div>
-                                                            )}
-                                                            <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover/cat:opacity-100 transition-opacity flex items-center justify-center">
-                                                                {at.type === 'image' ? <Eye size={16} className="text-white" /> : <Download size={16} className="text-white" />}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
-                                )}
-                            </div>
-                        </div>
-                    )) : (
+                                </div>
+                            )}
+                        />
+                    ) : (
                         <div className="py-20 text-center space-y-4">
                              <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mx-auto text-slate-300"><LockIcon size={32} /></div>
                              <p className="text-xs font-bold text-slate-400">Yorumlar Kapalı</p>

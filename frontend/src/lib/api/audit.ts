@@ -16,12 +16,14 @@ export interface Audit {
     owner_id?: string;
     assigned_to?: string[];
     shared_with?: string[];
+    shared_roles?: Record<string, "view" | "comment" | "edit">;
     pending_collaborators?: string[];
     is_public?: boolean;
     report_seq?: number;
     doc_header?: string;
     doc_footer?: string;
     show_page_numbers?: boolean;
+    version_name?: string;
 }
 
 export interface AuditVersion {
@@ -136,11 +138,20 @@ export async function createAudit(audit: Partial<Audit>): Promise<Audit> {
     return response.json();
 }
 
-export async function updateAudit(id: string, update: Partial<Audit>, forceVersion?: boolean): Promise<Audit> {
+export async function updateAudit(
+    id: string,
+    update: Partial<Audit>,
+    forceVersion?: boolean,
+    userIdentity?: { userId?: string; userEmail?: string }
+): Promise<Audit> {
     try {
         let url = `${API_BASE_URL}/audit/${id}`;
-        if (forceVersion) {
-            url += `?force_version=true`;
+        const query = new URLSearchParams();
+        if (forceVersion) query.set("force_version", "true");
+        if (userIdentity?.userId) query.set("user_id", userIdentity.userId);
+        if (userIdentity?.userEmail) query.set("user_email", userIdentity.userEmail);
+        if (query.toString()) {
+            url += `?${query.toString()}`;
         }
         const response = await fetchWithTimeout(url, {
             method: "PATCH",
@@ -157,7 +168,10 @@ export async function updateAudit(id: string, update: Partial<Audit>, forceVersi
     } catch (error) {
         if (!navigator.onLine || error instanceof Error && (error.message.includes("Failed to fetch") || error.message.includes("timeout"))) {
             console.warn("Offline detected in updateAudit, queueing action.");
-            addToQueue('updateAudit', [id, update]);
+            addToQueue('updateAudit', [id, update, forceVersion, userIdentity], {
+                auditId: id,
+                hasReportContent: Object.prototype.hasOwnProperty.call(update, "report_content")
+            });
             return { id, ...update } as any;
         }
         throw error;
@@ -207,8 +221,15 @@ export async function fetchAuditVersions(id: string): Promise<AuditVersion[]> {
     return response.json();
 }
 
-export async function restoreAuditVersion(id: string, versionId: string): Promise<Audit> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}/restore/${versionId}`, {
+export async function restoreAuditVersion(id: string, versionId: string, userIdentity?: { userId?: string; userEmail?: string }): Promise<Audit> {
+    let url = `${API_BASE_URL}/audit/${id}/restore/${versionId}`;
+    const query = new URLSearchParams();
+    if (userIdentity?.userId) query.set("user_id", userIdentity.userId);
+    if (userIdentity?.userEmail) query.set("user_email", userIdentity.userEmail);
+    if (query.toString()) {
+        url += `?${query.toString()}`;
+    }
+    const response = await fetchWithTimeout(url, {
         method: "POST"
     });
     if (!response.ok) {

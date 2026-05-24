@@ -1,0 +1,22 @@
+export const INSPECTORS = [
+    "Ahmet Yılmaz", "Mehmet Demir", "Sefa Yapraklı", "Ayşe Kaya", "Fatma Şahin",
+    "Mustafa Aydın", "Emine Özkan", "Ali Yıldız", "Zeynep Çelik", "Hüseyin Şen",
+    "Canan Erdem", "Bülent Kılıç", "Deniz Aksoy", "Ebru Yücel", "Fatih Doğan",
+    "Gökhan Aras", "Hande Güler", "İbrahim Koç", "Jale Tezcan", "Kenan Polat",
+    "Lale Bulut", "Murat Sağlam", "Nalan Uzun", "Okan Erol", "Pelin Sönmez",
+    "Rıza Kara", "Sibel Tunç", "Tarik Öztürk", "Umut Çetin", "Vildan Yavuz",
+    "Yavuz Selim", "Zekiye Eren", "Adem Akçay", "Bahar Gökce", "Cemal Işık",
+    "Demet Korkmaz", "Engin Dağ", "Filiz Bakır", "Gürkan Çavuş", "Hale Gümüş",
+    "İlker Sarp", "Kader İnci", "Levent Ünal", "Meral Savaş", "Nihat Baran",
+    "Oya Şimşek", "Ömer Faruk", "Pınar Ay", "Recep Uçar", "Suna Bilgin",
+    "Şaban Mutlu", "Tülay Yiğit", "Ufuk Mert", "Veli Altın", "Yeşim Bal",
+    "Zafer Dinç", "Aslıhan Karataş", "Barış Ertekin", "Ceyda Yanık", "Dursun Alparslan",
+    "Ercan Demirtaş", "Funda Yazıcı", "Güliz Atak", "Hakan Serbest", "Iraz Çevik",
+    "Kürşat Kaçmaz", "Leyla Derin", "Metin Toprak", "Nuray Şanslı", "Orhan Tan",
+    "Özlem Gül", "Perihan Ece", "Rafet Orhon", "Semra Narin", "Tamer Soysal",
+    "Uğur Gündüz", "Vedat Başar", "Yeliz Akman", "Zuhal Tınaz", "Atilla Günay",
+    "Berrin Sancak", "Cavit Köylü", "Derya Deniz", "Erol Taş", "Ferit Edgü",
+    "Gülten Akın", "Halit Ziya", "Işık Kansu", "Kamil Koç", "Lütfi Akad",
+    "Melih Cevdet", "Nazım Hikmet", "Oğuz Atay", "Peyami Safa", "Refik Halit",
+    "Sabahattin Ali", "Tarık Buğra", "Ümit Yaşar", "Yahya Kemal", "Ziya Gökalp"
+];
