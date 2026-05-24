@@ -121,6 +121,7 @@ export default function ReportEditor() {
     const [showToolbar, setShowToolbar] = useState(true);
     const [isToolbarPinned, setIsToolbarPinned] = useState(true);
     const showToolbarActual = isToolbarPinned || showToolbar;
+    const [showMobileActions, setShowMobileActions] = useState(true);
 
     const [syncConflictWarning, setSyncConflictWarning] = useState<string | null>(null);
     const [isChecklistOpen, setIsChecklistOpen] = useState(false);
@@ -1089,9 +1090,24 @@ export default function ReportEditor() {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-wrap">
+                    {/* Mobil için İşlemleri Göster/Gizle Butonu */}
+                    <div className="flex md:hidden w-full mt-1">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowMobileActions(!showMobileActions)}
+                            className="w-full flex items-center justify-between h-8 px-3 text-[11px] font-bold border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-lg shadow-sm"
+                        >
+                            <span className="flex items-center gap-1.5 text-slate-700">
+                                <LayoutGrid size={12} className="text-violet-600 animate-pulse" />
+                                Rapor İşlemleri
+                            </span>
+                            {showMobileActions ? <ChevronUp size={12} className="text-slate-500" /> : <ChevronDown size={12} className="text-slate-500" />}
+                        </Button>
+                    </div>
+
+                    <div className={`${showMobileActions ? "flex animate-in slide-in-from-top-2 duration-200" : "hidden"} md:flex flex-col md:flex-row items-stretch md:items-center gap-2 flex-wrap w-full md:w-auto bg-slate-50 md:bg-transparent p-2.5 md:p-0 rounded-xl border border-slate-200 md:border-none mt-2 md:mt-0`}>
                         {providerStatus === 'connected' && onlineUsers.length > 0 && (
-                            <div className="flex -space-x-1.5 mr-2">
+                            <div className="flex -space-x-1.5 mr-2 mb-2 md:mb-0 justify-center md:justify-start">
                                 {onlineUsers.map((u, i) => (
                                     <div key={i} title={u.name} className="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[9px] font-black text-white shadow-sm" style={{ backgroundColor: u.color }}>
                                         {u.name.substring(0, 2).toUpperCase()}
@@ -1101,67 +1117,69 @@ export default function ReportEditor() {
                         )}
                         
                         {/* TÜM BUTONLAR VE PANELLER AKTİF */}
-                        <Button variant="ghost" onClick={() => setIsShareModalOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg">Paylaş</Button>
-                        <Button variant="ghost" onClick={() => setIsAuditTrailOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg">Denetim İzi</Button>
-                        <Button variant="ghost" onClick={() => setIsHistoryOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg"><History size={14} className="mr-1.5" /> Sürümler</Button>
-                        <Button variant="ghost" onClick={() => openChat(`audit_${id}`, audit?.title || "Rapor Odası", "audit")} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all"><MessageSquare size={14} className="mr-1.5" /> Rapor Odası</Button>
-                        <Button variant="ghost" onClick={() => setIsTemplateModalOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all"><LayoutGrid size={14} className="mr-1.5" /> Şablon Seç</Button>
-                        <Button variant="ghost" onClick={() => setIsProofreadOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all"><CheckCircle size={14} className="mr-1.5" /> Dil Kontrolü</Button>
-                        <Button variant="ghost" onClick={() => setIsLegislationOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all"><BookOpen size={14} className="mr-1.5" /> Mevzuat Öner</Button>
-                        <Button variant="ghost" onClick={() => setIsSnippetBankOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg">Taslak Metinler</Button>
-                        <Button variant="ghost" onClick={() => setIsVoiceInputOpen(true)} className="h-8 px-3 text-[11px] font-bold rounded-lg">Sesli Not</Button>
-                        <Button variant="ghost" onClick={() => setIsAiSuggestionOpen(true)} disabled={!canEditContent} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"><Sparkles size={14} className="mr-1.5" /> <span className="hidden xl:inline">AI Öneri</span></Button>
-                         <Button variant="outline" onClick={handleSave} disabled={saving || !canEditContent} className="h-8 px-2 md:px-3 text-[11px] font-bold border-primary/20 rounded-lg">{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="md:mr-1.5" />} <span className="hidden md:inline">Kaydet</span></Button>
-                         <Button variant="outline" onClick={handleSaveVersion} disabled={saving || !canEditContent} className="h-8 px-2 md:px-3 text-[11px] font-bold border-emerald-300 text-emerald-700 rounded-lg"><History size={14} className="md:mr-1.5" /> <span className="hidden md:inline">Sürüm Kaydet</span></Button>
-                         <ReportEditorVersionLabelModal isOpen={isVersionLabelModalOpen} onClose={() => setIsVersionLabelModalOpen(false)} onSave={handleConfirmSaveVersion} />
-                         <Button onClick={handleExportWord} className="h-8 px-2 md:px-3 text-[11px] font-black bg-slate-900 text-white rounded-lg shadow-sm"><Download size={14} className="md:mr-1.5" /> <span className="hidden md:inline">Word</span></Button>
-                         <Button variant="outline" onClick={handlePrintPreview} className="h-8 px-2 md:px-3 text-[11px] font-bold rounded-lg border-slate-300"><span className="mr-0 md:mr-1.5">🖨️</span> <span className="hidden md:inline">Önizleme</span></Button>
-                                         {/* Tüm panellerin açılması */}
-                                         {isAuditTrailOpen && <ReportEditorAuditTrailPanel isOpen={isAuditTrailOpen} onClose={() => setIsAuditTrailOpen(false)} auditId={id || ""} />}
-                                         {isSnippetBankOpen && (
-                                             <ReportEditorSnippetBankPanel 
-                                                 isOpen={isSnippetBankOpen} 
-                                                 onClose={() => setIsSnippetBankOpen(false)} 
-                                                 onInsert={(html: string) => { 
-                                                     if (editorRef.current) {
-                                                         editorRef.current.insertContent(html); 
-                                                         setContent(editorRef.current.getContent());
-                                                     }
-                                                     setIsSnippetBankOpen(false); 
-                                                 }} 
-                                             />
-                                         )}
-                                        {isVoiceInputOpen && (
-                                            <div 
-                                                onClick={() => setIsVoiceInputOpen(false)} 
-                                                className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-950/40 backdrop-blur-md animate-in fade-in duration-200"
-                                            >
-                                                <div 
-                                                    onClick={(e) => e.stopPropagation()} 
-                                                    className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 w-full max-w-md relative flex flex-col items-center gap-4 border border-slate-100 dark:border-slate-800/80 animate-in zoom-in-95 duration-200"
-                                                >
-                                                    <button 
-                                                        onClick={() => setIsVoiceInputOpen(false)} 
-                                                        className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all" 
-                                                        title="Kapat"
-                                                    >
-                                                        <X size={18} />
-                                                    </button>
-                                                    <h3 className="font-bold text-slate-800 dark:text-slate-100 text-base">Sesli Not Girişi</h3>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400 text-center px-2 leading-relaxed">
-                                                        Konuşmaya başlamak için aşağıdaki mikrofona tıklayın. Deşifre edilen metni düzenleyebilir, kopyalayabilir veya doğrudan editöre aktarabilirsiniz.
-                                                    </p>
-                                                    <VoiceToTextInput onResult={(text: string) => { 
-                                                        if (editorRef.current) {
-                                                            editorRef.current.insertContent(text); 
-                                                            setContent(editorRef.current.getContent());
-                                                        }
-                                                        setIsVoiceInputOpen(false); 
-                                                    }} />
-                                                </div>
-                                            </div>
-                                        )}
+                        <Button variant="ghost" onClick={() => { setIsShareModalOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Paylaş</Button>
+                        <Button variant="ghost" onClick={() => { setIsAuditTrailOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Denetim İzi</Button>
+                        <Button variant="ghost" onClick={() => { setIsHistoryOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center"><History size={14} className="mr-1.5" /> Sürümler</Button>
+                        <Button variant="ghost" onClick={() => { openChat(`audit_${id}`, audit?.title || "Rapor Odası", "audit"); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><MessageSquare size={14} className="mr-1.5" /> Rapor Odası</Button>
+                        <Button variant="ghost" onClick={() => { setIsTemplateModalOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><LayoutGrid size={14} className="mr-1.5" /> Şablon Seç</Button>
+                        <Button variant="ghost" onClick={() => { setIsProofreadOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><CheckCircle size={14} className="mr-1.5" /> Dil Kontrolü</Button>
+                        <Button variant="ghost" onClick={() => { setIsLegislationOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><BookOpen size={14} className="mr-1.5" /> Mevzuat Öner</Button>
+                        <Button variant="ghost" onClick={() => { setIsSnippetBankOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Taslak Metinler</Button>
+                        <Button variant="ghost" onClick={() => { setIsVoiceInputOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Sesli Not</Button>
+                        <Button variant="ghost" onClick={() => { setIsAiSuggestionOpen(true); setShowMobileActions(false); }} disabled={!canEditContent} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed justify-start md:justify-center"><Sparkles size={14} className="mr-1.5" /> <span className="inline md:hidden xl:inline">AI Öneri</span></Button>
+                        <Button variant="outline" onClick={() => { handleSave(); setShowMobileActions(false); }} disabled={saving || !canEditContent} className="h-8 px-2 md:px-3 text-[11px] font-bold border-primary/20 rounded-lg justify-start md:justify-center">{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" />} <span className="inline md:hidden lg:inline">Kaydet</span></Button>
+                        <Button variant="outline" onClick={() => { handleSaveVersion(); setShowMobileActions(false); }} disabled={saving || !canEditContent} className="h-8 px-2 md:px-3 text-[11px] font-bold border-emerald-300 text-emerald-700 rounded-lg justify-start md:justify-center"><History size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" /> <span className="inline md:hidden lg:inline">Sürüm Kaydet</span></Button>
+                        <Button onClick={() => { handleExportWord(); setShowMobileActions(false); }} className="h-8 px-2 md:px-3 text-[11px] font-black bg-slate-900 text-white rounded-lg shadow-sm justify-start md:justify-center"><Download size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" /> <span className="inline md:hidden lg:inline">Word</span></Button>
+                        <Button variant="outline" onClick={() => { handlePrintPreview(); setShowMobileActions(false); }} className="h-8 px-2 md:px-3 text-[11px] font-bold rounded-lg border-slate-300 justify-start md:justify-center"><span className="mr-1.5 md:mr-0 lg:mr-1.5">🖨️</span> <span className="inline md:hidden lg:inline">Önizleme</span></Button>
                     </div>
+
+                    <ReportEditorVersionLabelModal isOpen={isVersionLabelModalOpen} onClose={() => setIsVersionLabelModalOpen(false)} onSave={handleConfirmSaveVersion} />
+                    
+                    {/* Tüm panellerin açılması - Collapsible dışına alındı ki mobilde açıldıklarında görünürlükleri bozulmasın */}
+                    {isAuditTrailOpen && <ReportEditorAuditTrailPanel isOpen={isAuditTrailOpen} onClose={() => setIsAuditTrailOpen(false)} auditId={id || ""} />}
+                    {isSnippetBankOpen && (
+                        <ReportEditorSnippetBankPanel 
+                            isOpen={isSnippetBankOpen} 
+                            onClose={() => setIsSnippetBankOpen(false)} 
+                            onInsert={(html: string) => { 
+                                if (editorRef.current) {
+                                    editorRef.current.insertContent(html); 
+                                    setContent(editorRef.current.getContent());
+                                }
+                                setIsSnippetBankOpen(false); 
+                            }} 
+                        />
+                    )}
+                    {isVoiceInputOpen && (
+                        <div 
+                            onClick={() => setIsVoiceInputOpen(false)} 
+                            className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-950/40 backdrop-blur-md animate-in fade-in duration-200"
+                        >
+                            <div 
+                                onClick={(e) => e.stopPropagation()} 
+                                className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 w-full max-w-md relative flex flex-col items-center gap-4 border border-slate-100 dark:border-slate-800/80 animate-in zoom-in-95 duration-200"
+                            >
+                                <button 
+                                    onClick={() => setIsVoiceInputOpen(false)} 
+                                    className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all" 
+                                    title="Kapat"
+                                >
+                                    <X size={18} />
+                                </button>
+                                <h3 className="font-bold text-slate-800 dark:text-slate-100 text-base">Sesli Not Girişi</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 text-center px-2 leading-relaxed">
+                                    Konuşmaya başlamak için aşağıdaki mikrofona tıklayın. Deşifre edilen metni düzenleyebilir, kopyalayabilir veya doğrudan editöre aktarabilirsiniz.
+                                </p>
+                                <VoiceToTextInput onResult={(text: string) => { 
+                                    if (editorRef.current) {
+                                        editorRef.current.insertContent(text); 
+                                        setContent(editorRef.current.getContent());
+                                    }
+                                    setIsVoiceInputOpen(false); 
+                                }} />
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -1291,8 +1309,15 @@ export default function ReportEditor() {
 
                         <Suspense fallback={<div className="h-[800px] flex items-center justify-center text-slate-400 text-xs font-bold"><Loader2 size={18} className="mr-2 animate-spin" /> Editör yükleniyor...</div>}>
                             <style>{`
-                                .hide-tinymce-toolbar .tox-editor-header {
+                                .hide-tinymce-toolbar .tox-editor-header,
+                                .hide-tinymce-toolbar .tox-toolbar-overlord,
+                                .hide-tinymce-toolbar .tox-toolbar,
+                                .hide-tinymce-toolbar .tox-editor-header * {
                                     display: none !important;
+                                    height: 0 !important;
+                                    overflow: hidden !important;
+                                    padding: 0 !important;
+                                    border: none !important;
                                 }
                             `}</style>
                             <div className={showToolbarActual ? "" : "hide-tinymce-toolbar"}>
