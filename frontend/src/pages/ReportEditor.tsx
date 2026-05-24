@@ -1239,6 +1239,48 @@ export default function ReportEditor() {
                         </div>
                     </div>
 
+                    {/* Cetvel ile Editör Arasındaki Şık Collapse & Pin Kontrolü */}
+                    <div className="flex flex-col items-center w-full my-2 z-10 relative select-none">
+                        <div 
+                            className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-full px-4 py-1.5 shadow-sm hover:shadow transition-all cursor-pointer group"
+                            onClick={() => {
+                                if (isToolbarPinned) {
+                                    setIsToolbarPinned(false);
+                                    setShowToolbar(false);
+                                } else {
+                                    setShowToolbar(!showToolbar);
+                                }
+                            }}
+                        >
+                            {/* Sabitleme Butonu */}
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    const nextPinned = !isToolbarPinned;
+                                    setIsToolbarPinned(nextPinned);
+                                    if (nextPinned) {
+                                        setShowToolbar(true);
+                                    }
+                                }}
+                                className={`p-1 rounded-full hover:bg-white/80 transition-colors ${
+                                    isToolbarPinned ? "text-violet-600 bg-violet-50 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                                }`}
+                                title={isToolbarPinned ? "Araç Çubuğu Sabitlendi (Serbest Bırak)" : "Araç Çubuğunu Sabitle"}
+                            >
+                                <Pin size={12} className={isToolbarPinned ? "fill-violet-600 rotate-45" : ""} />
+                            </button>
+                            
+                            <span className="w-px h-3 bg-slate-200" />
+                            
+                            {/* Aç/Kapa Uzun Ok / Metin Butonu */}
+                            <div className="flex items-center gap-1.5 text-[11px] font-black text-slate-500 group-hover:text-slate-800 transition-colors">
+                                <span>{showToolbarActual ? "Araç Çubuğunu Gizle" : "Araç Çubuğunu Göster"}</span>
+                                {showToolbarActual ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            </div>
+                        </div>
+                    </div>
+
                     <Card onClick={(e) => { if (e.target === e.currentTarget && editorRef.current) editorRef.current.focus(); }} style={{ zoom: `${zoom}%` }} className="p-4 md:p-16 min-h-[1100px] bg-white shadow-2xl border-none rounded-none prose max-w-none relative mb-20 overflow-visible cursor-text">
                         <div className="absolute -top-1 left-0 w-full h-1 bg-primary/10" />
                         <div className="mb-4 pb-2 border border-dashed border-slate-200 hover:border-violet-300 hover:bg-slate-50/50 rounded-lg p-2 transition-all group relative">
@@ -1265,47 +1307,7 @@ export default function ReportEditor() {
                             </div>
                         )}
 
-                        {/* Cetvel ile Editör Arasındaki Şık Collapse & Pin Kontrolü */}
-                        <div className="flex flex-col items-center w-full my-2 z-10 relative select-none">
-                            <div 
-                                className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-full px-4 py-1.5 shadow-sm hover:shadow transition-all cursor-pointer group"
-                                onClick={() => {
-                                    if (isToolbarPinned) {
-                                        setIsToolbarPinned(false);
-                                        setShowToolbar(false);
-                                    } else {
-                                        setShowToolbar(!showToolbar);
-                                    }
-                                }}
-                            >
-                                {/* Sabitleme Butonu */}
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        const nextPinned = !isToolbarPinned;
-                                        setIsToolbarPinned(nextPinned);
-                                        if (nextPinned) {
-                                            setShowToolbar(true);
-                                        }
-                                    }}
-                                    className={`p-1 rounded-full hover:bg-white/80 transition-colors ${
-                                        isToolbarPinned ? "text-violet-600 bg-violet-50 shadow-sm" : "text-slate-400 hover:text-slate-600"
-                                    }`}
-                                    title={isToolbarPinned ? "Araç Çubuğu Sabitlendi (Serbest Bırak)" : "Araç Çubuğunu Sabitle"}
-                                >
-                                    <Pin size={12} className={isToolbarPinned ? "fill-violet-600 rotate-45" : ""} />
-                                </button>
-                                
-                                <span className="w-px h-3 bg-slate-200" />
-                                
-                                {/* Aç/Kapa Uzun Ok / Metin Butonu */}
-                                <div className="flex items-center gap-1.5 text-[11px] font-black text-slate-500 group-hover:text-slate-800 transition-colors">
-                                    <span>{showToolbarActual ? "Araç Çubuğunu Gizle" : "Araç Çubuğunu Göster"}</span>
-                                    {showToolbarActual ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                </div>
-                            </div>
-                        </div>
+
 
                         <Suspense fallback={<div className="h-[800px] flex items-center justify-center text-slate-400 text-xs font-bold"><Loader2 size={18} className="mr-2 animate-spin" /> Editör yükleniyor...</div>}>
                             <style>{`
