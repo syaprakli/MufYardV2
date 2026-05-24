@@ -1323,6 +1323,7 @@ export default function ReportEditor() {
                             <div className={showToolbarActual ? "" : "hide-tinymce-toolbar"}>
                                 <ReportEditorTinyMCELazy
                                 licenseKey="gpl"
+                                tinymceScriptSrc="https://cdnjs.cloudflare.com/ajax/libs/tinymce/7.11.0/tinymce.min.js"
                                 onInit={(_evt: any, editor: any) => {
                                     editorRef.current = editor;
                                     if (content) {

@@ -1,7 +1,8 @@
 import { Editor } from "@tinymce/tinymce-react";
 
 type TinyMCEProps = {
-    licenseKey: string;
+    licenseKey?: string;
+    tinymceScriptSrc?: string;
     value: string;
     disabled?: boolean;
     onInit: (evt: any, editor: any) => void;
