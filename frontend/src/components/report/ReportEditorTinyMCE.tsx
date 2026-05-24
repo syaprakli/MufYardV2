@@ -1,5 +1,5 @@
 import { Editor } from "@tinymce/tinymce-react";
-import "tinymce/tinymce";
+import "./tinymce-core";
 import "tinymce/icons/default";
 import "tinymce/models/dom";
 import "tinymce/themes/silver";
