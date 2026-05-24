@@ -1319,7 +1319,7 @@ export default function ReportEditor() {
                                 plugins: [
                                     'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
                                     'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-                                    'insertdatetime', 'media', 'table', 'help', 'wordcount', 'quickbars'
+                                    'insertdatetime', 'media', 'table', 'wordcount', 'quickbars'
                                 ],
                                 skin: false,
                                 content_css: false,
@@ -1340,6 +1340,7 @@ export default function ReportEditor() {
                                 table_toolbar: 'tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol',
                                 content_style: 'body { font-family: Times New Roman, serif; font-size: 12pt; line-height: 1.6; padding: 24px; } p { margin: 0 0 12px 0; } table td, table th { border: 1px solid #cbd5e1; padding: 8px; }',
                                 language: 'tr',
+                                language_url: '/langs/tr.js',
                                 branding: false,
                                 promotion: false,
                                 setup: (editor: any) => {
