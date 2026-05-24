@@ -1349,8 +1349,6 @@ export default function ReportEditor() {
                                     'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
                                     'insertdatetime', 'media', 'table', 'wordcount', 'quickbars'
                                 ],
-                                skin: false,
-                                content_css: false,
                                 font_formats: 'Times New Roman=Times New Roman,Times,serif; Arial=arial,helvetica,sans-serif; Calibri=Calibri,sans-serif; Courier New=Courier New,Courier,monospace; Verdana=Verdana,sans-serif',
                                 fontsize_formats: '8pt 9pt 10pt 10.5pt 11pt 12pt 14pt 16pt 18pt 20pt 22pt 24pt 26pt 28pt 36pt 48pt 72pt',
                                 block_formats: 'Paragraf=p; Başlık 1=h1; Başlık 2=h2; Başlık 3=h3; Başlık 4=h4; Alıntı=blockquote',
