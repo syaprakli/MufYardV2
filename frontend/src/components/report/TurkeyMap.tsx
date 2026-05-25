@@ -186,6 +186,40 @@ export function TurkeyMap({
     if (hoveredCity) setHoveredCity(null);
   };
 
+  // Search suggestion and selection logic
+  const searchSuggestions = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const queryNormalized = normalizeCityName(searchQuery.trim());
+    return CITIES.filter((c) => normalizeCityName(c.name).includes(queryNormalized)).slice(0, 5);
+  }, [searchQuery]);
+
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!searchQuery.trim()) return;
+    
+    const queryNormalized = normalizeCityName(searchQuery.trim());
+    const matchedCity = CITIES.find(
+      (c) => normalizeCityName(c.name) === queryNormalized
+    );
+    
+    if (matchedCity) {
+      setSelectedCity(matchedCity.name);
+      setIsAddingPlace(false);
+      setSelectedPlaceId(null);
+      setSearchQuery("");
+    } else {
+      const partialMatch = CITIES.find(
+        (c) => normalizeCityName(c.name).includes(queryNormalized)
+      );
+      if (partialMatch) {
+        setSelectedCity(partialMatch.name);
+        setIsAddingPlace(false);
+        setSelectedPlaceId(null);
+        setSearchQuery("");
+      }
+    }
+  };
+
   // Place Form State
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<PlaceType>("hotel");
@@ -394,21 +428,42 @@ export function TurkeyMap({
             <p className="text-[9px] text-violet-400 font-bold mt-1 lg:hidden">↔ Haritayı parmağınızla sağa/sola kaydırabilirsiniz</p>
           </div>
           {/* Search Box */}
-          <div className="relative w-48">
+          <form onSubmit={handleSearchSubmit} className="relative w-48">
             <input
               type="text"
               placeholder="İl ara..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-8 pl-8 pr-3 text-[11px] bg-slate-950/80 border border-slate-800 rounded-xl outline-none focus:ring-1 focus:ring-violet-500 text-slate-300 font-bold"
+              className="w-full h-8 pl-8 pr-8 text-[11px] bg-slate-950/80 border border-slate-800 rounded-xl outline-none focus:ring-1 focus:ring-violet-500 text-slate-300 font-bold"
             />
-            <Search size={12} className="absolute left-2.5 top-2.5 text-slate-500" />
+            <button type="submit" className="absolute left-2.5 top-2.5 text-slate-500 hover:text-violet-400 transition-colors" title="Ara">
+              <Search size={12} />
+            </button>
             {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute right-2.5 top-2 text-slate-500 hover:text-white">
+              <button type="button" onClick={() => setSearchQuery("")} className="absolute right-2.5 top-2 text-slate-500 hover:text-white">
                 <X size={12} />
               </button>
             )}
-          </div>
+            {searchSuggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-9 bg-slate-950/95 border border-slate-800 rounded-xl shadow-2xl overflow-hidden z-50">
+                {searchSuggestions.map((city) => (
+                  <button
+                    key={city.name}
+                    type="button"
+                    onClick={() => {
+                      setSelectedCity(city.name);
+                      setIsAddingPlace(false);
+                      setSelectedPlaceId(null);
+                      setSearchQuery("");
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-[10px] text-slate-300 hover:bg-violet-900/40 hover:text-white transition-colors font-bold border-b border-slate-900/60 last:border-0"
+                  >
+                    {city.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </form>
         </div>
 
         {/* Turkey Map Stylized Canvas Area */}
