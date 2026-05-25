@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { TagSelector, type TagType } from "./TagSelector";
 import { Button } from "../ui/Button";
 import { Star, MapPin, Search, Plus, Home, Utensils, X, ArrowLeft, Trash2, MessageSquare } from "lucide-react";
@@ -152,6 +152,24 @@ export function TurkeyMap({
   const [svgContent, setSvgContent] = useState<string>("");
   const [hoveredCity, setHoveredCity] = useState<string | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const [hasHover, setHasHover] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const mediaQuery = window.matchMedia("(hover: hover)");
+      setHasHover(mediaQuery.matches);
+      const handler = (e: MediaQueryListEvent) => setHasHover(e.matches);
+      mediaQuery.addEventListener("change", handler);
+      return () => mediaQuery.removeEventListener("change", handler);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (window.innerWidth < 1024 && drawerRef.current) {
+      drawerRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedCity]);
 
   const handleSvgMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     setMousePos({ x: e.clientX, y: e.clientY });
@@ -373,6 +391,7 @@ export function TurkeyMap({
           <div>
             <h4 className="text-sm font-black uppercase tracking-wider text-slate-400">Denetim Sosyal Haritası</h4>
             <p className="text-[10px] text-slate-500 font-semibold mt-0.5">Konaklama, Yurt ve Lezzet Haritası (Müfettiş Önerileri)</p>
+            <p className="text-[9px] text-violet-400 font-bold mt-1 lg:hidden">↔ Haritayı parmağınızla sağa/sola kaydırabilirsiniz</p>
           </div>
           {/* Search Box */}
           <div className="relative w-48">
@@ -393,9 +412,9 @@ export function TurkeyMap({
         </div>
 
         {/* Turkey Map Stylized Canvas Area */}
-        <div className="flex-1 w-full aspect-[2/1] relative bg-slate-950/45 rounded-2xl border border-slate-850/40 min-h-[280px]">
+        <div className="flex-1 w-full bg-slate-950/45 rounded-2xl border border-slate-850/40 overflow-x-auto overflow-y-hidden">
           {/* Actual Turkey Map SVG Outline */}
-          <div className="absolute inset-0 p-2 flex items-center justify-center">
+          <div className="min-w-[650px] w-full aspect-[2/1] p-2 flex items-center justify-center relative lg:min-w-0">
             {svgContent ? (
               <svg
                 viewBox="0 0 1005 490"
@@ -448,7 +467,7 @@ export function TurkeyMap({
       </div>
 
       {/* Sağ Panel: Öneriler Çekmecesi & Ekleme & Yorumlama Formu */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 flex flex-col shadow-xl h-[600px] overflow-hidden text-slate-800 dark:text-slate-100">
+      <div ref={drawerRef} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 flex flex-col shadow-xl h-[600px] overflow-hidden text-slate-800 dark:text-slate-100">
         
         {/* VIEW 1: Yeni Mekan Önerisi Ekleme */}
         {isAddingPlace ? (
@@ -921,7 +940,7 @@ export function TurkeyMap({
       </div>
 
       {/* Hover Tooltip */}
-      {hoveredCity && (
+      {hoveredCity && hasHover && (
         <div
           style={{ left: mousePos.x + 15, top: mousePos.y + 15 }}
           className="fixed bg-slate-900/95 border border-slate-700 text-white text-[11px] font-black uppercase tracking-wider px-3 py-1.5 rounded-lg shadow-xl pointer-events-none z-[100] animate-in fade-in duration-150"
