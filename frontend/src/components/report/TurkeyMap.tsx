@@ -467,7 +467,7 @@ export function TurkeyMap({
         </div>
 
         {/* Turkey Map Stylized Canvas Area */}
-        <div className="flex-1 w-full bg-slate-950/45 rounded-2xl border border-slate-850/40 overflow-x-auto overflow-y-hidden">
+        <div className="w-full h-[325px] lg:h-auto lg:flex-1 bg-slate-950/45 rounded-2xl border border-slate-850/40 overflow-x-auto overflow-y-hidden">
           {/* Actual Turkey Map SVG Outline */}
           <div className="min-w-[650px] w-full aspect-[2/1] p-2 flex items-center justify-center relative lg:min-w-0">
             {svgContent ? (
