@@ -655,7 +655,7 @@ export function TurkeyMap({
                 onClick={() => setSelectedPlaceId(null)}
                 className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-slate-600 dark:hover:text-white uppercase tracking-wider"
               >
-                <ArrowLeft size={12} /> Mekan Listesi
+                <ArrowLeft size={12} /> {selectedCity} - Mekan Listesi
               </button>
               
               {canDeletePlace(selectedPlace) && (
@@ -735,7 +735,7 @@ export function TurkeyMap({
             {/* Reviews Section */}
             <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
               <h6 className="text-[10px] font-black text-slate-450 uppercase tracking-wider flex items-center gap-1">
-                <MessageSquare size={11} /> Müfettiş Değerlendirmeleri ({selectedPlaceReviews.length})
+                <MessageSquare size={11} /> {selectedCity} - Müfettiş Değerlendirmeleri ({selectedPlaceReviews.length})
               </h6>
 
               {selectedPlaceReviews.length === 0 ? (
@@ -828,7 +828,7 @@ export function TurkeyMap({
             {/* Write a Review Form */}
             <form onSubmit={handleReviewSubmit} className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
               <span className="text-[10px] font-black text-violet-600 dark:text-violet-400 uppercase tracking-widest">
-                Değerlendirme Yaz
+                {selectedCity} - Değerlendirme Yaz
               </span>
 
               <div className="flex items-center gap-1">
@@ -872,8 +872,8 @@ export function TurkeyMap({
           /* VIEW 3: Seçili İl Mekan Listesi */
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Kayıtlı Öneriler
+              <span className="text-[10px] font-black text-slate-450 dark:text-slate-400 uppercase tracking-widest">
+                {selectedCity} - Kayıtlı Öneriler
               </span>
               <Button
                 size="sm"
