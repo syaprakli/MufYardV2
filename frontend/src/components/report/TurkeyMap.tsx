@@ -1,7 +1,69 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { TagSelector, type TagType } from "./TagSelector";
 import { Button } from "../ui/Button";
-import { Star, MapPin, Search, Plus, Home, Utensils, X, ArrowLeft, Trash2, MessageSquare } from "lucide-react";
+import { Star, MapPin, Search, Plus, Home, Utensils, X, ArrowLeft, Trash2, MessageSquare, Camera } from "lucide-react";
+import { API_URL } from "../../lib/config";
+
+const resolveAttachmentUrl = (url: string | null | undefined) => {
+  if (!url) return '';
+  let raw = String(url).trim().replace(/\\/g, '/');
+  raw = raw.replace(/https?:\/\/localhost:\d+/g, '');
+  raw = raw.replace(/https?:\/\/127\.0\.0\.1:\d+/g, '');
+  if (raw.startsWith('http') || raw.startsWith('blob:') || raw.startsWith('data:')) return raw;
+  const cleanRaw = raw.startsWith('/') ? raw : `/${raw}`;
+  const parts = cleanRaw.split('/');
+  const encodedRaw = parts.map(p => encodeURIComponent(p)).join('/');
+  return `https://mufyardv2.up.railway.app${encodedRaw}`;
+};
+
+const compressImage = (file: File): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.src = e.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 1000;
+        const MAX_HEIGHT = 1000;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width = Math.round((width * MAX_HEIGHT) / height);
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error("Canvas compression failed"));
+            }
+          },
+          "image/jpeg",
+          0.75
+        );
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+};
 
 export type PlaceType = "hotel" | "yurt" | "facility" | "food" | string;
 
@@ -29,6 +91,9 @@ export type MapReview = {
   rating: number;
   content: string;
   date: string;
+  price?: string;
+  fitsPerDiem?: boolean;
+  image?: string;
 };
 
 const CITIES = [
@@ -140,7 +205,7 @@ export function TurkeyMap({
   reviews?: MapReview[];
   onAddPlace: (place: Omit<MapPlace, "id" | "author" | "date" | "authorId">) => Promise<void>;
   onDeletePlace?: (placeId: string) => Promise<void>;
-  onAddReview?: (review: { placeId: string; rating: number; content: string }) => Promise<void>;
+  onAddReview?: (review: { placeId: string; rating: number; content: string; price?: string; fitsPerDiem?: boolean; image?: string; }) => Promise<void>;
   onDeleteReview?: (reviewId: string) => Promise<void>;
   submitting: boolean;
   currentUser?: { uid?: string; role?: string };
@@ -233,6 +298,11 @@ export function TurkeyMap({
   // Review Form State
   const [newReviewContent, setNewReviewContent] = useState("");
   const [newReviewRating, setNewReviewRating] = useState(5);
+  const [newReviewPrice, setNewReviewPrice] = useState("");
+  const [newReviewFitsPerDiem, setNewReviewFitsPerDiem] = useState(false);
+  const [newReviewImage, setNewReviewImage] = useState("");
+  const [uploadingReviewImage, setUploadingReviewImage] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewPage, setReviewPage] = useState(1);
   const [placePage, setPlacePage] = useState(1);
@@ -336,6 +406,30 @@ export function TurkeyMap({
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingReviewImage(true);
+    try {
+      const compressedBlob = await compressImage(file);
+      const formData = new FormData();
+      formData.append("file", compressedBlob, "review_image.jpg");
+
+      const response = await fetch(`${API_URL}/files/upload?user_id=${currentUser?.uid || 'guest'}`, {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) throw new Error("Upload failed");
+      const data = await response.json();
+      setNewReviewImage(data.url);
+    } catch (err) {
+      alert("Görsel yüklenirken bir hata oluştu.");
+    } finally {
+      setUploadingReviewImage(false);
+    }
+  };
+
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newReviewContent.trim() || !selectedPlaceId || !onAddReview) return;
@@ -345,9 +439,15 @@ export function TurkeyMap({
         placeId: selectedPlaceId,
         rating: newReviewRating,
         content: newReviewContent,
+        price: newReviewPrice.trim() || undefined,
+        fitsPerDiem: newReviewFitsPerDiem || undefined,
+        image: newReviewImage || undefined,
       });
       setNewReviewContent("");
       setNewReviewRating(5);
+      setNewReviewPrice("");
+      setNewReviewFitsPerDiem(false);
+      setNewReviewImage("");
     } catch (err) {
       // Ignored
     } finally {
@@ -522,13 +622,12 @@ export function TurkeyMap({
       </div>
 
       {/* Sağ Panel: Öneriler Çekmecesi & Ekleme & Yorumlama Formu */}
-      <div ref={drawerRef} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 flex flex-col shadow-xl h-[600px] overflow-hidden text-slate-800 dark:text-slate-100">
-        
+      <div ref={drawerRef} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 flex flex-col shadow-xl h-[600px] overflow-hidden">
         {/* VIEW 1: Yeni Mekan Önerisi Ekleme */}
         {isAddingPlace ? (
           <form onSubmit={handlePlaceSubmit} className="flex-1 flex flex-col h-full overflow-hidden animate-in fade-in slide-in-from-right-3 duration-250">
             <div className="flex items-center justify-between mb-4 shrink-0">
-              <span className="text-[10px] font-black text-violet-600 dark:text-violet-400 uppercase tracking-widest">
+              <span className="text-[10px] font-black text-violet-650 dark:text-violet-400 uppercase tracking-widest">
                 Yeni Mekan Ekle ({selectedCity})
               </span>
               <button
@@ -540,120 +639,125 @@ export function TurkeyMap({
               </button>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Mekan Adı</label>
-              <input
-                type="text"
-                required
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Örn: Ankara Hakimevi"
-                className="w-full h-9 px-3 rounded-xl border border-slate-105 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold outline-none focus:ring-1 focus:ring-violet-500 text-slate-800 dark:text-slate-100"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Mekan Türü</label>
-              <select
-                value={newType}
-                onChange={(e) => setNewType(e.target.value as PlaceType)}
-                className="w-full h-9 px-3 rounded-xl border border-slate-105 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold outline-none focus:ring-1 focus:ring-violet-500 text-slate-700 dark:text-slate-200 cursor-pointer"
-              >
-                <option value="hotel">Otel / Konaklama</option>
-                <option value="yurt">GSB Yurdu</option>
-                <option value="facility">Misafirhane / Kamu Tesisi</option>
-                <option value="food">Restoran / Yemek</option>
-                <option value="other">Diğer (Kendiniz yazın)</option>
-              </select>
-              {newType === "other" && (
+            {/* Scrollable inputs wrapper */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 pb-3 scrollbar-thin">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Mekan Adı</label>
                 <input
                   type="text"
                   required
-                  value={customType}
-                  onChange={(e) => setCustomType(e.target.value)}
-                  placeholder="Mekan türünü yazın..."
-                  className="w-full h-9 px-3 mt-1.5 rounded-xl border border-slate-105 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold outline-none focus:ring-1 focus:ring-violet-500 text-slate-800 dark:text-slate-100"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Örn: Ankara Hakimevi"
+                  className="w-full h-9 px-3 rounded-xl border border-slate-105 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold outline-none focus:ring-1 focus:ring-violet-500 text-slate-800 dark:text-slate-100"
                 />
-              )}
-              {(newType === "hotel" || newType === "facility" || newType === "yurt") && (
-                <label className="flex items-center gap-2 mt-2 p-2 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors">
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Mekan Türü</label>
+                <select
+                  value={newType}
+                  onChange={(e) => setNewType(e.target.value as PlaceType)}
+                  className="w-full h-9 px-3 rounded-xl border border-slate-105 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold outline-none focus:ring-1 focus:ring-violet-500 text-slate-700 dark:text-slate-200 cursor-pointer"
+                >
+                  <option value="hotel">Otel / Konaklama</option>
+                  <option value="yurt">GSB Yurdu</option>
+                  <option value="facility">Misafirhane / Kamu Tesisi</option>
+                  <option value="food">Restoran / Yemek</option>
+                  <option value="other">Diğer (Kendiniz yazın)</option>
+                </select>
+                {newType === "other" && (
                   <input
-                    type="checkbox"
-                    checked={newFitsPerDiem}
-                    onChange={(e) => setNewFitsPerDiem(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                    type="text"
+                    required
+                    value={customType}
+                    onChange={(e) => setCustomType(e.target.value)}
+                    placeholder="Mekan türünü yazın..."
+                    className="w-full h-9 px-3 mt-1.5 rounded-xl border border-slate-105 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold outline-none focus:ring-1 focus:ring-violet-500 text-slate-800 dark:text-slate-100"
                   />
-                  <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                    Harcıraha Uygun (Gündelikle kalınabilir)
-                  </span>
-                </label>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Konaklama Fiyatı / Ücret (Opsiyonel)</label>
-              <input
-                type="text"
-                value={newPrice}
-                onChange={(e) => setNewPrice(e.target.value)}
-                placeholder="Örn: 450 TL"
-                className="w-full h-9 px-3 rounded-xl border border-slate-105 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold outline-none focus:ring-1 focus:ring-violet-500 text-slate-800 dark:text-slate-100"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Puanlama</label>
-              <div className="flex items-center gap-1.5 mt-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={() => setNewRating(star)}
-                    className="p-1 hover:scale-110 active:scale-95 transition-transform"
-                  >
-                    <Star
-                      size={18}
-                      className={star <= newRating ? "fill-amber-400 text-amber-400" : "text-slate-300 dark:text-slate-700"}
+                )}
+                {(newType === "hotel" || newType === "facility" || newType === "yurt") && (
+                  <label className="flex items-center gap-2 mt-2 p-2 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={newFitsPerDiem}
+                      onChange={(e) => setNewFitsPerDiem(e.target.checked)}
+                      className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
                     />
-                  </button>
-                ))}
+                    <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                      Harcıraha Uygun (Gündelikle kalınabilir)
+                    </span>
+                  </label>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Konaklama Fiyatı / Ücret (Opsiyonel)</label>
+                <input
+                  type="text"
+                  value={newPrice}
+                  onChange={(e) => setNewPrice(e.target.value)}
+                  placeholder="Örn: 450 TL"
+                  className="w-full h-9 px-3 rounded-xl border border-slate-105 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold outline-none focus:ring-1 focus:ring-violet-500 text-slate-800 dark:text-slate-100"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Puanlama</label>
+                <div className="flex items-center gap-1.5 mt-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setNewRating(star)}
+                      className="p-1 hover:scale-110 active:scale-95 transition-transform"
+                    >
+                      <Star
+                        size={18}
+                        className={star <= newRating ? "fill-amber-400 text-amber-400" : "text-slate-300 dark:text-slate-700"}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Etiketler</label>
+                <TagSelector value={newTags} onChange={setNewTags} />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Açıklama & Tavsiyeler</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="Örn: Odaları geniş ve konforlu, kahvaltısı tavsiye edilir..."
+                  className="w-full rounded-xl border border-slate-105 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 px-3 py-2 text-xs font-medium outline-none focus:ring-1 focus:ring-violet-500 text-slate-700 dark:text-slate-200 resize-none leading-relaxed"
+                />
               </div>
             </div>
 
-
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Etiketler</label>
-              <TagSelector value={newTags} onChange={setNewTags} />
+            {/* Sticky Submit Button */}
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 shrink-0">
+              <Button
+                type="submit"
+                disabled={submitting}
+                className="w-full h-10 rounded-xl font-bold text-xs shadow-md"
+              >
+                {submitting ? "Gönderiliyor..." : "Öneriyi Kaydet"}
+              </Button>
             </div>
-
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">Açıklama & Tavsiyeler</label>
-              <textarea
-                required
-                rows={3}
-                value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
-                placeholder="Örn: Odaları geniş ve konforlu, kahvaltısı tavsiye edilir..."
-                className="w-full rounded-xl border border-slate-105 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 px-3 py-2 text-xs font-medium outline-none focus:ring-1 focus:ring-violet-500 text-slate-700 dark:text-slate-200 resize-none leading-relaxed"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="w-full h-10 rounded-xl font-bold text-xs shadow-md"
-            >
-              {submitting ? "Gönderiliyor..." : "Öneriyi Kaydet"}
-            </Button>
           </form>
         ) : selectedPlace ? (
           /* VIEW 2: Google Maps Tarzı Mekan Detayı, Yorumları ve Yorum Ekleme */
-          <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-250">
+          <div className="flex-1 flex flex-col h-full overflow-hidden animate-in fade-in slide-in-from-right-3 duration-250">
             {/* Detail Drawer Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3 shrink-0">
               <button
                 onClick={() => setSelectedPlaceId(null)}
-                className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-slate-600 dark:hover:text-white uppercase tracking-wider"
+                className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-slate-650 dark:hover:text-white uppercase tracking-wider"
               >
                 <ArrowLeft size={12} /> {selectedCity} - Mekan Listesi
               </button>
@@ -669,209 +773,306 @@ export function TurkeyMap({
               )}
             </div>
 
-            {/* Place Summary */}
-            <div className="space-y-2">
-              <div className="flex items-start gap-2">
-                <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800/50 shadow-sm shrink-0 mt-0.5">
-                  {getPlaceIcon(selectedPlace.type)}
+            {/* Scrollable Content Container */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 pb-3 scrollbar-thin">
+              {/* Place Summary */}
+              <div className="space-y-2 mt-2">
+                <div className="flex items-start gap-2">
+                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800/50 shadow-sm shrink-0 mt-0.5">
+                    {getPlaceIcon(selectedPlace.type)}
+                  </div>
+                  <div>
+                    <h6 className="text-xs font-black text-slate-850 dark:text-slate-100 leading-tight">
+                      {selectedPlace.name}
+                    </h6>
+                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block mt-0.5">
+                      {getTypeName(selectedPlace.type)}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <h6 className="text-xs font-black text-slate-850 dark:text-slate-100 leading-tight">
-                    {selectedPlace.name}
-                  </h6>
-                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block mt-0.5">
-                    {getTypeName(selectedPlace.type)}
-                  </span>
-                </div>
-              </div>
 
-              {/* Rating Summary HUD */}
-              {(() => {
-                const stats = getPlaceRatingStats(selectedPlace.id, selectedPlace.rating);
-                return (
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
-                    <div className="flex items-center gap-0.5">
-                      {Array.from({ length: 5 }).map((_, idx) => (
-                        <Star
-                          key={idx}
-                          size={12}
-                          className={
-                            idx < Math.round(stats.avg)
-                              ? "fill-amber-400 text-amber-400"
-                              : "text-slate-200 dark:text-slate-700"
-                          }
-                        />
-                      ))}
+                {/* Rating Summary HUD */}
+                {(() => {
+                  const stats = getPlaceRatingStats(selectedPlace.id, selectedPlace.rating);
+                  return (
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
+                      <div className="flex items-center gap-0.5">
+                        {Array.from({ length: 5 }).map((_, idx) => (
+                          <Star
+                            key={idx}
+                            size={12}
+                            className={
+                              idx < Math.round(stats.avg)
+                                ? "fill-amber-400 text-amber-400"
+                                : "text-slate-200 dark:text-slate-700"
+                            }
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs text-amber-500 dark:text-amber-400 font-extrabold">{stats.avg} / 5</span>
+                      <span className="text-[10px] text-slate-450 font-medium">({stats.count || 0} Yorum)</span>
                     </div>
-                    <span className="text-xs text-amber-500 dark:text-amber-400 font-extrabold">{stats.avg} / 5</span>
-                    <span className="text-[10px] text-slate-450 font-medium">({stats.count || 0} Yorum)</span>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
 
-              <div className="flex flex-wrap gap-1 mt-1">
-                {selectedPlace.fitsPerDiem && (
-                  <div className="bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">
-                    Harcıraha Uygun
-                  </div>
-                )}
-                {selectedPlace.price && (
-                  <div className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">
-                    Fiyat: {selectedPlace.price}
-                  </div>
-                )}
-              </div>
-
-              <p className="text-xs text-slate-600 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-950/20 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-800/40 italic leading-relaxed font-semibold">
-                "{selectedPlace.description}"
-              </p>
-
-              <div className="text-[8px] text-slate-400 font-semibold flex items-center justify-between">
-                <span>Ekleyen: {selectedPlace.author}</span>
-                <span>{new Date(selectedPlace.date).toLocaleDateString("tr-TR")}</span>
-              </div>
-            </div>
-
-            {/* Reviews Section */}
-            <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
-              <h6 className="text-[10px] font-black text-slate-450 uppercase tracking-wider flex items-center gap-1">
-                <MessageSquare size={11} /> {selectedCity} - Müfettiş Değerlendirmeleri ({selectedPlaceReviews.length})
-              </h6>
-
-              {selectedPlaceReviews.length === 0 ? (
-                <div className="text-center py-6 text-slate-400 text-[10px] font-bold">
-                  Henüz yorum yapılmamış. İlk değerlendirmeyi siz yazın!
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {selectedPlace.fitsPerDiem && (
+                    <div className="bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">
+                      Harcıraha Uygun
+                    </div>
+                  )}
+                  {selectedPlace.price && (
+                    <div className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">
+                      Fiyat: {selectedPlace.price}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="h-[270px] flex flex-col pr-1">
-                  {(() => {
-                    const REVIEWS_PER_PAGE = 3;
-                    const totalPages = Math.max(1, Math.ceil(selectedPlaceReviews.length / REVIEWS_PER_PAGE));
-                    const currentReviews = selectedPlaceReviews.slice((reviewPage - 1) * REVIEWS_PER_PAGE, reviewPage * REVIEWS_PER_PAGE);
 
-                    return (
-                      <>
-                        <div className="flex-1 space-y-3">
-                          {currentReviews.map((review) => (
-                            <div
-                              key={review.id}
-                              className="p-3 bg-slate-50/40 dark:bg-slate-950/15 rounded-xl border border-slate-100 dark:border-slate-800/50 text-[11px] relative group"
-                            >
-                              <div className="flex items-start justify-between gap-1 mb-1.5">
-                                <div className="font-extrabold text-slate-700 dark:text-slate-250 truncate max-w-[150px]">
-                                  {review.author}
-                                </div>
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <div className="flex items-center">
-                                    {Array.from({ length: 5 }).map((_, idx) => (
-                                      <Star
-                                        key={idx}
-                                        size={8}
-                                        className={
-                                          idx < review.rating
-                                            ? "fill-amber-400 text-amber-400"
-                                            : "text-slate-200 dark:text-slate-700"
-                                        }
-                                      />
-                                    ))}
+                <p className="text-xs text-slate-600 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-950/20 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-800/40 italic leading-relaxed font-semibold">
+                  "{selectedPlace.description}"
+                </p>
+
+                <div className="text-[8px] text-slate-400 font-semibold flex items-center justify-between">
+                  <span>Ekleyen: {selectedPlace.author}</span>
+                  <span>{new Date(selectedPlace.date).toLocaleDateString("tr-TR")}</span>
+                </div>
+              </div>
+
+              {/* Reviews Section */}
+              <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                <h6 className="text-[10px] font-black text-slate-450 uppercase tracking-wider flex items-center gap-1">
+                  <MessageSquare size={11} /> {selectedCity} - Müfettiş Değerlendirmeleri ({selectedPlaceReviews.length})
+                </h6>
+
+                {selectedPlaceReviews.length === 0 ? (
+                  <div className="text-center py-6 text-slate-400 text-[10px] font-bold">
+                    Henüz yorum yapılmamış. İlk değerlendirmeyi siz yazın!
+                  </div>
+                ) : (
+                  <div className="flex flex-col pr-1">
+                    {(() => {
+                      const REVIEWS_PER_PAGE = 3;
+                      const totalPages = Math.max(1, Math.ceil(selectedPlaceReviews.length / REVIEWS_PER_PAGE));
+                      const currentReviews = selectedPlaceReviews.slice((reviewPage - 1) * REVIEWS_PER_PAGE, reviewPage * REVIEWS_PER_PAGE);
+
+                      return (
+                        <>
+                          <div className="space-y-3">
+                            {currentReviews.map((review) => (
+                              <div
+                                key={review.id}
+                                className="p-3 bg-slate-50/40 dark:bg-slate-950/15 rounded-xl border border-slate-100 dark:border-slate-800/50 text-[11px] relative group"
+                              >
+                                <div className="flex items-start justify-between gap-1 mb-1.5">
+                                  <div className="font-extrabold text-slate-700 dark:text-slate-250 truncate max-w-[150px]">
+                                    {review.author}
                                   </div>
-                                  
-                                  {canDeleteReview(review) && (
-                                    <button
-                                      onClick={() => handleDeleteReview(review.id)}
-                                      className="text-red-500 hover:text-red-700 ml-1 p-0.5 hover:bg-red-50 dark:hover:bg-red-950/20 rounded"
-                                      title="Yorumu Sil"
-                                    >
-                                      <Trash2 size={10} />
-                                    </button>
-                                  )}
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <div className="flex items-center">
+                                      {Array.from({ length: 5 }).map((_, idx) => (
+                                        <Star
+                                          key={idx}
+                                          size={8}
+                                          className={
+                                            idx < review.rating
+                                              ? "fill-amber-400 text-amber-400"
+                                              : "text-slate-200 dark:text-slate-700"
+                                          }
+                                        />
+                                      ))}
+                                    </div>
+                                    
+                                    {canDeleteReview(review) && (
+                                      <button
+                                        onClick={() => handleDeleteReview(review.id)}
+                                        className="text-red-500 hover:text-red-700 ml-1 p-0.5 hover:bg-red-50 dark:hover:bg-red-950/20 rounded"
+                                        title="Yorumu Sil"
+                                      >
+                                        <Trash2 size={10} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                                <p className="text-slate-600 dark:text-slate-400 font-semibold leading-relaxed">
+                                  {review.content}
+                                </p>
+
+                                {/* Yorum fiyat / harcırah etiketleri */}
+                                {(review.fitsPerDiem || review.price) && (
+                                  <div className="flex flex-wrap gap-1 mt-1.5 mb-0.5">
+                                    {review.fitsPerDiem && (
+                                      <span className="bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider">
+                                        Harcıraha Uygun
+                                      </span>
+                                    )}
+                                    {review.price && (
+                                      <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-350 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider">
+                                        Fiyat: {review.price}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Yorum görseli */}
+                                {review.image && (
+                                  <div className="mt-2 w-14 h-14 rounded-lg overflow-hidden border border-slate-100 dark:border-slate-800/80 cursor-zoom-in hover:opacity-90 transition-opacity">
+                                    <img
+                                      src={resolveAttachmentUrl(review.image)}
+                                      alt="Değerlendirme görseli"
+                                      className="w-full h-full object-cover"
+                                      onClick={() => setLightboxImage(review.image || null)}
+                                    />
+                                  </div>
+                                )}
+
+                                <div className="text-[7px] text-slate-400 font-bold text-right mt-2 pt-2 border-t border-slate-100/50 dark:border-slate-800/50">
+                                  {new Date(review.date).toLocaleDateString("tr-TR")}
                                 </div>
                               </div>
-                              <p className="text-slate-600 dark:text-slate-400 font-semibold leading-relaxed">
-                                {review.content}
-                              </p>
-                              <div className="text-[7px] text-slate-400 font-bold text-right mt-2 pt-2 border-t border-slate-100/50 dark:border-slate-800/50">
-                                {new Date(review.date).toLocaleDateString("tr-TR")}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        
-                        {totalPages > 1 && (
-                          <div className="flex items-center justify-center gap-2 pt-2 pb-1 mt-auto">
-                            <button
-                              type="button"
-                              disabled={reviewPage === 1}
-                              onClick={() => setReviewPage(p => p - 1)}
-                              className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md text-[10px] font-bold disabled:opacity-30 transition-colors"
-                            >
-                              Önceki
-                            </button>
-                            <span className="text-[10px] text-slate-500 font-bold">{reviewPage} / {totalPages}</span>
-                            <button
-                              type="button"
-                              disabled={reviewPage === totalPages}
-                              onClick={() => setReviewPage(p => p + 1)}
-                              className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md text-[10px] font-bold disabled:opacity-30 transition-colors"
-                            >
-                              Sonraki
-                            </button>
+                            ))}
                           </div>
-                        )}
-                      </>
-                    );
-                  })()}
+                          
+                          {totalPages > 1 && (
+                            <div className="flex items-center justify-center gap-2 pt-2 pb-1 mt-3">
+                              <button
+                                type="button"
+                                disabled={reviewPage === 1}
+                                onClick={() => setReviewPage(p => p - 1)}
+                                className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md text-[10px] font-bold disabled:opacity-30 transition-colors"
+                              >
+                                Önceki
+                              </button>
+                              <span className="text-[10px] text-slate-500 font-bold">{reviewPage} / {totalPages}</span>
+                              <button
+                                type="button"
+                                disabled={reviewPage === totalPages}
+                                onClick={() => setReviewPage(p => p + 1)}
+                                className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md text-[10px] font-bold disabled:opacity-30 transition-colors"
+                              >
+                                Sonraki
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {/* Write a Review Form */}
+              <form onSubmit={handleReviewSubmit} className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                <span className="text-[10px] font-black text-violet-600 dark:text-violet-400 uppercase tracking-widest">
+                  {selectedCity} - Değerlendirme Yaz
+                </span>
+
+                <div className="flex items-center gap-1">
+                  <span className="text-[9px] font-bold text-slate-450 mr-1 uppercase">Puanınız:</span>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setNewReviewRating(star)}
+                      className="p-0.5 hover:scale-110 active:scale-95 transition-transform"
+                    >
+                      <Star
+                        size={14}
+                        className={star <= newReviewRating ? "fill-amber-400 text-amber-400" : "text-slate-200 dark:text-slate-700"}
+                      />
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
 
-            {/* Write a Review Form */}
-            <form onSubmit={handleReviewSubmit} className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
-              <span className="text-[10px] font-black text-violet-600 dark:text-violet-400 uppercase tracking-widest">
-                {selectedCity} - Değerlendirme Yaz
-              </span>
+                <div className="space-y-1">
+                  <textarea
+                    required
+                    rows={2}
+                    value={newReviewContent}
+                    onChange={(e) => setNewReviewContent(e.target.value)}
+                    placeholder="Deneyiminizi ve tavsiyelerinizi yazın..."
+                    className="w-full rounded-xl border border-slate-105 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 px-3 py-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-violet-500 text-slate-700 dark:text-slate-200 resize-none leading-relaxed"
+                  />
+                </div>
 
-              <div className="flex items-center gap-1">
-                <span className="text-[9px] font-bold text-slate-450 mr-1 uppercase">Puanınız:</span>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={() => setNewReviewRating(star)}
-                    className="p-0.5 hover:scale-110 active:scale-95 transition-transform"
-                  >
-                    <Star
-                      size={14}
-                      className={star <= newReviewRating ? "fill-amber-400 text-amber-400" : "text-slate-200 dark:text-slate-700"}
+                {/* Fiyat ve Harcırah Bilgisi */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Fiyat (Opsiyonel)</label>
+                    <input
+                      type="text"
+                      value={newReviewPrice}
+                      onChange={(e) => setNewReviewPrice(e.target.value)}
+                      placeholder="Örn: 450 TL"
+                      className="w-full h-8 px-2.5 rounded-lg border border-slate-105 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-[11px] font-semibold outline-none focus:ring-1 focus:ring-violet-500 text-slate-800 dark:text-slate-100"
                     />
-                  </button>
-                ))}
-              </div>
+                  </div>
+                  <div className="flex items-end pb-1.5">
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={newReviewFitsPerDiem}
+                        onChange={(e) => setNewReviewFitsPerDiem(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                      />
+                      <span className="text-[9px] font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                        Harcıraha Uygun
+                      </span>
+                    </label>
+                  </div>
+                </div>
 
-              <div className="space-y-1">
-                <textarea
-                  required
-                  rows={2}
-                  value={newReviewContent}
-                  onChange={(e) => setNewReviewContent(e.target.value)}
-                  placeholder="Deneyiminizi ve tavsiyelerinizi yazın..."
-                  className="w-full rounded-xl border border-slate-105 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 px-3 py-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-violet-500 text-slate-700 dark:text-slate-200 resize-none leading-relaxed"
-                />
-              </div>
+                {/* Yorum Görsel Yükleme */}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Görsel (Opsiyonel)</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      id="review-image-upload"
+                      onChange={handleImageUpload}
+                    />
+                    <label
+                      htmlFor="review-image-upload"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950/40 dark:hover:bg-slate-950/80 border border-slate-150 dark:border-slate-800/80 rounded-xl cursor-pointer text-[10px] font-bold text-slate-600 dark:text-slate-300 transition-colors uppercase tracking-wider"
+                    >
+                      <Camera size={11} />
+                      {uploadingReviewImage ? "Yükleniyor..." : "Görsel Seç"}
+                    </label>
 
-              <Button
-                type="submit"
-                disabled={submittingReview}
-                className="w-full h-8 rounded-lg font-bold text-[10px] uppercase tracking-wider shadow-sm"
-              >
-                {submittingReview ? "Gönderiliyor..." : "Değerlendirmeyi Gönder"}
-              </Button>
-            </form>
+                    {newReviewImage && (
+                      <div className="relative w-9 h-9 rounded-lg overflow-hidden border border-slate-205 dark:border-slate-700">
+                        <img
+                          src={resolveAttachmentUrl(newReviewImage)}
+                          alt="Önizleme"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setNewReviewImage("")}
+                          className="absolute top-0 right-0 p-0.5 bg-red-500 text-white rounded-bl hover:bg-red-650 transition-colors"
+                        >
+                          <X size={8} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={submittingReview}
+                  className="w-full h-8 rounded-lg font-bold text-[10px] uppercase tracking-wider shadow-sm"
+                >
+                  {submittingReview ? "Gönderiliyor..." : "Değerlendirmeyi Gönder"}
+                </Button>
+              </form>
+            </div>
           </div>
         ) : (
           /* VIEW 3: Seçili İl Mekan Listesi */
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="flex-1 flex flex-col h-full overflow-hidden">
+            <div className="flex items-center justify-between shrink-0 mb-4">
               <span className="text-[10px] font-black text-slate-450 dark:text-slate-400 uppercase tracking-widest">
                 {selectedCity} - Kayıtlı Öneriler
               </span>
@@ -885,7 +1086,7 @@ export function TurkeyMap({
             </div>
 
             {selectedCityPlaces.length === 0 ? (
-              <div className="text-center py-12 text-slate-400 dark:text-slate-500 space-y-2">
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-12 text-slate-400 dark:text-slate-500 space-y-2">
                 <MapPin size={24} className="mx-auto text-slate-300 dark:text-slate-700 animate-bounce" />
                 <p className="text-xs font-bold uppercase tracking-wider">Öneri Bulunmuyor</p>
                 <p className="text-[10px] font-semibold opacity-75 max-w-[200px] mx-auto leading-relaxed">
@@ -893,7 +1094,7 @@ export function TurkeyMap({
                 </p>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 {(() => {
                   const PLACES_PER_PAGE = 3;
                   const totalPages = Math.max(1, Math.ceil(selectedCityPlaces.length / PLACES_PER_PAGE));
@@ -1001,6 +1202,28 @@ export function TurkeyMap({
           className="fixed bg-slate-900/95 border border-slate-700 text-white text-[11px] font-black uppercase tracking-wider px-3 py-1.5 rounded-lg shadow-xl pointer-events-none z-[100] animate-in fade-in duration-150"
         >
           {hoveredCity}
+        </div>
+      )}
+
+      {/* Lightbox Modal */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[110] flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={resolveAttachmentUrl(lightboxImage)}
+              alt="Büyük Değerlendirme Görseli"
+              className="max-w-[90vw] max-h-[90vh] rounded-2xl object-contain shadow-2xl animate-in zoom-in-95 duration-200"
+            />
+            <button
+              onClick={() => setLightboxImage(null)}
+              className="absolute -top-10 right-0 p-2 bg-slate-800/80 hover:bg-slate-700/80 text-white rounded-full transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
       )}
     </div>
