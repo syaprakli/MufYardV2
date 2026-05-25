@@ -35,7 +35,7 @@ export default function ReportEditorChecklistPanel({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-y-0 right-0 w-96 max-w-[92vw] bg-white shadow-2xl z-[101] border-l border-border flex flex-col animate-in slide-in-from-right-10 duration-300">
+        <div className="fixed lg:relative inset-y-0 right-0 lg:inset-auto lg:h-full w-96 max-w-[92vw] bg-white shadow-2xl lg:shadow-none z-[101] lg:z-10 border-l border-border flex flex-col animate-in slide-in-from-right-10 duration-300">
             <div className="p-5 border-b border-border flex items-start justify-between bg-slate-50">
                 <div>
                     <h3 className="font-bold flex items-center gap-2"><ClipboardCheck size={18} className="text-primary" /> Teslim Öncesi Kontrol</h3>

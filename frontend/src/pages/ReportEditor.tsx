@@ -137,6 +137,61 @@ export default function ReportEditor() {
     const [aiPresetName, setAiPresetName] = useState("");
     const [savedAiPresets, setSavedAiPresets] = useState<SavedAiPromptPreset[]>([]);
 
+    const closeAllSidebarsAndModals = () => {
+        setIsHistoryOpen(false);
+        setIsAuditTrailOpen(false);
+        setIsSnippetBankOpen(false);
+        setIsLegislationOpen(false);
+        setIsProofreadOpen(false);
+        setIsAiSuggestionOpen(false);
+        setIsTemplateModalOpen(false);
+        setIsVoiceInputOpen(false);
+        setIsShareModalOpen(false);
+        setIsDiffOpen(false);
+        setIsChecklistOpen(false);
+    };
+
+    const openHistory = () => {
+        closeAllSidebarsAndModals();
+        setIsHistoryOpen(true);
+    };
+    const openAuditTrail = () => {
+        closeAllSidebarsAndModals();
+        setIsAuditTrailOpen(true);
+    };
+    const openSnippetBank = () => {
+        closeAllSidebarsAndModals();
+        setIsSnippetBankOpen(true);
+    };
+    const openLegislation = () => {
+        closeAllSidebarsAndModals();
+        setIsLegislationOpen(true);
+    };
+    const openProofread = () => {
+        closeAllSidebarsAndModals();
+        setIsProofreadOpen(true);
+    };
+    const openAiSuggestion = () => {
+        closeAllSidebarsAndModals();
+        setIsAiSuggestionOpen(true);
+    };
+    const openTemplateModal = () => {
+        closeAllSidebarsAndModals();
+        setIsTemplateModalOpen(true);
+    };
+    const openVoiceInput = () => {
+        closeAllSidebarsAndModals();
+        setIsVoiceInputOpen(true);
+    };
+    const openShareModal = () => {
+        closeAllSidebarsAndModals();
+        setIsShareModalOpen(true);
+    };
+    const openChecklist = () => {
+        closeAllSidebarsAndModals();
+        setIsChecklistOpen(true);
+    };
+
     const [activeUsers, setActiveUsers] = useState<any[]>([]);
     const [providerStatus, setProviderStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
     const lastVersionAtRef = useRef<number>(Date.now());
@@ -641,7 +696,7 @@ export default function ReportEditor() {
     const handleExportWord = async () => {
         if (!id) return;
         if (criticalChecklistFailures.length > 0) {
-            setIsChecklistOpen(true);
+            openChecklist();
             toast.error("Teslim öncesi kalite kontrolünde kritik eksikler var.", { id: "export-word" });
             return;
         }
@@ -1117,16 +1172,16 @@ export default function ReportEditor() {
                         )}
                         
                         {/* TÜM BUTONLAR VE PANELLER AKTİF */}
-                        <Button variant="ghost" onClick={() => { setIsShareModalOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Paylaş</Button>
-                        <Button variant="ghost" onClick={() => { setIsAuditTrailOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Denetim İzi</Button>
-                        <Button variant="ghost" onClick={() => { setIsHistoryOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center"><History size={14} className="mr-1.5" /> Sürümler</Button>
+                        <Button variant="ghost" onClick={() => { openShareModal(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Paylaş</Button>
+                        <Button variant="ghost" onClick={() => { openAuditTrail(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Denetim İzi</Button>
+                        <Button variant="ghost" onClick={() => { openHistory(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center"><History size={14} className="mr-1.5" /> Sürümler</Button>
                         <Button variant="ghost" onClick={() => { openChat(`audit_${id}`, audit?.title || "Rapor Odası", "audit"); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><MessageSquare size={14} className="mr-1.5" /> Rapor Odası</Button>
-                        <Button variant="ghost" onClick={() => { setIsTemplateModalOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><LayoutGrid size={14} className="mr-1.5" /> Şablon Seç</Button>
-                        <Button variant="ghost" onClick={() => { setIsProofreadOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><CheckCircle size={14} className="mr-1.5" /> Dil Kontrolü</Button>
-                        <Button variant="ghost" onClick={() => { setIsLegislationOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><BookOpen size={14} className="mr-1.5" /> Mevzuat Öner</Button>
-                        <Button variant="ghost" onClick={() => { setIsSnippetBankOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Taslak Metinler</Button>
-                        <Button variant="ghost" onClick={() => { setIsVoiceInputOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Sesli Not</Button>
-                        <Button variant="ghost" onClick={() => { setIsAiSuggestionOpen(true); setShowMobileActions(false); }} disabled={!canEditContent} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed justify-start md:justify-center"><Sparkles size={14} className="mr-1.5" /> <span className="inline md:hidden xl:inline">AI Öneri</span></Button>
+                        <Button variant="ghost" onClick={() => { openTemplateModal(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><LayoutGrid size={14} className="mr-1.5" /> Şablon Seç</Button>
+                        <Button variant="ghost" onClick={() => { openProofread(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><CheckCircle size={14} className="mr-1.5" /> Dil Kontrolü</Button>
+                        <Button variant="ghost" onClick={() => { openLegislation(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><BookOpen size={14} className="mr-1.5" /> Mevzuat Öner</Button>
+                        <Button variant="ghost" onClick={() => { openSnippetBank(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Taslak Metinler</Button>
+                        <Button variant="ghost" onClick={() => { openVoiceInput(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Sesli Not</Button>
+                        <Button variant="ghost" onClick={() => { openAiSuggestion(); setShowMobileActions(false); }} disabled={!canEditContent} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed justify-start md:justify-center"><Sparkles size={14} className="mr-1.5" /> <span className="inline md:hidden xl:inline">AI Öneri</span></Button>
                         <Button variant="outline" onClick={() => { handleSave(); setShowMobileActions(false); }} disabled={saving || !canEditContent} className="h-8 px-2 md:px-3 text-[11px] font-bold border-primary/20 rounded-lg justify-start md:justify-center">{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" />} <span className="inline md:hidden lg:inline">Kaydet</span></Button>
                         <Button variant="outline" onClick={() => { handleSaveVersion(); setShowMobileActions(false); }} disabled={saving || !canEditContent} className="h-8 px-2 md:px-3 text-[11px] font-bold border-emerald-300 text-emerald-700 rounded-lg justify-start md:justify-center"><History size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" /> <span className="inline md:hidden lg:inline">Sürüm Kaydet</span></Button>
                         <Button onClick={() => { handleExportWord(); setShowMobileActions(false); }} className="h-8 px-2 md:px-3 text-[11px] font-black bg-slate-900 text-white rounded-lg shadow-sm justify-start md:justify-center"><Download size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" /> <span className="inline md:hidden lg:inline">Word</span></Button>
@@ -1183,8 +1238,9 @@ export default function ReportEditor() {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-2 md:p-12 flex justify-center gap-6">
-                <div className="w-full max-w-[850px]">
+            <div className="flex-1 flex overflow-hidden">
+                <div className="flex-1 overflow-y-auto p-2 md:p-12 flex justify-center gap-6 bg-[#f8fafc] dark:bg-slate-950">
+                    <div className="w-full max-w-[850px]">
                     {(auditRole === "view" || auditRole === "comment") && (
                         <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-800">
                             {auditRole === "comment"
@@ -1199,7 +1255,7 @@ export default function ReportEditor() {
                                 <button
                                     type="button"
                                     className="text-[10px] uppercase tracking-widest font-black text-rose-700 hover:text-rose-900"
-                                    onClick={() => setIsHistoryOpen(true)}
+                                    onClick={openHistory}
                                 >
                                     Sürümleri Aç
                                 </button>
@@ -1223,11 +1279,11 @@ export default function ReportEditor() {
                         </div>
                         <div className="text-[11px] font-bold">
                             {checklistSummary.criticalFailures === 0 ? (
-                                <button type="button" onClick={() => setIsChecklistOpen(true)} className="text-emerald-600 hover:text-emerald-700">
+                                <button type="button" onClick={openChecklist} className="text-emerald-600 hover:text-emerald-700">
                                     Teslim kontrolü hazır
                                 </button>
                             ) : (
-                                <button type="button" onClick={() => setIsChecklistOpen(true)} className="text-amber-600 hover:text-amber-700">
+                                <button type="button" onClick={openChecklist} className="text-amber-600 hover:text-amber-700">
                                     {checklistSummary.criticalFailures} kritik eksik var
                                 </button>
                             )}
@@ -1441,21 +1497,7 @@ export default function ReportEditor() {
                 </div>
             </div>
 
-            {isShareModalOpen && (
-                <Suspense fallback={null}>
-                    <ShareModalLazy
-                        isOpen={isShareModalOpen}
-                        onClose={() => setIsShareModalOpen(false)}
-                        sharedWith={audit?.shared_with || []}
-                        sharedRoles={audit?.shared_roles || {}}
-                        enableRoles={true}
-                        onShare={() => {}}
-                        onShareWithRoles={handleShareUpdate}
-                        title={`"${audit?.title}" Rapor Paylaşımı`}
-                    />
-                </Suspense>
-            )}
-
+            {/* Sidebars rendered inside the flex container */}
             {isHistoryOpen && (
                 <Suspense fallback={null}>
                     <ReportEditorHistoryPanelLazy
@@ -1502,6 +1544,24 @@ export default function ReportEditor() {
                     />
                 </Suspense>
             )}
+            </div>
+
+            {isShareModalOpen && (
+                <Suspense fallback={null}>
+                    <ShareModalLazy
+                        isOpen={isShareModalOpen}
+                        onClose={() => setIsShareModalOpen(false)}
+                        sharedWith={audit?.shared_with || []}
+                        sharedRoles={audit?.shared_roles || {}}
+                        enableRoles={true}
+                        onShare={() => {}}
+                        onShareWithRoles={handleShareUpdate}
+                        title={`"${audit?.title}" Rapor Paylaşımı`}
+                    />
+                </Suspense>
+            )}
+
+
 
             {isAiSuggestionOpen && (
                 <Suspense fallback={null}>
@@ -1542,8 +1602,8 @@ export default function ReportEditor() {
             )}
 
             {isDiffOpen && selectedDiffVersion && (
-                <div className="fixed inset-x-0 bottom-0 top-[64px] z-40 bg-black/35 flex items-start justify-center p-2 md:p-4">
-                    <Card className="w-full max-w-6xl h-[calc(100vh-80px)] p-0 overflow-hidden border border-slate-200 shadow-2xl">
+                <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-sm flex items-center justify-center p-2 md:p-6 animate-in fade-in duration-200">
+                    <Card className="w-full max-w-6xl h-[90vh] md:h-[85vh] p-0 overflow-hidden border border-slate-200 shadow-2xl flex flex-col animate-in zoom-in-95 duration-200">
                         <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
                             <div>
                                 <h3 className="text-sm md:text-base font-bold text-slate-800">Sürüm Karşılaştırma</h3>
@@ -1576,7 +1636,7 @@ export default function ReportEditor() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 h-[calc(100%-58px)]">
+                        <div className="grid grid-cols-1 md:grid-cols-2 flex-1 min-h-0">
                             <div className="border-r border-slate-200 overflow-auto">
                                 <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">
                                     {selectedDiffVersion.version_name}

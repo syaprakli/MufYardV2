@@ -44,7 +44,7 @@ export default function ReportEditorHistoryPanel({
     };
 
     return (
-        <div className="fixed inset-y-0 right-0 w-80 bg-white shadow-2xl z-[100] border-l border-border flex flex-col animate-in slide-in-from-right-10 duration-300">
+        <div className="fixed lg:relative inset-y-0 right-0 lg:inset-auto lg:h-full w-80 bg-white shadow-2xl lg:shadow-none z-[100] lg:z-10 border-l border-border flex flex-col animate-in slide-in-from-right-10 duration-300">
             <div className="p-5 border-b border-border flex items-center justify-between bg-slate-50">
                 <h3 className="font-bold flex items-center gap-2"><History size={18} className="text-primary" /> Sürüm Geçmişi</h3>
                 <Button variant="ghost" size="sm" onClick={onClose} className="rounded-full w-8 h-8 p-0">
