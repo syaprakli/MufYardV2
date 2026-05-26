@@ -41,7 +41,10 @@ function ActionBtn({ children, title, color, onClick }: { children: React.ReactN
     );
 }
 
-const RAPOR_TURLERI = ["Genel Denetim", "Özel Denetim", "İnceleme", "Soruşturma", "Ön İnceleme", "Araştırma"];
+const RAPOR_TURLERI = [
+    "Genel Denetim", "Özel Denetim", "İnceleme", "Soruşturma", "Ön İnceleme", "Araştırma",
+    "İl Denetimi", "Federasyon Denetimi", "Kyk Yurt Denetimi", "Özel Yurt Denetimi", "Spor Kulüpleri Denetimi"
+];
 const RAPOR_SABLONLARI: Record<string, string> = {
     "Boş Rapor": "",
     "Genel Teftiş": `<h1 style="text-align: center;">GENEL TEFTİŞ RAPORU</h1><p><br></p><p><strong>1. GİRİŞ</strong></p><p>....... tarihli ve ....... sayılı Makam Onayı üzerine ....... İl Müdürlüğü ve bağlı birimlerinde yürütülen Genel Teftiş çalışmaları sonucunda bu rapor düzenlenmiştir.</p><p><br></p><p><strong>2. YAPILAN İNCELEME VE TESPİTLER</strong></p><p>Kurumun mevzuata uygunluk, mali ve idari işlemleri incelenmiş olup, tespit edilen hususlar aşağıda maddeler halinde açıklanmıştır:</p><ul><li>İlk tespit...</li></ul><p><br></p><p><strong>3. SONUÇ VE ÖNERİLER</strong></p><p>Yapılan genel teftiş neticesinde ....... kanaatine varılmıştır.</p>`,
@@ -272,7 +275,8 @@ export default function Tasks() {
         rapor_turu: "Genel Denetim",
         baslama_tarihi: new Date().toISOString().split("T")[0],
         sure_gun: 30,
-        assigned_to: [] as string[]
+        assigned_to: [] as string[],
+        parent_task_id: ""
     });
 
     useEffect(() => { 
@@ -341,7 +345,8 @@ export default function Tasks() {
                 rapor_turu: "Genel Denetim",
                 baslama_tarihi: new Date().toISOString().split("T")[0],
                 sure_gun: 30,
-                assigned_to: []
+                assigned_to: [],
+                parent_task_id: ""
             });
             if (effectiveUid) refreshTasks(effectiveUid);
         } catch { toast.error("Görev oluşturulamadı."); }
@@ -848,6 +853,7 @@ export default function Tasks() {
                 rapor_turu: editingTask.rapor_turu,
                 baslama_tarihi: editingTask.baslama_tarihi,
                 sure_gun: editingTask.sure_gun,
+                parent_task_id: editingTask.parent_task_id || ""
             });
             if (effectiveUid) refreshTasks(effectiveUid);
             toast.success("Görev güncellendi.");
@@ -1359,6 +1365,24 @@ export default function Tasks() {
                                 </select>
                             </div>
                         </div>
+
+                        {form.rapor_turu === "Kyk Yurt Denetimi" && (
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 mb-4">
+                                <div className="md:col-span-12 space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Bağlı İl Denetimi</label>
+                                    <select
+                                        value={form.parent_task_id || ""}
+                                        onChange={e => setForm({ ...form, parent_task_id: e.target.value })}
+                                        className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold outline-none cursor-pointer"
+                                    >
+                                        <option value="">Seçiniz (Bağlı İl Denetimi yoksa boş bırakın)...</option>
+                                        {tasks.filter(t => t.rapor_turu === "İl Denetimi").map(t => (
+                                            <option key={t.id} value={t.id}>{t.rapor_adi} ({t.rapor_kodu})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
                             <div className="md:col-span-6 lg:col-span-3 space-y-1.5">
@@ -2080,6 +2104,22 @@ export default function Tasks() {
                                     </select>
                                 </div>
                             </div>
+
+                            {editingTask.rapor_turu === "Kyk Yurt Denetimi" && (
+                                <div>
+                                    <label style={labelStyle}>Bağlı İl Denetimi</label>
+                                    <select
+                                        value={editingTask.parent_task_id || ""}
+                                        onChange={e => setEditingTask({ ...editingTask, parent_task_id: e.target.value })}
+                                        style={inputStyle}
+                                    >
+                                        <option value="">Seçiniz (Bağlı İl Denetimi yoksa boş bırakın)...</option>
+                                        {tasks.filter(t => t.rapor_turu === "İl Denetimi" && t.id !== editingTask.id).map(t => (
+                                            <option key={t.id} value={t.id}>{t.rapor_adi} ({t.rapor_kodu})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             <div>
                                 <label style={labelStyle}>Rapor Adı</label>

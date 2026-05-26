@@ -27,6 +27,7 @@ export interface Task {
     created_at?: string;
     completed_at?: string;
     completed_in_days?: number;
+    parent_task_id?: string;
     status_history?: Array<{
         status: string;
         changed_at: string;
@@ -53,6 +54,7 @@ export interface TaskCreate {
     accepted_collaborators?: string[];
     completed_at?: string;
     completed_in_days?: number;
+    parent_task_id?: string;
     status_history?: Array<{
         status: string;
         changed_at: string;

@@ -24,6 +24,7 @@ class TaskBase(BaseModel):
     completed_at: Optional[str] = None
     completed_in_days: Optional[int] = None
     status_history: List[Any] = Field(default_factory=list)
+    parent_task_id: Optional[str] = None
 
 
 class TaskCreate(TaskBase):
@@ -45,6 +46,7 @@ class TaskUpdate(BaseModel):
     completed_at: Optional[str] = None
     completed_in_days: Optional[int] = None
     status_history: Optional[List[Any]] = None
+    parent_task_id: Optional[str] = None
 
 
 class TaskResponse(TaskBase):

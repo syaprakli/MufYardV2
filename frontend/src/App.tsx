@@ -26,7 +26,7 @@ const Audit = lazy(() => import("./pages/Audit"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 const Contacts = lazy(() => import("./pages/Contacts"));
 const Assistant = lazy(() => import("./pages/Assistant"));
-const AIKnowledge = lazy(() => import("./pages/AIKnowledge"));
+const Denetim = lazy(() => import("./pages/Denetim"));
 const Legislation = lazy(() => import("./pages/Legislation"));
 const Notes = lazy(() => import("./pages/Notes"));
 const Files = lazy(() => import("./pages/Files"));
@@ -210,7 +210,7 @@ function App() {
                         <Route path="tasks" element={<Tasks />} />
                         <Route path="contacts" element={<Contacts />} />
                         <Route path="assistant" element={<Assistant />} />
-                        <Route path="ai-knowledge" element={<AIKnowledge />} />
+                        <Route path="denetim" element={<Denetim />} />
                         <Route path="legislation" element={<Legislation />} />
                         <Route path="notes" element={<Notes />} />
                         <Route path="files" element={<Files />} />

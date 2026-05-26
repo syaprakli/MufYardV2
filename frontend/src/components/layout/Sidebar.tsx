@@ -12,7 +12,6 @@ import {
     Settings,
     Bot,
     HelpCircle,
-    Sparkles,
     Star,
     MessageSquare,
     ClipboardCheck,
@@ -34,6 +33,7 @@ interface SidebarProps {
 const navItems: Array<{ icon: any; label: string; href: string }> = [
     { icon: LayoutDashboard, label: "Genel Bakış", href: "/" },
     { icon: CheckSquare, label: "Görevler", href: "/tasks" },
+    { icon: ClipboardCheck, label: "Denetim", href: "/denetim" },
     { icon: ClipboardCheck, label: "Görev Analizleri", href: "/report-analytics" },
     { icon: FileText, label: "Raporlar", href: "/audit" },
     { icon: StickyNote, label: "Hızlı Notlar", href: "/notes" },
@@ -48,8 +48,6 @@ const navItems: Array<{ icon: any; label: string; href: string }> = [
 ];
 
 const comingSoonItems: Array<{ icon: any; label: string; href: string }> = [
-    { icon: Sparkles, label: "AI Bilgi Bankası", href: "/ai-knowledge" },
-    { icon: ClipboardCheck, label: "Denetim", href: "/denetim" },
 ];
 
 const bottomNavItems = [
