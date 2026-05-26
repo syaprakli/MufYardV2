@@ -72,12 +72,12 @@ export default function Denetim() {
 
     // Map categories
     const AUDIT_CATEGORIES = [
-        { id: "il", label: "İl Denetimi", icon: Shield },
-        { id: "federasyon", label: "Federasyon Denetimi", icon: BookOpen },
-        { id: "kyk", label: "Kyk Yurt Denetimi", icon: ClipboardCheck },
-        { id: "ozel", label: "Özel Yurt Denetimi", icon: ClipboardCheck },
-        { id: "spor", label: "Spor Kulüpleri Denetimi", icon: ClipboardCheck },
-        { id: "bilgi_bankasi", label: "AI Bilgi Bankası", icon: Bot }
+        { id: "il", label: "İl\nDenetimi", icon: Shield },
+        { id: "federasyon", label: "Federasyon\nDenetimi", icon: BookOpen },
+        { id: "kyk", label: "Kyk Yurt\nDenetimi", icon: ClipboardCheck },
+        { id: "ozel", label: "Özel Yurt\nDenetimi", icon: ClipboardCheck },
+        { id: "spor", label: "Spor Kulüpleri\nDenetimi", icon: ClipboardCheck },
+        { id: "bilgi_bankasi", label: "AI Bilgi\nBankası", icon: Bot }
     ];
 
     const categoryMap: Record<string, string> = {
@@ -341,7 +341,7 @@ export default function Denetim() {
     return (
         <div className="flex flex-col gap-6 h-[calc(100vh-110px)] overflow-hidden animate-in fade-in duration-300">
             {/* Top horizontal tab bar */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar bg-slate-950/40 backdrop-blur-md border border-slate-900/50 rounded-2xl p-2 flex-shrink-0">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar bg-slate-100 dark:bg-slate-950 border border-slate-250/60 dark:border-slate-900 rounded-2xl p-2 flex-shrink-0">
                 {AUDIT_CATEGORIES.map(cat => {
                     const Icon = cat.icon;
                     const isActive = activeTab === cat.id;
@@ -352,7 +352,7 @@ export default function Denetim() {
                                 setActiveTab(cat.id);
                                 setSelectedTaskId(null);
                             }}
-                            className={`flex items-center gap-2.5 px-5 py-3 rounded-xl transition-all duration-200 font-bold text-sm whitespace-nowrap ${
+                            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl transition-all duration-200 font-bold text-xs whitespace-pre-line text-left leading-tight ${
                                 isActive
                                     ? "bg-primary-light text-white shadow-md shadow-black/10 border-b-2 border-blue-500"
                                     : "text-slate-400 hover:bg-slate-900/30 hover:text-white"
