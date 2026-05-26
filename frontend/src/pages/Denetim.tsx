@@ -339,16 +339,9 @@ export default function Denetim() {
     const knowledgeCategories = [...new Set(knowledgeItems.map(i => i.category))].sort();
 
     return (
-        <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-110px)] overflow-hidden animate-in fade-in duration-300">
-            {/* 1. Subcategory sidebar */}
-            <div className="w-full lg:w-64 bg-slate-950/40 backdrop-blur-md border border-slate-900/50 rounded-2xl p-4 flex flex-col gap-2 flex-shrink-0 overflow-y-auto">
-                <div className="px-3 py-2">
-                    <h2 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Denetim Türleri</h2>
-                    <p className="text-[10px] text-slate-500 font-bold mt-0.5">Alt Kategoriler ve Bilgi Bankası</p>
-                </div>
-                
-                <div className="h-px bg-slate-900/50 my-1" />
-
+        <div className="flex flex-col gap-6 h-[calc(100vh-110px)] overflow-hidden animate-in fade-in duration-300">
+            {/* Top horizontal tab bar */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar bg-slate-950/40 backdrop-blur-md border border-slate-900/50 rounded-2xl p-2 flex-shrink-0">
                 {AUDIT_CATEGORIES.map(cat => {
                     const Icon = cat.icon;
                     const isActive = activeTab === cat.id;
@@ -359,16 +352,16 @@ export default function Denetim() {
                                 setActiveTab(cat.id);
                                 setSelectedTaskId(null);
                             }}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left font-bold text-sm ${
+                            className={`flex items-center gap-2.5 px-5 py-3 rounded-xl transition-all duration-200 font-bold text-sm whitespace-nowrap ${
                                 isActive
-                                    ? "bg-primary-light text-white shadow-md shadow-black/10 border-l-4 border-blue-500"
+                                    ? "bg-primary-light text-white shadow-md shadow-black/10 border-b-2 border-blue-500"
                                     : "text-slate-400 hover:bg-slate-900/30 hover:text-white"
                             }`}
                         >
-                            <Icon size={16} className={isActive ? "text-blue-400 animate-pulse" : "text-slate-500"} />
-                            <span className="flex-1 truncate">{cat.label}</span>
+                            <Icon size={15} className={isActive ? "text-blue-400" : "text-slate-500"} />
+                            <span>{cat.label}</span>
                             {cat.id !== "bilgi_bankasi" && (
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
                                     isActive ? "bg-blue-500/20 text-blue-400" : "bg-slate-900 text-slate-500"
                                 }`}>
                                     {cachedData?.tasks?.filter(t => t.rapor_turu === categoryMap[cat.id]).length || 0}
@@ -526,7 +519,7 @@ export default function Denetim() {
                 </div>
             ) : (
                 // Standard Audit Category - Lists tasks and reports
-                <>
+                <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
                     {/* 2. Tasks list pane */}
                     <div className="w-full lg:w-80 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex flex-col gap-3 flex-shrink-0 overflow-y-auto">
                         <div className="px-1">
@@ -823,7 +816,7 @@ export default function Denetim() {
                             </div>
                         )}
                     </div>
-                </>
+                </div>
             )}
 
             {/* AI Knowledge Add/Edit Modal */}
