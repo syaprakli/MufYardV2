@@ -19,7 +19,7 @@ interface HeaderProps {
 
 export function Header({ toggleSidebar }: HeaderProps) {
     const { user, logout } = useAuth();
-    const { onlineUsers, wsConnected } = usePresence();
+    const { onlineUsers, wsConnected, restConnected } = usePresence();
     const navigate = useNavigate();
     const confirm = useConfirm();
     const { unreadCount, markAllAsRead } = useNotifications();
@@ -36,7 +36,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
     const [showUserMenu, setShowUserMenu] = useState(false);
     const notificationRef = useRef<HTMLDivElement>(null);
     const userMenuRef = useRef<HTMLDivElement>(null);
-    const presenceReady = wsConnected || onlineUsers.length > 0;
+    const presenceReady = wsConnected || restConnected || onlineUsers.length > 0;
 
     useEffect(() => {
         if (presenceReady) {

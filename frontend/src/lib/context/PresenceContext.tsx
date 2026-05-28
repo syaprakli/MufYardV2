@@ -25,6 +25,7 @@ interface Message {
 interface PresenceContextType {
     onlineUsers: OnlineUser[];
     wsConnected: boolean;
+    restConnected: boolean;
     isUserOnline: (uid: string) => boolean;
     messages: Message[];
     unreadMessages: Record<string, number>;
@@ -64,6 +65,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const { openChat } = useChat();
     const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
     const [wsConnected, setWsConnected] = useState(false);
+    const [restConnected, setRestConnected] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [unreadMessages, setUnreadMessages] = useState<Record<string, number>>({});
     
@@ -98,6 +100,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                 const data = await fetchOnlineUsers();
                 if (!cancelled && Array.isArray(data)) {
                     setOnlineUsers(normalizeOnlineUsers(data));
+                    setRestConnected(true);
                 }
             } catch {
                 // REST fallback silently fails
@@ -389,7 +392,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 
     return (
         <PresenceContext.Provider value={{ 
-            onlineUsers, wsConnected, isUserOnline, messages, unreadMessages, markAsRead, 
+            onlineUsers, wsConnected, restConnected, isUserOnline, messages, unreadMessages, markAsRead, 
             sendMessage, clearGlobalMessages, clearLocalMessages
         }}>
             {children}
@@ -404,6 +407,7 @@ export function usePresence() {
         return {
             onlineUsers: [],
             wsConnected: false,
+            restConnected: false,
             isUserOnline: () => false,
             messages: [],
             unreadMessages: {},

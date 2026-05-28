@@ -1079,9 +1079,9 @@ export function TurkeyMap({
               <Button
                 size="sm"
                 onClick={() => setIsAddingPlace(true)}
-                className="h-8 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5"
+                className="h-7 px-2 rounded-lg text-[8px] font-black uppercase tracking-wider flex items-center gap-1"
               >
-                <Plus size={11} /> Yeni Öneri Ekle
+                <Plus size={10} /> Öneri Ekle
               </Button>
             </div>
 

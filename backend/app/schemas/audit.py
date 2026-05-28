@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Literal
+from typing import Optional, List, Dict, Literal, Any
 from datetime import datetime
 
 class AuditBase(BaseModel):
@@ -25,6 +25,7 @@ class AuditBase(BaseModel):
     doc_header: Optional[str] = Field(default="T.C. GENÇLİK VE SPOR BAKANLIĞI")
     doc_footer: Optional[str] = Field(default="Müfettişlik Raporu")
     show_page_numbers: Optional[bool] = Field(default=True)
+    audit_data: Optional[Dict[str, Any]] = None
 
 class AuditCreate(AuditBase):
     pass
@@ -50,6 +51,7 @@ class AuditUpdate(BaseModel):
     doc_header: Optional[str] = None
     doc_footer: Optional[str] = None
     show_page_numbers: Optional[bool] = None
+    audit_data: Optional[Dict[str, Any]] = None
 
 
 class AuditResponse(AuditBase):

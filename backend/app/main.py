@@ -258,8 +258,14 @@ async def websocket_chat_endpoint(websocket: WebSocket):
     await chat_manager.connect(websocket, room_id, uid, name)
     try:
         while True:
+            # 1. Receive data. If it fails (disconnect, close, etc.), raise the exception to exit the loop.
             try:
                 raw_data = await websocket.receive_text()
+            except Exception as e:
+                raise e
+
+            # 2. Process data. If processing fails, log the error and continue.
+            try:
                 data = json.loads(raw_data)
 
                 # Ping/pong heartbeat - Railway WS timeout'unu önler
@@ -385,9 +391,7 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                 await chat_manager.broadcast(room_id, raw_data)
 
             except Exception as e:
-                if isinstance(e, WebSocketDisconnect):
-                    raise e
-                logger.error(f"WebSocket döngü hatası: {str(e)}")
+                logger.error(f"WebSocket döngü hatası (mesaj işleme): {str(e)}")
                 continue
 
 

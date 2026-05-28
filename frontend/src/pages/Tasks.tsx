@@ -8,6 +8,7 @@ import {
 import { toast } from "react-hot-toast";
 
 import { useAuth } from "../lib/hooks/useAuth";
+import { useConfirm } from "../lib/context/ConfirmContext";
 import { useTheme } from "../lib/context/ThemeContext";
 import { isElectron } from "../lib/firebase";
 import { Button } from "../components/ui/Button";
@@ -90,6 +91,7 @@ import { useGlobalData } from "../lib/context/GlobalDataContext";
 
 export default function Tasks() {
     const navigate = useNavigate();
+    const confirm = useConfirm();
 
     // Global Search State
     const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -438,7 +440,12 @@ export default function Tasks() {
     const bulkDeleteSelectedTasks = async () => {
         if (selectedTaskIds.length === 0) return;
 
-        const confirmed = window.confirm(`${selectedTaskIds.length} görevi ve ilişkili raporlarını kalıcı olarak silmek istediğinize emin misiniz?`);
+        const confirmed = await confirm({
+            title: "Toplu Silme",
+            message: `${selectedTaskIds.length} görevi ve ilişkili raporlarını kalıcı olarak silmek istediğinize emin misiniz?`,
+            confirmText: "Sil",
+            variant: "danger"
+        });
         if (!confirmed) return;
 
         try {

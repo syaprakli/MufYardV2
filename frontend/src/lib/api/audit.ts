@@ -24,6 +24,7 @@ export interface Audit {
     doc_footer?: string;
     show_page_numbers?: boolean;
     version_name?: string;
+    audit_data?: any;
 }
 
 export interface AuditVersion {

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
     Shield, BookOpen, ClipboardCheck, Bot, Plus, Edit2, Trash2, Search,
     Tag, ChevronRight, X, Check, Loader2, Database, Sparkles, FileText,
-    ArrowRight, Info, AlertCircle, Save, ExternalLink
+    ArrowRight, Info, AlertCircle, Save, ExternalLink, Play
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { API_URL } from "../lib/config";
@@ -13,6 +13,7 @@ import { useConfirm } from "../lib/context/ConfirmContext";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useGlobalData } from "../lib/context/GlobalDataContext";
 import { createAudit, updateAudit } from "../lib/api/audit";
+import { updateTask } from "../lib/api/tasks";
 
 interface KnowledgeItem {
     id: string;
@@ -24,6 +25,59 @@ interface KnowledgeItem {
     created_at: string;
     updated_at?: string;
 }
+
+interface ChecklistQuestion {
+    id: string;
+    text: string;
+    area: string;
+}
+
+const AUDIT_TEMPLATES: Record<string, ChecklistQuestion[]> = {
+    il: [
+        { id: "il_q1", text: "Yatırım projeleri planlamaya uygun ilerliyor mu?", area: "Yatırım" },
+        { id: "il_q2", text: "Tesislerin bakım ve onarımı düzenli yapılıyor mu?", area: "Tesisler" },
+        { id: "il_q3", text: "Personel devam takibi yapılıyor mu?", area: "Personel" },
+        { id: "il_q4", text: "Gelen/Giden evrak kayıtları düzenli mi?", area: "İdari" },
+        { id: "il_q5", text: "Taşınır işlem fişleri güncel mi?", area: "Mali" }
+    ],
+    federasyon: [
+        { id: "fed_q1", text: "Federasyon ana statüsü mevzuata uygun mu?", area: "Hukuk" },
+        { id: "fed_q2", text: "Genel kurul tutanakları usulüne uygun tutulmuş mu?", area: "İdari" },
+        { id: "fed_q3", text: "Yönetim kurulu karar defteri mevcut ve onaylı mı?", area: "İdari" },
+        { id: "fed_q4", text: "Harcamalar bütçe talimatına uygun yapılmış mı?", area: "Mali" },
+        { id: "fed_q5", text: "Personel özlük dosyaları tam mı?", area: "Personel" },
+        { id: "fed_q6", text: "Sponsorluk sözleşmeleri dosyalanmış mı?", area: "Mali" },
+        { id: "fed_q7", text: "Mal ve hizmet alımları ihale yönetmeliğine uygun mu?", area: "Mali" },
+        { id: "fed_q8", text: "Demirbaş eşya defteri güncel mi?", area: "İdari" }
+    ],
+    kyk: [
+        { id: "kyk_q1", text: "Öğrenci giriş-çıkış sistemi aktif mi?", area: "Güvenlik" },
+        { id: "kyk_q2", text: "Yemekhane numune alma işlemi yapılıyor mu?", area: "Sağlık" },
+        { id: "kyk_q3", text: "Kantin fiyat listesi asılı mı?", area: "İşletme" },
+        { id: "kyk_q4", text: "Oda temizlik kontrolleri yapılıyor mu?", area: "Temizlik" },
+        { id: "kyk_q5", text: "Yangın tüplerinin dolumu güncel mi?", area: "Güvenlik" }
+    ],
+    ozel: [
+        { id: "ozel_q1", text: "Kurum açma izin belgesi mevcut mu?", area: "Genel" },
+        { id: "ozel_q2", text: "Yangın merdiveni ve çıkışları açık ve kullanılabilir mi?", area: "Güvenlik" },
+        { id: "ozel_q3", text: "Yemekhane hijyen kurallarına uygun mu?", area: "Sağlık" },
+        { id: "ozel_q4", text: "Öğrenci kayıt defteri güncel tutuluyor mu?", area: "İdari" },
+        { id: "ozel_q5", text: "Personel çalışma izinleri tam mı?", area: "Personel" },
+        { id: "ozel_q6", text: "Isıtma ve havalandırma sistemleri çalışıyor mu?", area: "Teknik" },
+        { id: "ozel_q7", text: "Güvenlik kameraları aktif mi?", area: "Güvenlik" },
+        { id: "ozel_q8", text: "Ecza dolabı ve ilk yardım malzemeleri tam mı?", area: "Sağlık" }
+    ],
+    spor: [
+        { id: "spor_q1", text: "Dernekler masası / Spor İl Müd. tescil belgesi var mı?", area: "Hukuk" },
+        { id: "spor_q2", text: "Üye kayıt defteri güncel mi?", area: "İdari" },
+        { id: "spor_q3", text: "Karar defteri noter tasdikli mi?", area: "İdari" },
+        { id: "spor_q4", text: "Alındı belgeleri ve faturalar düzenli saklanıyor mu?", area: "Mali" },
+        { id: "spor_q5", text: "Antrenör sözleşmeleri ve vizeleri tam mı?", area: "Sportif" },
+        { id: "spor_q6", text: "Sporcu lisansları güncel mi?", area: "Sportif" },
+        { id: "spor_q7", text: "Yıllık beyanname zamanında verilmiş mi?", area: "Hukuk" },
+        { id: "spor_q8", text: "Lokal açma izni var mı (varsa)?", area: "İdari" }
+    ]
+};
 
 const PRESET_CATEGORIES = [
     "Yurt İşlemleri", "Spor Tesisi", "Federasyon", "Denetim Genel",
@@ -42,7 +96,7 @@ export default function Denetim() {
     const confirm = useConfirm();
     const navigate = useNavigate();
     const { user, profile } = useAuth();
-    const { data: cachedData, refreshAudits } = useGlobalData();
+    const { data: cachedData, refreshAudits, refreshTasks } = useGlobalData();
 
     // 1. Sidebar / Category Navigation
     const [activeTab, setActiveTab] = useState<string>("il");
@@ -70,6 +124,29 @@ export default function Denetim() {
     const [tenkitSearch, setTenkitSearch] = useState("");
     const [tenkitResults, setTenkitResults] = useState<KnowledgeItem[]>([]);
 
+    // 6. Detailed Tab States
+    const [activeDetailTab, setActiveDetailTab] = useState<"info" | "notes" | "photos" | "checklist" | "editor">("info");
+    const [localAuditData, setLocalAuditData] = useState<any>({
+        info: {},
+        generalNotes: "",
+        photos: [],
+        photo_descriptions: {},
+        form: {}
+    });
+    const [activeQuestionForTenkit, setActiveQuestionForTenkit] = useState<string | null>(null);
+    const [isSavingAuditData, setIsSavingAuditData] = useState(false);
+    const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const [checklistAreaFilter, setChecklistAreaFilter] = useState<string>("");
+    const [checklistSearch, setChecklistSearch] = useState<string>( "");
+
+    // 7. Audit Prep Modal States
+    const [prepAuditName, setPrepAuditName] = useState("");
+    const [isCreatingReport, setIsCreatingReport] = useState(false);
+
+    // 8. Task Picker Modal (for starting audit from page-level button)
+    const [showTaskPicker, setShowTaskPicker] = useState(false);
+    const [pickerTaskForAudit, setPickerTaskForAudit] = useState<any>(null);
+
     // Map categories
     const AUDIT_CATEGORIES = [
         { id: "il", label: "İl\nDenetimi", icon: Shield },
@@ -88,6 +165,11 @@ export default function Denetim() {
         spor: "Spor Kulüpleri Denetimi"
     };
 
+    // Reverse lookup: rapor_turu -> tab id
+    const reverseCategoryMap: Record<string, string> = Object.fromEntries(
+        Object.entries(categoryMap).map(([k, v]) => [v, k])
+    );
+
     const currentRaporTuru = categoryMap[activeTab];
 
     // Get tasks from global context
@@ -101,6 +183,12 @@ export default function Denetim() {
         if (!selectedTaskId || !cachedData?.tasks) return null;
         return cachedData.tasks.find(t => t.id === selectedTaskId) || null;
     }, [selectedTaskId, cachedData?.tasks]);
+
+    // Resolve the correct tab ID for the selected task (may differ from activeTab)
+    const taskTabId = useMemo(() => {
+        if (!selectedTask) return activeTab;
+        return reverseCategoryMap[selectedTask.rapor_turu] || activeTab;
+    }, [selectedTask, activeTab, reverseCategoryMap]);
 
     // Audit (Report) for selected task
     const selectedReport = useMemo(() => {
@@ -124,11 +212,621 @@ export default function Denetim() {
     useEffect(() => {
         if (selectedReport) {
             setReportContent(selectedReport.report_content || "");
+            const ad = selectedReport.audit_data || {};
+            setLocalAuditData({
+                info: ad.info || {},
+                generalNotes: ad.generalNotes || "",
+                photos: ad.photos || [],
+                photo_descriptions: ad.photo_descriptions || {},
+                form: ad.form || {}
+            });
         } else {
             setReportContent("");
+            setLocalAuditData({
+                info: {},
+                generalNotes: "",
+                photos: [],
+                photo_descriptions: {},
+                form: {}
+            });
         }
         setReportEditing(false);
     }, [selectedReport]);
+
+    const handleSaveAuditData = async (updatedData = localAuditData) => {
+        if (!selectedReport) return;
+        setIsSavingAuditData(true);
+        try {
+            await updateAudit(selectedReport.id, {
+                audit_data: updatedData
+            });
+            if (user?.uid) {
+                await refreshAudits(user.uid, user.email || undefined);
+            }
+        } catch {
+            toast.error("Denetim verileri kaydedilemedi.");
+        } finally {
+            setIsSavingAuditData(false);
+        }
+    };
+
+    const handleInfoChange = (key: string, value: string) => {
+        setLocalAuditData((prev: any) => {
+            const next = {
+                ...prev,
+                info: {
+                    ...(prev.info || {}),
+                    [key]: value
+                }
+            };
+            return next;
+        });
+    };
+
+    const handlePhotoDescriptionChange = (url: string, description: string) => {
+        setLocalAuditData((prev: any) => {
+            const next = {
+                ...prev,
+                photo_descriptions: {
+                    ...(prev.photo_descriptions || {}),
+                    [url]: description
+                }
+            };
+            return next;
+        });
+    };
+
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0 || !selectedReport) return;
+        const file = e.target.files[0];
+        
+        setUploadingPhoto(true);
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            
+            let url = `${API_URL}/files/upload`;
+            const params = new URLSearchParams();
+            params.append("path", `denetim_fotograflari/${selectedReport.id}`);
+            if (user?.uid) params.append("uid", user.uid);
+            url += `?${params.toString()}`;
+            
+            const authHeaders = await getAuthHeaders();
+            const res = await fetch(url, {
+                method: "POST",
+                headers: {
+                    ...authHeaders
+                },
+                body: formData
+            });
+            
+            if (!res.ok) {
+                throw new Error("Fotoğraf yüklenemedi");
+            }
+            
+            const data = await res.json();
+            const newPhotoUrl = data.url;
+            
+            const updatedPhotos = [...(localAuditData.photos || []), newPhotoUrl];
+            const updatedData = {
+                ...localAuditData,
+                photos: updatedPhotos
+            };
+            setLocalAuditData(updatedData);
+            await handleSaveAuditData(updatedData);
+            toast.success("Fotoğraf yüklendi.");
+        } catch (error) {
+            console.error("Photo upload error:", error);
+            toast.error("Fotoğraf yüklenirken bir hata oluştu.");
+        } finally {
+            setUploadingPhoto(false);
+        }
+    };
+
+    const handleDeletePhoto = async (index: number) => {
+        const confirmed = await confirm({
+            title: "Fotoğrafı Kaldır",
+            message: "Bu fotoğrafı denetim dosyasından kaldırmak istediğinize emin misiniz?",
+            confirmText: "Kaldır",
+            variant: "danger"
+        });
+        if (!confirmed) return;
+        
+        const deletedPhotoUrl = (localAuditData.photos || [])[index];
+        const updatedPhotos = (localAuditData.photos || []).filter((_: any, idx: number) => idx !== index);
+        const updatedDescriptions = { ...(localAuditData.photo_descriptions || {}) };
+        if (deletedPhotoUrl) {
+            delete updatedDescriptions[deletedPhotoUrl];
+        }
+        
+        const updatedData = {
+            ...localAuditData,
+            photos: updatedPhotos,
+            photo_descriptions: updatedDescriptions
+        };
+        setLocalAuditData(updatedData);
+        await handleSaveAuditData(updatedData);
+        toast.success("Fotoğraf kaldırıldı.");
+    };
+
+    const handleChecklistAnswer = (questionId: string, answer: "yes" | "no") => {
+        setLocalAuditData((prev: any) => {
+            const next = {
+                ...prev,
+                form: {
+                    ...(prev.form || {}),
+                    [questionId]: answer
+                }
+            };
+            if (answer === "yes" && activeQuestionForTenkit === questionId) {
+                setActiveQuestionForTenkit(null);
+            }
+            handleSaveAuditData(next);
+            return next;
+        });
+    };
+
+    const handleChecklistNoteChange = (questionId: string, note: string) => {
+        setLocalAuditData((prev: any) => {
+            const next = {
+                ...prev,
+                form: {
+                    ...(prev.form || {}),
+                    [`inspector_note_${questionId}`]: note
+                }
+            };
+            return next;
+        });
+    };
+
+    const handleAppendTenkitToNote = async (item: KnowledgeItem) => {
+        if (!activeQuestionForTenkit) {
+            toast.error("Önce bir sorunun 'Tenkit Bankasından Ekle' butonuna tıklamalısınız.");
+            return;
+        }
+        
+        const questionId = activeQuestionForTenkit;
+        const currentNote = localAuditData.form?.[`inspector_note_${questionId}`] || "";
+        const appendedNote = currentNote 
+            ? `${currentNote}\n\n[Bulgu: ${item.topic}] - ${item.standard_remark}`
+            : `[Bulgu: ${item.topic}] - ${item.standard_remark}`;
+            
+        setLocalAuditData((prev: any) => {
+            const next = {
+                ...prev,
+                form: {
+                    ...(prev.form || {}),
+                    [`inspector_note_${questionId}`]: appendedNote
+                }
+            };
+            handleSaveAuditData(next);
+            return next;
+        });
+        
+        // Also append to the main report HTML content
+        if (selectedReport) {
+            const formattedRemark = `<p><strong>Bulgu: ${item.topic}</strong><br/>${item.standard_remark}</p>`;
+            const updatedContent = (reportContent || "") + formattedRemark;
+            setReportContent(updatedContent);
+            try {
+                await updateAudit(selectedReport.id, {
+                    report_content: updatedContent
+                });
+                if (user?.uid) {
+                    await refreshAudits(user.uid, user.email || undefined);
+                }
+            } catch (error) {
+                console.error("Report sync error:", error);
+            }
+        }
+        
+        toast.success(`"${item.topic}" müfettiş notuna ve rapora eklendi.`);
+        setActiveQuestionForTenkit(null);
+    };
+
+    const renderInfoTab = () => {
+        const info = localAuditData.info || {};
+        const fields: Record<string, { label: string, key: string, type: string, placeholder?: string }[]> = {
+            il: [
+                { label: "İl Müdürü Adı Soyadı", key: "directorName", type: "text", placeholder: "Örn: Ahmet Yılmaz" },
+                { label: "Personel Sayısı", key: "staffCount", type: "number", placeholder: "Örn: 45" },
+                { label: "Tesis Sayısı", key: "facilityCount", type: "number", placeholder: "Örn: 12" },
+                { label: "Toplam Öğrenci Kapasitesi", key: "capacity", type: "number", placeholder: "Örn: 1500" },
+                { label: "Yıllık Bütçe (TL)", key: "budget", type: "text", placeholder: "Örn: 5.000.000" }
+            ],
+            federasyon: [
+                { label: "Federasyon Başkanı", key: "presidentName", type: "text", placeholder: "Örn: Mehmet Demir" },
+                { label: "Personel Sayısı", key: "staffCount", type: "number", placeholder: "Örn: 20" },
+                { label: "Bağlı Kulüp Sayısı", key: "clubCount", type: "number", placeholder: "Örn: 150" },
+                { label: "Lisanslı Sporcu Sayısı", key: "athleteCount", type: "number", placeholder: "Örn: 12000" },
+                { label: "Yıllık Bütçe (TL)", key: "budget", type: "text", placeholder: "Örn: 25.000.000" }
+            ],
+            kyk: [
+                { label: "Yurt Müdürü Adı Soyadı", key: "directorName", type: "text", placeholder: "Örn: Mustafa Kaya" },
+                { label: "Yurt Kapasitesi", key: "capacity", type: "number", placeholder: "Örn: 800" },
+                { label: "Barınan Öğrenci Sayısı", key: "studentCount", type: "number", placeholder: "Örn: 760" },
+                { label: "Personel Sayısı", key: "staffCount", type: "number", placeholder: "Örn: 30" },
+                { label: "Toplam Oda Sayısı", key: "roomCount", type: "number", placeholder: "Örn: 200" }
+            ],
+            ozel: [
+                { label: "Yurt Müdürü / Kurucu", key: "directorName", type: "text", placeholder: "Örn: Ali Şahin" },
+                { label: "Öğrenci Kapasitesi", key: "capacity", type: "number", placeholder: "Örn: 120" },
+                { label: "Barınan Öğrenci Sayısı", key: "studentCount", type: "number", placeholder: "Örn: 95" },
+                { label: "Çalışan Personel Sayısı", key: "staffCount", type: "number", placeholder: "Örn: 10" },
+                { label: "Ruhsat / İzin Tarihi", key: "permitDate", type: "text", placeholder: "Örn: 12.04.2021" }
+            ],
+            spor: [
+                { label: "Kulüp Başkanı", key: "presidentName", type: "text", placeholder: "Örn: Selim Yıldız" },
+                { label: "Kuruluş Yılı", key: "foundationYear", type: "number", placeholder: "Örn: 1998" },
+                { label: "Aktif Branş Sayısı", key: "branchCount", type: "number", placeholder: "Örn: 5" },
+                { label: "Lisanslı Sporcu Sayısı", key: "athleteCount", type: "number", placeholder: "Örn: 350" },
+                { label: "Antrenör/Personel Sayısı", key: "staffCount", type: "number", placeholder: "Örn: 8" }
+            ]
+        };
+
+        const activeFields = fields[taskTabId] || [];
+
+        return (
+            <div className="space-y-5 bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl border border-slate-200 dark:border-slate-800">
+                <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-850 dark:text-slate-200">
+                        {categoryMap[taskTabId] || categoryMap[activeTab]} Genel Bilgileri
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-bold mt-0.5">Denetime esas teşkil edecek temel kurumsal veriler</p>
+                </div>
+                <div className="h-px bg-slate-200 dark:bg-slate-800/60" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {activeFields.map(f => (
+                        <div key={f.key} className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                                {f.label}
+                            </label>
+                            <input
+                                type={f.type}
+                                value={info[f.key] || ""}
+                                onChange={e => handleInfoChange(f.key, e.target.value)}
+                                onBlur={() => handleSaveAuditData(localAuditData)}
+                                placeholder={f.placeholder}
+                                className="h-10 px-3.5 rounded-xl border border-slate-250 dark:border-slate-800 text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 bg-white dark:bg-slate-900 text-slate-900 dark:text-white transition-all"
+                            />
+                        </div>
+                    ))}
+                </div>
+                <div className="flex justify-end pt-2">
+                    <Button onClick={() => handleSaveAuditData(localAuditData)} disabled={isSavingAuditData} className="rounded-xl h-10 px-6 shadow-md shadow-primary/20">
+                        {isSavingAuditData ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
+                        Kaydet
+                    </Button>
+                </div>
+            </div>
+        );
+    };
+
+    const renderNotesTab = () => {
+        return (
+            <div className="space-y-5 bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 flex-1 flex flex-col min-h-[350px]">
+                <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-850 dark:text-slate-200">
+                        Genel Müfettiş Notları
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-bold mt-0.5">Denetim esnasında alınan genel kararlar, tespitler ve notlar</p>
+                </div>
+                <div className="h-px bg-slate-200 dark:bg-slate-800/60" />
+                <textarea
+                    value={localAuditData.generalNotes || ""}
+                    onChange={e => {
+                        const val = e.target.value;
+                        setLocalAuditData((prev: any) => ({ ...prev, generalNotes: val }));
+                    }}
+                    onBlur={() => handleSaveAuditData(localAuditData)}
+                    placeholder="Müfettiş notlarını buraya serbest biçimde yazabilirsiniz..."
+                    className="flex-1 w-full p-4 rounded-xl border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 dark:text-white resize-none leading-relaxed min-h-[200px]"
+                />
+                <div className="flex justify-end">
+                    <Button onClick={() => handleSaveAuditData(localAuditData)} disabled={isSavingAuditData} className="rounded-xl h-10 px-6 shadow-md shadow-primary/20">
+                        {isSavingAuditData ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
+                        Kaydet
+                    </Button>
+                </div>
+            </div>
+        );
+    };
+
+    const renderPhotosTab = () => {
+        const photos = localAuditData.photos || [];
+        return (
+            <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-850 dark:text-slate-200">
+                            Fotoğraf Galerisi
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-bold mt-0.5">Denetime ait görsel ve belgeler</p>
+                    </div>
+                    <div>
+                        <label className={`flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-all duration-200 shadow-md shadow-blue-500/20 ${uploadingPhoto ? "opacity-50 pointer-events-none" : ""}`}>
+                            {uploadingPhoto ? (
+                                <>
+                                    <Loader2 size={14} className="animate-spin" />
+                                    <span>Yükleniyor...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Plus size={14} />
+                                    <span>Fotoğraf Ekle</span>
+                                </>
+                            )}
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handlePhotoUpload}
+                                disabled={uploadingPhoto}
+                            />
+                        </label>
+                    </div>
+                </div>
+
+                <div className="h-px bg-slate-105 dark:bg-slate-800/50" />
+
+                {photos.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl gap-3">
+                        <AlertCircle size={20} className="text-slate-400" />
+                        <p className="text-xs font-bold text-slate-400 uppercase">Görsel Bulunmamaktadır</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {photos.map((url: string, index: number) => (
+                            <div
+                                key={index}
+                                className="group flex flex-col bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow transition-all"
+                            >
+                                <div className="relative aspect-video sm:aspect-square overflow-hidden bg-slate-100 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
+                                    <img
+                                        src={`${API_URL.replace("/api", "")}${url}`}
+                                        alt={`Denetim Görseli ${index + 1}`}
+                                        className="w-full h-full object-cover cursor-pointer hover:scale-[1.02] transition-transform duration-200"
+                                        onClick={() => {
+                                            const modalHtml = `<div id="photo-modal-${index}" onclick="this.remove()" class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-200">
+                                                <img src="${API_URL.replace("/api", "")}${url}" class="max-w-full max-h-full rounded-lg object-contain shadow-2xl" />
+                                            </div>`;
+                                            document.body.insertAdjacentHTML('beforeend', modalHtml);
+                                        }}
+                                    />
+                                    <button
+                                        onClick={() => handleDeletePhoto(index)}
+                                        className="absolute top-2 right-2 w-7 h-7 bg-black/75 hover:bg-red-600 text-white rounded-lg flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 shadow"
+                                        title="Görseli Kaldır"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                                <div className="p-2 bg-white dark:bg-slate-900">
+                                    <input
+                                        type="text"
+                                        value={localAuditData.photo_descriptions?.[url] || ""}
+                                        onChange={e => handlePhotoDescriptionChange(url, e.target.value)}
+                                        onBlur={() => handleSaveAuditData(localAuditData)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                (e.target as HTMLInputElement).blur();
+                                            }
+                                        }}
+                                        placeholder="Görsel açıklaması ekleyin..."
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const renderChecklistTab = () => {
+        const questions = AUDIT_TEMPLATES[taskTabId] || [];
+        const areas = [...new Set(questions.map(q => q.area))];
+        const form = localAuditData.form || {};
+
+        const filteredQuestions = questions.filter(q => {
+            const matchesSearch = !checklistSearch || q.text.toLowerCase().includes(checklistSearch.toLowerCase());
+            const matchesArea = !checklistAreaFilter || q.area === checklistAreaFilter;
+            return matchesSearch && matchesArea;
+        });
+
+        return (
+            <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 overflow-hidden h-full">
+                <div className={`flex flex-col gap-4 overflow-hidden h-full ${activeQuestionForTenkit ? "xl:col-span-7" : "xl:col-span-12"}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                        <div className="flex-1 relative">
+                            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                                type="text"
+                                value={checklistSearch}
+                                onChange={e => setChecklistSearch(e.target.value)}
+                                placeholder="Kontrol listesinde arama yapın..."
+                                className="w-full pl-9 pr-3.5 h-9.5 rounded-xl border border-slate-250 dark:border-slate-800 text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                            />
+                        </div>
+                        <div className="flex gap-2">
+                            <select
+                                value={checklistAreaFilter}
+                                onChange={e => setChecklistAreaFilter(e.target.value)}
+                                className="h-9.5 px-3 rounded-xl border border-slate-250 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/20 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                            >
+                                <option value="">Tüm Alanlar</option>
+                                {areas.map(a => <option key={a} value={a}>{a}</option>)}
+                            </select>
+                            <Button onClick={() => handleSaveAuditData(localAuditData)} disabled={isSavingAuditData} size="sm" className="rounded-xl h-9.5 px-4">
+                                {isSavingAuditData ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} className="mr-1" />}
+                                Kaydet
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                        {filteredQuestions.length === 0 ? (
+                            <div className="text-center py-12 border border-dashed border-slate-200 dark:border-slate-850 rounded-2xl bg-slate-50/20 dark:bg-slate-955/5">
+                                <AlertCircle size={20} className="mx-auto text-slate-400 mb-2" />
+                                <p className="text-xs font-bold text-slate-400 uppercase">Aramaya Uygun Madde Bulunamadı</p>
+                            </div>
+                        ) : (
+                            filteredQuestions.map(q => {
+                                const answer = form[q.id];
+                                const note = form[`inspector_note_${q.id}`] || "";
+                                
+                                return (
+                                    <div key={q.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-955/20 hover:border-slate-300 dark:hover:border-slate-700/50 transition-colors flex flex-col gap-3.5 shadow-sm">
+                                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                            <div className="space-y-1">
+                                                <span className="inline-block text-[9px] font-black uppercase text-blue-600 bg-blue-50 dark:bg-blue-955/30 px-2 py-0.5 rounded-lg border border-blue-100/30 dark:border-blue-900/10">
+                                                    {q.area}
+                                                </span>
+                                                <h5 className="text-xs font-bold text-slate-900 dark:text-white leading-relaxed">{q.text}</h5>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                <button
+                                                    onClick={() => handleChecklistAnswer(q.id, "yes")}
+                                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all ${
+                                                        answer === "yes"
+                                                            ? "bg-green-600 border-green-600 text-white shadow-sm"
+                                                            : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                                                    }`}
+                                                >
+                                                    Evet, Uygun
+                                                </button>
+                                                <button
+                                                    onClick={() => handleChecklistAnswer(q.id, "no")}
+                                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all ${
+                                                        answer === "no"
+                                                            ? "bg-red-600 border-red-600 text-white shadow-sm"
+                                                            : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                                                    }`}
+                                                >
+                                                    Hayır, Aykırı
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-950/40 p-3 rounded-lg border border-slate-100 dark:border-slate-900">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                    Müfettiş Tespit ve Notları
+                                                </label>
+                                                {answer === "no" && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-6.5 text-[9px] font-bold text-blue-600 dark:text-blue-400 border-blue-500/20 bg-blue-500/5 hover:bg-blue-500 hover:text-white rounded-lg flex items-center gap-1 shadow-sm transition-all"
+                                                        onClick={() => {
+                                                            setActiveQuestionForTenkit(q.id);
+                                                            setTimeout(() => {
+                                                                const searchInput = document.getElementById("ai-tenkit-search-input");
+                                                                if (searchInput) searchInput.focus();
+                                                            }, 100);
+                                                        }}
+                                                    >
+                                                        <Bot size={11} />
+                                                        <span>Tenkit Bankasından Ekle</span>
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <textarea
+                                                value={note}
+                                                onChange={e => handleChecklistNoteChange(q.id, e.target.value)}
+                                                onBlur={() => handleSaveAuditData(localAuditData)}
+                                                placeholder="Bu soruyla ilgili eksiklik, mevzuat ihlali veya tespit notlarını yazın..."
+                                                rows={2}
+                                                className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 text-[11px] font-semibold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 outline-none focus:ring-2 focus:ring-blue-500/10 resize-none leading-relaxed"
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+                {activeQuestionForTenkit && (
+                    <div className="xl:col-span-5 flex flex-col max-h-full overflow-hidden border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-950 p-4 relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                <Bot size={12} className="text-blue-500 animate-pulse" />
+                                <span>AI Tenkit Bankası</span>
+                            </h4>
+                            <button onClick={() => setActiveQuestionForTenkit(null)} className="w-6 h-6 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center transition-colors text-slate-500">
+                                <X size={12} />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                            {renderTenkitBank("checklist")}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const renderTenkitBank = (mode: "editor" | "checklist") => {
+        return (
+            <div className="flex flex-col gap-3 bg-slate-50/40 dark:bg-slate-955/10 border border-slate-100 dark:border-slate-800/40 p-4 rounded-xl max-h-[450px] xl:max-h-full overflow-y-auto h-full">
+                <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                        <Sparkles size={12} className="text-blue-500" />
+                        <span>AI Tenkit Bankası</span>
+                    </h4>
+                    <span className="text-[9px] font-bold text-slate-400">{tenkitResults.length} Tenkit</span>
+                </div>
+
+                <div className="relative">
+                    <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                        id="ai-tenkit-search-input"
+                        value={tenkitSearch}
+                        onChange={e => setTenkitSearch(e.target.value)}
+                        placeholder="Tenkit maddelerinde arama..."
+                        className="w-full pl-8 pr-3 h-8.5 rounded-lg border border-slate-200 dark:border-slate-800 text-[11px] outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-950/20 text-slate-800 dark:text-white"
+                    />
+                </div>
+
+                <div className="h-px bg-slate-100 dark:bg-slate-800/50" />
+
+                <div className="flex-1 flex flex-col gap-2 overflow-y-auto pr-1">
+                    {tenkitResults.length === 0 ? (
+                        <p className="text-[11px] text-slate-400 text-center py-4 font-bold">Sonuç bulunamadı.</p>
+                    ) : (
+                        tenkitResults.map(item => (
+                            <div
+                                key={item.id}
+                                className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 p-3 rounded-lg flex flex-col gap-2 hover:border-blue-500/50 transition-colors"
+                            >
+                                <div className="flex justify-between items-start gap-2">
+                                    <div className="min-w-0">
+                                        <span className="inline-block text-[8px] font-black uppercase text-blue-500 bg-blue-50 dark:bg-blue-955/30 px-1.5 py-0.5 rounded mb-1">
+                                            {item.category}
+                                        </span>
+                                        <h5 className="text-[11px] font-black text-slate-850 dark:text-slate-200 leading-tight truncate">{item.topic}</h5>
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="rounded-lg text-[9px] h-7 bg-blue-500/5 text-blue-600 dark:text-blue-400 border-blue-500/20 hover:bg-blue-500 hover:text-white transition-all flex-shrink-0"
+                                        onClick={() => mode === "editor" ? handleAppendTenkit(item) : handleAppendTenkitToNote(item)}
+                                    >
+                                        {mode === "editor" ? "Rapora Ekle" : "Nota Ekle"}
+                                    </Button>
+                                </div>
+                                <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-3 bg-slate-50 dark:bg-slate-950/5 p-2 rounded font-medium border border-slate-100 dark:border-slate-800/20">
+                                    {item.standard_remark}
+                                </p>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        );
+    };
 
     // Load AI Knowledge Base Items
     const loadKnowledgeItems = useCallback(async () => {
@@ -254,30 +952,58 @@ export default function Denetim() {
         setKnowledgeForm(f => ({ ...f, tags: f.tags.filter(t => t !== tag) }));
     };
 
-    // Create Report
-    const handleCreateReport = async () => {
-        if (!selectedTask) return;
+    // Create Report / Start Audit
+    // Accepts an optional taskOverride to support starting audits from the task picker flow
+    const handleCreateReport = async (customTitle: string, taskOverride?: any) => {
+        const targetTask = taskOverride || selectedTask;
+        if (!targetTask) return;
+        setIsCreatingReport(true);
         try {
             const newAuditPayload = {
-                task_id: selectedTask.id,
-                title: `${selectedTask.rapor_adi} Denetim Raporu`,
+                task_id: targetTask.id,
+                title: customTitle,
                 location: "",
                 date: new Date().toLocaleDateString("tr-TR"),
                 inspector: profile?.full_name || user?.displayName || user?.email?.split('@')[0] || "Müfettiş",
                 status: "Devam Ediyor",
-                report_content: `<h1>${selectedTask.rapor_adi} DENETİM RAPORU</h1><p>Denetim bulguları ve tespitleri buraya kaydedilecektir.</p>`,
+                report_content: `<h1>${customTitle}</h1><p>Denetim bulguları ve tespitleri buraya kaydedilecektir.</p>`,
                 owner_id: user?.uid,
                 assigned_to: [user?.uid].filter(Boolean) as string[],
                 report_seq: 1
             };
             await createAudit(newAuditPayload);
-            toast.success("Rapor başarıyla oluşturuldu.");
+
+            // Update Task status to "Devam Ediyor"
+            try {
+                await updateTask(targetTask.id, { rapor_durumu: "Devam Ediyor" });
+            } catch (err) {
+                console.error("Task status update error:", err);
+            }
+
+            toast.success("Denetim dosyası başarıyla oluşturuldu.");
+            setShowTaskPicker(false);
+            setPickerTaskForAudit(null);
+
+            // Auto-switch activeTab to match the task's category
+            const targetTabId = reverseCategoryMap[targetTask.rapor_turu];
+            if (targetTabId && targetTabId !== activeTab) {
+                setActiveTab(targetTabId);
+            }
+
+            // Auto-select the task in the panel
+            setSelectedTaskId(targetTask.id);
+            
             if (user?.uid) {
-                await refreshAudits(user.uid, user.email || undefined);
+                await Promise.all([
+                    refreshAudits(user.uid, user.email || undefined),
+                    refreshTasks(user.uid)
+                ]);
             }
         } catch (error) {
             console.error(error);
-            toast.error("Rapor oluşturulamadı.");
+            toast.error("Denetim başlatılamadı.");
+        } finally {
+            setIsCreatingReport(false);
         }
     };
 
@@ -522,9 +1248,18 @@ export default function Denetim() {
                 <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
                     {/* 2. Tasks list pane */}
                     <div className="w-full lg:w-80 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex flex-col gap-3 flex-shrink-0 overflow-y-auto">
-                        <div className="px-1">
-                            <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">{currentRaporTuru}</h3>
-                            <p className="text-[10px] text-slate-400 font-bold">Aktif denetim görevleri listesi</p>
+                        <div className="px-1 flex items-start justify-between gap-2">
+                            <div>
+                                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">{currentRaporTuru}</h3>
+                                <p className="text-[10px] text-slate-400 font-bold">Aktif denetim görevleri listesi</p>
+                            </div>
+                            <button
+                                onClick={() => setShowTaskPicker(true)}
+                                className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-px active:translate-y-0 flex-shrink-0 group"
+                            >
+                                <Play size={11} className="group-hover:scale-110 transition-transform" />
+                                <span>Denetimi Başlat</span>
+                            </button>
                         </div>
 
                         <div className="h-px bg-slate-100 dark:bg-slate-800/50" />
@@ -668,151 +1403,133 @@ export default function Denetim() {
                                     </div>
                                 )}
 
-                                {/* Report Editor & Content */}
-                                <div className="flex-1 flex flex-col gap-4">
-                                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/30 pb-2">
-                                        <h3 className="text-xs font-black uppercase tracking-[0.15em] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                                            <FileText size={14} className="text-blue-500" />
-                                            <span>Denetim Raporu İçeriği</span>
-                                        </h3>
-                                        {selectedReport && (
-                                            <div className="flex items-center gap-1.5">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="rounded-lg text-[10px] h-8"
-                                                    onClick={() => navigate(`/audit/${selectedReport.id}/report`)}
+                                {/* Report Tabs and Content */}
+                                {selectedReport && (
+                                    <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 bg-slate-100 dark:bg-slate-955 border border-slate-250 dark:border-slate-900 rounded-xl p-1 flex-shrink-0 mb-4">
+                                        {[
+                                            { id: "info", label: "Genel\nBilgiler" },
+                                            { id: "notes", label: "Notlar" },
+                                            { id: "photos", label: "Fotoğraflar" },
+                                            { id: "checklist", label: "Kontrol\nListesi" },
+                                            { id: "editor", label: "Rapor\nEditörü" }
+                                        ].map(tab => {
+                                            const isActive = activeDetailTab === tab.id;
+                                            return (
+                                                <button
+                                                    key={tab.id}
+                                                    onClick={() => {
+                                                        handleSaveAuditData(localAuditData);
+                                                        setActiveDetailTab(tab.id as any);
+                                                    }}
+                                                    className={`flex-1 text-center py-2 px-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 whitespace-pre-line leading-tight min-h-[38px] flex items-center justify-center ${
+                                                        isActive
+                                                            ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200 dark:border-slate-850"
+                                                            : "text-slate-400 dark:text-slate-500 hover:bg-slate-250 dark:hover:bg-slate-900/50 hover:text-slate-800 dark:hover:text-slate-200"
+                                                    }`}
                                                 >
-                                                    <ExternalLink size={12} className="mr-1" /> Editörde Aç
-                                                </Button>
-                                                {reportEditing ? (
-                                                    <div className="flex items-center gap-1">
+                                                    {tab.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {!selectedReport ? (
+                                    <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center gap-3">
+                                        <AlertCircle size={24} className="text-slate-350 dark:text-slate-650" />
+                                        <div>
+                                            <h4 className="font-bold text-xs text-slate-850 dark:text-slate-250">Henüz Rapor Oluşturulmamış</h4>
+                                            <p className="text-[11px] text-slate-400 mt-0.5">Bu görev için denetim başlatmak için soldaki <span className="font-bold text-blue-500">Denetimi Başlat</span> butonunu kullanın.</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex-1 flex flex-col overflow-y-auto">
+                                        {activeDetailTab === "info" && renderInfoTab()}
+                                        {activeDetailTab === "notes" && renderNotesTab()}
+                                        {activeDetailTab === "photos" && renderPhotosTab()}
+                                        {activeDetailTab === "checklist" && renderChecklistTab()}
+                                        {activeDetailTab === "editor" && (
+                                            <div className="flex-1 flex flex-col gap-4">
+                                                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/30 pb-2">
+                                                    <h3 className="text-xs font-black uppercase tracking-[0.15em] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                                        <FileText size={14} className="text-blue-500" />
+                                                        <span>Denetim Raporu İçeriği</span>
+                                                    </h3>
+                                                    <div className="flex items-center gap-1.5">
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            className="rounded-lg text-[10px] h-8 text-slate-400"
-                                                            onClick={() => {
-                                                                setReportContent(selectedReport.report_content || "");
-                                                                setReportEditing(false);
-                                                            }}
-                                                        >
-                                                            İptal
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
                                                             className="rounded-lg text-[10px] h-8"
-                                                            onClick={handleSaveReport}
-                                                            disabled={reportSaving}
+                                                            onClick={() => navigate(`/audit/${selectedReport.id}/report`)}
                                                         >
-                                                            {reportSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} className="mr-1" />}
-                                                            Kaydet
+                                                            <ExternalLink size={12} className="mr-1" /> Editörde Aç
                                                         </Button>
+                                                        {reportEditing ? (
+                                                            <div className="flex items-center gap-1">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="rounded-lg text-[10px] h-8 text-slate-400"
+                                                                    onClick={() => {
+                                                                        setReportContent(selectedReport.report_content || "");
+                                                                        setReportEditing(false);
+                                                                    }}
+                                                                >
+                                                                    İptal
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    className="rounded-lg text-[10px] h-8"
+                                                                    onClick={handleSaveReport}
+                                                                    disabled={reportSaving}
+                                                                >
+                                                                    {reportSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} className="mr-1" />}
+                                                                    Kaydet
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="rounded-lg text-[10px] h-8"
+                                                                onClick={() => setReportEditing(true)}
+                                                            >
+                                                                Manuel Düzenle
+                                                            </Button>
+                                                        )}
                                                     </div>
-                                                ) : (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="rounded-lg text-[10px] h-8"
-                                                        onClick={() => setReportEditing(true)}
-                                                    >
-                                                        Manuel Düzenle
-                                                    </Button>
-                                                )}
+                                                </div>
+
+                                                <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 min-h-[300px]">
+                                                    {/* Left: Editor Area */}
+                                                    <div className="xl:col-span-7 flex flex-col gap-2">
+                                                        {reportEditing ? (
+                                                            <textarea
+                                                                value={reportContent}
+                                                                onChange={e => setReportContent(e.target.value)}
+                                                                className="flex-1 w-full p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/20 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed resize-none h-[350px] lg:h-full"
+                                                                placeholder="Rapor içeriğini HTML formatında yazın..."
+                                                            />
+                                                        ) : (
+                                                            <div 
+                                                                className="flex-1 p-4 rounded-xl border border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-950/5 text-xs text-slate-800 dark:text-slate-255 leading-relaxed overflow-y-auto select-text prose prose-sm dark:prose-invert max-w-none h-[350px] lg:h-full"
+                                                                dangerouslySetInnerHTML={{ __html: reportContent || "<p class='text-slate-400 italic'>Rapor içeriği boş.</p>" }}
+                                                            />
+                                                        )}
+                                                        <p className="text-[10px] text-slate-400 font-bold">
+                                                            * Rapor içeriği HTML formatındadır. TinyMCE zengin metin düzenleyiciyle düzenlemek için sağ üstteki "Editörde Aç" butonunu kullanın.
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Right: AI Tenkit Bankası Panel */}
+                                                    <div className="xl:col-span-5 max-h-[500px]">
+                                                        {renderTenkitBank("editor")}
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
-
-                                    {!selectedReport ? (
-                                        <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center gap-3">
-                                            <AlertCircle size={24} className="text-slate-350 dark:text-slate-650" />
-                                            <div>
-                                                <h4 className="font-bold text-xs text-slate-850 dark:text-slate-250">Henüz Rapor Oluşturulmamış</h4>
-                                                <p className="text-[11px] text-slate-400 mt-0.5">Bu denetim görevi için henüz taslak bir rapor kaydı bulunmuyor.</p>
-                                            </div>
-                                            <Button size="sm" onClick={handleCreateReport} className="rounded-xl mt-1 h-9 text-xs">
-                                                <Plus size={14} className="mr-1" /> Rapor Oluştur
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 min-h-[300px]">
-                                            {/* Left: Editor Area */}
-                                            <div className="xl:col-span-7 flex flex-col gap-2">
-                                                {reportEditing ? (
-                                                    <textarea
-                                                        value={reportContent}
-                                                        onChange={e => setReportContent(e.target.value)}
-                                                        className="flex-1 w-full p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/20 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed resize-none h-[350px] lg:h-full"
-                                                        placeholder="Rapor içeriğini HTML formatında yazın..."
-                                                    />
-                                                ) : (
-                                                    <div 
-                                                        className="flex-1 p-4 rounded-xl border border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-950/5 text-xs text-slate-800 dark:text-slate-255 leading-relaxed overflow-y-auto select-text prose prose-sm dark:prose-invert max-w-none h-[350px] lg:h-full"
-                                                        dangerouslySetInnerHTML={{ __html: reportContent || "<p className='text-slate-400 italic'>Rapor içeriği boş.</p>" }}
-                                                    />
-                                                )}
-                                                <p className="text-[10px] text-slate-400 font-bold">
-                                                    * Rapor içeriği HTML formatındadır. TinyMCE zengin metin düzenleyiciyle düzenlemek için sağ üstteki "Editörde Aç" butonunu kullanın.
-                                                </p>
-                                            </div>
-
-                                            {/* Right: AI Tenkit Bankası Panel */}
-                                            <div className="xl:col-span-5 flex flex-col gap-3 bg-slate-50/40 dark:bg-slate-950/10 border border-slate-100 dark:border-slate-800/40 p-4 rounded-xl max-h-[450px] xl:max-h-full overflow-y-auto">
-                                                <div className="flex items-center justify-between">
-                                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                                                        <Sparkles size={12} className="text-blue-500" />
-                                                        <span>AI Tenkit Bankası</span>
-                                                    </h4>
-                                                    <span className="text-[9px] font-bold text-slate-400">{tenkitResults.length} Tenkit</span>
-                                                </div>
-
-                                                <div className="relative">
-                                                    <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                                    <input
-                                                        value={tenkitSearch}
-                                                        onChange={e => setTenkitSearch(e.target.value)}
-                                                        placeholder="Tenkit maddelerinde arama..."
-                                                        className="w-full pl-8 pr-3 h-8.5 rounded-lg border border-slate-200 dark:border-slate-800 text-[11px] outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-950/20 text-slate-800 dark:text-white"
-                                                    />
-                                                </div>
-
-                                                <div className="h-px bg-slate-100 dark:bg-slate-800/50" />
-
-                                                <div className="flex-1 flex flex-col gap-2 overflow-y-auto pr-1">
-                                                    {tenkitResults.length === 0 ? (
-                                                        <p className="text-[11px] text-slate-400 text-center py-4 font-bold">Sonuç bulunamadı.</p>
-                                                    ) : (
-                                                        tenkitResults.map(item => (
-                                                            <div
-                                                                key={item.id}
-                                                                className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 p-3 rounded-lg flex flex-col gap-2 hover:border-blue-500/50 transition-colors"
-                                                            >
-                                                                <div className="flex justify-between items-start gap-2">
-                                                                    <div className="min-w-0">
-                                                                        <span className="inline-block text-[8px] font-black uppercase text-blue-500 bg-blue-50 dark:bg-blue-950/30 px-1.5 py-0.5 rounded mb-1">
-                                                                            {item.category}
-                                                                        </span>
-                                                                        <h5 className="text-[11px] font-black text-slate-850 dark:text-slate-200 leading-tight truncate">{item.topic}</h5>
-                                                                    </div>
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        className="rounded-lg text-[9px] h-7 bg-blue-500/5 text-blue-600 dark:text-blue-400 border-blue-500/20 hover:bg-blue-500 hover:text-white transition-all flex-shrink-0"
-                                                                        onClick={() => handleAppendTenkit(item)}
-                                                                    >
-                                                                        Rapora Ekle
-                                                                    </Button>
-                                                                </div>
-                                                                <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-3 bg-slate-50 dark:bg-slate-950/5 p-2 rounded font-medium border border-slate-100 dark:border-slate-800/20">
-                                                                    {item.standard_remark}
-                                                                </p>
-                                                            </div>
-                                                        ))
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -957,6 +1674,182 @@ export default function Denetim() {
                                 {editingKnowledgeItem ? "Güncelle" : "Kaydet"}
                             </Button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Task Picker Modal - Start Audit from page level */}
+            {showTaskPicker && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-950/20 flex-shrink-0">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+                                    <Play size={18} />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-black text-slate-900 dark:text-white tracking-tight">
+                                        Denetim Başlat
+                                    </h2>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                                        Rapor Oluşturulmamış Görev Seçin
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => { setShowTaskPicker(false); setPickerTaskForAudit(null); }}
+                                className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors text-slate-500"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        {/* Task List or Prep Form */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {!pickerTaskForAudit ? (
+                                <div className="space-y-3">
+                                    {/* Show all tasks - mark ones that already have reports */}
+                                    {(() => {
+                                        const allTasks = cachedData?.tasks || [];
+
+                                        if (allTasks.length === 0) {
+                                            return (
+                                                <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
+                                                    <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center">
+                                                        <AlertCircle size={24} className="text-slate-400" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Görev Bulunamadı</h4>
+                                                        <p className="text-xs text-slate-400 mt-1">Sistemde henüz denetim görevi tanımlanmamış.</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        return allTasks.map(task => {
+                                            const hasReport = (cachedData?.audits || []).some(a => a.task_id === task.id);
+                                            return (
+                                            <button
+                                                key={task.id}
+                                                onClick={() => {
+                                                    setPickerTaskForAudit(task);
+                                                    const year = new Date().getFullYear();
+                                                    setPrepAuditName(`${task.rapor_adi} Denetimi ${year}`);
+                                                }}
+                                                className="w-full p-4 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/10 hover:border-blue-400 hover:bg-blue-50/30 dark:hover:bg-blue-950/10 transition-all duration-200 text-left group flex items-center justify-between gap-3"
+                                            >
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-500">
+                                                            {task.rapor_turu}
+                                                        </span>
+                                                        <span className="text-[9px] font-mono font-bold text-slate-400">{task.rapor_kodu}</span>
+                                                        {hasReport && (
+                                                            <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-green-500/10 text-green-500">
+                                                                Rapor Var
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <h4 className="font-bold text-xs text-slate-800 dark:text-slate-200 line-clamp-1 leading-tight">{task.rapor_adi}</h4>
+                                                    <span className="text-[9px] text-slate-400 font-semibold mt-1 inline-block">Başlama: {task.baslama_tarihi} • {task.sure_gun} Gün</span>
+                                                </div>
+                                                <ArrowRight size={14} className="text-slate-300 group-hover:text-blue-500 transition-colors flex-shrink-0" />
+                                            </button>
+                                            );
+                                        });
+                                    })()}
+                                </div>
+                            ) : (
+                                // Prep form for selected task
+                                <div className="space-y-5">
+                                    {/* Selected Task Summary */}
+                                    <div className="bg-slate-50 dark:bg-slate-955/30 p-4 rounded-2xl border border-slate-100 dark:border-slate-850 flex flex-col gap-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] font-black uppercase tracking-wider text-blue-500">
+                                                Seçilen Görev
+                                            </span>
+                                            <button
+                                                onClick={() => setPickerTaskForAudit(null)}
+                                                className="text-[10px] font-bold text-slate-400 hover:text-blue-500 transition-colors flex items-center gap-1"
+                                            >
+                                                <ArrowRight size={10} className="rotate-180" />
+                                                Geri Dön
+                                            </button>
+                                        </div>
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div>
+                                                <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
+                                                    {pickerTaskForAudit.rapor_adi}
+                                                </h4>
+                                                <span className="text-[10px] text-slate-400 font-semibold mt-1 inline-block">
+                                                    Tür: {pickerTaskForAudit.rapor_turu}
+                                                </span>
+                                            </div>
+                                            <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-200/55 dark:bg-slate-800 px-2 py-0.5 rounded">
+                                                {pickerTaskForAudit.rapor_kodu}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Audit Title Input */}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                                            Dosya Adı / Başlık *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={prepAuditName}
+                                            onChange={e => setPrepAuditName(e.target.value)}
+                                            placeholder="Örn: İl Müdürlüğü Denetimi 2026"
+                                            className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 bg-white dark:bg-slate-950/20 text-slate-900 dark:text-white transition-all"
+                                            disabled={isCreatingReport}
+                                        />
+                                    </div>
+
+                                    {/* Warning Note */}
+                                    <div className="flex items-start gap-2 bg-amber-500/5 text-amber-600 dark:text-amber-400 p-3.5 rounded-xl border border-amber-500/10">
+                                        <Info size={14} className="flex-shrink-0 mt-0.5" />
+                                        <p className="text-[10px] font-bold leading-relaxed">
+                                            Denetimi başlattığınızda görevin durumu sistemde otomatik olarak <span className="underline">"Devam Ediyor"</span> olarak güncellenecektir.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer - only show when a task is picked */}
+                        {pickerTaskForAudit && (
+                            <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-950/10 flex-shrink-0">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => { setShowTaskPicker(false); setPickerTaskForAudit(null); }}
+                                    className="rounded-xl h-10 px-5 text-xs"
+                                    disabled={isCreatingReport}
+                                >
+                                    İptal
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    onClick={() => handleCreateReport(prepAuditName.trim(), pickerTaskForAudit)}
+                                    disabled={isCreatingReport || !prepAuditName.trim()}
+                                    className="rounded-xl h-10 px-6 shadow-md shadow-blue-500/20 bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                                >
+                                    {isCreatingReport ? (
+                                        <>
+                                            <Loader2 size={14} className="animate-spin mr-2" />
+                                            <span>Başlatılıyor...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Check size={14} className="mr-2" />
+                                            <span>Denetimi Başlat</span>
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
