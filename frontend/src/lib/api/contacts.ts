@@ -1,5 +1,5 @@
 import { API_URL as API_BASE_URL } from "../config";
-import { fetchWithTimeout } from "./utils";
+import { fetchWithTimeout, getAuthHeaders } from "./utils";
 
 export interface Contact {
     id: string;
@@ -32,14 +32,11 @@ export interface ContactCreate {
 
 export async function fetchContacts(category: 'corporate' | 'personal', userId?: string, userEmail?: string): Promise<Contact[]> {
     let url = `${API_BASE_URL}/contacts/?category=${category}`;
-    if (userId) {
-        url += `&user_id=${userId}`;
-    }
-    if (userEmail) {
-        url += `&user_email=${encodeURIComponent(userEmail)}`;
-    }
+    void userId;
+    void userEmail;
+    const headers = await getAuthHeaders();
     
-    const response = await fetchWithTimeout(url);
+    const response = await fetchWithTimeout(url, { headers });
     if (!response.ok) {
         throw new Error("Rehber verileri yüklenemedi.");
     }
@@ -47,9 +44,11 @@ export async function fetchContacts(category: 'corporate' | 'personal', userId?:
 }
 
 export async function acceptContact(id: string, userId: string, userEmail?: string): Promise<{status: string, message: string}> {
-    const params = new URLSearchParams({ user_id: userId });
-    if (userEmail) params.append("user_email", userEmail);
-    const response = await fetchWithTimeout(`${API_BASE_URL}/contacts/${id}/accept?${params.toString()}`, {
+    void userId;
+    void userEmail;
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/contacts/${id}/accept`, {
+        headers,
         method: "POST"
     });
     if (!response.ok) throw new Error("Kişi kabul edilemedi.");
@@ -57,9 +56,11 @@ export async function acceptContact(id: string, userId: string, userEmail?: stri
 }
 
 export async function rejectContact(id: string, userId: string, userEmail?: string): Promise<{status: string, message: string}> {
-    const params = new URLSearchParams({ user_id: userId });
-    if (userEmail) params.append("user_email", userEmail);
-    const response = await fetchWithTimeout(`${API_BASE_URL}/contacts/${id}/reject?${params.toString()}`, {
+    void userId;
+    void userEmail;
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/contacts/${id}/reject`, {
+        headers,
         method: "POST"
     });
     if (!response.ok) throw new Error("Kişi reddedilemedi.");
@@ -67,11 +68,12 @@ export async function rejectContact(id: string, userId: string, userEmail?: stri
 }
 
 export async function createContact(contact: ContactCreate): Promise<Contact> {
+    const headers = await getAuthHeaders({
+        "Content-Type": "application/json",
+    });
     const response = await fetchWithTimeout(`${API_BASE_URL}/contacts/`, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(contact),
     });
     if (!response.ok) {
@@ -81,7 +83,10 @@ export async function createContact(contact: ContactCreate): Promise<Contact> {
 }
 
 export async function shareContact(contactId: string, userId: string): Promise<{status: string, message: string}> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/contacts/${contactId}/share?user_id=${userId}`, {
+    void userId;
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/contacts/${contactId}/share`, {
+        headers,
         method: "PATCH",
     });
     if (!response.ok) {
@@ -92,7 +97,10 @@ export async function shareContact(contactId: string, userId: string): Promise<{
 }
 
 export async function deleteContact(contactId: string, userId: string): Promise<{status: string, message: string}> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/contacts/${contactId}?user_id=${userId}`, {
+    void userId;
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/contacts/${contactId}`, {
+        headers,
         method: "DELETE",
     });
     if (!response.ok) {
@@ -105,9 +113,11 @@ export async function deleteContact(contactId: string, userId: string): Promise<
 export async function uploadAndSyncContacts(file: File): Promise<{status: string, message: string, processed: number}> {
     const formData = new FormData();
     formData.append("file", file);
+    const headers = await getAuthHeaders();
     
     const response = await fetchWithTimeout(`${API_BASE_URL}/contacts/upload-and-sync`, {
         method: "POST",
+        headers,
         body: formData,
     });
     
@@ -120,11 +130,13 @@ export async function uploadAndSyncContacts(file: File): Promise<{status: string
 }
 
 export async function updateContact(contactId: string, userId: string, contact: Partial<ContactCreate>): Promise<Contact> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/contacts/${contactId}?user_id=${userId}`, {
+    void userId;
+    const headers = await getAuthHeaders({
+        "Content-Type": "application/json",
+    });
+    const response = await fetchWithTimeout(`${API_BASE_URL}/contacts/${contactId}`, {
         method: "PATCH",
-        headers: {
-            "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(contact),
     });
     if (!response.ok) {

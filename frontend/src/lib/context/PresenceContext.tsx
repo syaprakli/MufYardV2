@@ -1,12 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { WS_URL, API_URL } from '../config';
-
-import { fetchOnlineUsers } from '../api/online';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { useChat } from './ChatContext';
 import { fetchGlobalMessages } from '../api/collaboration';
-
+import { fetchOnlineUsers } from '../api/online';
+import { API_URL, WS_URL } from '../config';
+import { useAuth } from '../hooks/useAuth';
+import { useChat } from './ChatContext';
+import { getAuthHeaders } from '../api/utils';
 
 interface OnlineUser {
     uid: string;
@@ -18,6 +17,7 @@ interface Message {
     text: string;
     author_id: string;
     author_name: string;
+    author_role?: string;
     timestamp: string;
     attachments?: any[];
 }
@@ -30,33 +30,36 @@ interface PresenceContextType {
     messages: Message[];
     unreadMessages: Record<string, number>;
     markAsRead: (roomId: string) => void;
-    sendMessage: (text: string, attachments?: any[]) => string;
+    sendMessage: (content: string, attachments?: any[]) => string;
     clearGlobalMessages: () => Promise<void>;
     clearLocalMessages: () => void;
 }
 
-
 const PresenceContext = createContext<PresenceContextType | undefined>(undefined);
 
-function normalizeOnlineUsers(users: OnlineUser[]) {
-    const seen = new Set<string>();
-    return users.filter((user) => {
-        if (!user?.uid || seen.has(user.uid)) return false;
-        seen.add(user.uid);
-        return true;
-    });
+function safeParse(raw: string) {
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
 }
 
-function resolvePresenceName(user: any, profileName?: string) {
-    const normalizedProfile = (profileName || '').trim();
-    if (normalizedProfile && normalizedProfile !== 'Müfettiş' && normalizedProfile !== 'Kullanıcı') {
-        return normalizedProfile;
-    }
+function normalizeOnlineUsers(users: any[]): OnlineUser[] {
+    return (users || [])
+        .map((user) => ({
+            uid: user.uid || user.user_id || user.id || '',
+            name: user.name || user.author_name || user.display_name || 'Kullanıcı',
+        }))
+        .filter((user) => user.uid);
+}
+
+function resolvePresenceName(user: any): string {
     const displayName = (user?.displayName || '').trim();
     if (displayName && displayName !== 'Müfettiş' && displayName !== 'Kullanıcı') {
         return displayName;
     }
-    const emailPrefix = (user?.email || '').split('@')[0]?.trim();
+    const emailPrefix = user?.email?.split('@')[0]?.trim();
     return emailPrefix || user?.email || 'Kullanıcı';
 }
 
@@ -91,6 +94,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (!user?.uid) {
             setOnlineUsers([]);
+            setRestConnected(false);
             return;
         }
 
@@ -98,12 +102,20 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         const syncOnlineUsers = async () => {
             try {
                 const data = await fetchOnlineUsers();
-                if (!cancelled && Array.isArray(data)) {
-                    setOnlineUsers(normalizeOnlineUsers(data));
+                const rawUsers = Array.isArray(data)
+                    ? data
+                    : Array.isArray((data as any)?.users)
+                        ? (data as any).users
+                        : [];
+
+                if (!cancelled) {
+                    setOnlineUsers(normalizeOnlineUsers(rawUsers));
                     setRestConnected(true);
                 }
             } catch {
-                // REST fallback silently fails
+                if (!cancelled) {
+                    setRestConnected(false);
+                }
             }
         };
 
@@ -148,19 +160,106 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 
     // WebSocket Connection Logic
     useEffect(() => {
+        if (!user?.uid) return;
+
+        const scheduleReconnect = () => {
+            clearTimeout(retryTimer.current);
+            const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 5000);
+            retryCountRef.current += 1;
+            retryTimer.current = setTimeout(connect, delay);
+        };
+
+        const handleMessage = (data: any) => {
+            if (!data) return;
+
+            if (data.type === 'presence' && Array.isArray(data.users)) {
+                setOnlineUsers(normalizeOnlineUsers(data.users));
+                return;
+            }
+
+            const msgContent = data.content || data.text || data.message || '';
+            const msgAttachments = data.attachments || (data.attachment ? [data.attachment] : []);
+            const msgRoomId = data.room_id || 'global';
+
+            if ((msgContent && typeof msgContent === 'string') || msgAttachments.length > 0) {
+                if (msgRoomId.startsWith('dm_')) {
+                    data.content = msgContent;
+                    data.text = msgContent;
+                    window.dispatchEvent(new CustomEvent('mufyard:new_message', { detail: data }));
+
+                    const senderId = data.sender_id || data.author_id;
+                    if (senderId !== user?.uid) {
+                        setUnreadMessages(prev => ({
+                            ...prev,
+                            [msgRoomId]: (prev[msgRoomId] || 0) + 1
+                        }));
+
+                        toast.success(`${data.sender_name || data.author_name || 'Bir Müfettiş'}: ${msgContent || 'Bir dosya gönderdi'}`, {
+                            icon: '💬',
+                            duration: 4000,
+                            position: 'top-center'
+                        });
+
+                        openChat(msgRoomId, data.sender_name || data.author_name, 'dm', senderId);
+                    }
+                    return;
+                }
+
+                const newMsg: Message = {
+                    id: data.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+                    text: msgContent,
+                    author_id: data.author_id || data.sender_id,
+                    author_name: data.author_name || data.sender_name || 'Müfettiş',
+                    author_role: data.author_role || 'Müfettiş',
+                    timestamp: data.timestamp || new Date().toISOString(),
+                    attachments: msgAttachments,
+                };
+
+                setMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
+                return;
+            }
+
+            if (data.type === 'update_message') {
+                const updatedMsg = data.message || data;
+                setMessages(prev => prev.map(m => m.id === data.message_id || m.id === updatedMsg.id
+                    ? { ...m, text: updatedMsg.text || updatedMsg.content || m.text }
+                    : m));
+                if (data.room_id?.startsWith('dm_')) {
+                    window.dispatchEvent(new CustomEvent('mufyard:message_updated', { detail: data }));
+                }
+                return;
+            }
+
+            if (data.type === 'delete_message') {
+                setMessages(prev => prev.filter(m => m.id !== data.message_id));
+                if (data.room_id?.startsWith('dm_')) {
+                    window.dispatchEvent(new CustomEvent('mufyard:message_deleted', { detail: data }));
+                }
+                return;
+            }
+
+            if (data.type === 'clear_messages') {
+                if (data.room_id === 'global') {
+                    setMessages([]);
+                } else if (data.room_id?.startsWith('dm_')) {
+                    window.dispatchEvent(new CustomEvent('mufyard:messages_cleared', { detail: data }));
+                }
+            }
+        };
+
         const connect = () => {
             if (!user?.uid) return;
             if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) return;
 
             clearTimeout(retryTimer.current);
 
-            try {
-                const activeName = activeNameRef.current || resolvePresenceName(user);
-                const baseWsUrl = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
-                // Force room_id=global for all users in the presence provider
-                const wsUrl = `${baseWsUrl}/ws?uid=${encodeURIComponent(user.uid)}&name=${encodeURIComponent(activeName)}&room_id=global`;
+            const activeName = activeNameRef.current || resolvePresenceName(user);
+            const baseWsUrl = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
 
+            user.getIdToken().then((token) => {
+                const wsUrl = `${baseWsUrl}/ws?token=${encodeURIComponent(token)}&name=${encodeURIComponent(activeName)}&room_id=global`;
                 console.log("Connecting to WS:", wsUrl);
+
                 const ws = new WebSocket(wsUrl);
                 wsRef.current = ws;
 
@@ -182,112 +281,12 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                 };
 
                 ws.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        
-                        if (data.type === 'pong') {
-                            clearTimeout(pongTimer.current);
-                            return;
-                        }
-
-                        // Handle Presence Updates
-                        if (data.type === 'presence' && Array.isArray(data.users)) {
-                            setOnlineUsers(normalizeOnlineUsers(data.users));
-                            return;
-                        }
-
-                        // Handle Messages (Universal Logic)
-                        const msgContent = data.content || data.text || data.message || "";
-                        const msgAttachments = data.attachments || (data.attachment ? [data.attachment] : []);
-                        const msgRoomId = data.room_id || 'global';
-                        
-                        // Metin VEYA ek varsa işle
-                        if ((msgContent && typeof msgContent === 'string') || msgAttachments.length > 0) {
-                            // Backend artık tüm mesajlara room_id ekliyor.
-                            if (msgRoomId.startsWith('dm_')) {
-                                // DM ise diğer bileşenlerin (FloatingChat gibi) yakalaması için bir event fırlat
-                                // Data içindeki content/text alanlarını her ihtimale karşı senkronla
-                                data.content = msgContent;
-                                data.text = msgContent;
-                                window.dispatchEvent(new CustomEvent('mufyard:new_message', { detail: data }));
-                                
-                                // Okunmamış mesaj sayısını artır (Eğer gönderen ben değilsem)
-                                const senderId = data.sender_id || data.author_id;
-                                if (senderId !== user?.uid) {
-                                    setUnreadMessages(prev => ({
-                                        ...prev,
-                                        [msgRoomId]: (prev[msgRoomId] || 0) + 1
-                                    }));
-
-                                    // Toast bildirimi göster
-                                    toast.success(`${data.sender_name || data.author_name || 'Bir Müfettiş'}: ${msgContent || 'Bir dosya gönderdi'}`, {
-                                        icon: '💬',
-                                        duration: 4000,
-                                        position: 'top-center'
-                                    });
-
-                                    // SOHBET KUTUSUNU OTOMATİK AÇ (Kullanıcının isteği üzerine)
-                                    openChat(msgRoomId, data.sender_name || data.author_name, 'dm', senderId);
-                            }
-                            return;
-                        }
-
-                        // Handle Message Updates (Edits)
-                        if (data.type === 'update_message') {
-                            const updatedMsg = data.message || data;
-                            setMessages(prev => prev.map(m => m.id === data.message_id || m.id === updatedMsg.id ? { 
-                                ...m, 
-                                text: updatedMsg.text || updatedMsg.content || m.text 
-                            } : m));
-                            
-                            // Ayrıca DM ise FloatingChat'e bildir (Event üzerinden)
-                            if (data.room_id?.startsWith('dm_')) {
-                                window.dispatchEvent(new CustomEvent('mufyard:message_updated', { detail: data }));
-                            }
-                            return;
-                        }
-
-                        // Handle Message Deletions
-                        if (data.type === 'delete_message') {
-                            setMessages(prev => prev.filter(m => m.id !== data.message_id));
-                            
-                            // Ayrıca DM ise FloatingChat'e bildir (Event üzerinden)
-                            if (data.room_id?.startsWith('dm_')) {
-                                window.dispatchEvent(new CustomEvent('mufyard:message_deleted', { detail: data }));
-                            }
-                            return;
-                        }
-
-                        // Handle Clear Messages
-                        if (data.type === 'clear_messages') {
-                            if (data.room_id === 'global') {
-                                setMessages([]);
-                            } else if (data.room_id?.startsWith('dm_')) {
-                                window.dispatchEvent(new CustomEvent('mufyard:messages_cleared', { detail: data }));
-                            }
-                            return;
-                        }
-
-                        // Global mesaj ise listeye ekle (Canlı Müzakere)
-                            const newMsg: Message = {
-                                id: data.id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-                                text: msgContent,
-                                author_id: data.author_id || data.sender_id,
-                                author_name: data.author_name || data.sender_name || 'Müfettiş',
-                                timestamp: data.timestamp || new Date().toISOString(),
-                                attachments: msgAttachments
-                            };
-
-                            setMessages(prev => {
-                                // ID kontrolü ile mükerrer mesajı önle
-                                if (prev.some(m => m.id === newMsg.id)) return prev;
-                                return [...prev, newMsg];
-                            });
-                        }
-
-                    } catch (err) {
-                        console.error('WS Message parsing error:', err);
+                    const data = safeParse(event.data);
+                    if (data?.type === 'pong') {
+                        clearTimeout(pongTimer.current);
+                        return;
                     }
+                    handleMessage(data);
                 };
 
                 ws.onclose = () => {
@@ -295,20 +294,18 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                     setWsConnected(false);
                     clearInterval(pingTimer.current);
                     clearTimeout(pongTimer.current);
-                    const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 5000);
-                    retryCountRef.current += 1;
-                    retryTimer.current = setTimeout(connect, delay);
+                    scheduleReconnect();
                 };
 
                 ws.onerror = (err) => {
                     console.error("WS Socket error:", err);
                     ws.close();
                 };
-            } catch (err) {
-                console.error("WS Connection error:", err);
+            }).catch((err) => {
+                console.error("WS token error:", err);
                 setWsConnected(false);
-                retryTimer.current = setTimeout(connect, 3000);
-            }
+                scheduleReconnect();
+            });
         };
 
         if (user?.uid) {
@@ -371,7 +368,9 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 
     const clearGlobalMessages = useCallback(async () => {
         try {
-            const res = await fetch(`${API_URL}/collaboration/messages?uid=${user?.uid}&role=${profile?.role || 'user'}`, {
+            const headers = await getAuthHeaders();
+            const res = await fetch(`${API_URL}/collaboration/messages`, {
+                headers,
                 method: 'DELETE'
             });
             if (res.ok) {

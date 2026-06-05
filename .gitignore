@@ -1,3 +1,12 @@
+# Log ve yedek dosyalarını dışarıdan erişime kapat
+backend/app/lib/firebase_secrets.py
+backend/app/lib/firebase-credentials.json
+backend/app/lib/credentials.json
+backend/app/lib/*.log
+backend/app/lib/*.bak
+backups/
+server_log*.txt
+backend/app/lib/local_settings.json
 # Dependencies
 node_modules/
 frontend/node_modules/

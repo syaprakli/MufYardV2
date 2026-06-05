@@ -3,7 +3,7 @@ import { Suspense, lazy, useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History, ArrowUpDown, FolderOpen, WifiOff, Zap, Mail, Phone
+    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History, ArrowUpDown, FolderOpen, WifiOff
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -42,16 +42,25 @@ function ActionBtn({ children, title, color, onClick }: { children: React.ReactN
     );
 }
 
+function toPlainTextSnippet(input: string): string {
+    return String(input || "")
+        .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
 const RAPOR_TURLERI = [
-    "Genel Denetim", "Özel Denetim", "İnceleme", "Soruşturma", "Ön İnceleme", "Araştırma",
+    "İnceleme", "Soruşturma", "Ön İnceleme", "Araştırma",
     "İl Denetimi", "Federasyon Denetimi", "Kyk Yurt Denetimi", "Özel Yurt Denetimi", "Spor Kulüpleri Denetimi"
 ];
-const RAPOR_SABLONLARI: Record<string, string> = {
+export const RAPOR_SABLONLARI: Record<string, string> = {
     "Boş Rapor": "",
     "Genel Teftiş": `<h1 style="text-align: center;">GENEL TEFTİŞ RAPORU</h1><p><br></p><p><strong>1. GİRİŞ</strong></p><p>....... tarihli ve ....... sayılı Makam Onayı üzerine ....... İl Müdürlüğü ve bağlı birimlerinde yürütülen Genel Teftiş çalışmaları sonucunda bu rapor düzenlenmiştir.</p><p><br></p><p><strong>2. YAPILAN İNCELEME VE TESPİTLER</strong></p><p>Kurumun mevzuata uygunluk, mali ve idari işlemleri incelenmiş olup, tespit edilen hususlar aşağıda maddeler halinde açıklanmıştır:</p><ul><li>İlk tespit...</li></ul><p><br></p><p><strong>3. SONUÇ VE ÖNERİLER</strong></p><p>Yapılan genel teftiş neticesinde ....... kanaatine varılmıştır.</p>`,
     "İnceleme-Soruşturma": `<h1 style="text-align: center;">İNCELEME VE SORUŞTURMA RAPORU</h1><p><br></p><p><strong>1. İNCELEME/SORUŞTURMA EMRİ</strong></p><p>....... tarihli ve ....... sayılı görevlendirme emri.</p><p><br></p><p><strong>2. İDDİA KONUSU</strong></p><p>Şikayet/İhbar dilekçesinde belirtilen iddialar: .......</p><p><br></p><p><strong>3. İFADE VE BEYANLAR</strong></p><p>Müşteki, şüpheli ve bilgi sahiplerinin beyanları...</p><p><br></p><p><strong>4. TAHLİL VE DEĞERLENDİRME</strong></p><p>Elde edilen bilgi, belge ve ifadeler ışığında iddiaların değerlendirilmesi.</p><p><br></p><p><strong>5. SONUÇ VE TEKLİF</strong></p><p>İddiaların sübuta erip ermediği ve getirilen disiplin/mali teklifler.</p>`,
     "Ön İnceleme": `<h1 style="text-align: center;">ÖN İNCELEME RAPORU</h1><p><br></p><p><strong>1. ÖN İNCELEME EMRİ</strong></p><p>.......</p><p><br></p><p><strong>2. HAKKINDA ÖN İNCELEME YAPILANLAR</strong></p><p>Adı Soyadı, Unvanı, Görev Yeri</p><p><br></p><p><strong>3. ÖN İNCELEME KONUSU</strong></p><p>.......</p><p><br></p><p><strong>4. İNCELEME VE DEĞERLENDİRME</strong></p><p>.......</p><p><br></p><p><strong>5. SONUÇ VE TEKLİF</strong></p><p>4483 sayılı Kanun kapsamında Soruşturma İzni Verilmesi / Verilmemesi teklifi.</p>`,
-    "Spor Kulüpleri": `<h1 style="text-align: center;">SPOR KULÜBÜ DENETİM RAPORU</h1><p><br></p><p><strong>1. GİRİŞ</strong></p><p>7405 sayılı Spor Kulüpleri ve Spor Federasyonları Kanunu kapsamında ....... Spor Kulübü'nün idari ve mali denetimi hakkındadır.</p><p><br></p><p><strong>2. İDARİ YAPI VE İŞLEYİŞ</strong></p><p>Tüzük uygunluğu, üye kayıt defteri, yönetim kurulu karar defterinin incelenmesi.</p><p><br></p><p><strong>3. MALİ İNCELEME</strong></p><p>Gelir-gider tabloları, bağış makbuzları ve bilanço değerleri.</p><p><br></p><p><strong>4. SONUÇ</strong></p><p>İyileştirilmesi gereken alanlar ve mevzuata aykırı eylemlere ilişkin bildirimler.</p>`
+    "Spor Kulüpleri": `<h1 style="text-align: center;">SPOR KULÜBÜ DENETİM RAPORU</h1><p><br></p><p><strong>1. GİRİŞ</strong></p><p>7405 sayılı Spor Kulüpleri ve Spor Federasyonları Kanunu kapsamında ....... Spor Kulübü'nün idari ve mali denetimi hakkındadır.</p><p><br></p><p><strong>2. İDARİ YAPI VE İŞLEYİŞ</strong></p><p>Tüzük uygunluğu, üye kayıt defteri, yönetim kurulu karar defterinin incelenmesi.</p><p><br></p><p><strong>3. MALİ İNCELEME</strong></p><p>Gelir-gider tabloları, bağış makbuzları ve bilanço değerleri.</p><p><br></p><p><strong>4. SONUÇ</strong></p><p>İyileştirilmesi gereken alanlar ve mevzuata aykırı eylemlere ilişkin bildirimler.</p>`,
+    "Spor Kulüpleri Evrak Talep Yazısı": `<h1 style="text-align: center;">SPOR KULÜBÜ EVRAK TALEP YAZISI</h1><p><br></p><p><strong>İlgi :</strong><br>a) ....... tarihli ve ....... sayılı Makam Oluru.<br>b) ....... tarihli ve ....... sayılı Görevlendirme Yazısı.</p><p><br></p><p>İlgi (a)'da yer alan Bakanlık Makamı Oluru ve ilgi (b)'de kayıtlı Rehberlik ve Denetim Başkanlığının Görev Emri uyarınca, ....... yılı Spor Kulüpleri ve Spor Anonim Şirketleri Genel Denetimi kapsamında aşağıda belirtilen tüm bilgi ve belgelerin madde bazında tasniflenmiş onaylı suretlerinin denetime hazır hale getirilerek 7 (yedi) gün içinde Müfettişliğe teslim edilmesini rica ederim.</p><p><br></p><p><strong>TALEP EDİLEN BİLGİ VE BELGELER:</strong></p><ol><li>Kuruluş ve tescil işlemlerine ilişkin evrak,</li><li>Çek Karnesi,</li><li>Sulh ve İbra Sözleşmeleri,</li><li>Varsa ayni yardım teslim belgesi (dağıtım tutanakları, ayni bağış alındı belgesi),</li><li>Başta tasdikli Yönetim Kurulu Karar defteri olmak üzere tüm yasal defterler ve varsa tutulan yardımcı defterler,</li><li>Bankalar nezdindeki tüm TL ve YP vadeli, vadesiz mevduat, yatırım hesapları, kredi kartı pos cihazı kullanımının bağlı olduğu hesaplar, kullanılan kredi hesapları (denetim dönemi içerisinde işlem görmüş ancak kapatılmış banka hesapları dahil), Kasa hesabı varsa denetime başlanıldığı gün itibariyle buna ilişkin mevcut durum tutanakları,</li><li>Tüzük, Esas Sözleşme ve Genel Kurul toplantı tutanakları (olağan ve olağanüstü kurul toplantıları),</li><li>İç Denetim Raporları (Denetim dönemi itibari ile),</li><li>Varsa Bağımsız Denetim Raporları,</li><li>Finansal Tablolar (Denetim dönemi itibariyle konsolidasyona tabi olan kulüp ve şirketlerde konsolide finansal tablolar ile konsolidasyon tarihinde konsolide olanlara ait olan tablolar birlikte),</li><li>Yasal defterlere ve yardımcı defterlere intikal etmiş işlemlere ait tüm evrak,</li><li>Bağlı ortaklık, iştirak ve iktisadi işletmeler varsa bu şirketlerin kuruluş ve varsa değişiklik ticaret sicil gazeteleri,</li><li>Bağlı bulunulan İl Müdürlüklerine verilen beyannameler,</li><li>Yönetim Kurulu üyelerinin ve personelin dosyaları,</li><li>Hasılat ve gelir kalemleri (UEFA, sporcu satışı, lisanslı ürün, bilet, yayın, loca, sponsor vb. gerçekleşen ile kayıtların uygunluğu, finansal tablolara uygunluk, taraflar vb.),</li><li>Futbolcu, Teknik Direktör ve Temsilci Sözleşmeleri (Tek taraflı-karşılıklı fesihler, tahkim kararları, geciken maaşlar, tazminatlar, vekalet ücretleri ve faiz ödemeleri, bonservis bedeli, amortisman giderleri vb.),</li><li>Bilet satış işlemlerine ilişkin sözleşme ve gelirlerin takibi, bedelsiz verilen biletler,</li><li>Sponsorluklara ilişkin kayıt ve belgeler,</li><li>Tahsisli, kiralık ve mülk olan menkul (araçlar vb.) ve gayrimenkullerin listesi,</li><li>Spor okullarına ilişkin iş ve işlemler,</li><li>Vadesinde Ödenmeyen Vergi ve SGK Borçlarına dair kayıtlar,</li><li>Lisansiyerlerden Tahsil Edilen Royalty Bedellerine ilişkin kayıtlar,</li><li>Verilen avanslar, alacakların takip ve tahsili, dava karşılıklarına ilişkin kayıtlar,</li><li>İnşaatlar, yapım işlerine ilişkin kayıtlar (Haklar, sözleşmeler, tedarikçilere ödemeler, yüklenici kontrolü vb.),</li><li>Kulüp içi talimatların mevcudiyeti, güncel mevzuata uygunluğuna dair bilgiler,</li><li>UEFA ve TFF tarafından Kulübe kesilen cezalar vb. kayıtları,</li><li>Muhatap kalınan icra takipleri, faiz ödemeleri, aleyhteki davalar vb. hakkındaki kayıtlar,</li><li>Satın alma ve gider işlemleri ile ticari ilişkilerde tespit edilen aksaklıklar ve istisnai durumlara ilişkin kayıtlar (yetki durumu, kalıntı değerler, fiziki mevcudiyet, envanter kaydı vb.),</li><li>Nakit ve nakit benzerleri, ticari alacaklar ve borçlar, tahsil kabiliyeti, beklenen zarar, işlemlerin tutar ve niteliği vb. hakkındaki kayıtlar,</li><li>Stoklara ilişkin kayıtlar (devir hızı, kayıt sistemi, uygulanan programlama işlerliği vb., fatura/irsaliye),</li><li>Sabit kıymetlere ilişkin kayıtlar (yeterli açıklama, sınıflandırma, mülkiyet, yapılan tahminler, kredi vb.).</li></ol><p><br></p><p style="text-align: right;">.......<br>Müfettiş</p>`
 };
 const RAPOR_DURUMLARI = ["Başlanmadı", "Devam Ediyor", "Evrak Bekleniyor", "İncelemede", "Tamamlandı"];
 
@@ -142,7 +151,7 @@ export default function Tasks() {
     const modalBoxStyle: React.CSSProperties = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: "1.5rem", boxShadow: "var(--shadow-lg)", width: "100%", maxWidth: "550px", padding: "2rem" };
 
     const { user, profile } = useAuth();
-    const { data: cachedData, refreshAll, refreshTasks, isOffline, trialDaysLeft, isTrialExpired } = useGlobalData();
+    const { data: cachedData, refreshAll, refreshTasks, isOffline } = useGlobalData();
     
     const [loading, setLoading] = useState(false);
     const [bulkActionLoading, setBulkActionLoading] = useState(false);
@@ -201,12 +210,17 @@ export default function Tasks() {
                 const profiles = await fetchAllProfiles();
                 
                 // Filter out current user from registered profiles
-                const myUid = currentUser?.uid;
-                const myEmail = currentUser?.email?.toLowerCase().trim();
+                const myUid = currentUser?.uid || profile?.uid;
+                const myEmail = currentUser?.email?.toLowerCase().trim() || profile?.email?.toLowerCase().trim();
+                const myName = profile?.full_name?.toLowerCase().trim();
                 const filtered = profiles.filter(p => {
                     const pUid = p.uid;
                     const pEmail = p.email?.toLowerCase().trim();
-                    return pUid !== myUid && pEmail !== myEmail;
+                    const pName = p.full_name?.toLowerCase().trim();
+                    const isMe = (pUid && pUid === myUid) || 
+                                 (pEmail && pEmail === myEmail) || 
+                                 (pName && myName && pName === myName);
+                    return !isMe;
                 });
 
                 setRegisteredProfiles(filtered);
@@ -215,7 +229,7 @@ export default function Tasks() {
             }
         };
         loadProfiles();
-    }, [currentUser?.uid, currentUser?.email]);
+    }, [currentUser?.uid, currentUser?.email, profile]);
 
     // Memoized derived data from global cache
     const { tasks, invitations } = useMemo(() => {
@@ -266,7 +280,9 @@ export default function Tasks() {
     const raporOnek = localStorage.getItem('raporKoduOnek') || 'S.Y.64';
     const currentYear = new Date().getFullYear();
     const autoKodu = useMemo(() => {
-        const allCodes = [...tasks, ...invitations].map((t) => t.rapor_kodu);
+        const allCodes = [...tasks, ...invitations]
+            .filter(t => !t.parent_task_id)
+            .map((t) => t.rapor_kodu);
         const nextSeq = getNextMissingTaskSeq(allCodes, raporOnek, currentYear);
         return `${raporOnek}/${currentYear}-${nextSeq}`;
     }, [tasks, invitations, raporOnek, currentYear]);
@@ -274,12 +290,29 @@ export default function Tasks() {
     const [form, setForm] = useState({
         rapor_kodu: "",
         rapor_adi: "",
-        rapor_turu: "Genel Denetim",
+        rapor_turu: "İnceleme",
         baslama_tarihi: new Date().toISOString().split("T")[0],
         sure_gun: 30,
         assigned_to: [] as string[],
         parent_task_id: ""
     });
+
+    useEffect(() => {
+        if (form.parent_task_id) {
+            const parent = tasks.find(t => t.id === form.parent_task_id);
+            if (parent) {
+                setForm(prev => ({
+                    ...prev,
+                    rapor_kodu: parent.rapor_kodu || ""
+                }));
+            }
+        } else {
+            setForm(prev => ({
+                ...prev,
+                rapor_kodu: ""
+            }));
+        }
+    }, [form.parent_task_id, tasks]);
 
     useEffect(() => { 
         if (effectiveUid) {
@@ -344,7 +377,7 @@ export default function Tasks() {
             setForm({
                 rapor_kodu: "",
                 rapor_adi: "",
-                rapor_turu: "Genel Denetim",
+                rapor_turu: "İnceleme",
                 baslama_tarihi: new Date().toISOString().split("T")[0],
                 sure_gun: 30,
                 assigned_to: [],
@@ -977,8 +1010,13 @@ export default function Tasks() {
     const statusFilter = searchParams.get("status");
 
     const filtered = tasks.filter(t => {
+        // Alt görevleri ana listede gösterme
+        if (t.parent_task_id) return false;
+
+        const children = tasks.filter(c => c.parent_task_id === t.id);
         const matchesSearch = t.rapor_adi?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                               t.rapor_kodu?.toLowerCase().includes(searchQuery.toLowerCase());
+                               t.rapor_kodu?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                               children.some(c => c.rapor_adi?.toLowerCase().includes(searchQuery.toLowerCase()) || c.rapor_kodu?.toLowerCase().includes(searchQuery.toLowerCase()));
 
         const matchesStatusFilter = statusFilter === "active"
             ? t.rapor_durumu !== "Tamamlandı"
@@ -1122,9 +1160,9 @@ export default function Tasks() {
         };
 
         const header = [
-            "Rapor No",
+            "Görev / Dosya No",
             "Görev Adı",
-            "Tür",
+            "Görev Türü",
             "Başlama Tarihi",
             "Süre (Gün)",
             "Durum",
@@ -1206,59 +1244,13 @@ export default function Tasks() {
                                         {result.type === "audit" ? <FileText size={16} /> : <ClipboardList size={16} />}
                                         {result.title}
                                     </div>
-                                    <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 line-clamp-2" dangerouslySetInnerHTML={{ __html: result.snippet }} />
+                                    <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">{toPlainTextSnippet(result.snippet)}</div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </div>
             )}
-            {/* ─── Trial Status Banner ─── */}
-            {(isTrialExpired || (trialDaysLeft <= 7 && !profile?.has_premium_ai && profile?.role !== 'admin')) && (
-                <div className={cn(
-                    "mb-6 p-4 rounded-3xl border flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500",
-                    isTrialExpired 
-                        ? "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400" 
-                        : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
-                )}>
-                    <div className="flex items-center gap-4">
-                        <div className={cn(
-                            "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg",
-                            isTrialExpired ? "bg-rose-500 text-white" : "bg-amber-500 text-white"
-                        )}>
-                            {isTrialExpired ? <FileText size={24} /> : <Zap size={24} />}
-                        </div>
-                        <div>
-                            <h4 className="font-black uppercase tracking-tight text-sm">
-                                {isTrialExpired ? "Deneme Süreniz Doldu" : "Deneme Süreniz Azalıyor"}
-                            </h4>
-                            <p className="text-xs font-semibold opacity-80 max-w-md">
-                                {isTrialExpired 
-                                    ? "30 günlük ücretsiz deneme süreniz sona ermiştir. Görev yönetimine devam etmek için lütfen üyeliğinizi yükseltin veya aktivasyon anahtarı için bizimle iletişime geçin."
-                                    : `Ücretsiz deneme sürenizin bitmesine ${trialDaysLeft} gün kaldı. Tüm özelliklere erişim için Premium'a geçebilirsiniz.`}
-                            </p>
-                            <div className="flex flex-wrap gap-x-6 gap-y-2 mt-2">
-                                <a href="mailto:sefayaprakli@hotmail.com" className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest hover:text-primary transition-colors">
-                                    <Mail size={12} className="shrink-0" /> sefayaprakli@hotmail.com
-                                </a>
-                                <a href="tel:05368318846" className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest hover:text-primary transition-colors">
-                                    <Phone size={12} className="shrink-0" /> 0536 831 88 46
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    <Button 
-                        onClick={() => navigate('/settings/billing')}
-                        className={cn(
-                            "rounded-2xl font-black uppercase tracking-widest text-[10px] px-6 h-12 shadow-xl hover:scale-105 active:scale-95 transition-all w-full md:w-auto",
-                            isTrialExpired ? "bg-rose-500 hover:bg-rose-600 text-white" : "bg-amber-500 hover:bg-amber-600 text-white"
-                        )}
-                    >
-                        {isTrialExpired ? "Şimdi Yükselt" : "Premium'a Geç"}
-                    </Button>
-                </div>
-            )}
-
             {/* Standardized Page Header */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6 font-outfit">
                 <div>
@@ -1343,16 +1335,17 @@ export default function Tasks() {
                     <form onSubmit={handleCreate} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
                             <div className="md:col-span-3 lg:col-span-2 space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Rapor No</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Görev / Dosya No</label>
                                 <input
+                                    disabled={!!form.parent_task_id}
                                     placeholder={autoKodu}
                                     value={form.rapor_kodu || autoKodu}
                                     onChange={e => setForm({ ...form, rapor_kodu: e.target.value })}
-                                    className="w-full px-4 py-3 rounded-xl border border-border bg-muted/30 focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold tracking-tight outline-none"
+                                    className="w-full px-4 py-3 rounded-xl border border-border bg-muted/30 focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold tracking-tight outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                                 />
                             </div>
                             <div className="md:col-span-9 lg:col-span-7 space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Rapor Adı / Konusu</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Görev Adı / Konusu</label>
                                 <input
                                     required
                                     placeholder="Örn: X Belediyesi İncelemesi"
@@ -1362,7 +1355,7 @@ export default function Tasks() {
                                 />
                             </div>
                             <div className="md:col-span-12 lg:col-span-3 space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Rapor Türü</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Görev Türü</label>
                                 <select
                                     value={form.rapor_turu}
                                     onChange={e => setForm({ ...form, rapor_turu: e.target.value })}
@@ -1373,18 +1366,18 @@ export default function Tasks() {
                             </div>
                         </div>
 
-                        {form.rapor_turu === "Kyk Yurt Denetimi" && (
+                        {(form.rapor_turu === "Kyk Yurt Denetimi" || form.rapor_turu === "Özel Yurt Denetimi" || form.rapor_turu === "Spor Kulüpleri Denetimi") && (
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 mb-4">
                                 <div className="md:col-span-12 space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Bağlı İl Denetimi</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Bağlı Üst Görev (Denetim)</label>
                                     <select
                                         value={form.parent_task_id || ""}
                                         onChange={e => setForm({ ...form, parent_task_id: e.target.value })}
                                         className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold outline-none cursor-pointer"
                                     >
-                                        <option value="">Seçiniz (Bağlı İl Denetimi yoksa boş bırakın)...</option>
-                                        {tasks.filter(t => t.rapor_turu === "İl Denetimi").map(t => (
-                                            <option key={t.id} value={t.id}>{t.rapor_adi} ({t.rapor_kodu})</option>
+                                        <option value="">Seçiniz (Bağlı üst görev yoksa boş bırakın)...</option>
+                                        {tasks.filter(t => !t.parent_task_id).map(t => (
+                                            <option key={t.id} value={t.id}>{t.rapor_adi} ({t.rapor_kodu}) - {t.rapor_turu}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -1739,8 +1732,67 @@ export default function Tasks() {
 
                                         {expandedRow === task.id && (
                                             <div className="mt-4 pt-4 border-t border-border space-y-4 animate-in slide-in-from-top-2 duration-200">
+                                                {(() => {
+                                                    const childTasks = tasks.filter(t => t.parent_task_id === task.id);
+                                                    return childTasks.length > 0 && (
+                                                        <div className="space-y-2">
+                                                            <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bağlı Alt Görevler ({childTasks.length})</h5>
+                                                            <div className="divide-y divide-border border border-border rounded-xl overflow-hidden bg-muted/20">
+                                                                {childTasks.map(child => {
+                                                                    return (
+                                                                        <div key={child.id} className="p-3 bg-card space-y-3">
+                                                                            <div className="flex justify-between items-start">
+                                                                                <div>
+                                                                                    <h6 className="text-xs font-bold text-slate-900 dark:text-slate-100">{child.rapor_adi}</h6>
+                                                                                    <p className="text-[9px] text-slate-400 font-bold uppercase">{child.rapor_turu}</p>
+                                                                                </div>
+                                                                                <span className="text-[9px] font-black text-slate-500">{child.rapor_kodu}</span>
+                                                                            </div>
+                                                                            <div className="flex justify-between items-center">
+                                                                                <select
+                                                                                    disabled={!isElectron}
+                                                                                    value={child.rapor_durumu}
+                                                                                    onChange={async (e) => {
+                                                                                        const newStatus = e.target.value;
+                                                                                        try {
+                                                                                            await updateTaskStatus(child, newStatus);
+                                                                                            if (effectiveUid) refreshTasks(effectiveUid);
+                                                                                            toast.success("Durum güncellendi.");
+                                                                                        } catch { toast.error("Hata oluştu."); }
+                                                                                    }}
+                                                                                    className={cn("bg-transparent text-[10px] font-black tracking-widest outline-none cursor-pointer p-1 rounded-lg hover:bg-slate-100", !isElectron && "opacity-50 cursor-not-allowed")}
+                                                                                    style={{ color: getDurumColor(child.rapor_durumu) }}
+                                                                                >
+                                                                                    {RAPOR_DURUMLARI.map(d => <option key={d} value={d} className="text-slate-900">{d}</option>)}
+                                                                                </select>
+                                                                                <div className="flex gap-1">
+                                                                                    <ActionBtn title="Dosya Aç" color="#64748b" onClick={() => handleOpenTaskFolder(child)}>
+                                                                                        <FolderOpen size={12} />
+                                                                                    </ActionBtn>
+                                                                                    <ActionBtn title="Raporları Gör" color="#10b981" onClick={() => handleOpenReportSelector(child)}>
+                                                                                        <FileText size={12} />
+                                                                                    </ActionBtn>
+                                                                                    <ActionBtn title="Görevi Düzenle" color="#f59e0b" onClick={() => isElectron ? setEditingTask(child) : toast.error("Düzenleme sadece masaüstü uygulamasında aktiftir.")}>
+                                                                                        <Edit3 size={12} />
+                                                                                    </ActionBtn>
+                                                                                    <ActionBtn title="Paylaş" color="#8b5cf6" onClick={() => isElectron ? setShareTask(child) : toast.error("Paylaşım sadece masaüstü uygulamasında aktiftir.")}>
+                                                                                        <UserPlus size={12} />
+                                                                                    </ActionBtn>
+                                                                                    <ActionBtn title="Sil" color="#ef4444" onClick={() => isElectron ? handleDelete(child.id) : toast.error("Silme işlemi sadece masaüstü uygulamasında aktiftir.")}>
+                                                                                        <Trash2 size={12} />
+                                                                                    </ActionBtn>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+
                                                 <div className="space-y-3">
-                                                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alt Görevler / Adımlar</h5>
+                                                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">İş Adımları</h5>
                                                     <div className="space-y-2">
                                                         {(task.steps || []).map((step: any, idx: number) => (
                                                             <div key={idx} className="flex items-center justify-between gap-3 p-2 bg-muted/50 rounded-lg">
@@ -1787,7 +1839,7 @@ export default function Tasks() {
                                 </th>
                                 <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
                                     <button type="button" onClick={() => toggleSort("rapor_kodu")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
-                                        Rapor No <ArrowUpDown size={12} />
+                                        Görev / Dosya No <ArrowUpDown size={12} />
                                     </button>
                                 </th>
                                 <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
@@ -1797,7 +1849,7 @@ export default function Tasks() {
                                 </th>
                                 <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
                                     <button type="button" onClick={() => toggleSort("rapor_turu")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
-                                        Tür <ArrowUpDown size={12} />
+                                        Görev Türü <ArrowUpDown size={12} />
                                     </button>
                                 </th>
                                 <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
@@ -1872,7 +1924,10 @@ export default function Tasks() {
                                                     </select>
                                                 </td>
                                                 <td className="px-4 lg:px-6 py-4">
-                                                    <div className="grid grid-cols-3 xl:flex xl:flex-row gap-1.5 w-fit">
+                                                    <div className="grid grid-cols-4 xl:flex xl:flex-row gap-1.5 w-fit">
+                                                        <ActionBtn title="İş Adımları" color="#3b82f6" onClick={() => setExpandedRow(expandedRow === task.id ? null : task.id)}>
+                                                            <ClipboardList size={16} />
+                                                        </ActionBtn>
                                                         <ActionBtn title="Dosya Aç" color="#64748b" onClick={() => handleOpenTaskFolder(task)}>
                                                             <FolderOpen size={16} />
                                                         </ActionBtn>
@@ -1897,27 +1952,98 @@ export default function Tasks() {
                                             {isExpanded && (
                                                 <tr className="bg-muted/30">
                                                     <td colSpan={7} className="px-12 py-6">
-                                                        <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
-                                                            <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">ALT GÖREVLER / ADIMLAR</h5>
-                                                            <div className="space-y-2">
-                                                                {(task.steps || []).map((step: TaskStep, idx: number) => (
-                                                                    <div key={idx} className="flex items-center justify-between gap-3 p-3 bg-muted/50 rounded-xl">
-                                                                        <div className="flex items-center gap-3">
-                                                                            <input type="checkbox" checked={step.done} onChange={() => handleToggleStep(task, idx)} className="w-5 h-5 rounded border-border" />
-                                                                            <span className={cn("text-sm font-medium", step.done ? "line-through text-slate-400" : "text-slate-700")}>{step.text}</span>
+                                                        <div className="bg-card p-6 rounded-2xl border border-border shadow-sm space-y-6">
+                                                            {(() => {
+                                                                const childTasks = tasks.filter(t => t.parent_task_id === task.id);
+                                                                return childTasks.length > 0 && (
+                                                                    <div className="space-y-3">
+                                                                        <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Denetim Kapsamındaki Alt Görevler ({childTasks.length})</h5>
+                                                                        <div className="divide-y divide-border border border-border rounded-xl overflow-hidden bg-muted/20">
+                                                                            {childTasks.map(child => {
+                                                                                const childSureInfo = getSureInfo(child);
+                                                                                return (
+                                                                                    <div key={child.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-card hover:bg-muted/10 transition-colors">
+                                                                                        <div className="flex items-center gap-3">
+                                                                                            <span className="text-[10px] font-black text-primary tracking-widest font-outfit">{child.rapor_kodu}</span>
+                                                                                            <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                                                                                            <div>
+                                                                                                <h6 className="text-sm font-bold text-slate-900 dark:text-slate-100">{child.rapor_adi}</h6>
+                                                                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{child.rapor_turu}</p>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div className="flex items-center gap-4 flex-wrap">
+                                                                                            {childSureInfo && (
+                                                                                                <span 
+                                                                                                    className="text-[10px] font-black px-2 py-0.5 rounded-md"
+                                                                                                    style={{ backgroundColor: (childSureInfo.isCompleted ? '#10b981' : getKalanColor(childSureInfo.diff, childSureInfo.total)) + "15", color: childSureInfo.isCompleted ? '#10b981' : getKalanColor(childSureInfo.diff, childSureInfo.total) }}
+                                                                                                >
+                                                                                                    {childSureInfo.isCompleted ? `Tamamlandı` : `${childSureInfo.diff} Gün`}
+                                                                                                </span>
+                                                                                            )}
+                                                                                            <select
+                                                                                                disabled={!isElectron}
+                                                                                                value={child.rapor_durumu}
+                                                                                                onChange={async (e) => {
+                                                                                                    const newStatus = e.target.value;
+                                                                                                    try {
+                                                                                                        await updateTaskStatus(child, newStatus);
+                                                                                                        if (effectiveUid) refreshTasks(effectiveUid);
+                                                                                                        toast.success("Durum güncellendi.");
+                                                                                                    } catch { toast.error("Hata oluştu."); }
+                                                                                                }}
+                                                                                                className={cn("bg-transparent text-[10px] font-black tracking-widest outline-none cursor-pointer p-1 rounded-lg hover:bg-slate-100", !isElectron && "opacity-50 cursor-not-allowed")}
+                                                                                                style={{ color: getDurumColor(child.rapor_durumu) }}
+                                                                                            >
+                                                                                                {RAPOR_DURUMLARI.map(d => <option key={d} value={d} className="text-slate-900">{d}</option>)}
+                                                                                            </select>
+                                                                                            <div className="flex gap-1">
+                                                                                                <ActionBtn title="Dosya Aç" color="#64748b" onClick={() => handleOpenTaskFolder(child)}>
+                                                                                                    <FolderOpen size={14} />
+                                                                                                </ActionBtn>
+                                                                                                <ActionBtn title="Raporları Gör" color="#10b981" onClick={() => handleOpenReportSelector(child)}>
+                                                                                                    <FileText size={14} />
+                                                                                                </ActionBtn>
+                                                                                                <ActionBtn title="Görevi Düzenle" color="#f59e0b" onClick={() => isElectron ? setEditingTask(child) : toast.error("Düzenleme sadece masaüstü uygulamasında aktiftir.")}>
+                                                                                                    <Edit3 size={14} />
+                                                                                                </ActionBtn>
+                                                                                                <ActionBtn title="Paylaş" color="#8b5cf6" onClick={() => isElectron ? setShareTask(child) : toast.error("Paylaşım sadece masaüstü uygulamasında aktiftir.")}>
+                                                                                                    <UserPlus size={14} />
+                                                                                                </ActionBtn>
+                                                                                                <ActionBtn title="Sil" color="#ef4444" onClick={() => isElectron ? handleDelete(child.id) : toast.error("Silme işlemi sadece masaüstü uygulamasında aktiftir.")}>
+                                                                                                    <Trash2 size={14} />
+                                                                                                </ActionBtn>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
                                                                         </div>
-                                                                        <button onClick={() => handleDeleteStep(task, idx)} className="text-rose-400 p-1.5 hover:bg-rose-50 rounded-lg transition-colors"><X size={16} /></button>
                                                                     </div>
-                                                                ))}
-                                                                <div className="flex gap-3 mt-4">
-                                                                    <input
-                                                                        placeholder="Yeni adım ekle..."
-                                                                        value={newStepText[task.id] || ""}
-                                                                        onChange={e => setNewStepText({ ...newStepText, [task.id]: e.target.value })}
-                                                                        onKeyDown={e => e.key === 'Enter' && handleAddStep(task)}
-                                                                        className="flex-1 h-11 px-4 rounded-xl border border-border bg-card text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all"
-                                                                    />
-                                                                    <Button onClick={() => handleAddStep(task)} className="h-11 px-6 text-[10px] font-black uppercase tracking-widest">EKLE</Button>
+                                                                );
+                                                            })()}
+
+                                                            <div className="space-y-3">
+                                                                <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">İş Adımları / Checklist</h5>
+                                                                <div className="space-y-2">
+                                                                    {(task.steps || []).map((step: TaskStep, idx: number) => (
+                                                                        <div key={idx} className="flex items-center justify-between gap-3 p-3 bg-muted/50 rounded-xl">
+                                                                            <div className="flex items-center gap-3">
+                                                                                <input type="checkbox" checked={step.done} onChange={() => handleToggleStep(task, idx)} className="w-5 h-5 rounded border-border" />
+                                                                                <span className={cn("text-sm font-medium", step.done ? "line-through text-slate-400" : "text-slate-700")}>{step.text}</span>
+                                                                            </div>
+                                                                            <button onClick={() => handleDeleteStep(task, idx)} className="text-rose-400 p-1.5 hover:bg-rose-50 rounded-lg transition-colors"><X size={16} /></button>
+                                                                        </div>
+                                                                    ))}
+                                                                    <div className="flex gap-3 mt-4">
+                                                                        <input
+                                                                            placeholder="Yeni adım ekle..."
+                                                                            value={newStepText[task.id] || ""}
+                                                                            onChange={e => setNewStepText({ ...newStepText, [task.id]: e.target.value })}
+                                                                            onKeyDown={e => e.key === 'Enter' && handleAddStep(task)}
+                                                                            className="flex-1 h-11 px-4 rounded-xl border border-border bg-card text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                                                                        />
+                                                                        <Button onClick={() => handleAddStep(task)} className="h-11 px-6 text-[10px] font-black uppercase tracking-widest">EKLE</Button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -2078,7 +2204,7 @@ export default function Tasks() {
 
             {/* Editing Modal */}
             {editingTask && createPortal(
-                <div style={overlayStyle} onClick={(e) => { if (e.target === e.currentTarget) setEditingTask(null); }}>
+                <div style={overlayStyle}>
                     <div style={{...modalBoxStyle, maxWidth: "600px"}} onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-6 border-b border-slate-50 dark:border-slate-800 pb-4">
                             <div>
@@ -2093,7 +2219,7 @@ export default function Tasks() {
                         <div className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label style={labelStyle}>Rapor No</label>
+                                    <label style={labelStyle}>Görev No</label>
                                     <input 
                                         value={editingTask.rapor_kodu} 
                                         onChange={e => setEditingTask({...editingTask, rapor_kodu: e.target.value})} 
@@ -2101,7 +2227,7 @@ export default function Tasks() {
                                     />
                                 </div>
                                 <div>
-                                    <label style={labelStyle}>Rapor Türü</label>
+                                    <label style={labelStyle}>Görev Türü</label>
                                     <select
                                         value={editingTask.rapor_turu}
                                         onChange={e => setEditingTask({ ...editingTask, rapor_turu: e.target.value })}
@@ -2129,12 +2255,12 @@ export default function Tasks() {
                             )}
 
                             <div>
-                                <label style={labelStyle}>Rapor Adı</label>
+                                <label style={labelStyle}>Görev Adı</label>
                                 <input 
                                     value={editingTask.rapor_adi} 
                                     onChange={e => setEditingTask({...editingTask, rapor_adi: e.target.value})} 
                                     style={inputStyle} 
-                                    placeholder="Rapor adını girin..."
+                                    placeholder="Görev adını girin..."
                                 />
                             </div>
 

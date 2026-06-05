@@ -1,0 +1,39 @@
+{
+  "started_at": "2026-06-01T10:40:42.674961Z",
+  "query": {
+    "uid": "sefa-yaprakli-gsb-unique-id",
+    "email": "sefa.yaprakli@gsb.gov.tr"
+  },
+  "auth": {
+    "checked": true,
+    "by_uid": null,
+    "by_email": {
+      "uid": "VKV8SfuNkWf9WeTYeSCTizd4oG83",
+      "email": "sefa.yaprakli@gsb.gov.tr",
+      "display_name": "Sefa YAPRAKLI",
+      "disabled": false
+    },
+    "errors": [
+      "UID sorgusu hatasi: No user record found for the provided user ID: sefa-yaprakli-gsb-unique-id."
+    ]
+  },
+  "total_matches": 2,
+  "collections": [
+    {
+      "collection": "users",
+      "matches": [],
+      "errors": []
+    },
+    {
+      "collection": "profiles",
+      "matches": [
+        {
+          "doc_id": "VKV8SfuNkWf9WeTYeSCTizd4oG83",
+          "matched_on": [
+            "emails"
+          ],
+          "preview": {
+            "trial_started": true,
+            "uid": "VKV8SfuNkWf9WeTYeSCTizd4oG83",
+            "full_name": "Sefa Yapraklı",
+            "updated_at": 

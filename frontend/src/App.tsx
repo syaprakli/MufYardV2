@@ -27,6 +27,12 @@ const Tasks = lazy(() => import("./pages/Tasks"));
 const Contacts = lazy(() => import("./pages/Contacts"));
 const Assistant = lazy(() => import("./pages/Assistant"));
 const Denetim = lazy(() => import("./pages/Denetim"));
+const DenetimIl = lazy(() => import("./pages/DenetimIl"));
+const DenetimFederasyon = lazy(() => import("./pages/DenetimFederasyon"));
+const DenetimKyk = lazy(() => import("./pages/DenetimKyk"));
+const DenetimOzel = lazy(() => import("./pages/DenetimOzel"));
+const DenetimSpor = lazy(() => import("./pages/DenetimSpor"));
+const DenetimBilgiBankasi = lazy(() => import("./pages/DenetimBilgiBankasi"));
 const Legislation = lazy(() => import("./pages/Legislation"));
 const Notes = lazy(() => import("./pages/Notes"));
 const Files = lazy(() => import("./pages/Files"));
@@ -123,30 +129,15 @@ function App() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
-          // E-Posta doğrulama kalkanı
-          // Sadece gerçek Firebase kullanıcıları için (demo/bypass hariç)
-          const isBypass = firebaseUser.uid === "mufettis-gsb-unique-id" || firebaseUser.uid === "demo-user-123";
-          
-          if (!isBypass && !firebaseUser.emailVerified) {
+          if (!firebaseUser.emailVerified) {
               console.log("🔒 Onaysız e-posta tespit edildi, oturum kapatılıyor.");
               await auth.signOut();
               setUser(null);
-              localStorage.removeItem('demo_user');
           } else {
               setUser(firebaseUser);
           }
         } else {
-          // Firebase'de kullanıcı yoksa localStorage'daki bypass'ı kontrol et
-          const localUserRaw = localStorage.getItem('demo_user');
-          const localUser = localUserRaw ? JSON.parse(localUserRaw) : null;
-          
-          const bypassUids = ["mufettis-gsb-unique-id", "test-user-trial-99", "sefa-yaprakli-gsb-unique-id", "expired-user-trial-99"];
-          if (localUser && bypassUids.includes(localUser.uid)) {
-             setUser(localUser as FirebaseUser);
-          } else {
-             setUser(null);
-             localStorage.removeItem('demo_user');
-          }
+          setUser(null);
         }
       } catch (error) {
         console.error("Auth error:", error);
@@ -211,6 +202,12 @@ function App() {
                         <Route path="contacts" element={<Contacts />} />
                         <Route path="assistant" element={<Assistant />} />
                         <Route path="denetim" element={<Denetim />} />
+                        <Route path="denetim/il" element={<DenetimIl />} />
+                        <Route path="denetim/federasyon" element={<DenetimFederasyon />} />
+                        <Route path="denetim/kyk" element={<DenetimKyk />} />
+                        <Route path="denetim/ozel" element={<DenetimOzel />} />
+                        <Route path="denetim/spor" element={<DenetimSpor />} />
+                        <Route path="denetim/bilgi-bankasi" element={<DenetimBilgiBankasi />} />
                         <Route path="legislation" element={<Legislation />} />
                         <Route path="notes" element={<Notes />} />
                         <Route path="files" element={<Files />} />

@@ -1,5 +1,5 @@
 import { API_URL as API_BASE_URL } from "../config";
-import { fetchWithTimeout } from "./utils";
+import { fetchWithTimeout, getAuthHeaders } from "./utils";
 import { addToQueue } from "./syncQueue";
 
 export interface Note {
@@ -29,10 +29,9 @@ export interface NoteCreate {
     accepted_collaborators?: string[];
 }
 
-export async function fetchNotes(uid: string, email?: string): Promise<Note[]> {
-    const params = new URLSearchParams({ uid });
-    if (email) params.append("email", email);
-    const response = await fetchWithTimeout(`${API_BASE_URL}/notes/?${params.toString()}`);
+export async function fetchNotes(_uid: string, _email?: string): Promise<Note[]> {
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/notes/`, { headers });
     if (!response.ok) {
         throw new Error("Notlar yüklenemedi.");
     }
@@ -41,11 +40,10 @@ export async function fetchNotes(uid: string, email?: string): Promise<Note[]> {
 
 export async function createNote(note: NoteCreate): Promise<Note> {
     try {
+        const headers = await getAuthHeaders({ "Content-Type": "application/json" });
         const response = await fetchWithTimeout(`${API_BASE_URL}/notes/`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
+            headers,
             body: JSON.stringify(note),
         });
 
@@ -65,20 +63,17 @@ export async function createNote(note: NoteCreate): Promise<Note> {
 
 export async function updateNote(id: string, update: Partial<NoteCreate>): Promise<Note> {
     try {
+        const headers = await getAuthHeaders({ "Content-Type": "application/json" });
         const response = await fetchWithTimeout(`${API_BASE_URL}/notes/${id}`, {
             method: "PATCH",
-            headers: {
-                "Content-Type": "application/json",
-            },
+            headers,
             body: JSON.stringify(update),
         });
 
         if (!response.ok && Object.prototype.hasOwnProperty.call(update, "is_done")) {
             const fallbackResponse = await fetchWithTimeout(`${API_BASE_URL}/notes/${id}`, {
                 method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers,
                 body: JSON.stringify({ is_completed: (update as any).is_done }),
             });
 
@@ -119,8 +114,10 @@ export async function updateNote(id: string, update: Partial<NoteCreate>): Promi
 }
 
 export async function deleteNote(id: string): Promise<{status: string, message: string}> {
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${API_BASE_URL}/notes/${id}`, {
         method: "DELETE",
+        headers,
     });
     if (!response.ok) {
         throw new Error("Not silinemedi.");
@@ -128,21 +125,21 @@ export async function deleteNote(id: string): Promise<{status: string, message: 
     return response.json();
 }
 
-export async function acceptNote(id: string, userId: string, userEmail?: string): Promise<{status: string, message: string}> {
-    const params = new URLSearchParams({ user_id: userId });
-    if (userEmail) params.append("user_email", userEmail);
-    const response = await fetchWithTimeout(`${API_BASE_URL}/notes/${id}/accept?${params.toString()}`, {
+export async function acceptNote(id: string, _userId: string, _userEmail?: string): Promise<{status: string, message: string}> {
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/notes/${id}/accept`, {
         method: "POST"
+        , headers
     });
     if (!response.ok) throw new Error("Not kabul edilemedi.");
     return response.json();
 }
 
-export async function rejectNote(id: string, userId: string, userEmail?: string): Promise<{status: string, message: string}> {
-    const params = new URLSearchParams({ user_id: userId });
-    if (userEmail) params.append("user_email", userEmail);
-    const response = await fetchWithTimeout(`${API_BASE_URL}/notes/${id}/reject?${params.toString()}`, {
+export async function rejectNote(id: string, _userId: string, _userEmail?: string): Promise<{status: string, message: string}> {
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/notes/${id}/reject`, {
         method: "POST"
+        , headers
     });
     if (!response.ok) throw new Error("Not reddedilemedi.");
     return response.json();

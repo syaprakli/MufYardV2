@@ -487,6 +487,8 @@ export default function Audit() {
             
             const matchesTab = activeTab === 'ortak' ? isArchived : !isArchived;
 
+            if (a.report_created === false) return false;
+
             const effectiveStatus = relatedTask?.rapor_durumu || a.status;
             const matchesStatus = filterStatus === "Tümü" || effectiveStatus === filterStatus;
             const matchesInspector = filterInspector === "Tümü" || a.inspector === filterInspector;

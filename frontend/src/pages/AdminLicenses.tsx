@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { 
     Key, Plus, Trash2, CheckCircle2, 
     Loader2, Shield, Copy, RefreshCw, ChevronRight,
@@ -498,32 +498,6 @@ export default function AdminLicenses() {
                                                     </p>
                                                     {license.expires_at && (
                                                         <p className="text-[10px] font-black text-rose-500 mt-1 uppercase tracking-wider">
-
-                                {filteredLicenses.length > pageSize && (
-                                    <div className="flex items-center justify-between gap-4 px-8 py-5 border-t border-slate-50 bg-slate-50/30">
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                            Sayfa {currentPage} / {totalPages} - {filteredLicenses.length} sonuç
-                                        </p>
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                                                disabled={currentPage === 1}
-                                                className="rounded-xl"
-                                            >
-                                                Önceki
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                                                disabled={currentPage === totalPages}
-                                                className="rounded-xl"
-                                            >
-                                                Sonraki
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
                                                             Süre Sonu: {new Date(license.expires_at).toLocaleDateString('tr-TR')}
                                                         </p>
                                                     )}
@@ -567,7 +541,34 @@ export default function AdminLicenses() {
                         </tbody>
                     </table>
                 </div>
+
+                {filteredLicenses.length > pageSize && (
+                    <div className="flex items-center justify-between gap-4 px-8 py-5 border-t border-slate-50 bg-slate-50/30">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                            Sayfa {currentPage} / {totalPages} - {filteredLicenses.length} sonuç
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                                className="rounded-xl"
+                            >
+                                Önceki
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage === totalPages}
+                                className="rounded-xl"
+                            >
+                                Sonraki
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </Card>
         </div>
     );
 }
+

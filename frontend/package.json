@@ -66,6 +66,7 @@
     "files": [
       "dist/**/*",
       "main.cjs",
+      "preload.cjs",
       "public/favicon.ico",
       "package.json"
     ],
@@ -73,10 +74,6 @@
       {
         "from": "../backend/dist/mufyard-backend",
         "to": "backend-dist"
-      },
-      {
-        "from": "../backend/.env",
-        "to": "backend-dist/.env"
       },
       {
         "from": "../backend/rehber.xlsx",

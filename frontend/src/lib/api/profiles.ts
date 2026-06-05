@@ -43,8 +43,9 @@ export async function fetchProfile(uid: string, email?: string, fullName?: strin
         if (fullName) params.set("full_name", fullName);
         const query = params.toString();
         const url = `${API_BASE_URL}/profiles/${uid}${query ? `?${query}` : ""}`;
+        const headers = await getAuthHeaders();
         
-        const response = await fetchWithTimeout(url);
+        const response = await fetchWithTimeout(url, { headers });
         if (!response.ok) {
             throw new Error("Profil yüklenemedi.");
         }
@@ -80,7 +81,8 @@ export async function fetchAllProfiles(): Promise<Profile[]> {
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
-            const response = await fetchWithTimeout(`${API_BASE_URL}/profiles/`, { timeout: 25000 });
+            const headers = await getAuthHeaders();
+            const response = await fetchWithTimeout(`${API_BASE_URL}/profiles/`, { timeout: 25000, headers });
             if (!response.ok) {
                 throw new Error("Profiller yüklenemedi.");
             }
@@ -125,9 +127,11 @@ export async function updateProfile(uid: string, update: Partial<Profile>): Prom
 export async function uploadAvatar(uid: string, file: File): Promise<{avatar_url: string}> {
     const formData = new FormData();
     formData.append("file", file);
+    const headers = await getAuthHeaders();
 
     const response = await fetchWithTimeout(`${API_BASE_URL}/profiles/${uid}/avatar`, {
         method: "POST",
+        headers,
         body: formData,
     });
 

@@ -33,7 +33,7 @@ interface SidebarProps {
 const navItems: Array<{ icon: any; label: string; href: string }> = [
     { icon: LayoutDashboard, label: "Genel Bakış", href: "/" },
     { icon: CheckSquare, label: "Görevler", href: "/tasks" },
-    { icon: ClipboardCheck, label: "Denetim", href: "/denetim" },
+    { icon: ClipboardCheck, label: "Denetim Formları", href: "/denetim" },
     { icon: ClipboardCheck, label: "Görev Analizleri", href: "/report-analytics" },
     { icon: FileText, label: "Raporlar", href: "/audit" },
     { icon: StickyNote, label: "Hızlı Notlar", href: "/notes" },
@@ -56,17 +56,14 @@ const bottomNavItems = [
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
-    const { user, profile } = useAuth();
+    const { profile } = useAuth();
     const { unreadMessages } = usePresence();
     
     const totalUnread = Object.values(unreadMessages).reduce((a, b) => a + b, 0);
     
-    const isFounder = user?.email === "sefayaprakli@hotmail.com" || 
-                      user?.email === "sefa.yaprakli@gsb.gov.tr" ||
-                      user?.email === "syaprakli@gmail.com";
+    const isFounder = profile?.role === 'admin';
 
-    // Check role from profile, or fallback to hardcoded emails for initial setup
-    const isAdmin = profile?.role === 'admin' || isFounder;
+    const isAdmin = profile?.role === 'admin';
     
     const isModerator = profile?.role === 'moderator' || isAdmin;
     

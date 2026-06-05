@@ -67,27 +67,11 @@ class FolderManager:
         Belirli bir dosya/klasör için kullanıcıya verilen izni kontrol eder.
         action: 'read', 'write', 'delete'
         """
-        # Admin & Founder bypass (E-posta ve UID)
-        founders = [
-            "sefa.yaprakli@gsb.gov.tr", 
-            "syaprakli@gmail.com", 
-            "yasir.yaprakli@gsb.gov.tr",
-            "admin", 
-            "user_1", 
-            "VKV8SfuNkWf9WeTYeSCTizd4oG83", # Sefa UID
-            "tvmLKgsHf5WvjB12BEeGWaAT4tK2"  # Yeni eklenen UID
-        ]
-        if user_id in founders or user_id.lower() in [f.lower() for f in founders]:
-            return True
-
         permissions = FolderManager.load_permissions()
         file_meta = permissions.get(file_id)
-        
         if not file_meta:
-            # Metadata yoksa, sistem tarafından oluşturulmuş standart bir klasör veya yeni eklenmiş bir öğe olabilir.
-            # Güvenlik için varsayılan olarak izin verelim (Özellikle silme için admin kontrolü yukarda yapıldı)
-            return True
-            
+            # Metadata yoksa erişim izni verilmez (daha güvenli varsayılan)
+            return False
         allowed = file_meta.get("permissions", {}).get(action, [])
         return user_id in allowed or user_id == file_meta.get("owner_id")
 
@@ -133,6 +117,12 @@ class FolderManager:
         
         folder_name = f"{safe_code} - {safe_title}"
         return os.path.join(BASE_REPORTS_DIR, year, type_folder, folder_name)
+
+    @staticmethod
+    def get_audit_relative_path(year: str, audit_type: str, audit_code: str, audit_title: str) -> str:
+        """Generates the hierarchical path relative to BASE_REPORTS_DIR"""
+        full_path = FolderManager.get_audit_path(year, audit_type, audit_code, audit_title)
+        return os.path.relpath(full_path, BASE_REPORTS_DIR).replace("\\", "/")
 
     @staticmethod
     def ensure_audit_folders(year: str, audit_type: str, audit_code: str, audit_title: str) -> str:

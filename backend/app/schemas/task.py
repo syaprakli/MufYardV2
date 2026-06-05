@@ -32,6 +32,7 @@ class TaskCreate(TaskBase):
 
 
 class TaskUpdate(BaseModel):
+    rapor_kodu: Optional[str] = None
     rapor_adi: Optional[str] = None
     rapor_turu: Optional[str] = None
     baslama_tarihi: Optional[str] = None

@@ -132,6 +132,13 @@ class TaskService:
 
         try:
             async with _task_creation_lock:
+                if task_data.get('parent_task_id'):
+                    parent_doc_ref = db.collection('tasks').document(task_data['parent_task_id'])
+                    parent_doc = await asyncio.to_thread(parent_doc_ref.get)
+                    if parent_doc.exists:
+                        parent_data = parent_doc.to_dict() or {}
+                        task_data['rapor_kodu'] = parent_data.get('rapor_kodu')
+
                 if not task_data.get('rapor_kodu'):
                     task_data['rapor_kodu'] = await TaskService._generate_rapor_kodu()
                 result = await asyncio.to_thread(db.collection('tasks').add, task_data)
@@ -199,12 +206,50 @@ class TaskService:
             update_data = {k: v for k, v in task_update.dict().items() if v is not None}
             if not update_data:
                 return None
+
+            doc = await asyncio.to_thread(doc_ref.get)
+            if not doc.exists:
+                return None
+            current_data = doc.to_dict() or {}
+
+            # If parent_task_id is being updated, inherit parent's code
+            new_parent_id = update_data.get('parent_task_id')
+            if new_parent_id is not None:
+                if new_parent_id:
+                    parent_doc_ref = db.collection('tasks').document(new_parent_id)
+                    parent_doc = await asyncio.to_thread(parent_doc_ref.get)
+                    if parent_doc.exists:
+                        parent_data = parent_doc.to_dict() or {}
+                        update_data['rapor_kodu'] = parent_data.get('rapor_kodu')
+                else:
+                    # Parent cleared, generate a new sequence code if none is provided
+                    if not update_data.get('rapor_kodu'):
+                        update_data['rapor_kodu'] = await TaskService._generate_rapor_kodu()
+
             await asyncio.to_thread(doc_ref.update, update_data)
+
+            # Cascade: if this task's rapor_kodu changed, update all children's rapor_kodu
+            new_rapor_kodu = update_data.get('rapor_kodu')
+            if new_rapor_kodu and new_rapor_kodu != current_data.get('rapor_kodu'):
+                children_docs = await asyncio.to_thread(
+                    lambda: list(
+                        db.collection('tasks')
+                        .where('parent_task_id', '==', task_id)
+                        .stream()
+                    )
+                )
+                for child in children_docs:
+                    await asyncio.to_thread(
+                        db.collection('tasks').document(child.id).update,
+                        {'rapor_kodu': new_rapor_kodu}
+                    )
+
             updated_doc_res = await asyncio.to_thread(doc_ref.get)
             updated_doc = updated_doc_res.to_dict() or {}
             updated_doc['id'] = task_id
             return updated_doc
-        except Exception:
+        except Exception as e:
+            print(f"Error updating task: {e}")
             return None
 
     @staticmethod
@@ -291,8 +336,7 @@ class TaskService:
             doc = await asyncio.to_thread(doc_ref.get)
             if doc.exists:
                 task_data = doc.to_dict()
-                
-                # Klasörü de temizle (opsiyonel ama ghost dosya kalmaması için iyi)
+                           # Klasörü de temizle (opsiyonel ama ghost dosya kalmaması için iyi)
                 try:
                     from app.lib.folder_manager import FolderManager
                     import shutil
@@ -318,6 +362,20 @@ class TaskService:
                         await asyncio.to_thread(shutil.rmtree, audit_path)
                 except Exception as ef:
                     print(f"Task folder deletion failed: {ef}")
+
+                # Alt görevleri de sil (öksüz/ orphaned görev kalmasını önlemek için)
+                try:
+                    children = await asyncio.to_thread(
+                        lambda: list(
+                            db.collection('tasks')
+                            .where('parent_task_id', '==', task_id)
+                            .stream()
+                        )
+                    )
+                    for child in children:
+                        await asyncio.to_thread(db.collection('tasks').document(child.id).delete)
+                except Exception as ec:
+                    print(f"Child tasks deletion failed: {ec}")
 
                 await asyncio.to_thread(doc_ref.delete)
                 return True

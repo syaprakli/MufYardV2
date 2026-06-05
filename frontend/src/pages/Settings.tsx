@@ -45,7 +45,7 @@ const SettingsNav = React.memo(({ icon: Icon, label, active, onClick }: any) => 
 
 export default function Settings({ initialTab }: { initialTab?: string }) {
     const { user, logout, resetPassword } = useAuth();
-    const { refreshProfile: globalRefreshProfile, trialDaysLeft, isTrialExpired } = useGlobalData();
+    const { refreshProfile: globalRefreshProfile } = useGlobalData();
     
     const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
@@ -58,6 +58,7 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
     const [licenseKey, setLicenseKey] = useState("");
     const [activatingLicense, setActivatingLicense] = useState(false);
     const [resettingPassword, setResettingPassword] = useState(false);
+        const [resetCooldown, setResetCooldown] = useState(0);
     const avatarInputRef = useRef<HTMLInputElement>(null);
 
     // Initial Load
@@ -149,12 +150,22 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
                     )}
                     {activeTab === "Güvenlik" && (
                         <SecuritySection 
-                            resettingPassword={resettingPassword} 
+                            resettingPassword={resettingPassword || resetCooldown > 0}
+                            resetCooldown={resetCooldown}
                             handlePasswordReset={async () => {
+                                if (resetCooldown > 0) return;
                                 setResettingPassword(true);
                                 try {
                                     await resetPassword(profile!.email);
                                     toast.success("Sıfırlama e-postası gönderildi.");
+                                    localStorage.setItem("pw_reset_at", Date.now().toString());
+                                    setResetCooldown(60);
+                                    const interval = setInterval(() => {
+                                        setResetCooldown(prev => {
+                                            if (prev <= 1) { clearInterval(interval); return 0; }
+                                            return prev - 1;
+                                        });
+                                    }, 1000);
                                 } finally { setResettingPassword(false); }
                             }} 
                         />
@@ -162,7 +173,6 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
                     {activeTab === "Lisans" && (
                         <LicenseSection 
                             profile={profile} licenseKey={licenseKey} setLicenseKey={setLicenseKey}
-                            trialDaysLeft={trialDaysLeft} isTrialExpired={isTrialExpired}
                             activatingLicense={activatingLicense}
                             handleActivateLicense={async () => {
                                 setActivatingLicense(true);

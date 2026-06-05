@@ -317,7 +317,7 @@ export default function AIKnowledge() {
 
                             <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Resmi Tenkit Metni</p>
-                                <p className="text-sm text-slate-700 font-medium leading-relaxed line-clamp-4">{item.standard_remark}</p>
+                                <div className="text-sm text-slate-700 font-medium leading-relaxed line-clamp-4" dangerouslySetInnerHTML={{ __html: item.standard_remark }} />
                             </div>
 
                             {item.tags && item.tags.length > 0 && (

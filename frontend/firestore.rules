@@ -2,10 +2,32 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function createsNoPrivilegedFields() {
+      return !request.resource.data.keys().hasAny(["role", "has_premium_ai", "premium_type", "is_admin"]);
+    }
+
+    function keepsPrivilegedFieldsUnchanged() {
+      return request.resource.data.role == resource.data.role
+        && request.resource.data.has_premium_ai == resource.data.has_premium_ai
+        && request.resource.data.premium_type == resource.data.premium_type
+        && request.resource.data.is_admin == resource.data.is_admin;
+    }
     
     // Herkesin kendi hesabına tam erişimi var
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && createsNoPrivilegedFields();
+      allow update: if isOwner(userId) && keepsPrivilegedFieldsUnchanged();
+      allow delete: if false;
     }
 
     // Görevler ve Denetimler için "Kişisel Alan" / "Ortak Alan" (is_public=true) mantığı
@@ -47,7 +69,7 @@ service cloud.firestore {
 
     // Sistem ayarları (Sürüm kontrolü vb. için)
     match /system/{document=**} {
-      allow read: if request.auth != null;
+      allow read: if isSignedIn();
     }
   }
 }

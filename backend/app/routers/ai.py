@@ -22,10 +22,12 @@ class SearchResult(BaseModel):
 class AISearchRequest(BaseModel):
     query: str
 
+from app.lib.auth import get_current_user
+
 @router.post("/search", response_model=List[SearchResult])
 async def ai_search(
     req: AISearchRequest,
-    user_id: str = Depends(lambda: "user_1")
+    current_user: dict = Depends(get_current_user)
 ):
     """
     AI destekli dosya/folder arama. Şimdilik sadece isimlerde basit benzerlik, ileride içerik ve embedding ile genişletilebilir.
@@ -34,6 +36,7 @@ async def ai_search(
     import difflib
     all_items = await asyncio.to_thread(FolderManager.get_tree)
     results = []
+    user_id = current_user.get("uid")
     for item in all_items:
         # Sadece okuma izni olanlar
         if item["type"] == "folder" or FolderManager.check_permission(item["id"], user_id, "read"):

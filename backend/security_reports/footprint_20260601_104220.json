@@ -1,0 +1,138 @@
+{
+  "started_at": "2026-06-01T10:41:41.954055+00:00",
+  "query": {
+    "uid": "sefa-yaprakli-gsb-unique-id",
+    "email": "sefa.yaprakli@gsb.gov.tr"
+  },
+  "auth": {
+    "checked": true,
+    "by_uid": null,
+    "by_email": {
+      "uid": "VKV8SfuNkWf9WeTYeSCTizd4oG83",
+      "email": "sefa.yaprakli@gsb.gov.tr",
+      "display_name": "Sefa YAPRAKLI",
+      "disabled": false
+    },
+    "errors": [
+      "UID sorgusu hatasi: No user record found for the provided user ID: sefa-yaprakli-gsb-unique-id."
+    ]
+  },
+  "total_matches": 2,
+  "collections": [
+    {
+      "collection": "users",
+      "matches": [],
+      "errors": []
+    },
+    {
+      "collection": "profiles",
+      "matches": [
+        {
+          "doc_id": "VKV8SfuNkWf9WeTYeSCTizd4oG83",
+          "matched_on": [
+            "emails"
+          ],
+          "preview": {
+            "trial_started": true,
+            "uid": "VKV8SfuNkWf9WeTYeSCTizd4oG83",
+            "full_name": "Sefa Yapraklı",
+            "updated_at": "2026-05-26T20:43:55.349138+00:00",
+            "ai_temperature": 0.7,
+            "ai_model": "Gemini 2.0 Flash",
+            "verified": true,
+            "phone": null,
+            "emails": [
+              "sefa.yaprakli@gsb.gov.tr"
+            ],
+            "role": "admin",
+            "institution": "Birim: Müfettiş | Kat: 5 | Oda: 509 | Dahili: 5036",
+            "title": "Müfettiş"
+          }
+        }
+      ],
+      "errors": []
+    },
+    {
+      "collection": "roles",
+      "matches": [],
+      "errors": []
+    },
+    {
+      "collection": "licenses",
+      "matches": [],
+      "errors": []
+    },
+    {
+      "collection": "inspectors",
+      "matches": [
+        {
+          "doc_id": "5i2lNQstIBbrumeDo6u6",
+          "matched_on": [
+            "email"
+          ],
+          "preview": {
+            "created_at": "2026-05-06T13:00:43.875779",
+            "uid": "sefa.yaprakli@gsb.gov.tr",
+            "phone": "0536 831 88 46",
+            "title": "Müfettiş",
+            "room": "509",
+            "email": "sefa.yaprakli@gsb.gov.tr",
+            "extension": "5036",
+            "name": "Sefa Yapraklı"
+          }
+        }
+      ],
+      "errors": []
+    },
+    {
+      "collection": "audit",
+      "matches": [],
+      "errors": []
+    },
+    {
+      "collection": "calendar",
+      "matches": [],
+      "errors": []
+    },
+    {
+      "collection": "notes",
+      "matches": [],
+      "errors": []
+    },
+    {
+      "collection": "feedback",
+      "matches": [],
+      "errors": []
+    },
+    {
+      "collection": "tasks",
+      "matches": [],
+      "errors": []
+    },
+    {
+      "collection": "settings",
+      "matches": [],
+      "errors": []
+    },
+    {
+      "collection": "messages",
+      "matches": [],
+      "errors": []
+    },
+    {
+      "collection": "files",
+      "matches": [],
+      "errors": []
+    },
+    {
+      "collection": "contacts",
+      "matches": [],
+      "errors": []
+    },
+    {
+      "collection": "notifications",
+      "matches": [],
+      "errors": []
+    }
+  ]
+}

@@ -5,7 +5,7 @@ import { useAuth } from "../../lib/hooks/useAuth";
 import { useConfirm } from "../../lib/context/ConfirmContext";
 import { useGlobalData } from "../../lib/context/GlobalDataContext";
 import { useNotifications } from "../../lib/context/NotificationContext";
-import { Search, Bell, ChevronDown, User, LogOut, Menu, Sparkles } from "lucide-react";
+import { Search, Bell, ChevronDown, User, LogOut, Menu } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { usePresence } from "../../lib/context/PresenceContext";
 import { fetchPendingRequests } from "../../lib/api/collaboration";
@@ -26,30 +26,16 @@ export function Header({ toggleSidebar }: HeaderProps) {
     const [showNotifications, setShowNotifications] = useState(false);
     const [showCollaborationRequests, setShowCollaborationRequests] = useState(false);
     const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
-    const [presenceTimedOut, setPresenceTimedOut] = useState(false);
     const collaborationRef = useRef<HTMLDivElement>(null);
 
 
 
 
-    const { data: { profile, trialDaysLeft }, refreshProfile } = useGlobalData();
+    const { data: { profile }, refreshProfile } = useGlobalData();
     const [showUserMenu, setShowUserMenu] = useState(false);
     const notificationRef = useRef<HTMLDivElement>(null);
     const userMenuRef = useRef<HTMLDivElement>(null);
     const presenceReady = wsConnected || restConnected || onlineUsers.length > 0;
-
-    useEffect(() => {
-        if (presenceReady) {
-            setPresenceTimedOut(false);
-            return;
-        }
-
-        const timer = setTimeout(() => {
-            setPresenceTimedOut(true);
-        }, 10000);
-
-        return () => clearTimeout(timer);
-    }, [presenceReady]);
 
     const resolveUrl = (url: string | null) => {
         if (!url) return null;
@@ -175,23 +161,11 @@ export function Header({ toggleSidebar }: HeaderProps) {
             </div>
 
             <div className="flex items-center gap-4 lg:gap-6">
-                {/* Trial Countdown Reminder */}
-                {profile && profile.role !== 'admin' && !profile.has_premium_ai && (
-                    <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-primary/5 border border-primary/10 rounded-full animate-pulse-slow">
-                        <Sparkles size={14} className="text-primary" />
-                        <span className="text-[11px] font-black text-primary uppercase tracking-wider">
-                            Deneme Süresi: {trialDaysLeft} Gün Kaldı
-                        </span>
-                    </div>
-                )}
-
                 {/* Online Users Indicator */}
                 <div className="relative group flex items-center gap-2 text-xs font-bold whitespace-nowrap">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${presenceReady ? 'bg-emerald-500 animate-pulse' : presenceTimedOut ? 'bg-red-400' : 'bg-slate-300 animate-pulse'}`} />
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${presenceReady ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300 animate-pulse'}`} />
                     {!presenceReady ? (
-                        <span className={presenceTimedOut ? "text-red-500" : "text-slate-400"}>
-                            {presenceTimedOut ? "Bağlı değil" : "Bağlanıyor..."}
-                        </span>
+                        <span className="text-slate-400">Durum güncelleniyor...</span>
                     ) : onlineUsers.length > 0 ? (
                         <span className="text-emerald-600 dark:text-emerald-400">
                             {onlineUsers.length} kişi online

@@ -52,6 +52,7 @@ export default function ShareModal({
                 setLoading(true);
                 try {
                     const profiles = await fetchAllProfiles();
+                    const myName = profile?.full_name?.toLowerCase().trim() || user?.displayName?.toLowerCase().trim();
                     const normalized = profiles
                         .map((p: any) => {
                             const uid = p.uid || p.id;
@@ -65,7 +66,11 @@ export default function ShareModal({
                             };
                         })
                         .filter((p: any) => p.id)
-                        .filter((p: any) => !(p.identityKeys || []).some((k: string) => currentUserKeys.includes(String(k).toLowerCase())));
+                        .filter((p: any) => {
+                            const isMeById = (p.identityKeys || []).some((k: string) => currentUserKeys.includes(String(k).toLowerCase()));
+                            const isMeByName = myName && p.name && p.name.toLowerCase().trim() === myName;
+                            return !isMeById && !isMeByName;
+                        });
                     setUsers(normalized);
                 } catch (e) {
                     console.error("User fetch failed:", e);

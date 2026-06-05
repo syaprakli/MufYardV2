@@ -444,6 +444,7 @@ class ProfileService:
         except Exception as e:
             logger.error(f"[ProfileService] Aktivasyon HATASI (uid={uid}): {e}")
             return False
+
     @staticmethod
     async def reset_to_trial(uid: str) -> bool:
         """
@@ -455,7 +456,7 @@ class ProfileService:
             update_data = {
                 'has_premium_ai': False,
                 'trial_started': True,
-                'account_created_at': datetime.utcnow(), # Deneme süresini baştan başlat
+                'account_created_at': datetime.utcnow(),
                 'premium_until': None,
                 'premium_type': None,
                 'updated_at': datetime.utcnow()

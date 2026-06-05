@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => ({
   build: {
     target: 'es2020',
     minify: 'esbuild',
+    sourcemap: false,
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {

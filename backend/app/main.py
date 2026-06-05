@@ -1,14 +1,20 @@
 import os
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
 import json
 import asyncio
 import logging
 import shutil
 from datetime import datetime
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
+from slowapi.middleware import SlowAPIMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import get_settings, BASE_DIR, DATA_DIR
+from app.lib.rate_limiter import limiter
+from app.lib.auth import get_current_user
+from typing import Any, Dict
 
 # --- KARAKUTU (LOG) SİSTEMİ ---
 if not os.path.exists(DATA_DIR):
@@ -64,6 +70,21 @@ class CSPMiddleware(BaseHTTPMiddleware):
 
 settings = get_settings()
 app = FastAPI(title=settings.APP_NAME)
+
+# --- Rate Limiting ---
+app.state.limiter = limiter
+
+# Rate limit exceeded handler
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request, exc):
+    # Güvenlik logu: Rate limit ihlali
+    logger.warning(f"RATE LIMIT EXCEEDED: IP={request.client.host}, Path={request.url.path}, Headers={dict(request.headers)}")
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Çok fazla istek gönderdiniz. Lütfen daha sonra tekrar deneyin."}
+    )
+
+app.add_middleware(SlowAPIMiddleware)
 
 @app.get("/")
 async def root():
@@ -150,7 +171,9 @@ mount_static_dir("Raporlar", "/Raporlar")
 mount_static_dir("Mevzuat", "/Mevzuat")
 
 # Middleware
-_default_origins = [
+
+# Güvenli CORS: Sadece güvenilir domainler izinli. Yeni domain eklemek için aşağıya ekleyin.
+_allowed_origins = [
     "http://localhost:5173",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
@@ -158,8 +181,9 @@ _default_origins = [
     "https://mufyardv2.web.app",
     "https://mufyardv2.firebaseapp.com",
 ]
+# Ortam değişkeniyle ek domain eklemek için: .env dosyasında CORS_ORIGINS kullanın.
 _env_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()] if settings.CORS_ORIGINS else []
-_allowed_origins = list(set(_default_origins + _env_origins))
+_allowed_origins = list(set(_allowed_origins + _env_origins))
 
 app.add_middleware(
     CORSMiddleware,
@@ -168,7 +192,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# app.add_middleware(CSPMiddleware) # Removed as it blocks local frontend connections
+app.add_middleware(CSPMiddleware)
 
 # Routers
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
@@ -198,6 +222,46 @@ app.include_router(audit_trail.router, prefix="/api/audit-trail", tags=["AuditTr
 from fastapi import WebSocket, WebSocketDisconnect, Query
 from app.routers.collaboration import chat_manager, CollaborationService, DirectMessageCreate, NotificationService, NotificationCreate
 from app.lib.firebase_admin import db
+from firebase_admin import auth as firebase_auth
+
+
+async def _authenticate_websocket_identity(websocket: WebSocket) -> tuple[str, str | None, str]:
+    token = websocket.query_params.get("token")
+    requested_name = websocket.query_params.get("name", "Müfettiş")
+
+    if not token:
+        await websocket.close(code=1008)
+        raise WebSocketDisconnect(code=1008)
+
+    try:
+        decoded = None
+        for attempt in range(3):
+            try:
+                decoded = await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=60))
+                break
+            except Exception as e:
+                err_str = str(e).lower()
+                if "too early" in err_str or "clock" in err_str or "time" in err_str:
+                    if attempt < 2:
+                        await asyncio.sleep(1.0)
+                        continue
+                raise e
+    except Exception:
+        await websocket.close(code=1008)
+        raise WebSocketDisconnect(code=1008)
+
+    if not decoded:
+        await websocket.close(code=1008)
+        raise WebSocketDisconnect(code=1008)
+
+    uid = decoded.get("uid")
+    if not uid:
+        await websocket.close(code=1008)
+        raise WebSocketDisconnect(code=1008)
+
+    user_email = decoded.get("email")
+    display_name = decoded.get("name") or requested_name or (user_email.split("@")[0] if user_email else "Müfettiş")
+    return uid, user_email, display_name
 
 
 async def _resolve_audit_chat_role(audit_id: str, uid: str, user_email: str = None) -> str:
@@ -233,58 +297,52 @@ async def _resolve_audit_chat_role(audit_id: str, uid: str, user_email: str = No
 
 @app.websocket("/ws")
 async def websocket_chat_endpoint(websocket: WebSocket):
-    uid = websocket.query_params.get("uid", "guest")
-    user_email = websocket.query_params.get("email")
-    name = websocket.query_params.get("name", "Müfettiş")
+    import logging
+    ws_logger = logging.getLogger("app.websocket")
+    uid, user_email, name = await _authenticate_websocket_identity(websocket)
     room_id = websocket.query_params.get("room_id", "global")
     audit_chat_role = "none"
-    
+
     # DM Odası Normalizasyonu: dm_UID1_UID2 formatını alfabetik sırala
     if room_id.startswith("dm_"):
         parts = room_id.split("_")
         if len(parts) >= 3:
-            # "dm" öneki dışındaki parçaları sırala
             uids = sorted(parts[1:])
             room_id = f"dm_{'_'.join(uids)}"
-            logger.info(f"DM Odası Normalize Edildi: {room_id}")
+            ws_logger.info(f"DM Odası Normalize Edildi: {room_id}")
 
     if room_id.startswith("audit_"):
         audit_id = room_id.replace("audit_", "", 1)
         audit_chat_role = await _resolve_audit_chat_role(audit_id, uid, user_email)
         if audit_chat_role == "none":
+            ws_logger.warning(f"YETKISIZ CHAT ERISIMI: uid={uid}, email={user_email}, room_id={room_id}")
             await websocket.close(code=1008)
             return
 
+    ws_logger.info(f"WS CONNECT: uid={uid}, name={name}, room_id={room_id}")
     await chat_manager.connect(websocket, room_id, uid, name)
     try:
         while True:
-            # 1. Receive data. If it fails (disconnect, close, etc.), raise the exception to exit the loop.
             try:
                 raw_data = await websocket.receive_text()
             except Exception as e:
+                ws_logger.warning(f"WS RECEIVE ERROR: uid={uid}, room_id={room_id}, error={str(e)}")
                 raise e
-
-            # 2. Process data. If processing fails, log the error and continue.
             try:
                 data = json.loads(raw_data)
-
                 # Ping/pong heartbeat - Railway WS timeout'unu önler
                 if data.get("type") == "ping":
                     await websocket.send_text(json.dumps({"type": "pong"}))
                     continue
-                
-                # Mesaj içeriğini normalize et (Hem 'text' hem 'content' desteği)
                 msg_text = data.get("text") or data.get("content") or ""
                 msg_attachments = data.get("attachments", [])
                 if not msg_attachments and data.get("attachment"):
                     msg_attachments = [data.get("attachment")]
-                
-                # Eğer DM odasıysa ve mesaj geliyorsa, veri tabanına kaydet
                 is_dm = room_id.startswith("dm_")
                 msg_type = data.get("type", "message")
-                
                 if msg_type == "message":
                     if room_id.startswith("audit_") and audit_chat_role not in ["comment", "edit"]:
+                        ws_logger.warning(f"YETKISIZ CHAT MESAJI: uid={uid}, room_id={room_id}, role={audit_chat_role}")
                         await websocket.send_text(json.dumps({
                             "type": "error",
                             "code": "forbidden",
@@ -292,23 +350,17 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                             "room_id": room_id
                         }))
                         continue
-
+                    ws_logger.info(f"CHAT MESSAGE: uid={uid}, name={name}, room_id={room_id}, text={msg_text[:100]}")
                     if is_dm:
-                        logger.info(f"DM Mesajı alınıyor: {uid} -> {room_id}")
-                        
-                        # Alıcıyı bul (En sağlam yöntem: client'ın gönderdiği recipient_id)
                         recipient_id = data.get("recipient_id")
-                        
                         # Fallback: room_id'den ayıkla
                         if not recipient_id:
                             parts = room_id.split("_")
                             if len(parts) >= 3:
                                 recipient_id = parts[1] if parts[2] == uid else parts[2]
-                        
                         if not recipient_id:
-                            logger.error(f"Alıcı bulunamadı! Room: {room_id}, UID: {uid}")
+                            ws_logger.error(f"Alıcı bulunamadı! Room: {room_id}, UID: {uid}")
                             continue
-
                         # Servis üzerinden kaydet (persistent)
                         dm_create = DirectMessageCreate(
                             recipient_id=recipient_id,
@@ -316,7 +368,6 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                             attachment=msg_attachments[0] if msg_attachments else None
                         )
                         new_db_msg = await CollaborationService.save_private_message(uid, name, dm_create)
-                        
                         # Bildirim gönder (async)
                         notif = NotificationCreate(
                             user_id=recipient_id,
@@ -326,7 +377,6 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                             chat_room_id=room_id
                         )
                         asyncio.create_task(NotificationService.create_notification(notif))
-                        
                         # Mesaj verisini zenginleştir
                         data["id"] = new_db_msg["id"]
                         data["timestamp"] = new_db_msg["timestamp"]
@@ -336,21 +386,17 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                         data["sender_id"] = uid
                         data["sender_name"] = name
                         raw_data = json.dumps(data)
-                        
                         # 1. Mevcut odaya bas (FloatingChat)
                         await chat_manager.broadcast(room_id, raw_data)
-                        
                         # 2. Alıcının TÜM diğer bağlantılarına bas (Bildirim ve diğer sekmeler)
                         await chat_manager.send_to_user(recipient_id, raw_data)
-                        
                         # 3. GÖNDERENİN diğer bağlantılarına da bas (Diğer sekmeler senkron kalsın)
                         await chat_manager.send_to_user(uid, raw_data)
-                        
-                        logger.info(f"DM İletimi tamamlandı: {uid} -> {recipient_id}")
+                        ws_logger.info(f"DM İletimi tamamlandı: {uid} -> {recipient_id}")
                     else:
                         if room_id == "global":
                             # Global mesaj (Canlı Müzakere): Veritabanına kaydet
-                            logger.info(f"Global Mesaj alınıyor: {uid} -> {room_id}")
+                            ws_logger.info(f"Global Mesaj alınıyor: {uid} -> {room_id}")
                             from app.schemas.messaging import MessageCreate
                             global_msg = MessageCreate(
                                 text=msg_text,
@@ -359,7 +405,6 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                                 author_role="Müfettiş"
                             )
                             new_db_msg = await CollaborationService.save_message(global_msg)
-
                             # Veriyi zenginleştir
                             data["id"] = new_db_msg["id"]
                             data["timestamp"] = new_db_msg["timestamp"].isoformat() if hasattr(new_db_msg["timestamp"], "isoformat") else new_db_msg["timestamp"]
@@ -369,10 +414,9 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                             data["content"] = msg_text
                             data["room_id"] = "global"
                             raw_data = json.dumps(data)
-
                             # Herkese yayınla
                             await chat_manager.broadcast(room_id, raw_data)
-                            logger.info(f"Global Broadcast tamamlandı: {room_id}")
+                            ws_logger.info(f"Global Broadcast tamamlandı: {room_id}")
                         else:
                             # Audit gibi oda bazlı sohbetler: dogrudan odaya yayinla.
                             data["id"] = data.get("id") or f"ws_{int(asyncio.get_event_loop().time() * 1000)}"
@@ -384,29 +428,23 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                             data["room_id"] = room_id
                             raw_data = json.dumps(data)
                             await chat_manager.broadcast(room_id, raw_data)
-                    
-                    continue
-                
-                # Diğer tipler için sadece broadcast
-                await chat_manager.broadcast(room_id, raw_data)
-
+                        continue
+                else:
+                    # Diğer tipler için sadece broadcast
+                    await chat_manager.broadcast(room_id, raw_data)
             except Exception as e:
-                logger.error(f"WebSocket döngü hatası (mesaj işleme): {str(e)}")
-                continue
-
-
+                ws_logger.error(f"WebSocket döngü hatası (mesaj işleme): {str(e)}")
     except WebSocketDisconnect:
-        logger.info(f"WS Bağlantısı kesildi: {name} (Oda: {room_id})")
-        await chat_manager.disconnect(websocket, room_id)
-    except Exception as e:
-        logger.error(f"Chat WS Hatası: {e}")
-        await chat_manager.disconnect(websocket, room_id)
+        ws_logger.info(f"WS Bağlantısı kesildi: {name} (Oda: {room_id})")
 
 # Health endpoints moved up for visibility
 
 @app.get("/health/detail")
-async def health_detail():
+async def health_detail(current_user: Dict[str, Any] = Depends(get_current_user)):
     from app.lib.firebase_admin import is_mock
+    caller_role = (current_user.get("role") or "user").strip().lower()
+    if caller_role != "admin":
+        return {"status": "healthy", "firebase_mode": "mock" if is_mock else "real"}
     return {
         "status": "healthy",
         "firebase_mode": "mock" if is_mock else "real",

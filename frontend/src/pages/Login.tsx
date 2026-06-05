@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { User, Lock, ArrowRight, AlertCircle, LogIn, CheckCircle2 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { signIn, signUp } from "../lib/firebase";
@@ -19,6 +19,7 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [rememberMe, setRememberMe] = useState(false);
+    const [resetCooldown, setResetCooldown] = useState(0);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -28,6 +29,13 @@ export default function Login() {
             setEmail(savedEmail);
             setRememberMe(true);
         }
+    }, []);
+
+    useEffect(() => {
+        const lastReset = parseInt(localStorage.getItem("pw_reset_at") || "0", 10);
+        const elapsed = Math.floor((Date.now() - lastReset) / 1000);
+        const remaining = 60 - elapsed;
+        if (remaining > 0) setResetCooldown(remaining);
     }, []);
 
     const handleAuth = async (e: React.FormEvent) => {
@@ -51,15 +59,13 @@ export default function Login() {
                 userUid = result.user?.uid;
                 userName = result.user?.displayName || "";
                 userEmail = result.user?.email || email;
-                // E-POSTA DOĞRULAMA KONTROLÜ (Gerçek Firebase User ise kontrol et)
+                // E-posta doğrulaması olmayan hesapların girişini engelle.
                 const fbUser = result.user as any;
-                if (fbUser && fbUser.uid !== "mufettis-gsb-unique-id" && fbUser.uid !== "demo-user-123") {
-                    if (fbUser.emailVerified === false) {
-                        import("firebase/auth").then(({ getAuth, signOut }) => {
-                            signOut(getAuth());
-                        });
-                        throw new Error("Hesabınız henüz aktif edilmemiş. Lütfen e-postanıza gönderilen doğrulama linkine tıklayın.");
-                    }
+                if (fbUser?.emailVerified === false) {
+                    import("firebase/auth").then(({ getAuth, signOut }) => {
+                        signOut(getAuth());
+                    });
+                    throw new Error("Hesabınız henüz aktif edilmemiş. Lütfen e-postanıza gönderilen doğrulama linkine tıklayın.");
                 }
             }
 
@@ -100,9 +106,6 @@ export default function Login() {
                 localStorage.removeItem("remembered_email_enabled");
             }
 
-            // Başarılı giriş/kayıt
-            localStorage.setItem("demo_user", JSON.stringify(result.user));
-
             if (isRegister) {
                 toast.success("Doğrulama e-postası gönderildi. Lütfen gelen kutusu veya spam klasörünü kontrol edin.");
             }
@@ -137,18 +140,32 @@ export default function Login() {
         }
     };
 
+    const resetSendingRef = useRef(false);
     const handleForgotPassword = async () => {
+        if (resetCooldown > 0 || resetSendingRef.current) return;
+        resetSendingRef.current = true;
         const normalizedEmail = email.trim().toLowerCase();
         if (!normalizedEmail) {
             setError("Lütfen önce e-posta adresinizi girin.");
+            resetSendingRef.current = false;
             return;
         }
 
         try {
             await resetPassword(normalizedEmail);
             toast.success(`${normalizedEmail} adresine şifre sıfırlama bağlantısı gönderildi. Lütfen spam klasörünü de kontrol edin.`);
+            localStorage.setItem("pw_reset_at", Date.now().toString());
+            setResetCooldown(60);
+            const interval = setInterval(() => {
+                setResetCooldown(prev => {
+                    if (prev <= 1) { clearInterval(interval); return 0; }
+                    return prev - 1;
+                });
+            }, 1000);
         } catch (err: any) {
             setError(err?.message || "Şifre sıfırlama bağlantısı gönderilemedi.");
+        } finally {
+            resetSendingRef.current = false;
         }
     };
 
@@ -222,6 +239,7 @@ export default function Login() {
                                         type="text"
                                         value={fullName}
                                         onChange={(e) => setFullName(e.target.value)}
+                                        autoComplete="name"
                                         className="block w-full pl-12 pr-5 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-[20px] text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-600/5 focus:border-blue-600 transition-all font-medium text-[15px]"
                                         placeholder="Ad Soyad"
                                         required
@@ -240,6 +258,7 @@ export default function Login() {
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
+                                    autoComplete="username"
                                     className="block w-full pl-12 pr-5 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-[20px] text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-600/5 focus:border-blue-600 transition-all font-medium text-[15px]"
                                     placeholder="ad.soyad@gsb.gov.tr"
                                     required
@@ -257,6 +276,7 @@ export default function Login() {
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
+                                    autoComplete={isRegister ? "new-password" : "current-password"}
                                     className="block w-full pl-12 pr-5 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-[20px] text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-600/5 focus:border-blue-600 transition-all font-medium text-[15px]"
                                     placeholder="••••••••"
                                     required
@@ -327,13 +347,11 @@ export default function Login() {
                                 )}
                             </button>
                         </div>
-
                     </form>
 
-
-                    <footer className="mt-6 flex items-center justify-center gap-8 text-[11px] font-bold text-slate-400 dark:text-slate-500 border-t border-slate-50 dark:border-slate-800 pt-8">
-                        <span className="cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-all uppercase tracking-widest flex items-center gap-1.5 group"><span className="w-1.5 h-1.5 bg-slate-200 dark:bg-slate-700 group-hover:bg-blue-400 rounded-full" /> YARDIM MERKEZİ</span>
-                        <span className="cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-all uppercase tracking-widest flex items-center gap-1.5 group"><span className="w-1.5 h-1.5 bg-slate-200 dark:bg-slate-700 group-hover:bg-blue-400 rounded-full" /> GÜVENLİK PROTOKOLÜ</span>
+                    <footer className="mt-8 flex flex-wrap items-center justify-center gap-4 text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                        <span className="cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-all uppercase tracking-widest flex items-center gap-1.5 group"><span className="w-1.5 h-1.5 bg-slate-200 dark:bg-slate-700 group-hover:bg-blue-400 rounded-full" /> YARDIM MERKEZI</span>
+                        <span className="cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-all uppercase tracking-widest flex items-center gap-1.5 group"><span className="w-1.5 h-1.5 bg-slate-200 dark:bg-slate-700 group-hover:bg-blue-400 rounded-full" /> GUVENLIK PROTOKOLU</span>
                     </footer>
                 </div>
             </div>

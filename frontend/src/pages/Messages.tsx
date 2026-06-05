@@ -22,7 +22,7 @@ interface UnifiedContact {
 }
 
 export default function Messages() {
-  const { user } = useAuth();
+  const { user, profile: myProfile } = useAuth();
   const { onlineUsers, unreadMessages, markAsRead } = usePresence();
   const [contacts, setContacts] = useState<UnifiedContact[]>([]);
   const [selectedContact, setSelectedContact] = useState<UnifiedContact & { isOnline: boolean } | null>(null);
@@ -34,7 +34,7 @@ export default function Messages() {
 
   useEffect(() => {
     fetchUsers();
-  }, [user]);
+  }, [user, myProfile]);
 
   const onlineUids = onlineUsers.map(u => u.uid);
 
@@ -86,14 +86,20 @@ export default function Messages() {
       const unified: UnifiedContact[] = [];
 
       // Kayıtlı profilleri ekle ve rehber bilgisiyle zenginleştir.
-      const myUid = user?.uid;
-      const myEmail = user?.email?.toLowerCase().trim();
+      const myUid = user?.uid || myProfile?.uid;
+      const myEmail = user?.email?.toLowerCase().trim() || myProfile?.email?.toLowerCase().trim();
+      const myName = myProfile?.full_name?.toLowerCase().trim();
 
       profiles.forEach(profile => {
         const pUid = profile.uid;
         const pEmail = profile.email?.toLowerCase().trim();
+        const pName = profile.full_name?.toLowerCase().trim();
         
-        const isMe = !!((pUid && pUid === myUid) || (pEmail && pEmail === myEmail));
+        const isMe = !!(
+          (pUid && pUid === myUid) || 
+          (pEmail && pEmail === myEmail) || 
+          (pName && myName && pName === myName)
+        );
         if (isMe) return;
         
         const dirEntry = directory.find(d => {
@@ -123,7 +129,13 @@ export default function Messages() {
       const finalContacts = unified.filter(c => {
         const cUid = c.uid;
         const cEmail = c.email?.toLowerCase().trim();
-        return (cUid !== myUid) && (cEmail !== myEmail);
+        const cName = c.full_name?.toLowerCase().trim();
+        const isMe = !!(
+          (cUid && cUid === myUid) || 
+          (cEmail && cEmail === myEmail) || 
+          (cName && myName && cName === myName)
+        );
+        return !isMe;
       });
 
       setContacts(finalContacts);

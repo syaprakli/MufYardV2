@@ -32,7 +32,22 @@ async def get_current_user(
             raise HTTPException(status_code=401, detail="Geçersiz kimlik doğrulama başlığı.")
 
         try:
-            decoded = await asyncio.to_thread(firebase_auth.verify_id_token, token)
+            decoded = None
+            for attempt in range(3):
+                try:
+                    decoded = await asyncio.to_thread(firebase_auth.verify_id_token, token)
+                    break
+                except Exception as e:
+                    err_str = str(e).lower()
+                    if "too early" in err_str or "clock" in err_str or "time" in err_str:
+                        if attempt < 2:
+                            await asyncio.sleep(1.0)
+                            continue
+                    raise e
+
+            if not decoded:
+                raise HTTPException(status_code=401, detail="Token doğrulanamadı.")
+
             uid = decoded.get("uid")
             if not uid:
                 raise HTTPException(status_code=401, detail="Token içinde kullanıcı kimliği bulunamadı.")

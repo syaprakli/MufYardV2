@@ -6,6 +6,7 @@ import { useAuth } from '../../lib/hooks/useAuth';
 import { usePresence } from '../../lib/context/PresenceContext';
 import { toast } from 'react-hot-toast';
 import { API_URL } from '../../lib/config';
+import { getAuthHeaders } from '../../lib/api/utils';
 
 export function DraggableChatWidget() {
     const { user } = useAuth();
@@ -36,9 +37,10 @@ export function DraggableChatWidget() {
 
     const handleEditMessage = async (id: string, text: string) => {
         try {
-            const res = await fetch(`${API_URL}/collaboration/messages/${id}?uid=${user?.uid}&role=${profile?.role || 'user'}`, {
+            const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
+            const res = await fetch(`${API_URL}/collaboration/messages/${id}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({ text })
             });
             if (res.ok) {
@@ -54,7 +56,9 @@ export function DraggableChatWidget() {
         if (!window.confirm("Bu mesajı silmek istediğinize emin misiniz?")) return;
         setIsDeleting(id);
         try {
-            const res = await fetch(`${API_URL}/collaboration/messages/${id}?uid=${user?.uid}&role=${profile?.role || 'user'}`, {
+            const headers = await getAuthHeaders();
+            const res = await fetch(`${API_URL}/collaboration/messages/${id}`, {
+                headers,
                 method: 'DELETE'
             });
             if (res.ok) {

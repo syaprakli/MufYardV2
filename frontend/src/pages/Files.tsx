@@ -147,13 +147,10 @@ export default function Files() {
     }, [previewFile]);
 
     const saveWithElectronDialog = async (url: string, fileName: string) => {
-        const ipcRenderer = (window as any)?.require?.("electron")?.ipcRenderer;
-        if (!ipcRenderer?.invoke) return false;
+        const api = (window as any)?.electronAPI;
+        if (!api?.downloadFile) return false;
 
-        const result = await ipcRenderer.invoke("download-file-with-dialog", {
-            url,
-            fileName: fileName || "dosya"
-        });
+        const result = await api.downloadFile(url, fileName || "dosya");
 
         if (result?.ok) {
             toast.success("Dosya kaydedildi.");
@@ -231,12 +228,16 @@ export default function Files() {
                 profile?.email?.trim().toLowerCase()
             ].filter(Boolean).map(v => String(v).toLowerCase());
 
+            const myName = profile?.full_name?.toLowerCase().trim() || user?.displayName?.toLowerCase().trim();
+
             setAllProfiles(
                 data.filter(p => {
                     const pKeys = [p.uid, p.email?.trim().toLowerCase()]
                         .filter(Boolean)
                         .map(v => String(v).toLowerCase());
-                    return !pKeys.some(k => meKeys.includes(k));
+                    const isMeById = pKeys.some(k => meKeys.includes(k));
+                    const isMeByName = myName && p.full_name && p.full_name.toLowerCase().trim() === myName;
+                    return !isMeById && !isMeByName;
                 })
             );
         } catch (error) {
@@ -309,7 +310,7 @@ export default function Files() {
         if (!confirmed) return;
 
         try {
-            await deleteItem(id, user?.uid);
+            await deleteItem(id);
             await loadData();
             if (previewFile?.id === id) setPreviewFile(null);
             toast.success("Silindi");

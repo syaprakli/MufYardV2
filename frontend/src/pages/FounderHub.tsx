@@ -1,5 +1,5 @@
 import { 
-    Shield, Users, Star, Key, 
+    Shield, Users, Star, Key,
     ChevronRight, ArrowLeft,
     Activity, ShieldCheck, Zap
 } from "lucide-react";
@@ -49,20 +49,17 @@ const HUB_ITEMS = [
 ];
 
 export default function FounderHub() {
-    const { user } = useAuth();
+    const { user, profile, loading } = useAuth();
     const navigate = useNavigate();
 
-    const isFounder = user?.email === "sefayaprakli@hotmail.com" || 
-                      user?.email === "sefa.yaprakli@gsb.gov.tr" ||
-                      user?.email === "syaprakli@gmail.com" ||
-                      user?.uid === "VKV8SfuNkWf9WeTYeSCTizd4oG83";
+    const isFounder = profile?.role === "admin";
 
     useEffect(() => {
-        if (!isFounder && user) {
+        if (!loading && user && !isFounder) {
             toast.error("Bu sayfaya erişim yetkiniz bulunmamaktadır.");
             navigate("/");
         }
-    }, [isFounder, user, navigate]);
+    }, [isFounder, user, loading, navigate]);
 
     return (
         <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-6xl mx-auto pb-20">

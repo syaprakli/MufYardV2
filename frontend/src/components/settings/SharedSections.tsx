@@ -46,7 +46,7 @@ export const NotificationSection = ({
 );
 
 // --- Güvenlik Sekmesi ---
-export const SecuritySection = ({ handlePasswordReset, resettingPassword }: any) => (
+export const SecuritySection = ({ handlePasswordReset, resettingPassword, resetCooldown }: any) => (
     <Card className="p-4 sm:p-6 md:p-10 space-y-6 md:space-y-8 rounded-3xl border-none shadow-xl bg-card">
         <div className="flex items-center gap-3">
             <Shield className="text-primary" size={24} />
@@ -58,8 +58,8 @@ export const SecuritySection = ({ handlePasswordReset, resettingPassword }: any)
                 <span className="font-bold text-sm">Şifre İşlemleri</span>
             </div>
             <p className="text-xs text-slate-500 font-medium">Hesap güvenliğiniz için şifrenizi düzenli aralıklarla güncelleyin.</p>
-            <Button variant="outline" className="w-full rounded-2xl h-12 font-bold" onClick={handlePasswordReset} disabled={resettingPassword}>
-                {resettingPassword ? "Gönderiliyor..." : "Şifre Sıfırlama Bağlantısı Gönder"}
+            <Button variant="outline" className="w-full rounded-2xl h-12 font-bold" onClick={handlePasswordReset} disabled={resettingPassword || resetCooldown > 0}>
+                {resettingPassword ? "Gönderiliyor..." : resetCooldown > 0 ? `Tekrar gönder (${resetCooldown}s)` : "Şifre Sıfırlama Bağlantısı Gönder"}
             </Button>
         </div>
     </Card>
@@ -67,7 +67,7 @@ export const SecuritySection = ({ handlePasswordReset, resettingPassword }: any)
 
 // --- Lisans Sekmesi ---
 export const LicenseSection = ({ 
-    profile, licenseKey, setLicenseKey, handleActivateLicense, activatingLicense, trialDaysLeft 
+    profile, licenseKey, setLicenseKey, handleActivateLicense, activatingLicense 
 }: any) => (
     <Card className="p-4 sm:p-6 md:p-10 space-y-6 md:space-y-8 rounded-3xl border-none shadow-xl bg-card">
         <div className="flex items-center justify-between">
@@ -85,23 +85,12 @@ export const LicenseSection = ({
                         ? (profile?.premium_until 
                             ? (profile?.premium_type ? profile.premium_type.toUpperCase() : "SÜRELİ") + " PRO" 
                             : (profile?.premium_type || "SINIRSIZ").toUpperCase() + " PRO")
-                        : profile?.trial_started ? "DENEME" : "KAYITLI"}
+                        : "KAYITLI"}
                 </h4>
                 {profile?.has_premium_ai && profile?.premium_until && (
                     <div className="flex items-center gap-2 text-rose-500 font-bold text-xs uppercase tracking-wider">
                         <Zap size={14} className="fill-rose-500" />
                         Süre Sonu: {new Date(profile.premium_until).toLocaleDateString('tr-TR')}
-                    </div>
-                )}
-                {profile?.trial_started && !profile?.has_premium_ai && (
-                    <div className="space-y-2">
-                        <div className="flex justify-between text-xs font-bold text-slate-500">
-                            <span>Kalan Süre</span>
-                            <span>{trialDaysLeft} Gün</span>
-                        </div>
-                        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div className="h-full bg-primary" style={{ width: `${(trialDaysLeft / 30) * 100}%` }} />
-                        </div>
                     </div>
                 )}
             </div>

@@ -154,9 +154,7 @@ export default function Calendar() {
 
     // ── helpers ────────────────────────────────────────────────────────────────
     const effectiveUid = useCallback(() => {
-        if (user?.uid) return user.uid;
-        const raw = localStorage.getItem("demo_user");
-        return raw ? JSON.parse(raw)?.uid : null;
+        return user?.uid || null;
     }, [user]);
 
     // ── load data ──────────────────────────────────────────────────────────────

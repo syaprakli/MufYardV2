@@ -1,5 +1,5 @@
 import { API_URL } from "../config";
-import { fetchWithTimeout } from "./utils";
+import { fetchWithTimeout, getAuthHeaders } from "./utils";
 
 export type PendingRequest = {
     id: string;
@@ -9,33 +9,37 @@ export type PendingRequest = {
     created_at: string;
 };
 
-export async function fetchPendingRequests(uid: string, email?: string): Promise<PendingRequest[]> {
-    let url = `${API_URL}/collaboration/pending-requests?uid=${uid}`;
-    if (email) url += `&email=${encodeURIComponent(email)}`;
-    const res = await fetchWithTimeout(url);
+export async function fetchPendingRequests(_uid: string, _email?: string): Promise<PendingRequest[]> {
+    const headers = await getAuthHeaders();
+    const res = await fetchWithTimeout(`${API_URL}/collaboration/pending-requests`, { headers });
     if (!res.ok) return [];
     return await res.json();
 }
 
-export async function acceptRequest(type: string, id: string, uid: string) {
-    const res = await fetchWithTimeout(`${API_URL}/collaboration/pending-requests/${type}/${id}/accept?uid=${uid}`, {
-        method: 'POST'
+export async function acceptRequest(type: string, id: string, _uid: string) {
+    const headers = await getAuthHeaders();
+    const res = await fetchWithTimeout(`${API_URL}/collaboration/pending-requests/${type}/${id}/accept`, {
+        method: 'POST',
+        headers,
     });
     return res.ok;
 }
 
-export async function rejectRequest(type: string, id: string, uid: string) {
-    const res = await fetchWithTimeout(`${API_URL}/collaboration/pending-requests/${type}/${id}/reject?uid=${uid}`, {
-        method: 'POST'
+export async function rejectRequest(type: string, id: string, _uid: string) {
+    const headers = await getAuthHeaders();
+    const res = await fetchWithTimeout(`${API_URL}/collaboration/pending-requests/${type}/${id}/reject`, {
+        method: 'POST',
+        headers,
     });
     return res.ok;
 }
 
-export async function sendDirectMessage(recipientId: string, content: string, attachment: any, senderUid: string, senderName: string) {
-    const url = `${API_URL}/collaboration/dm/send?uid=${senderUid}&name=${encodeURIComponent(senderName)}`;
+export async function sendDirectMessage(recipientId: string, content: string, attachment: any, _senderUid: string, _senderName: string) {
+    const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
+    const url = `${API_URL}/collaboration/dm/send`;
     const res = await fetchWithTimeout(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
             recipient_id: recipientId,
             content: content,
@@ -46,7 +50,8 @@ export async function sendDirectMessage(recipientId: string, content: string, at
 }
 
 export async function fetchGlobalMessages(limit: number = 50) {
-    const res = await fetchWithTimeout(`${API_URL}/collaboration/messages?limit=${limit}`);
+    const headers = await getAuthHeaders();
+    const res = await fetchWithTimeout(`${API_URL}/collaboration/messages?limit=${limit}`, { headers });
     if (!res.ok) return [];
     return await res.json();
 }

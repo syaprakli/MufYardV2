@@ -75,7 +75,6 @@ export function useAuth() {
                 } catch (e) {}
             }
             // Önce localStorage'ı temizle, sonra Firebase signOut yap
-            localStorage.removeItem("demo_user");
             localStorage.removeItem("mufyard_assistant_messages");
             setUser(null);
             await firebaseSignOut(auth);

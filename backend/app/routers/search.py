@@ -1,13 +1,18 @@
-from fastapi import APIRouter, Query
-from firebase_admin import firestore
+from fastapi import APIRouter, Query, Depends
 from typing import List
+from typing import Dict, Any
+from app.lib.auth import get_current_user
+from app.lib.firebase_admin import db
 
 router = APIRouter()
 
-db = firestore.client()
 
 @router.get("/search-reports")
-def search_reports(q: str = Query(..., min_length=2), limit: int = 20):
+def search_reports(
+    q: str = Query(..., min_length=2),
+    limit: int = 20,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
     # Firestore'da tam metin arama (basit LIKE benzeri)
     audits_ref = db.collection("audits")
     results = []

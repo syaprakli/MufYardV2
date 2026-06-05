@@ -93,7 +93,7 @@ import { Button } from "../components/ui/Button";
 import { usePresence } from "../lib/context/PresenceContext";
 import { VirtualizedList } from "../components/ui/VirtualizedList";
 import { API_URL } from "../lib/config";
-import { fetchWithTimeout } from "../lib/api/utils";
+import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
 import toast from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -231,10 +231,11 @@ export default function PublicSpace() {
         const loadInitialData = async () => {
             if (!user?.uid) return;
             try {
+                const headers = await getAuthHeaders();
                 const [prof, cats, insps] = await Promise.all([
-                    fetchWithTimeout(`${API_URL}/profiles/${user.uid}`).then(r => r.json()),
-                    fetchWithTimeout(`${API_URL}/collaboration/categories`).then(r => r.json()),
-                    fetchWithTimeout(`${API_URL}/profiles/`).then(r => r.json())
+                    fetchWithTimeout(`${API_URL}/profiles/${user.uid}`, { headers }).then(r => r.json()),
+                    fetchWithTimeout(`${API_URL}/collaboration/categories`, { headers }).then(r => r.json()),
+                    fetchWithTimeout(`${API_URL}/profiles/`, { headers }).then(r => r.json())
                 ]);
                 setUserProfile(prof);
                 setUserRole(prof.role || 'user');
@@ -262,12 +263,13 @@ export default function PublicSpace() {
 
 
             try {
+                const headers = await getAuthHeaders();
                 const url = new URL(`${API_URL}/collaboration/posts`);
                 if (selectedCategory !== 'Hepsi') url.searchParams.append('category', selectedCategory);
                 if (user?.uid) url.searchParams.append('user_id', user.uid);
                 if (userRole === 'admin' || userRole === 'moderator') url.searchParams.append('is_admin', 'true');
                 
-                const postsRes = await fetchWithTimeout(url.toString());
+                const postsRes = await fetchWithTimeout(url.toString(), { headers });
                 const postsData = await postsRes.json();
                 const fetchedPosts = Array.isArray(postsData) ? postsData : [];
 
@@ -277,9 +279,10 @@ export default function PublicSpace() {
 
                 if (!hasMapPost && (selectedCategory === "Hepsi" || selectedCategory === "Genel") && user?.uid) {
                     try {
-                        const seedRes = await fetchWithTimeout(`${API_URL}/collaboration/posts?role=${encodeURIComponent(userRole)}`, {
+                        const seedHeaders = await getAuthHeaders({ "Content-Type": "application/json" });
+                        const seedRes = await fetchWithTimeout(`${API_URL}/collaboration/posts`, {
                             method: "POST",
-                            headers: { "Content-Type": "application/json" },
+                            headers: seedHeaders,
                             body: JSON.stringify({
                                 title: mapPostTitle,
                                 content: "Müfettişler için interaktif konaklama ve yemek haritası.",
@@ -473,9 +476,10 @@ export default function PublicSpace() {
 
     const handleEditMessage = async (id: string, newText: string) => {
         try {
-            const res = await fetch(`${API_URL}/collaboration/messages/${id}?uid=${user?.uid}&role=${userRole}`, {
+            const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
+            const res = await fetch(`${API_URL}/collaboration/messages/${id}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({ text: newText })
             });
             if (res.ok) {
@@ -495,7 +499,9 @@ export default function PublicSpace() {
             });
             if (!ok) return;
 
-            const res = await fetch(`${API_URL}/collaboration/messages/${id}?uid=${user?.uid}&role=${userRole}`, {
+            const headers = await getAuthHeaders();
+            const res = await fetch(`${API_URL}/collaboration/messages/${id}`, {
+                headers,
                 method: 'DELETE'
             });
             if (res.ok) {
@@ -520,8 +526,6 @@ export default function PublicSpace() {
                 ? `${API_URL}/collaboration/posts/${editingPost.id}` 
                 : `${API_URL}/collaboration/posts`;
             
-            url += `?role=${encodeURIComponent(userRole)}`;
-
             const method = editingPost ? 'PATCH' : 'POST';
             const payload = editingPost ? {
                 title: newPost.title,
@@ -538,9 +542,10 @@ export default function PublicSpace() {
                 shared_with: sharedWith,
                 attachments: newPost.attachments
             };
+            const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
             const res = await fetchWithTimeout(url, {
                 method,
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify(payload)
             });
             if (!res.ok) throw new Error();
@@ -571,9 +576,10 @@ export default function PublicSpace() {
 
     const handleApprovePost = async (postId: string) => {
         try {
-            const adminName = user?.displayName || user?.email || "Admin";
-            const res = await fetchWithTimeout(`${API_URL}/collaboration/posts/${postId}/approve?admin_name=${encodeURIComponent(adminName)}`, {
-                method: 'POST'
+            const headers = await getAuthHeaders();
+            const res = await fetchWithTimeout(`${API_URL}/collaboration/posts/${postId}/approve`, {
+                method: 'POST',
+                headers,
             });
             if (!res.ok) throw new Error();
             setPosts(prev => prev.map(p => p.id === postId ? { ...p, is_approved: true } : p));
@@ -594,8 +600,10 @@ export default function PublicSpace() {
         if (!confirmed) return;
 
         try {
+            const headers = await getAuthHeaders();
             const res = await fetchWithTimeout(`${API_URL}/collaboration/posts/${postId}/reject`, {
-                method: 'POST'
+                method: 'POST',
+                headers,
             });
             if (!res.ok) throw new Error();
             setPosts(prev => prev.filter(p => p.id !== postId));
@@ -615,7 +623,8 @@ export default function PublicSpace() {
         });
         if (!confirmed) return;
         try {
-            await fetchWithTimeout(`${API_URL}/collaboration/posts/${postId}?uid=${user?.uid}&role=${userRole}`, { method: 'DELETE' });
+            const headers = await getAuthHeaders();
+            await fetchWithTimeout(`${API_URL}/collaboration/posts/${postId}`, { method: 'DELETE', headers });
             setPosts(prev => prev.filter(p => p.id !== postId));
             toast.success("Silindi");
         } catch {

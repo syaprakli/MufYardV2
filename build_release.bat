@@ -18,6 +18,8 @@ echo [2/4] Guncer backend kodu derleniyor (PyInstaller)...
 "%PYTHON_EXE%" -m pip install pyinstaller -q || goto :fail
 "%PYTHON_EXE%" -m PyInstaller --noconfirm --clean --onedir --name mufyard-backend ^
     --collect-all app ^
+    --collect-all websockets ^
+    --collect-all uvicorn ^
     --paths "%~dp0backend" ^
     "%~dp0backend\run_backend.py" || goto :fail
 echo [2/4] Backend exe guncellendi.

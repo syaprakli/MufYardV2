@@ -19,19 +19,17 @@ interface Feedback {
 }
 
 export default function AdminFeedback() {
-    const { user } = useAuth();
+    const { user, profile, loading: authLoading } = useAuth();
     const navigate = useNavigate();
 
-    const isFounder = user?.email === "sefayaprakli@hotmail.com" || 
-                      user?.email === "sefa.yaprakli@gsb.gov.tr" ||
-                      user?.email === "syaprakli@gmail.com";
+    const isFounder = profile?.role === "admin";
 
     useEffect(() => {
-        if (!isFounder && user) {
+        if (!authLoading && user && !isFounder) {
             toast.error("Bu sayfaya erişim yetkiniz bulunmamaktadır.");
             navigate("/");
         }
-    }, [isFounder, user, navigate]);
+    }, [isFounder, user, authLoading, navigate]);
 
     const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
     const [loading, setLoading] = useState(true);

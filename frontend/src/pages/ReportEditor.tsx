@@ -2,7 +2,7 @@ import { Suspense, lazy, useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
-import { Save, Download, ArrowLeft, Loader2, FileText, CheckCircle, History, X, Sparkles, Pin, ChevronUp, ChevronDown, LayoutGrid, MessageSquare, BookOpen, Users } from "lucide-react";
+import { Save, Download, ArrowLeft, Loader2, FileText, CheckCircle, History, X, Sparkles, Pin, ChevronUp, ChevronDown, LayoutGrid, MessageSquare, BookOpen, Users, ClipboardCheck, AlertCircle } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { fetchAuditById, updateAudit, exportAuditToWord, type Audit, type AuditVersion } from "../lib/api/audit";
@@ -21,6 +21,7 @@ import { useGlobalData } from "../lib/context/GlobalDataContext";
 import { useChat } from "../lib/context/ChatContext";
 import { logPerfSample } from "../lib/performance";
 import { REPORT_TEMPLATES, type ReportTemplate } from "../lib/reportTemplates";
+import { AUDIT_TEMPLATES } from "../lib/auditTemplates";
 
 const ShareModalLazy = lazy(() => import("../components/ShareModal"));
 const ReportEditorTinyMCELazy = lazy(() => import("../components/report/ReportEditorTinyMCE"));
@@ -88,7 +89,7 @@ export default function ReportEditor() {
     const [isLegislationOpen, setIsLegislationOpen] = useState(false);
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { refreshAudits } = useGlobalData();
+    const { data: cachedData, refreshAudits } = useGlobalData();
     const editorLoadStartRef = useRef<number>(performance.now());
     const editorInitLoggedRef = useRef(false);
     
@@ -136,6 +137,33 @@ export default function ReportEditor() {
     const [aiSelectedText, setAiSelectedText] = useState("");
     const [aiPresetName, setAiPresetName] = useState("");
     const [savedAiPresets, setSavedAiPresets] = useState<SavedAiPromptPreset[]>([]);
+    const [showMergeReportModal, setShowMergeReportModal] = useState(false);
+    const [mergeReportOptions, setMergeReportOptions] = useState<any[]>([]);
+    const [selectedMergeAuditIds, setSelectedMergeAuditIds] = useState<string[]>([]);
+
+    const isChecklistEmpty = useMemo(() => {
+        if (!audit) return true;
+        const form = audit.audit_data?.form || {};
+        const answeredKeys = Object.keys(form).filter(k => !k.startsWith("inspector_note_"));
+        return answeredKeys.length === 0;
+    }, [audit]);
+
+    const checklistRoute = useMemo(() => {
+        if (!audit || !cachedData?.tasks) return null;
+        const task = cachedData.tasks.find((t: any) => t.id === audit.task_id);
+        if (!task) return null;
+        
+        const categoryMap: Record<string, string> = {
+            "İl Denetimi": "il",
+            "Federasyon Denetimi": "federasyon",
+            "Kyk Yurt Denetimi": "kyk",
+            "Özel Yurt Denetimi": "ozel",
+            "Spor Kulüpleri Denetimi": "spor"
+        };
+        const path = categoryMap[task.rapor_turu];
+        if (!path) return null;
+        return `/denetim/${path}?task_id=${task.id}`;
+    }, [audit, cachedData]);
 
     const closeAllSidebarsAndModals = () => {
         setIsHistoryOpen(false);
@@ -883,6 +911,138 @@ export default function ReportEditor() {
         setIsDiffOpen(true);
     };
 
+    const handleImportFindings = () => {
+        if (!audit) return;
+
+        const task = cachedData?.tasks?.find((t: any) => t.id === audit.task_id);
+        if (!task) {
+            toast.error("İlişkili görev bulunamadı.");
+            return;
+        }
+
+        const childTasks = (cachedData?.tasks || []).filter((t: any) => t.parent_task_id === task.id);
+        
+        // Find parent and child audits
+        const parentAudit = audit;
+        const childAudits = (cachedData?.audits || []).filter((a: any) => childTasks.some(ct => ct.id === a.task_id));
+        
+        const options: any[] = [];
+        // Add parent audit if it has form filled
+        const parentForm = parentAudit.audit_data?.form || {};
+        const parentHasForm = Object.keys(parentForm).filter(k => !k.startsWith("inspector_note_")).length > 0;
+        if (parentHasForm) {
+            options.push({
+                id: parentAudit.id,
+                title: `${task.rapor_adi} (Ana Görev)`,
+                type: task.rapor_turu,
+                audit: parentAudit
+            });
+        }
+
+        // Add child audits
+        childAudits.forEach(ca => {
+            const ct = childTasks.find(t => t.id === ca.task_id);
+            const caForm = ca.audit_data?.form || {};
+            const caHasForm = Object.keys(caForm).filter(k => !k.startsWith("inspector_note_")).length > 0;
+            if (ct && caHasForm) {
+                options.push({
+                    id: ca.id,
+                    title: `${ct.rapor_adi} (${ct.rapor_turu})`,
+                    type: ct.rapor_turu,
+                    audit: ca
+                });
+            }
+        });
+
+        if (options.length === 0) {
+            toast.error("Bu görev veya bağlı alt görevleri için doldurulmuş denetim formu bulunamadı.");
+            return;
+        }
+
+        if (childTasks.length > 0 && options.length > 1) {
+            // Show modal if there are multiple options to choose from
+            setMergeReportOptions(options);
+            setSelectedMergeAuditIds(options.map(o => o.id)); // select all by default
+            setShowMergeReportModal(true);
+        } else {
+            // Only one audit has checklist, import it directly
+            void executeImportFindings([options[0].audit]);
+        }
+    };
+
+    const executeImportFindings = async (selectedAudits: any[]) => {
+        if (selectedAudits.length === 0) {
+            toast.error("Lütfen en az bir denetim seçin.");
+            return;
+        }
+
+        const categoryMap: Record<string, string> = {
+            "İl Denetimi": "il",
+            "Federasyon Denetimi": "federasyon",
+            "Kyk Yurt Denetimi": "kyk",
+            "Özel Yurt Denetimi": "ozel",
+            "Spor Kulüpleri Denetimi": "spor"
+        };
+
+        let compiledHtml = "";
+        selectedAudits.forEach(aud => {
+            const task = cachedData?.tasks?.find((t: any) => t.id === aud.task_id);
+            if (!task) return;
+            const path = categoryMap[task.rapor_turu] || "il";
+            const questions = AUDIT_TEMPLATES[path] || [];
+            const form = aud.audit_data?.form || {};
+            const findings: { text: string; area: string; note: string }[] = [];
+
+            questions.forEach((q: any) => {
+                const answer = form[q.id];
+                const note = form[`inspector_note_${q.id}`];
+                if (answer === "no") {
+                    findings.push({ text: q.text, area: q.area, note: note || "" });
+                }
+            });
+
+            compiledHtml += `<h3><strong>BULUNAN TENKİTLER VE EKSİKLİKLER (${task.rapor_adi})</strong></h3>`;
+            if (findings.length > 0) {
+                compiledHtml += `<ul>`;
+                findings.forEach(f => {
+                    compiledHtml += `<li><strong>Madde:</strong> ${f.text}<br/><strong>Müfettiş Notu:</strong> ${f.note || "<em>Belirtilmedi</em>"}</li>`;
+                });
+                compiledHtml += `</ul>`;
+            } else {
+                compiledHtml += `<p>Yapılan denetim neticesinde herhangi bir tenkit veya eksikliğe rastlanılmamıştır.</p>`;
+            }
+            compiledHtml += `<br/>`;
+        });
+
+        let writeMode: "append" | "replace" = "replace";
+        if (content && content.replace(/<[^>]*>/g, "").trim().length > 0) {
+            const overwrite = await confirm({
+                title: "Bulguları Aktar",
+                message: "Editörde zaten mevcut içerik bulunuyor. Bulguları üzerine yazmak (mevcut içeriği silmek) istiyor musunuz?",
+                confirmText: "Üzerine Yaz",
+                cancelText: "Sonuna Ekle",
+                variant: "warning"
+            });
+            if (overwrite) {
+                writeMode = "replace";
+            } else {
+                writeMode = "append";
+            }
+        }
+
+        let finalContent = compiledHtml;
+        if (writeMode === "append") {
+            finalContent = content + "<br/>" + compiledHtml;
+        }
+
+        setContent(finalContent);
+        if (editorRef.current) {
+            editorRef.current.setContent(finalContent);
+        }
+        toast.success("Bulgular editöre aktarıldı.");
+        setShowMergeReportModal(false);
+    };
+
     const loadAudit = async (auditId: string) => {
         try {
             setLoading(true);
@@ -1102,7 +1262,7 @@ export default function ReportEditor() {
                     </Button>
                     <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-nowrap">
-                            <h2 className="font-bold text-base text-primary font-outfit truncate max-w-[200px] md:max-w-[400px]">{audit?.title}</h2>
+                            <h2 className="font-bold text-sm md:text-base text-primary font-outfit truncate max-w-[250px] md:max-w-[500px]" title={audit?.title}>{audit?.title}</h2>
                             {providerStatus === "connected" && (
                                 <span className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase rounded-full border border-emerald-100">
                                     <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" /> Canlı
@@ -1181,6 +1341,7 @@ export default function ReportEditor() {
                         <Button variant="ghost" onClick={() => { openLegislation(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><BookOpen size={14} className="mr-1.5" /> Mevzuat Öner</Button>
                         <Button variant="ghost" onClick={() => { openSnippetBank(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Taslak Metinler</Button>
                         <Button variant="ghost" onClick={() => { openVoiceInput(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Sesli Not</Button>
+                        <Button variant="ghost" onClick={() => { handleImportFindings(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><ClipboardCheck size={14} className="mr-1.5 text-violet-600 dark:text-violet-400" /> <span className="inline md:hidden xl:inline">Bulguları Aktar</span></Button>
                         <Button variant="ghost" onClick={() => { openAiSuggestion(); setShowMobileActions(false); }} disabled={!canEditContent} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed justify-start md:justify-center"><Sparkles size={14} className="mr-1.5" /> <span className="inline md:hidden xl:inline">AI Öneri</span></Button>
                         <Button variant="outline" onClick={() => { handleSave(); setShowMobileActions(false); }} disabled={saving || !canEditContent} className="h-8 px-2 md:px-3 text-[11px] font-bold border-primary/20 rounded-lg justify-start md:justify-center">{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" />} <span className="inline md:hidden lg:inline">Kaydet</span></Button>
                         <Button variant="outline" onClick={() => { handleSaveVersion(); setShowMobileActions(false); }} disabled={saving || !canEditContent} className="h-8 px-2 md:px-3 text-[11px] font-bold border-emerald-300 text-emerald-700 rounded-lg justify-start md:justify-center"><History size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" /> <span className="inline md:hidden lg:inline">Sürüm Kaydet</span></Button>
@@ -1271,6 +1432,25 @@ export default function ReportEditor() {
                                     Kapat
                                 </button>
                             </div>
+                        </div>
+                    )}
+                    {isChecklistEmpty && checklistRoute && (
+                        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4 text-xs text-amber-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm backdrop-blur-sm">
+                            <div className="flex items-start gap-2.5">
+                                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="font-bold">Henüz Denetim Formu Doldurulmadı</p>
+                                    <p className="text-amber-700/80 mt-0.5">Bu görev için henüz herhangi bir denetim formu (checklist) doldurulmamış veya kaydedilmemiştir. Bulguları otomatik aktarmak için önce formu doldurabilirsiniz.</p>
+                                </div>
+                            </div>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => navigate(checklistRoute)} 
+                                className="border-amber-200 bg-white hover:bg-amber-100/50 hover:text-amber-900 text-amber-800 text-[11px] font-bold shrink-0 shadow-sm w-full sm:w-auto"
+                            >
+                                Denetim Formuna Git
+                            </Button>
                         </div>
                     )}
                     <div className="mb-3 flex items-center justify-between px-2">
@@ -1830,6 +2010,78 @@ export default function ReportEditor() {
                     }}
                     onClose={() => setIsLegislationOpen(false)}
                 />
+            )}
+
+            {/* Çoklu Checklist Birleştirme Modali */}
+            {showMergeReportModal && (
+                <div 
+                    onClick={() => setShowMergeReportModal(false)}
+                    className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/40 backdrop-blur-md p-4 animate-in fade-in duration-200"
+                >
+                    <div 
+                        onClick={(e) => e.stopPropagation()}
+                        className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 dark:border-slate-800/80 overflow-hidden animate-in zoom-in-95 duration-200"
+                    >
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                    <ClipboardCheck className="text-violet-600 dark:text-violet-400" size={18} /> Bulguları Birleştir
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Hangi görevlerin denetim bulgularını bu rapora aktarmak istersiniz?</p>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={() => setShowMergeReportModal(false)} className="rounded-full w-8 h-8 p-0 text-slate-400 hover:text-slate-600 flex items-center justify-center">
+                                <X size={16} />
+                            </Button>
+                        </div>
+                        <div className="p-6 space-y-4 max-h-[50vh] overflow-y-auto">
+                            {mergeReportOptions.map((opt) => (
+                                <label 
+                                    key={opt.id}
+                                    className="flex items-start gap-3 p-3 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer select-none transition-colors"
+                                >
+                                    <input 
+                                        type="checkbox"
+                                        checked={selectedMergeAuditIds.includes(opt.id)}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                setSelectedMergeAuditIds([...selectedMergeAuditIds, opt.id]);
+                                            } else {
+                                                setSelectedMergeAuditIds(selectedMergeAuditIds.filter(id => id !== opt.id));
+                                            }
+                                        }}
+                                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                                    />
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{opt.title}</p>
+                                        <p className="text-[10px] text-slate-400 mt-0.5 uppercase font-bold tracking-wider">{opt.type}</p>
+                                    </div>
+                                </label>
+                            ))}
+                        </div>
+                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 flex gap-3">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setShowMergeReportModal(false)} 
+                                className="flex-1 rounded-xl h-9 text-xs"
+                            >
+                                Vazgeç
+                            </Button>
+                            <Button 
+                                size="sm" 
+                                onClick={() => {
+                                    const selectedAudits = mergeReportOptions
+                                        .filter(opt => selectedMergeAuditIds.includes(opt.id))
+                                        .map(opt => opt.audit);
+                                    void executeImportFindings(selectedAudits);
+                                }}
+                                className="flex-1 rounded-xl h-9 text-xs text-white"
+                            >
+                                Bulguları Aktar
+                            </Button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

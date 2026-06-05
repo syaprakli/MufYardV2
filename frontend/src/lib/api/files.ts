@@ -1,5 +1,5 @@
 import { API_URL, LOCAL_API_URL, IS_ELECTRON } from "../config";
-import { fetchWithTimeout } from "./utils";
+import { fetchWithTimeout, getAuthHeaders } from "./utils";
 
 // Masaüstündeysen yerel backend'i (Belgelerim/MufYARD), Web'deysen Railway'i kullan
 const CURRENT_FILES_API = IS_ELECTRON ? LOCAL_API_URL : API_URL;
@@ -15,7 +15,8 @@ export interface FileItem {
 }
 
 export const fetchFileTree = async (path?: string): Promise<FileItem[]> => {
-    const response = await fetchWithTimeout(`${CURRENT_FILES_API}/files/tree?path=${path || ""}`);
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${CURRENT_FILES_API}/files/tree?path=${path || ""}`, { headers });
     if (!response.ok) throw new Error("Dosya ağacı yüklenemedi");
     return response.json();
 };
@@ -28,8 +29,10 @@ export const uploadFile = async (file: File, path?: string, uid?: string): Promi
     if (path) url.searchParams.append("path", path);
     if (uid) url.searchParams.append("uid", uid);
     
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(url.toString(), {
         method: "POST",
+        headers,
         body: formData
     });
     
@@ -40,10 +43,11 @@ export const uploadFile = async (file: File, path?: string, uid?: string): Promi
 export const createFolder = async (name: string, path: string, parentId?: string, uid?: string): Promise<any> => {
     const url = new URL(`${CURRENT_FILES_API}/files/create-folder`);
     if (uid) url.searchParams.append("uid", uid);
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
 
     const response = await fetchWithTimeout(url.toString(), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ name, parentId: parentId || path })
     });
     
@@ -51,13 +55,15 @@ export const createFolder = async (name: string, path: string, parentId?: string
     return response.json();
 };
 
-export const deleteItem = async (id: string, uid?: string): Promise<any> => {
+export const deleteItem = async (id: string): Promise<any> => {
     // Slah'ları koruyarak diğer özel karakterleri encode et
     const safeId = id.split('/').map(part => encodeURIComponent(part)).join('/');
-    const url = uid ? `${CURRENT_FILES_API}/files/delete-item/${safeId}?uid=${uid}` : `${CURRENT_FILES_API}/files/delete-item/${safeId}`;
+    const url = `${CURRENT_FILES_API}/files/delete-item/${safeId}`;
+    const headers = await getAuthHeaders();
     
     const response = await fetchWithTimeout(url, {
-        method: "DELETE"
+        method: "DELETE",
+        headers
     });
     
     if (!response.ok) {
@@ -69,8 +75,10 @@ export const deleteItem = async (id: string, uid?: string): Promise<any> => {
 
 export const openFolder = async (id: string): Promise<any> => {
     const safeId = id.split('/').map(part => encodeURIComponent(part)).join('/');
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${CURRENT_FILES_API}/files/open-folder/${safeId}`, {
-        method: "POST"
+        method: "POST",
+        headers
     });
     
     if (!response.ok) throw new Error("Klasör açılamadı");
@@ -79,8 +87,10 @@ export const openFolder = async (id: string): Promise<any> => {
 
 export const openFile = async (id: string): Promise<any> => {
     const safeId = id.split('/').map(part => encodeURIComponent(part)).join('/');
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${CURRENT_FILES_API}/files/open-file/${safeId}`, {
-        method: "POST"
+        method: "POST",
+        headers
     });
     
     if (!response.ok) throw new Error("Dosya açılamadı");
@@ -89,8 +99,10 @@ export const openFile = async (id: string): Promise<any> => {
 
 export const openTaskFolder = async (taskId: string): Promise<any> => {
     const baseUrl = IS_ELECTRON ? LOCAL_API_URL : API_URL;
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${baseUrl}/files/open-task-folder/${taskId}`, {
-        method: "POST"
+        method: "POST",
+        headers
     });
     
     if (!response.ok) throw new Error("Görev klasörü açılamadı");
@@ -98,9 +110,10 @@ export const openTaskFolder = async (taskId: string): Promise<any> => {
 };
 
 export const shareFileToUser = async (fileId: string, recipientId: string): Promise<any> => {
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
     const response = await fetchWithTimeout(`${API_URL}/files/share-to-user`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ file_id: fileId, recipient_id: recipientId })
     });
 

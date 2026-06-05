@@ -1,12 +1,13 @@
 import { API_URL } from "./config";
-import { fetchWithTimeout } from "./api/utils";
+import { fetchWithTimeout, getAuthHeaders } from "./api/utils";
 
 export async function fetchStats(userId?: string) {
     const storageKey = `mufyard_stats_cache_${userId || 'guest'}`;
     
     try {
         const url = userId ? `${API_URL}/dashboard/stats?user_id=${userId}` : `${API_URL}/dashboard/stats`;
-        const response = await fetchWithTimeout(url);
+        const headers = await getAuthHeaders();
+        const response = await fetchWithTimeout(url, { headers });
         
         if (!response.ok) {
             throw new Error("Stats fetch failed");

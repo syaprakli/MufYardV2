@@ -1,30 +1,17 @@
-import { Suspense, lazy, useState, useEffect } from "react";
+import { Suspense, lazy, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { LayoutDashboard, CheckSquare, FileText, Settings, Shield } from "lucide-react";
-import { useGlobalData } from "../../lib/context/GlobalDataContext";
+import { useAuth } from "../../lib/hooks/useAuth";
 import { cn } from "../../lib/utils";
 
 const DraggableRadioWidgetLazy = lazy(() => import("./DraggableRadioWidget").then((module) => ({ default: module.DraggableRadioWidget })));
-const TrialOverlayLazy = lazy(() => import("../TrialOverlay").then((module) => ({ default: module.TrialOverlay })));
-const IntroPresentationLazy = lazy(() => import("../IntroPresentation").then((module) => ({ default: module.IntroPresentation })));
 
 export function MainLayout() {
-    const { data } = useGlobalData();
+    const { profile } = useAuth();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [showIntroForce, setShowIntroForce] = useState(false);
     const location = useLocation();
-
-    // Deneme süresi başlatılmamışsa tanıtımı zorla göster
-    useEffect(() => {
-        if (data.profile && data.profile.role !== 'admin' && !data.profile.trial_started) {
-            const hasSeen = localStorage.getItem(`mufyard_intro_seen_${data.profile.uid}`);
-            if (!hasSeen) {
-                setShowIntroForce(true);
-            }
-        }
-    }, [data.profile]);
     
     const isReportEditor = location.pathname.includes("/report") && location.pathname.includes("/audit/");
     const isFullScreen = isReportEditor;
@@ -34,14 +21,6 @@ export function MainLayout() {
 
     return (
         <div className="h-[100dvh] w-full flex bg-slate-50 dark:bg-slate-950 overflow-hidden font-outfit transition-colors duration-300">
-            <Suspense fallback={null}>
-                <TrialOverlayLazy />
-            </Suspense>
-            {showIntroForce && (
-                <Suspense fallback={null}>
-                    <IntroPresentationLazy onClose={() => setShowIntroForce(false)} />
-                </Suspense>
-            )}
             {/* Sidebar Overlay for Mobile */}
             {isSidebarOpen && !isFullScreen && (
                 <div 
@@ -102,7 +81,7 @@ export function MainLayout() {
                             <FileText size={20} />
                             <span className="text-[10px] font-bold">Raporlar</span>
                         </NavLink>
-                        {(data.profile?.role === 'admin' || ["sefayaprakli@hotmail.com", "sefa.yaprakli@gsb.gov.tr", "syaprakli@gmail.com"].includes(data.profile?.email || "")) && (
+                        {profile?.role === 'admin' && (
                             <NavLink 
                                 to="/admin" 
                                 className={({ isActive }) => cn(

@@ -1,5 +1,5 @@
 import { API_URL as API_BASE_URL } from "../config";
-import { fetchWithTimeout } from "./utils";
+import { fetchWithTimeout, getAuthHeaders } from "./utils";
 import { addToQueue } from "./syncQueue";
 
 export interface Audit {
@@ -25,6 +25,7 @@ export interface Audit {
     show_page_numbers?: boolean;
     version_name?: string;
     audit_data?: any;
+    report_created?: boolean;
 }
 
 export interface AuditVersion {
@@ -49,11 +50,10 @@ export async function fetchAudits(userId?: string, userEmail?: string, forceRefr
     }
 
     try {
-        let url = `${API_BASE_URL}/audit/?`;
-        if (userId) url += `user_id=${userId}&`;
-        if (userEmail) url += `user_email=${userEmail}`;
+        const url = `${API_BASE_URL}/audit/`;
+        const headers = await getAuthHeaders();
         
-        const response = await fetchWithTimeout(url);
+        const response = await fetchWithTimeout(url, { headers });
         if (!response.ok) {
             throw new Error("Denetimler yüklenemedi.");
         }
@@ -93,7 +93,8 @@ export async function fetchAuditById(id: string): Promise<Audit> {
     const storageKey = `mufyard_audit_detail_${id}`;
     
     try {
-        const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}`);
+        const headers = await getAuthHeaders();
+        const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}`, { headers });
         if (!response.ok) {
             throw new Error("Denetim bulunamadı.");
         }
@@ -125,11 +126,12 @@ export async function fetchAuditById(id: string): Promise<Audit> {
 }
 
 export async function createAudit(audit: Partial<Audit>): Promise<Audit> {
+    const headers = await getAuthHeaders({
+        "Content-Type": "application/json",
+    });
     const response = await fetchWithTimeout(`${API_BASE_URL}/audit/`, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(audit),
     });
     if (!response.ok) {
@@ -149,16 +151,16 @@ export async function updateAudit(
         let url = `${API_BASE_URL}/audit/${id}`;
         const query = new URLSearchParams();
         if (forceVersion) query.set("force_version", "true");
-        if (userIdentity?.userId) query.set("user_id", userIdentity.userId);
-        if (userIdentity?.userEmail) query.set("user_email", userIdentity.userEmail);
+        void userIdentity;
         if (query.toString()) {
             url += `?${query.toString()}`;
         }
+        const headers = await getAuthHeaders({
+            "Content-Type": "application/json",
+        });
         const response = await fetchWithTimeout(url, {
             method: "PATCH",
-            headers: {
-                "Content-Type": "application/json",
-            },
+            headers,
             body: JSON.stringify(update),
         });
         if (!response.ok) {
@@ -180,8 +182,10 @@ export async function updateAudit(
 }
 
 export async function deleteAudit(id: string): Promise<{status: string, message: string}> {
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers,
     });
     if (!response.ok) {
         throw new Error("Silme işlemi başarısız.");
@@ -191,11 +195,23 @@ export async function deleteAudit(id: string): Promise<{status: string, message:
 }
 
 export async function exportAuditsToExcel(): Promise<void> {
-    window.open(`${API_BASE_URL}/audit/export/excel`, "_self");
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/export/excel`, { headers });
+    if (!response.ok) throw new Error("Excel raporu oluşturulamadı");
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Tum_Denetimler.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 export async function exportAuditToWord(id: string): Promise<void> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}/export/word`);
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}/export/word`, { headers });
     if (!response.ok) throw new Error("Word raporu oluşturulamadı");
     const blob = await response.blob();
     const contentDisposition = response.headers.get("Content-Disposition");
@@ -215,7 +231,8 @@ export async function exportAuditToWord(id: string): Promise<void> {
 }
 
 export async function fetchAuditVersions(id: string): Promise<AuditVersion[]> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}/versions`);
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}/versions`, { headers });
     if (!response.ok) {
         throw new Error("Sürüm geçmişi yüklenemedi.");
     }
@@ -224,14 +241,11 @@ export async function fetchAuditVersions(id: string): Promise<AuditVersion[]> {
 
 export async function restoreAuditVersion(id: string, versionId: string, userIdentity?: { userId?: string; userEmail?: string }): Promise<Audit> {
     let url = `${API_BASE_URL}/audit/${id}/restore/${versionId}`;
-    const query = new URLSearchParams();
-    if (userIdentity?.userId) query.set("user_id", userIdentity.userId);
-    if (userIdentity?.userEmail) query.set("user_email", userIdentity.userEmail);
-    if (query.toString()) {
-        url += `?${query.toString()}`;
-    }
+    void userIdentity;
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(url, {
-        method: "POST"
+        method: "POST",
+        headers,
     });
     if (!response.ok) {
         throw new Error("Sürüm geri yüklenemedi.");
@@ -241,8 +255,10 @@ export async function restoreAuditVersion(id: string, versionId: string, userIde
 }
 
 export async function deleteAuditVersion(id: string, versionId: string): Promise<{status: string, message: string}> {
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}/versions/${versionId}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers,
     });
     if (!response.ok) {
         throw new Error("Sürüm silinemedi.");
@@ -251,9 +267,11 @@ export async function deleteAuditVersion(id: string, versionId: string): Promise
 }
 
 export async function acceptAudit(id: string, userId: string, userEmail?: string): Promise<{status: string, message: string}> {
-    const params = new URLSearchParams({ user_id: userId });
-    if (userEmail) params.append("user_email", userEmail);
-    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}/accept?${params.toString()}`, {
+    void userId;
+    void userEmail;
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}/accept`, {
+        headers,
         method: "POST"
     });
     if (!response.ok) throw new Error("Rapor kabul edilemedi.");
@@ -262,9 +280,11 @@ export async function acceptAudit(id: string, userId: string, userEmail?: string
 }
 
 export async function rejectAudit(id: string, userId: string, userEmail?: string): Promise<{status: string, message: string}> {
-    const params = new URLSearchParams({ user_id: userId });
-    if (userEmail) params.append("user_email", userEmail);
-    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}/reject?${params.toString()}`, {
+    void userId;
+    void userEmail;
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}/reject`, {
+        headers,
         method: "POST"
     });
     if (!response.ok) throw new Error("Rapor reddedilemedi.");

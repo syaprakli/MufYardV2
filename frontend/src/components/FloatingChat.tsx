@@ -8,6 +8,7 @@ import { isElectron } from '../lib/firebase';
 import EmojiPicker, { type EmojiClickData, Theme as EmojiTheme } from 'emoji-picker-react';
 import { toast } from 'react-hot-toast';
 import { uploadFile } from '../lib/api/files';
+import { getAuthHeaders } from '../lib/api/utils';
 
 // ─── TENOR GIF API v1 (resmi demo key, kayıt gerektirmez) ───────────────────
 const TENOR_KEY = 'LIVDSRZULELA';
@@ -15,33 +16,6 @@ const TENOR_BASE = 'https://g.tenor.com/v1';
 
 interface GifResult { id: string; url: string; preview: string; }
 
-async function searchGifs(query: string): Promise<GifResult[]> {
-  try {
-    const url = `${TENOR_BASE}/search?q=${encodeURIComponent(query)}&key=${TENOR_KEY}&limit=12`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.results || []).map((r: any) => {
-      const media = r.media?.[0] || {};
-      return { id: r.id, url: media.gif?.url || '', preview: media.tinygif?.url || media.gif?.url || '' };
-    });
-  } catch { return []; }
-}
-
-async function trendingGifs(): Promise<GifResult[]> {
-  try {
-    const url = `${TENOR_BASE}/trending?key=${TENOR_KEY}&limit=12`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.results || []).map((r: any) => {
-      const media = r.media?.[0] || {};
-      return { id: r.id, url: media.gif?.url || '', preview: media.tinygif?.url || media.gif?.url || '' };
-    });
-  } catch { return []; }
-}
-
-// ─── TYPES ──────────────────────────────────────────────────────────────────
 interface Attachment { type: 'file' | 'gif'; name?: string; url: string; mime?: string; size?: number; }
 
 interface Message {
@@ -60,21 +34,60 @@ interface FloatingChatProps {
   type?: 'dm' | 'audit' | 'global';
   inline?: boolean;
   isOnline?: boolean;
-  recipientId?: string; // Target user's UID for DMs
+  recipientId?: string;
 }
 
-
-function getDirectRoomUserIds(roomId: string, currentUid: string) {
-  const normalized = roomId.startsWith('dm_') ? roomId.slice(3) : roomId;
-  const parts = normalized.split('_');
-  if (parts.length === 2) {
-    return parts;
+async function searchGifs(query: string): Promise<GifResult[]> {
+  try {
+    const url = `${TENOR_BASE}/search?q=${encodeURIComponent(query)}&key=${TENOR_KEY}&limit=12`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.results || []).map((r: any) => {
+      const media = r.media?.[0] || {};
+      return { id: r.id, url: media.gif?.url || '', preview: media.tinygif?.url || media.gif?.url || '' };
+    });
+  } catch {
+    return [];
   }
-  const otherUid = parts.find(part => part !== currentUid);
-  return [currentUid, otherUid || currentUid];
 }
 
-function normalizeRoomId(roomId: string, type: FloatingChatProps['type']) {
+async function trendingGifs(): Promise<GifResult[]> {
+  try {
+    const url = `${TENOR_BASE}/trending?key=${TENOR_KEY}&limit=12`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.results || []).map((r: any) => {
+      const media = r.media?.[0] || {};
+      return { id: r.id, url: media.gif?.url || '', preview: media.tinygif?.url || media.gif?.url || '' };
+    });
+  } catch {
+    return [];
+  }
+}
+
+function normalizeMessage(data: any): Message {
+  return {
+    id: data.id || Math.random().toString(36).substr(2, 9),
+    sender_id: data.sender_id || data.author_id || '',
+    sender_name: data.sender_name || data.author_name || 'Müfettiş',
+    content: data.content || data.text || '',
+    timestamp: data.timestamp || new Date().toISOString(),
+    attachment: data.attachment,
+  };
+}
+
+function getDirectRoomUserIds(roomId: string, fallbackUid: string): [string, string] {
+  const normalized = roomId.startsWith('dm_') ? roomId.slice(3) : roomId;
+  const parts = normalized.split('_').filter(Boolean);
+  if (parts.length >= 2) {
+    return [parts[0], parts[1]];
+  }
+  return [fallbackUid, normalized];
+}
+
+function normalizeRoomId(roomId: string, type: string): string {
   if (type !== 'dm') {
     return roomId;
   }
@@ -135,7 +148,8 @@ export default function FloatingChat({
         try {
           const [uid1, uid2] = getDirectRoomUserIds(roomId, user.uid);
           const otherUid = uid1 === user.uid ? uid2 : uid1;
-          const res = await fetch(`${API_URL}/collaboration/dm/history?uid1=${user.uid}&uid2=${otherUid}`);
+          const headers = await getAuthHeaders();
+          const res = await fetch(`${API_URL}/collaboration/dm/history?uid1=${user.uid}&uid2=${otherUid}`, { headers });
           if (res.ok) {
             const data = await res.json();
             setMessages(data.map((m: any) => ({
@@ -167,99 +181,87 @@ export default function FloatingChat({
       if (!user) return;
       const baseWs = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
       const senderName = profile?.full_name || user.displayName || user.email?.split('@')[0] || user.email || 'Kullanıcı';
-      const encodedEmail = user.email ? `&email=${encodeURIComponent(user.email)}` : "";
+      user.getIdToken().then((token) => {
+        const socketUrl = `${baseWs}/ws?token=${encodeURIComponent(token)}&name=${encodeURIComponent(senderName)}&room_id=${normalizedRoomId}`;
+        ws.current = new WebSocket(socketUrl);
 
-      const socketUrl = `${baseWs}/ws?uid=${user.uid}&name=${encodeURIComponent(senderName)}&room_id=${normalizedRoomId}${encodedEmail}`;
-      
-      ws.current = new WebSocket(socketUrl);
+        let pingInterval: any = null;
 
-      // Heartbeat interval
-      let pingInterval: any = null;
+        ws.current.onopen = () => {
+          setIsConnected(true);
+          retryCount = 0;
+          pingInterval = setInterval(() => {
+            if (ws.current?.readyState === WebSocket.OPEN) {
+              ws.current.send(JSON.stringify({ type: 'ping' }));
+            }
+          }, 30000);
+        };
 
-      ws.current.onopen = () => {
-        setIsConnected(true);
-        retryCount = 0;
-        
-        // Start heartbeat
-        pingInterval = setInterval(() => {
-          if (ws.current?.readyState === WebSocket.OPEN) {
-            ws.current.send(JSON.stringify({ type: 'ping' }));
+        ws.current.onclose = () => {
+          setIsConnected(false);
+          if (pingInterval) clearInterval(pingInterval);
+          const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+          console.log(`Chat WS [${roomId}]: Disconnected, retrying in ${delay / 1000}s...`);
+          retryTimer = setTimeout(connect, delay);
+          retryCount += 1;
+        };
+
+        ws.current.onerror = (err) => {
+          console.error(`Chat WS [${roomId}] error:`, err);
+          ws.current?.close();
+        };
+
+        ws.current.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'presence') return;
+            if (data.type === 'error' && data.message) {
+              toast.error(data.message);
+              return;
+            }
+
+            if (data.type === 'delete_message') {
+              setMessages(prev => prev.filter(m => m.id !== data.message_id));
+              return;
+            }
+
+            if (data.type === 'update_message' && data.message) {
+              const updated = data.message;
+              setMessages(prev => prev.map((m) => (
+                m.id === updated.id
+                  ? {
+                      ...m,
+                      content: updated.content || m.content,
+                      timestamp: updated.timestamp || m.timestamp,
+                    }
+                  : m
+              )));
+              return;
+            }
+
+            if (data.type === 'clear_messages' && data.uid) {
+              setMessages(prev => prev.filter(m => m.sender_id !== data.uid));
+              return;
+            }
+
+            if (data.sender_id === user?.uid) return;
+            if (data.room_id && data.room_id !== normalizedRoomId) return;
+            if (!data.room_id && roomId !== 'global') return;
+
+            setMessages(prev => [...prev, normalizeMessage(data)]);
+            markAsRead(normalizedRoomId);
+            audioRef.current?.play().catch(() => {});
+
+            if (isMinimized) {
+              setHasNew(true);
+            }
+          } catch (e) {
+            console.error("Chat WS message error:", e);
           }
-        }, 30000);
-      };
-
-      ws.current.onclose = () => {
-        setIsConnected(false);
-        if (pingInterval) clearInterval(pingInterval);
-        const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
-        console.log(`Chat WS [${roomId}]: Disconnected, retrying in ${delay/1000}s...`);
-        retryTimer = setTimeout(connect, delay);
-        retryCount += 1;
-      };
-
-      ws.current.onerror = (err) => {
-        console.error(`Chat WS [${roomId}] error:`, err);
-        ws.current?.close();
-      };
-
-      ws.current.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'presence') return;
-          if (data.type === 'error' && data.message) {
-            toast.error(data.message);
-            return;
-          }
-          
-          if (data.type === 'delete_message') {
-            setMessages(prev => prev.filter(m => m.id !== data.message_id));
-            return;
-          }
-
-          if (data.type === 'update_message' && data.message) {
-            const updated = data.message;
-            setMessages(prev => prev.map((m) => (
-              m.id === updated.id
-                ? {
-                    ...m,
-                    content: updated.content || m.content,
-                    timestamp: updated.timestamp || m.timestamp,
-                  }
-                : m
-            )));
-            return;
-          }
-
-          if (data.type === 'clear_messages' && data.uid) {
-            setMessages(prev => prev.filter(m => m.sender_id !== data.uid));
-            return;
-          }
-
-          if (data.sender_id === user?.uid) return; // skip own echo
-          
-          // ODA FİLTRELEME: Eğer mesaj bu odaya ait değilse (veya global ise) DM penceresine ekleme
-          if (data.room_id && data.room_id !== normalizedRoomId) return;
-          if (!data.room_id && roomId !== 'global') return; // room_id yoksa ve biz global değilsek güvenli tarafta kal
-
-          setMessages(prev => [...prev, {
-            id: data.id || Math.random().toString(36).substr(2, 9),
-            sender_id: data.sender_id,
-            sender_name: data.sender_name,
-            content: data.content || '',
-            timestamp: data.timestamp || new Date().toISOString(),
-            attachment: data.attachment,
-          }]);
-          markAsRead(normalizedRoomId);
-          audioRef.current?.play().catch(() => {});
-          
-          // Minimize ise "Yeni Mesaj" uyarısı ver
-          if (isMinimized) {
-            setHasNew(true);
-          }
-        } catch (e) {
-          console.error("Chat WS message error:", e);
-        }
-      };
+        };
+      }).catch((err) => {
+        console.error(`Chat WS [${roomId}] token error:`, err);
+      });
     };
 
     connect();
@@ -278,14 +280,7 @@ export default function FloatingChat({
             
             setMessages(prev => {
                 if (prev.some(m => m.id === data.id)) return prev;
-                const newMsg: Message = {
-                    id: data.id || Math.random().toString(36).substr(2, 9),
-                    sender_id: data.sender_id,
-                    sender_name: data.sender_name,
-                    content: data.content || '',
-                    timestamp: data.timestamp || new Date().toISOString(),
-                    attachment: data.attachment,
-                };
+                const newMsg = normalizeMessage(data);
                 return [...prev, newMsg];
             });
             markAsRead(normalizedRoomId);
@@ -414,7 +409,9 @@ export default function FloatingChat({
   const deleteMessage = async (messageId: string) => {
     if (!user) return;
     try {
-      const res = await fetch(`${API_URL}/collaboration/dm/${roomId}/${messageId}?uid=${user.uid}`, {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${API_URL}/collaboration/dm/${roomId}/${messageId}`, {
+        headers,
         method: 'DELETE'
       });
       if (res.ok) {
@@ -441,9 +438,10 @@ export default function FloatingChat({
     const trimmed = editText.trim();
     if (!trimmed || !user) return;
     try {
-      const res = await fetch(`${API_URL}/collaboration/dm/${roomId}/${messageId}?uid=${user.uid}`, {
+      const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
+      const res = await fetch(`${API_URL}/collaboration/dm/${roomId}/${messageId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ content: trimmed }),
       });
       if (!res.ok) {
@@ -462,7 +460,8 @@ export default function FloatingChat({
     if (!user || type !== 'dm') return;
     try {
       const encodedRoomId = encodeURIComponent(roomId);
-      const res = await fetch(`${API_URL}/collaboration/dm/${encodedRoomId}/clear?uid=${encodeURIComponent(user.uid)}`, { method: 'DELETE' });
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${API_URL}/collaboration/dm/${encodedRoomId}/clear`, { method: 'DELETE', headers });
       if (!res.ok) {
         toast.error('Sohbet temizlenemedi.');
         return;
@@ -488,12 +487,9 @@ export default function FloatingChat({
   const saveAttachmentToDisk = async (att: Attachment) => {
     try {
       const resolvedUrl = resolveAttachmentUrl(att.url);
-      const ipcRenderer = (window as any)?.require?.('electron')?.ipcRenderer;
-      if (!ipcRenderer?.invoke) return false;
-      const result = await ipcRenderer.invoke('download-file-with-dialog', {
-        url: resolvedUrl,
-        fileName: att.name || 'dosya'
-      });
+      const api = (window as any)?.electronAPI;
+      if (!api?.downloadFile) return false;
+      const result = await api.downloadFile(resolvedUrl, att.name || 'dosya');
       if (result?.ok) {
         toast.success('Dosya kaydedildi.');
         return true;

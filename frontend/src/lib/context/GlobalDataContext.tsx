@@ -43,6 +43,33 @@ interface GlobalDataContextType {
 
 const GlobalDataContext = createContext<GlobalDataContextType | undefined>(undefined);
 
+// --- Stale-while-revalidate: load persisted cache from localStorage immediately ---
+function loadPersistedCache(uid: string): Partial<GlobalData> {
+    try {
+        const tasks = (() => {
+            const raw = localStorage.getItem(`mufyard_tasks_cache_${uid}`);
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed.data) ? parsed.data : [];
+        })();
+        const audits = (() => {
+            const raw = localStorage.getItem(`mufyard_audits_cache_${uid}`);
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed.data) ? parsed.data : [];
+        })();
+        const profile = (() => {
+            const raw = localStorage.getItem(`mufyard_profile_cache_${uid}`);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            return parsed.data || null;
+        })();
+        return { tasks, audits, profile };
+    } catch {
+        return {};
+    }
+}
+
 export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [data, setData] = useState<GlobalData>({
         stats: null,
@@ -52,14 +79,15 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         contactsCorporate: [],
         contactsPersonal: [],
         lastFetched: null,
-        trialDaysLeft: 30,
+        trialDaysLeft: 9999,
         isTrialExpired: false,
-        trialStarted: false,
+        trialStarted: true,
     });
     const [loading, setLoading] = useState(false);
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const lastFetchedRef = useRef<number | null>(null);
     const currentUidRef = useRef<string | null>(null);
+    const cacheInjectedRef = useRef<string | null>(null);
 
     React.useEffect(() => {
         const handleOnline = () => setIsOffline(false);
@@ -77,6 +105,20 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const refreshAll = useCallback(async (uid: string, email?: string, displayName?: string, force = false) => {
         const CACHE_TIME = 5 * 60 * 1000;
+
+        // --- Stale-while-revalidate: inject localStorage cache immediately on first call ---
+        if (cacheInjectedRef.current !== uid) {
+            cacheInjectedRef.current = uid;
+            const persisted = loadPersistedCache(uid);
+            if (persisted.tasks?.length || persisted.audits?.length || persisted.profile) {
+                setData(prev => ({
+                    ...prev,
+                    tasks: persisted.tasks ?? prev.tasks,
+                    audits: persisted.audits ?? prev.audits,
+                    profile: persisted.profile ?? prev.profile,
+                }));
+            }
+        }
         
         if (!force && 
             lastFetchedRef.current && 
@@ -115,38 +157,11 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 });
             };
             
-            // Deneme Süresi Hesaplama
-            let daysLeft = 30;
-            let expired = false;
+            // Trial akisi kapatildi: tum kullanicilar icin deneme kisitlari pasif.
+            const daysLeft = 9999;
+            const finalExpired = false;
             
             if (profileData) {
-                const founderEmails = ["sefayaprakli@hotmail.com", "syaprakli@gmail.com", "sefa.yaprakli@gsb.gov.tr"];
-                const userEmail = (profileData?.email || "").toLowerCase().trim();
-                const isFounder = founderEmails.includes(userEmail);
-                
-                // Kurucu e-postaları varsayılan olarak PRO'dur.
-                // ANCAK: Eğer bir admin bilerek has_premium_ai = false yapmışsa (test için),
-                // o zaman kurucu da deneme süresi mantığına tabi olur.
-                const isPro = profileData.has_premium_ai === true;
-                const isExemptFromTrial = isPro || (isFounder && profileData.has_premium_ai !== false);
-                
-                if (profileData.created_at) {
-                    const createdDate = new Date(profileData.created_at);
-                    const now = new Date();
-                    const diffTime = Math.max(0, now.getTime() - createdDate.getTime());
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    
-                    daysLeft = Math.max(0, 30 - diffDays);
-                    expired = diffDays > 30;
-                }
-
-                // Simülasyon Kontrolü
-                const isDebug = localStorage.getItem('mufyard_debug_expired') === 'true';
-                
-                // Son Karar: Kurucular ASLA kilitlenmez. Pro kullanıcılar ASLA kilitlenmez.
-                // Diğer kullanıcılar (Admin rolünde olsalar bile Kurucu değillerse) 30 gün sonunda kilitlenir.
-                const finalExpired = (isDebug && !isFounder) ? true : (isExemptFromTrial ? false : expired);
-
                 setData({
                     stats: statsRes.status === 'fulfilled' ? statsRes.value : { stats: [], news: [], forum_posts: [] },
                     tasks: tasksRes.status === 'fulfilled' ? tasksRes.value : [],
@@ -321,13 +336,13 @@ export const useGlobalData = () => {
                 contactsCorporate: [],
                 contactsPersonal: [],
                 lastFetched: null,
-                trialDaysLeft: 30,
+                trialDaysLeft: 9999,
                 isTrialExpired: false,
-                trialStarted: false
+                trialStarted: true
             },
             loading: false,
             isOffline: false,
-            trialDaysLeft: 30,
+            trialDaysLeft: 9999,
             isTrialExpired: false,
             refreshAll: async () => {},
             refreshProfile: async () => {},

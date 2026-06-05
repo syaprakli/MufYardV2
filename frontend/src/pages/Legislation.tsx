@@ -18,8 +18,7 @@ const DOC_TYPES = ["Kanun", "KHK", "Yönetmelik", "Genelge", "Özelge", "Yazı"]
 
 export default function Legislation() {
     const { user, profile } = useAuth();
-    const isAdminOrMod = profile?.role === 'admin' || profile?.role === 'moderator' ||
-                         user?.email === 'sefa.yaprakli@hotmail.com' || user?.email === 'sefa.yaprakli@gsb.gov.tr';
+    const isAdminOrMod = profile?.role === 'admin' || profile?.role === 'moderator';
     const confirm = useConfirm();
     const [selectedCategory, setSelectedCategory] = useState("Tümü");
     const [selectedSubType, setSelectedSubType] = useState<string | null>(null);

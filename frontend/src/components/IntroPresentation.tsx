@@ -69,49 +69,57 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
   const { data, refreshProfile } = useGlobalData();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [loading, setLoading] = useState(false);
+  const activeProfile = authProfile || data.profile;
+  const isAdmin = activeProfile?.role === 'admin';
+  const isTrialStarted = activeProfile?.trial_started === true;
 
   const nextSlide = async () => {
     if (currentSlide < slides.length - 1) {
       setCurrentSlide(currentSlide + 1);
     } else {
-      await handleStartTrial();
+      await handleStartTrialAndClose();
     }
   };
 
-  const handleStartTrial = async () => {
-    const activeProfile = authProfile || data.profile;
+  const markIntroSeen = () => {
+    const uid = activeProfile?.uid || user?.uid;
+    if (uid) {
+      localStorage.setItem(`mufyard_intro_seen_${uid}`, 'true');
+    }
+  };
+
+  const handleFinishIntro = () => {
+    markIntroSeen();
+    onClose();
+  };
+
+  const handleStartTrialAndClose = async () => {
+    if (loading) return;
+
     const uid = activeProfile?.uid || user?.uid;
     const email = activeProfile?.email || user?.email || undefined;
-    const isFounder = ["sefayaprakli@hotmail.com", "syaprakli@gmail.com", "sefa.yaprakli@gsb.gov.tr"].includes((email || "").toLowerCase().trim());
-    const isAdmin = activeProfile?.role === 'admin' || isFounder;
-
-    // Eğer zaten adminse veya trial başladıysa kapat gitsin
-    if (isAdmin || activeProfile?.trial_started) {
-        onClose();
-        return;
-    }
 
     if (!uid) {
-        toast.error("Kullanıcı kimliği alınamadı, lütfen sayfayı yenileyip tekrar deneyin.");
-        return;
+      toast.error("Kullanıcı bilgisi alınamadı.");
+      return;
     }
-    
+
+    // Admin veya zaten trial baslatmis kullanicida direkt kapat.
+    if (isAdmin || isTrialStarted) {
+      handleFinishIntro();
+      return;
+    }
+
     setLoading(true);
     try {
-        await updateProfile(uid, { trial_started: true });
-        // Tarayıcı hafızasına da işaret koy ki reload sonrası tekrar gelmesin
-        localStorage.setItem(`mufyard_intro_seen_${uid}`, 'true');
-        
-        toast.success("30 Günlük deneme süreniz başarıyla başlatıldı! Keyifli kullanımlar.");
-        
-        // Veriyi tazele ve kapat
-        await refreshProfile(uid, email);
-        setTimeout(() => {
-            window.location.reload();
-        }, 1000);
-    } catch (error) {
-        toast.error("Deneme süresi başlatılamadı.");
-        setLoading(false);
+      await updateProfile(uid, { trial_started: true });
+      await refreshProfile(uid, email);
+      toast.success("Deneme sürümünüz başlatıldı.");
+      handleFinishIntro();
+    } catch {
+      toast.error("Deneme sürümü başlatılamadı.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -121,40 +129,27 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
     }
   };
 
-  const handleClose = () => {
-    const activeProfile = authProfile || data.profile;
-    const email = activeProfile?.email || user?.email || undefined;
-    const isFounder = ["sefayaprakli@hotmail.com", "syaprakli@gmail.com", "sefa.yaprakli@gsb.gov.tr"].includes((email || "").toLowerCase().trim());
-    const isAdmin = activeProfile?.role === 'admin' || isFounder;
-
-    // Eğer trial başlamadıysa ve admin değilse kapatmaya izin verme
-    if (!isAdmin && !activeProfile?.trial_started) {
-        toast.error("Devam etmek için deneme süresini başlatmalısınız.");
-        return;
+  const handleClose = async () => {
+    // Kullanici X'e bastiginda da kilitlenme olmasin; trial baslamadiysa baslatip kapat.
+    if (!isAdmin && !isTrialStarted) {
+      await handleStartTrialAndClose();
+      return;
     }
-    onClose();
+    handleFinishIntro();
   };
 
   const slide = slides[currentSlide];
-  const activeProfile = authProfile || data.profile;
-  const email = activeProfile?.email || user?.email || undefined;
-  const isFounder = ["sefayaprakli@hotmail.com", "syaprakli@gmail.com", "sefa.yaprakli@gsb.gov.tr"].includes((email || "").toLowerCase().trim());
-  const isAdmin = activeProfile?.role === 'admin' || isFounder;
-  const isTrialStarted = activeProfile?.trial_started === true;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0f172a]/95 backdrop-blur-md overflow-hidden p-4">
-      {/* KESİN KONTROL: Sadece admin, kurucu veya denemesi zaten başlamış olanlar X butonunu görebilir */}
-      {(isAdmin || isTrialStarted) ? (
-        <motion.button
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          onClick={handleClose}
-          className="absolute top-6 right-6 p-2 text-white/50 hover:text-white transition-colors z-[10000]"
-        >
-          <X className="w-6 h-6" />
-        </motion.button>
-      ) : null}
+      <motion.button
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        onClick={() => void handleClose()}
+        className="absolute top-6 right-6 p-2 text-white/50 hover:text-white transition-colors z-[10000]"
+      >
+        <X className="w-6 h-6" />
+      </motion.button>
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -240,7 +235,7 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
                   </button>
                 )}
                 <button
-                  onClick={nextSlide}
+                  onClick={() => void nextSlide()}
                   disabled={loading}
                   className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold text-white transition-all transform hover:scale-105 active:scale-95 bg-gradient-to-r ${slide.color} shadow-lg disabled:opacity-50`}
                 >
@@ -248,7 +243,7 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
                     <>
-                      {currentSlide === slides.length - 1 ? 'Ücretsiz Denemeyi Başlat' : 'Devam Et'}
+                      {currentSlide === slides.length - 1 ? 'Deneme Sürümünü Başlat' : 'Devam Et'}
                       <ChevronRight className="w-5 h-5" />
                     </>
                   )}

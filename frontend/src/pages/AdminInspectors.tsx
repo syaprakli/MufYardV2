@@ -14,20 +14,23 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 export default function AdminInspectors() {
-    const { user, profile: userProfile } = useAuth();
+    const { user, profile: userProfile, loading: authLoading } = useAuth();
     const navigate = useNavigate();
 
-    const FOUNDER_EMAILS = ["sefayaprakli@hotmail.com", "sefa.yaprakli@gsb.gov.tr", "syaprakli@gmail.com"];
-
-    const isFounder = user?.email && FOUNDER_EMAILS.includes(user.email);
+    const isAdmin = userProfile?.role === "admin";
+    const founderEmails = new Set([
+        "sefa.yaprakli@gsb.gov.tr",
+        "syaprakli@gmail.com",
+        "sefayaprakli@hotmail.com",
+    ]);
+    const isFounder = founderEmails.has((user?.email || "").toLowerCase().trim());
 
     useEffect(() => {
-        const isAdmin = userProfile?.role === "admin" || isFounder;
-        if (!isAdmin && user) {
+        if (!authLoading && user && !isAdmin) {
             toast.error("Bu sayfaya erişim yetkiniz bulunmamaktadır.");
             navigate("/");
         }
-    }, [isFounder, user, userProfile, navigate]);
+    }, [isAdmin, user, authLoading, navigate]);
 
     const confirm = useConfirm();
     const [inspectors, setInspectors] = useState<Inspector[]>([]);
@@ -294,7 +297,7 @@ export default function AdminInspectors() {
                                         
                                         {profile && (
                                             <div className="relative">
-                                                {!FOUNDER_EMAILS.includes(profile.email || "") && (
+                                                {isFounder && profile.role !== "admin" && (
                                                     <button onClick={() => setOpenRoleMenu(openRoleMenu === profile.uid ? null : profile.uid)} className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-xl transition-all">
                                                         <MoreVertical size={16} />
                                                     </button>
@@ -311,31 +314,6 @@ export default function AdminInspectors() {
                                                         <div className="px-4 py-2 border-b border-t border-border my-1 bg-slate-50 dark:bg-slate-900/50">
                                                             <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">KULLANIM SÜRESİ</p>
                                                         </div>
-                                                        
-                                                        <button 
-                                                            onClick={async () => {
-                                                                try {
-                                                                    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
-                                                                    await fetchWithTimeout(`${API_URL}/profiles/${profile.uid}`, {
-                                                                        method: "PATCH",
-                                                                        headers,
-                                                                        body: JSON.stringify({ 
-                                                                            role: "user", 
-                                                                            has_premium_ai: false,
-                                                                            trial_started: false 
-                                                                        }),
-                                                                    });
-                                                                    toast.success("Kullanıcı tamamen sıfırlandı (Deneme Sürümü).");
-                                                                    setOpenRoleMenu(null);
-                                                                    loadData();
-                                                                } catch {
-                                                                    toast.error("İşlem başarısız.");
-                                                                }
-                                                            }}
-                                                            className="w-full text-left px-4 py-2.5 text-[10px] font-black hover:bg-rose-100 text-rose-600 transition-colors"
-                                                        >
-                                                            SIFIRLA (DENEME SÜRÜMÜ YAP)
-                                                        </button>
                                                         
                                                         {profile.has_premium_ai ? (
                                                             <button 
@@ -366,7 +344,7 @@ export default function AdminInspectors() {
                                                                         await fetchWithTimeout(`${API_URL}/profiles/${profile.uid}`, {
                                                                             method: "PATCH",
                                                                             headers,
-                                                                            body: JSON.stringify({ has_premium_ai: true, trial_started: true }),
+                                                                            body: JSON.stringify({ has_premium_ai: true }),
                                                                         });
                                                                         toast.success("Kullanıcı PRO sürüme yükseltildi.");
                                                                         setOpenRoleMenu(null);

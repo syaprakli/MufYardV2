@@ -64,16 +64,6 @@ export async function getAuthHeaders(baseHeaders: HeadersInit = {}): Promise<Rec
 
     if (currentUser?.uid || currentUser?.email) {
         ensureIdentityHeaders(currentUser?.uid, currentUser?.email);
-    } else {
-        try {
-            const raw = localStorage.getItem("demo_user");
-            if (raw) {
-                const demoUser = JSON.parse(raw);
-                ensureIdentityHeaders(demoUser?.uid, demoUser?.email);
-            }
-        } catch {
-            // Ignore malformed local demo payload.
-        }
     }
 
     return Object.fromEntries(headers.entries());

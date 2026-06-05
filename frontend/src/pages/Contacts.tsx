@@ -16,7 +16,7 @@ import { useGlobalData } from "../lib/context/GlobalDataContext";
 const ShareModalLazy = lazy(() => import("../components/ShareModal"));
 const ModalLazy = lazy(() => import("../components/ui/Modal").then((module) => ({ default: module.Modal })));
 export default function Contacts() {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
     const location = useLocation();
     const confirm = useConfirm();
     const { data: cachedData, refreshAll, refreshContactsPersonal, refreshContactsCorporate, loading: globalLoading } = useGlobalData();
@@ -97,13 +97,16 @@ export default function Contacts() {
             
             return { contacts: uniqueContacts, invitations: pending };
         } else {
+            const myName = profile?.full_name?.toLowerCase().trim();
             const corp = (cachedData.contactsCorporate || []).filter(c => {
                 const cEmail = c.email?.toLowerCase().trim();
-                return cEmail !== userEmail;
+                const cName = c.name?.toLowerCase().trim();
+                const isMe = cEmail === userEmail || (cName && myName && cName === myName);
+                return !isMe;
             });
             return { contacts: corp, invitations: [] };
         }
-    }, [activeTab, cachedData.contactsPersonal, cachedData.contactsCorporate, user]);
+    }, [activeTab, cachedData.contactsPersonal, cachedData.contactsCorporate, user, profile]);
 
     useEffect(() => {
         if (user?.uid) {

@@ -206,7 +206,10 @@ export default function ReportAnalytics() {
                 (Array.isArray(task.accepted_collaborators) && task.accepted_collaborators.includes(effectiveUid)) ||
                 (Array.isArray(task.accepted_collaborators) && user?.email && task.accepted_collaborators.includes(user.email))
             ) {
-                uniqueMap.set(key, task);
+                // Sadece ana görevleri dahil et, alt görevleri (denetim formları / raporlar) gösterme
+                if (!task.parent_task_id) {
+                    uniqueMap.set(key, task);
+                }
             }
         }
 

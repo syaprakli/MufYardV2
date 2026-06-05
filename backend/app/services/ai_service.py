@@ -84,8 +84,10 @@ async def _get_user_ai_settings(uid: str) -> tuple[str, str, float, str, bool]:
             res_temp = float(data.get("ai_temperature") or res_temp)
             res_sp = (data.get("ai_system_prompt") or "").strip()
             res_premium = bool(data.get("has_premium_ai") or False)
+    except (KeyError, ValueError, TypeError) as e:
+        logger.warning(f"AI ayarları Firestore'dan alınırken veri hatası: {e}")
     except Exception as e:
-        logger.warning(f"Error fetching Firestore AI settings: {e}")
+        logger.error(f"Firestore bağlantı hatası: {e}")
 
     # 2. Yerel (Local) ayarlara bak ve üzerine yaz
     try:
@@ -99,8 +101,10 @@ async def _get_user_ai_settings(uid: str) -> tuple[str, str, float, str, bool]:
                 res_temp = float(local_data.get("ai_temperature"))
             if local_data.get("ai_system_prompt") is not None:
                 res_sp = local_data.get("ai_system_prompt").strip()
+    except (KeyError, ValueError, TypeError) as e:
+        logger.warning(f"Yerel AI ayarları işlenirken veri hatası: {e}")
     except Exception as e:
-        logger.error(f"Error merging local AI settings: {e}")
+        logger.error(f"Yerel AI ayarları alınırken hata: {e}")
 
     return res_key, res_model, res_temp, res_sp, res_premium
 

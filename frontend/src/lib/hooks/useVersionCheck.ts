@@ -24,7 +24,11 @@ export function useVersionCheck() {
                     }
                 }
             } catch (error) {
-                console.warn("Sürüm kontrolü atlandı (izin/bağlantı hatası):", (error as any)?.code || error);
+                const code = (error as any)?.code;
+                if (code === "permission-denied" || code === "unavailable") {
+                    return;
+                }
+                console.warn("Sürüm kontrolü atlandı:", code || error);
             }
         };
 

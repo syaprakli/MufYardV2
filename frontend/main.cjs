@@ -130,7 +130,7 @@ async function startBackend() {
             });
 
             // Wait for port 8000 to be ready, notify if it never comes up
-            waitForPort(8000)
+            waitForPort(8000, 25, 2000)
                 .then(() => logStream.write('[INFO] Backend port 8000 hazır.\n'))
                 .catch(err => {
                     logStream.write('[FATAL] ' + err.message + '\n');
@@ -193,11 +193,12 @@ function createWindow() {
         title: "MufYARD",
         icon: path.join(__dirname, 'public/favicon.ico'),
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.cjs'),
             plugins: true,
-            webSecurity: false, // Radyo yayınları ve CORS sorunlarını aşmak için geçici olarak kapatıldı
-            allowRunningInsecureContent: true, // HTTP radyo akışlarına izin ver
+            webSecurity: !app.isPackaged, // Geliştirmede kapalı (localhost CORS), üretimde açık
+            allowRunningInsecureContent: false,
         }
     });
 

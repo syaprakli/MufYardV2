@@ -1,5 +1,5 @@
 import { API_URL as API_BASE_URL } from "../config";
-import { fetchWithTimeout } from "./utils";
+import { fetchWithTimeout, getAuthHeaders } from "./utils";
 import { addToQueue } from "./syncQueue";
 
 export interface TaskStep {
@@ -78,11 +78,8 @@ export async function fetchTasks(userId?: string, userEmail?: string): Promise<T
     }
 
     try {
-        let url = `${API_BASE_URL}/tasks/?`;
-        if (userId) url += `user_id=${userId}&`;
-        if (userEmail) url += `user_email=${userEmail}`;
-
-        const response = await fetchWithTimeout(url);
+        const headers = await getAuthHeaders();
+        const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/`, { headers });
         if (!response.ok) throw new Error("Görevler yüklenemedi.");
         
         const data = await response.json();
@@ -115,9 +112,10 @@ export async function fetchTasks(userId?: string, userEmail?: string): Promise<T
 }
 
 export async function createTask(task: TaskCreate): Promise<Task> {
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
     const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(task),
     });
     if (!response.ok) throw new Error("Görev oluşturulamadı.");
@@ -127,9 +125,10 @@ export async function createTask(task: TaskCreate): Promise<Task> {
 
 export async function updateTask(id: string, update: Partial<TaskCreate & { steps: TaskStep[], rapor_durumu: string, shared_with: string[] }>): Promise<Task> {
     try {
+        const headers = await getAuthHeaders({ "Content-Type": "application/json" });
         const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/${id}`, {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify(update),
         });
         if (!response.ok) throw new Error("Görev güncellenemedi.");
@@ -149,32 +148,35 @@ export async function updateTask(id: string, update: Partial<TaskCreate & { step
 }
 
 export async function deleteTask(id: string): Promise<{ status: string; message: string }> {
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/${id}`, {
         method: "DELETE",
+        headers,
     });
     if (!response.ok) throw new Error("Görev silinemedi.");
     taskCache = {}; // Invalidate
     return response.json();
 }
 
-export async function acceptTask(id: string, userId: string, userEmail?: string): Promise<{ status: string; message: string }> {
-    const params = new URLSearchParams();
-    if (userId) params.set("user_id", userId);
-    if (userEmail) params.set("user_email", userEmail);
-    const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/${id}/accept?${params.toString()}`, {
+export async function acceptTask(id: string, _userId: string, _userEmail?: string): Promise<{ status: string; message: string }> {
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/${id}/accept`, {
         method: "POST",
+        headers,
     });
     if (!response.ok) throw new Error("Görev kabul edilemedi.");
     taskCache = {}; // Invalidate
     return response.json();
 }
 
-export async function importTasksFromExcel(userId: string, file: File): Promise<any> {
+export async function importTasksFromExcel(_userId: string, file: File): Promise<any> {
     const formData = new FormData();
     formData.append("file", file);
     
-    const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/import?uid=${userId}`, {
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/import`, {
         method: "POST",
+        headers,
         body: formData
     });
     

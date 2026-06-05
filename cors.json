@@ -1,7 +1,14 @@
 [
   {
-    "origin": ["*"],
-    "method": ["GET", "HEAD"],
+    "origin": [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "http://127.0.0.1:5173",
+      "app://.",
+      "https://mufyardv2.web.app",
+      "https://mufyardv2.firebaseapp.com"
+    ],
+    "method": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     "responseHeader": ["Content-Type", "Content-Disposition"],
     "maxAgeSeconds": 3600
   }

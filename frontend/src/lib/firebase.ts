@@ -32,70 +32,41 @@ export const storage = getStorage(app);
 export const messaging = null; 
 
 // Electron environment detection
-// User-Agent bazli kontrol bazi makinelerde false donebiliyor.
-// Bu nedenle process.versions.electron ve renderer tipi ile birlikte kontrol ediyoruz.
+// contextIsolation: true ile window.process erişilemez.
+// preload.cjs üzerinden window.electronAPI.isElectron kontrolü yapılır.
 export const isElectron = (() => {
   if (typeof window === 'undefined') return false;
 
-  const maybeProcess = (window as any).process;
-  const hasElectronProcess = !!maybeProcess?.versions?.electron;
-  const isRendererProcess = maybeProcess?.type === 'renderer';
-  const hasElectronUA = window.navigator.userAgent.includes('Electron');
+  // Preload script tarafından sağlanan güvenli API
+  if ((window as any).electronAPI?.isElectron) return true;
 
-  return hasElectronProcess || isRendererProcess || hasElectronUA;
+  // Fallback: User-Agent kontrolü
+  return window.navigator.userAgent.includes('Electron');
 })();
 
 export const requestForToken = async () => null;
 
 export const onMessageListener = () => new Promise(() => {});
 
-// Geliştirici Giriş Fonksiyonu (Hızlı Test İçin)
 export const signIn = async (email: string, pass: string) => {
-  const normalizedEmail = email.trim().toLowerCase();
-
-  // 1. ÖNCELİKLİ BYPASS: Sabit hesap doğrudan geçer
-  if (normalizedEmail === "sefa.yaprakli@gsb.gov.tr" && pass === "123456") {
-    console.log("✅ Sabit hesap bypass aktif.");
-    return { 
-      user: { 
-        email: normalizedEmail, 
-        uid: "sefa-yaprakli-gsb-unique-id", 
-        displayName: "Sefa Yapraklı",
-        photoURL: null
-      } 
-    };
+  if (isDummy) {
+    throw new Error("Firebase yapılandırması eksik. Kimlik doğrulama devre dışı bırakıldı.");
   }
-
-  // 2. NORMAL FLOW + FAIL-SAFE
-  try {
-    if (isDummy) {
-      return { user: { email, uid: "demo-user-123" } };
-    }
-    return await firebaseSignIn(auth, email, pass);
-  } catch (error) {
-    // Firebase hata verse bile eğer bu bizim özel hesabımızsa içeri al
-    if (normalizedEmail === "sefa.yaprakli@gsb.gov.tr" && pass === "123456") {
-       return { user: { email: normalizedEmail, uid: "sefa-yaprakli-gsb-unique-id", displayName: "Sefa Yapraklı" } };
-    }
-    throw error;
-  }
+  return firebaseSignIn(auth, email, pass);
 };
 
 export const signUp = async (email: string, pass: string, name: string) => {
-  try {
-    if (isDummy) {
-      return { user: { email, uid: "demo-user-" + Date.now(), displayName: name } };
-    }
-    const result = await firebaseSignUp(auth, email, pass);
-    if (result.user) {
-      await updateProfile(result.user, { displayName: name });
-      // Kayıt sonrası doğrulama maili gönder
-      await sendEmailVerification(result.user);
-    }
-    return result;
-  } catch (error) {
-    throw error;
+  if (isDummy) {
+    throw new Error("Firebase yapılandırması eksik. Kayıt işlemi devre dışı bırakıldı.");
   }
+
+  const result = await firebaseSignUp(auth, email, pass);
+  if (result.user) {
+    await updateProfile(result.user, { displayName: name });
+    // Kayıt sonrası doğrulama maili gönder
+    await sendEmailVerification(result.user);
+  }
+  return result;
 };
 
 export const signInWithGoogle = async () => {

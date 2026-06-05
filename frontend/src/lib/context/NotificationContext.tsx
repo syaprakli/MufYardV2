@@ -13,6 +13,7 @@ import {
 
 import { WS_URL } from '../config';
 import { toast } from 'react-hot-toast';
+import { auth } from '../firebase';
 
 interface NotificationContextType {
     notifications: Notification[];
@@ -56,10 +57,26 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         let retryCount = 0;
         let retryTimer: any = null;
 
-        const connect = () => {
+        const connect = async () => {
             if (!user?.uid) return;
-            
-            socket = new WebSocket(`${WS_URL}/api/notifications/ws/${user.uid}`);
+
+            let token = '';
+            try {
+                token = await auth.currentUser?.getIdToken?.() || '';
+            } catch {
+                token = '';
+            }
+
+            let wsUrl = '';
+            if (token) {
+                wsUrl = `${WS_URL}/api/notifications/ws/${user.uid}?token=${encodeURIComponent(token)}`;
+            }
+
+            if (!wsUrl) {
+                return;
+            }
+
+            socket = new WebSocket(wsUrl);
 
             socket.onopen = () => {
                 console.log("Notification WS: Connected");
@@ -94,12 +111,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             socket.onclose = () => {
                 const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
                 console.log(`Notification WS: Disconnected, retrying in ${delay/1000}s...`);
-                retryTimer = setTimeout(connect, delay);
+                retryTimer = setTimeout(() => {
+                    void connect();
+                }, delay);
                 retryCount += 1;
             };
         };
 
-        connect();
+        void connect();
 
         return () => {
             if (socket) {

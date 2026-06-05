@@ -1,14 +1,13 @@
-from fastapi import APIRouter, Query
-from firebase_admin import firestore
-from typing import List
+from fastapi import APIRouter, Query, Depends
+from typing import Any, Dict, List
 from datetime import datetime
+from app.lib.firebase_admin import db
+from app.lib.auth import get_current_user
 
 router = APIRouter()
 
-db = firestore.client()
-
 @router.get("/{audit_id}")
-def get_audit_trail(audit_id: str):
+def get_audit_trail(audit_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     logs_ref = db.collection("audit_trail").where("audit_id", "==", audit_id)
     logs = []
     for doc in logs_ref.stream():

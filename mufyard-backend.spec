@@ -4,8 +4,10 @@ from PyInstaller.utils.hooks import collect_all
 datas = []
 binaries = []
 hiddenimports = []
-tmp_ret = collect_all('app')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+for pkg in ['app', 'websockets', 'uvicorn']:
+    tmp_ret = collect_all(pkg)
+    datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+
 
 
 a = Analysis(
