@@ -246,7 +246,9 @@ async def _authenticate_websocket_identity(websocket: WebSocket) -> tuple[str, s
                         await asyncio.sleep(1.0)
                         continue
                 raise e
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.getLogger("app.websocket").error(f"WS authentication failed: {e}", exc_info=True)
         await websocket.close(code=1008)
         raise WebSocketDisconnect(code=1008)
 

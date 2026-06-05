@@ -69,7 +69,9 @@ async def get_current_user(
             return {"uid": uid, "email": email, "role": role}
         except HTTPException:
             raise
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Token verification failed: {e}", exc_info=True)
             raise HTTPException(status_code=401, detail="Kimlik doğrulama başarısız.")
 
     # Dev fallback: only when backend runs with mock Firebase

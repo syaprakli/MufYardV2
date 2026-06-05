@@ -51,7 +51,9 @@ async def _authenticate_notification_ws_identity(websocket: WebSocket, requested
                 await websocket.close(code=1008)
                 raise WebSocketDisconnect(code=1008)
             return uid
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger("app.notifications").error(f"Notification WS authentication failed: {e}", exc_info=True)
             await websocket.close(code=1008)
             raise WebSocketDisconnect(code=1008)
 
