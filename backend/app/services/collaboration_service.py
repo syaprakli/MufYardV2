@@ -460,18 +460,23 @@ class CollaborationService:
             return None
 
     @staticmethod
-    async def toggle_like(post_id: str) -> Dict[str, Any]:
+    async def toggle_like(post_id: str, user_id: str = None) -> Dict[str, Any]:
         doc_ref = db.collection('posts').document(post_id)
         post = await asyncio.to_thread(doc_ref.get)
         if not post.exists:
             return {"error": "Post bulunamadı."}
         
         post_data = post.to_dict()
-        current_likes = post_data.get('likes_count', 0)
-        new_likes = current_likes + 1
+        liked_by = post_data.get('liked_by', [])
         
-        await asyncio.to_thread(doc_ref.update, {'likes_count': new_likes})
-        return {"id": post_id, "likes_count": new_likes}
+        if user_id and user_id in liked_by:
+            liked_by.remove(user_id)
+        elif user_id:
+            liked_by.append(user_id)
+        
+        new_likes = len(liked_by)
+        await asyncio.to_thread(doc_ref.update, {'likes_count': new_likes, 'liked_by': liked_by})
+        return {"id": post_id, "likes_count": new_likes, "liked": user_id in liked_by}
 
     # --- Category Management ---
     @staticmethod

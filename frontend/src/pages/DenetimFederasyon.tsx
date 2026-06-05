@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { sanitizeHtml } from "../lib/sanitize";
 import { useNavigate } from "react-router-dom";
 import {
     BookOpen, ClipboardCheck, Bot, Plus, Edit2, Trash2, Search,
@@ -41,12 +42,7 @@ const emptyForm = {
     tags: [] as string[],
 };
 
-function sanitizeRichHtml(input: string): string {
-    return String(input || "")
-        .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
-        .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-        .replace(/javascript\s*:/gi, "");
-}
+
 
 function stripHtml(html: string): string {
     if (!html) return "";
@@ -676,10 +672,15 @@ export default function DenetimFederasyon() {
                                         alt={`Denetim Görseli ${index + 1}`}
                                         className="w-full h-full object-cover cursor-pointer hover:scale-[1.02] transition-transform duration-200"
                                         onClick={() => {
-                                            const modalHtml = `<div id="photo-modal-${index}" onclick="this.remove()" class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-200">
-                                                <img src="${API_URL.replace("/api", "")}${url}" class="max-w-full max-h-full rounded-lg object-contain shadow-2xl" />
-                                            </div>`;
-                                            document.body.insertAdjacentHTML('beforeend', modalHtml);
+                                            const overlay = document.createElement('div');
+                                            overlay.id = `photo-modal-${index}`;
+                                            overlay.className = 'fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-200';
+                                            overlay.addEventListener('click', () => overlay.remove());
+                                            const img = document.createElement('img');
+                                            img.src = `${API_URL.replace("/api", "")}${url}`;
+                                            img.className = 'max-w-full max-h-full rounded-lg object-contain shadow-2xl';
+                                            overlay.appendChild(img);
+                                            document.body.appendChild(overlay);
                                         }}
                                     />
                                     <button
@@ -1918,7 +1919,7 @@ export default function DenetimFederasyon() {
                                                             ) : (
                                                                 <div 
                                                                     className="flex-1 p-4 rounded-xl border border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-955/5 text-xs text-slate-800 dark:text-slate-255 leading-relaxed overflow-y-auto select-text prose prose-sm dark:prose-invert max-w-none h-[350px] lg:h-full"
-                                                                    dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(reportContent || "<p class='text-slate-400 italic'>Rapor içeriği boş.</p>") }}
+                                                                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(reportContent || "<p class='text-slate-400 italic'>Rapor içeriği boş.</p>") }}
                                                                 />
                                                             )}
                                                             <p className="text-[10px] text-slate-400 font-bold">

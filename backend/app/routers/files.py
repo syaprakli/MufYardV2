@@ -16,6 +16,17 @@ from app.lib.rate_limiter import limiter
 
 router = APIRouter(tags=["files"])
 
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
+ALLOWED_EXTENSIONS = {
+    '.pdf', '.docx', '.xlsx', '.xls', '.doc', '.pptx', '.ppt',
+    '.txt', '.csv', '.json', '.xml', '.html',
+    '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg',
+    '.mp3', '.wav', '.webm', '.ogg', '.m4a',
+    '.mp4', '.avi', '.mov', '.mkv',
+    '.zip', '.rar', '.7z',
+}
+IS_DESKTOP = os.environ.get("MUFYARD_DESKTOP", "false").lower() == "true"
+
 
 
 class FileItem(BaseModel):
@@ -65,6 +76,17 @@ async def upload_file(
         if not await asyncio.to_thread(os.path.exists, target_dir):
             await asyncio.to_thread(os.makedirs, target_dir, exist_ok=True)
 
+        # Dosya boyut kontrolü (10MB)
+        file_bytes = await file.read()
+        if len(file_bytes) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=413, detail=f"Dosya boyutu çok büyük (max {MAX_UPLOAD_SIZE // (1024*1024)}MB).")
+        await file.seek(0)
+
+        # Dosya uzantı kontrolü
+        _, ext = os.path.splitext(file.filename or "")
+        if ext.lower() not in ALLOWED_EXTENSIONS:
+            raise HTTPException(status_code=400, detail=f"Bu dosya türü desteklenmiyor: {ext}")
+
         file_path = os.path.join(target_dir, file.filename)
         # Kök dizin dışına çıkış engeli
         if not os.path.abspath(file_path).startswith(os.path.abspath(BASE_REPORTS_DIR)):
@@ -77,7 +99,7 @@ async def upload_file(
 
         def save_file(f, p):
             with open(p, "wb") as buffer:
-                shutil.copyfileobj(f.file, buffer)
+                buffer.write(file_bytes)
 
         await asyncio.to_thread(save_file, file, file_path)
 
@@ -275,7 +297,9 @@ async def open_file(file_id: str, current_user: dict = Depends(get_current_user)
             # If it's a directory, use open_folder logic instead or just startfile
             pass
             
-        # Open in default app
+        # Open in default app (DESKTOP ONLY)
+        if not IS_DESKTOP:
+            raise HTTPException(status_code=403, detail="Dosya açma sadece masaüstü uygulamasında kullanılabilir.")
         if os.name == 'nt': # Windows
             await asyncio.to_thread(os.startfile, full_path)
         elif os.name == 'posix': # Mac/Linux
@@ -287,8 +311,10 @@ async def open_file(file_id: str, current_user: dict = Depends(get_current_user)
                 subprocess.run(['xdg-open', full_path])
             
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Dosya açılırken hata oluştu.")
 
 @router.post("/open-folder/{file_id:path}")
 async def open_folder(file_id: str, current_user: dict = Depends(get_current_user)):
@@ -308,7 +334,9 @@ async def open_folder(file_id: str, current_user: dict = Depends(get_current_use
         is_dir = await asyncio.to_thread(os.path.isdir, full_path)
         target_path = full_path if is_dir else os.path.dirname(full_path)
             
-        # Open in OS Explorer
+        # Open in OS Explorer (DESKTOP ONLY)
+        if not IS_DESKTOP:
+            raise HTTPException(status_code=403, detail="Klasör açma sadece masaüstü uygulamasında kullanılabilir.")
         if os.name == 'nt': # Windows
             await asyncio.to_thread(os.startfile, target_path)
         elif os.name == 'posix': # Mac/Linux
@@ -323,7 +351,7 @@ async def open_folder(file_id: str, current_user: dict = Depends(get_current_use
     except HTTPException as he:
         raise he
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Klasör açılırken hata oluştu.")
 
 
 @router.post("/open-task-folder/{task_id}")

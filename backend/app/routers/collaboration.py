@@ -1,4 +1,5 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query, Depends
+import asyncio
 from typing import List, Dict, Optional, Any
 from app.services.collaboration_service import CollaborationService
 from app.schemas.messaging import MessageCreate, MessageResponse, DirectMessageCreate, DirectMessageResponse
@@ -13,14 +14,14 @@ router = APIRouter(prefix="", tags=["collaboration"])
 # --- PERSISTENT MESSAGING (CHAT) ---
 
 @router.get("/messages", response_model=List[MessageResponse])
-async def get_message_history(limit: int = 50):
+async def get_message_history(limit: int = 50, current_user: Dict[str, Any] = Depends(get_current_user)):
     try:
         return await CollaborationService.get_messages(limit)
     except Exception:
         raise HTTPException(status_code=500, detail="Mesajlar alınırken bir hata oluştu.")
 
 @router.post("/messages", response_model=MessageResponse)
-async def save_global_message(message: MessageCreate):
+async def save_global_message(message: MessageCreate, current_user: Dict[str, Any] = Depends(get_current_user)):
     try:
         return await CollaborationService.save_message(message)
     except Exception:
@@ -218,36 +219,38 @@ async def delete_public_post(post_id: str, current_user: Dict[str, Any] = Depend
     raise HTTPException(status_code=403, detail="Paylaşım bulunamadı veya silme yetkiniz yok.")
 
 @router.post("/posts/{post_id}/like")
-async def like_public_post(post_id: str):
-    result = await CollaborationService.toggle_like(post_id)
+async def like_public_post(post_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    uid = current_user.get("uid")
+    result = await CollaborationService.toggle_like(post_id, uid)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
 
 @router.get("/posts/{post_id}/comments")
-async def get_post_comments(post_id: str):
+async def get_post_comments(post_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     try:
         return await CollaborationService.get_comments(post_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/posts/{post_id}/comments")
-async def add_post_comment(post_id: str, comment: Dict[str, Any]):
+async def add_post_comment(post_id: str, comment: Dict[str, Any], current_user: Dict[str, Any] = Depends(get_current_user)):
+    comment["author_id"] = current_user.get("uid")
+    comment["author_name"] = current_user.get("email") or comment.get("author_name", "Anonim")
     try:
         return await CollaborationService.add_comment(post_id, comment)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.patch("/posts/{post_id}")
-async def update_public_post(post_id: str, post_update: PostUpdate):
+async def update_public_post(post_id: str, post_update: PostUpdate, current_user: Dict[str, Any] = Depends(get_current_user)):
     result = await CollaborationService.update_post(post_id, post_update)
     if result:
         return result
     raise HTTPException(status_code=404, detail="Paylaşım bulunamadı.")
 
 @router.patch("/posts/{post_id}/comments/{comment_id}")
-async def update_post_comment(post_id: str, comment_id: str, comment: Dict[str, Any]):
-    # Note: Use comment.get('content') if it's passed as a dict
+async def update_post_comment(post_id: str, comment_id: str, comment: Dict[str, Any], current_user: Dict[str, Any] = Depends(get_current_user)):
     content = comment.get('content')
     if not content:
         raise HTTPException(status_code=400, detail="İçerik boş olamaz.")
@@ -258,7 +261,7 @@ async def update_post_comment(post_id: str, comment_id: str, comment: Dict[str, 
     raise HTTPException(status_code=404, detail="Yorum bulunamadı.")
 
 @router.delete("/posts/{post_id}/comments/{comment_id}")
-async def delete_post_comment(post_id: str, comment_id: str):
+async def delete_post_comment(post_id: str, comment_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     if await CollaborationService.delete_comment(post_id, comment_id):
         return {"status": "success", "message": "Yorum silindi."}
     raise HTTPException(status_code=404, detail="Yorum bulunamadı.")
@@ -380,7 +383,7 @@ class ChatConnectionManager:
 chat_manager = ChatConnectionManager()
 
 @router.get("/online-users")
-async def get_online_users():
+async def get_online_users(current_user: Dict[str, Any] = Depends(get_current_user)):
     return chat_manager.get_online_uids()
 
 # --- WEBSOCKET HANDLER MOVED TO main.py FOR STABILITY ---
@@ -417,6 +420,18 @@ doc_manager = DocumentConnectionManager()
 
 @router.websocket("/report/{audit_id}")
 async def report_collab_endpoint(websocket: WebSocket, audit_id: str):
+    # Auth: token doğrulama
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=1008)
+        return
+    try:
+        from firebase_admin import auth as firebase_auth
+        await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=60))
+    except Exception:
+        await websocket.close(code=1008)
+        return
+
     await doc_manager.connect(websocket, audit_id)
     try:
         while True:
@@ -428,11 +443,11 @@ async def report_collab_endpoint(websocket: WebSocket, audit_id: str):
 # --- CATEGORY MANAGEMENT ---
 
 @router.get("/categories", response_model=List[str])
-async def get_collaboration_categories():
+async def get_collaboration_categories(current_user: Dict[str, Any] = Depends(get_current_user)):
     return await CollaborationService.get_categories()
 
 @router.post("/categories")
-async def add_collaboration_category(payload: Dict[str, str]):
+async def add_collaboration_category(payload: Dict[str, str], current_user: Dict[str, Any] = Depends(get_current_user)):
     if await CollaborationService.add_category(payload.get("name")):
         return {"status": "success"}
     raise HTTPException(status_code=400, detail="Kategori eklenemedi.")

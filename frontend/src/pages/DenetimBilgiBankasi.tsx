@@ -14,6 +14,7 @@ import { useAuth } from "../lib/hooks/useAuth";
 import { useGlobalData } from "../lib/context/GlobalDataContext";
 import { createAudit, updateAudit, fetchAuditById } from "../lib/api/audit";
 import { updateTask } from "../lib/api/tasks";
+import { sanitizeHtml } from "../lib/sanitize";
 
 interface KnowledgeItem {
     id: string;
@@ -41,12 +42,7 @@ const emptyForm = {
     tags: [] as string[],
 };
 
-function sanitizeRichHtml(input: string): string {
-    return String(input || "")
-        .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
-        .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-        .replace(/javascript\s*:/gi, "");
-}
+// sanitizeRichHtml removed — using DOMPurify via sanitizeHtml import
 
 function stripHtml(html: string): string {
     if (!html) return "";
@@ -630,10 +626,7 @@ export default function DenetimBilgiBankasi() {
                                         alt={`Denetim Görseli ${index + 1}`}
                                         className="w-full h-full object-cover cursor-pointer hover:scale-[1.02] transition-transform duration-200"
                                         onClick={() => {
-                                            const modalHtml = `<div id="photo-modal-${index}" onclick="this.remove()" class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-200">
-                                                <img src="${API_URL.replace("/api", "")}${url}" class="max-w-full max-h-full rounded-lg object-contain shadow-2xl" />
-                                            </div>`;
-                                            document.body.insertAdjacentHTML('beforeend', modalHtml);
+                                            window.open(`${API_URL.replace("/api", "")}${url}`, '_blank');
                                         }}
                                     />
                                     <button
@@ -1675,7 +1668,7 @@ export default function DenetimBilgiBankasi() {
                                                         ) : (
                                                             <div 
                                                                 className="flex-1 p-4 rounded-xl border border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-950/5 text-xs text-slate-800 dark:text-slate-255 leading-relaxed overflow-y-auto select-text prose prose-sm dark:prose-invert max-w-none h-[350px] lg:h-full"
-                                                                dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(reportContent || "<p class='text-slate-400 italic'>Rapor içeriği boş.</p>") }}
+                                                                dangerouslySetInnerHTML={{ __html: sanitizeHtml(reportContent || "<p class='text-slate-400 italic'>Rapor içeriği boş.</p>") }}
                                                             />
                                                         )}
                                                         <p className="text-[10px] text-slate-400 font-bold">
