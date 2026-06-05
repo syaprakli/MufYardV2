@@ -26,6 +26,7 @@ class AuditBase(BaseModel):
     doc_footer: Optional[str] = Field(default="Müfettişlik Raporu")
     show_page_numbers: Optional[bool] = Field(default=True)
     audit_data: Optional[Dict[str, Any]] = None
+    report_created: Optional[bool] = None
 
 class AuditCreate(AuditBase):
     pass
@@ -52,6 +53,7 @@ class AuditUpdate(BaseModel):
     doc_footer: Optional[str] = None
     show_page_numbers: Optional[bool] = None
     audit_data: Optional[Dict[str, Any]] = None
+    report_created: Optional[bool] = None
 
 
 class AuditResponse(AuditBase):

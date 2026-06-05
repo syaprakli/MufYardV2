@@ -53,7 +53,7 @@ class AuditService:
         
         if not user_id and not user_email:
             fields = ['title', 'date', 'status', 'inspector', 'location', 'owner_id', 
-                      'assigned_to', 'shared_with', 'shared_roles', 'task_id', 'report_seq', 'is_public', 'created_at', 'audit_data']
+                      'assigned_to', 'shared_with', 'shared_roles', 'task_id', 'report_seq', 'is_public', 'created_at', 'audit_data', 'report_created']
             docs = await asyncio.to_thread(lambda: audits_ref.where('is_public', '==', True).limit(200).select(fields).stream())
             return [ {**doc.to_dict(), 'id': doc.id} for doc in docs]
 
@@ -61,7 +61,7 @@ class AuditService:
         admin_id = "sefa.yaprakli@gsb.gov.tr"
         if user_id == admin_id or user_email == admin_id or user_id == "admin":
             fields = ['title', 'date', 'status', 'inspector', 'location', 'owner_id', 
-                      'assigned_to', 'shared_with', 'shared_roles', 'task_id', 'report_seq', 'is_public', 'created_at', 'audit_data']
+                      'assigned_to', 'shared_with', 'shared_roles', 'task_id', 'report_seq', 'is_public', 'created_at', 'audit_data', 'report_created']
             docs = await asyncio.to_thread(lambda: audits_ref.order_by('created_at', direction='DESCENDING').limit(500).select(fields).stream())
             return [ {**doc.to_dict(), 'id': doc.id} for doc in docs]
 
@@ -70,7 +70,7 @@ class AuditService:
             if q is None: return []
             # Optimization: Select only metadata fields to avoid fetching large 'report_content'
             fields = ['title', 'date', 'status', 'inspector', 'location', 'owner_id', 
-                      'assigned_to', 'shared_with', 'shared_roles', 'task_id', 'report_seq', 'is_public', 'created_at', 'audit_data']
+                      'assigned_to', 'shared_with', 'shared_roles', 'task_id', 'report_seq', 'is_public', 'created_at', 'audit_data', 'report_created']
             return await asyncio.to_thread(lambda: list(q.select(fields).stream()))
 
         queries = [

@@ -718,7 +718,8 @@ export default function Tasks() {
                 file_name: file.name,
                 owner_id: effectiveUid,
                 assigned_to: Array.from(new Set([...(showReportSelector.assigned_to || []), effectiveUid])),
-                report_seq: nextSeq
+                report_seq: nextSeq,
+                report_created: true
             };
 
             await createAudit(auditPayload);
@@ -816,7 +817,8 @@ export default function Tasks() {
                 assigned_to: combinedAssigned,
                 shared_with: taskShared,
                 is_public: isPublic,
-                report_seq: newAudit.report_seq || 1
+                report_seq: newAudit.report_seq || 1,
+                report_created: true
             };
             
             const created = await createAudit(auditPayload);
@@ -865,7 +867,8 @@ export default function Tasks() {
                 assigned_to: Array.from(new Set([...(task.assigned_to || []), effectiveUid])),
                 shared_with: task.shared_with || [],
                 is_public: (task as any).is_public === true,
-                report_seq: nextSeq
+                report_seq: nextSeq,
+                report_created: true
             };
 
             const newAudit = await createAudit(auditPayload);

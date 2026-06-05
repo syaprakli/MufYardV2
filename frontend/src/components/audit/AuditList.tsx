@@ -195,7 +195,7 @@ function AuditListItem({
 
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 mb-1">
-            <h4 className="font-bold text-sm md:text-base text-secondary group-hover:text-primary transition-colors font-outfit uppercase tracking-tight truncate">
+            <h4 className="font-bold text-xs md:text-sm text-secondary group-hover:text-primary transition-colors font-outfit tracking-tight truncate">
               {title}
             </h4>
             {roleBadge.label && (
