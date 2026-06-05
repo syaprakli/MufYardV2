@@ -78,6 +78,14 @@
         "to": "backend-dist"
       },
       {
+        "from": "../backend/firebase-credentials.json",
+        "to": "backend-dist/firebase-credentials.json"
+      },
+      {
+        "from": "../backend/.env",
+        "to": "backend-dist/.env"
+      },
+      {
         "from": "../backend/rehber.xlsx",
         "to": "backend-dist/rehber.xlsx"
       },
