@@ -1,5 +1,5 @@
-// MufYard Service Worker — Network-First with Cache Fallback (Dev Mode Friendly)
-const CACHE_NAME = 'mufyard-v2-cache-v2'; // Changed name to trigger cache clear
+// MufYard Service Worker — Network-First with Cache Fallback
+const CACHE_NAME = 'mufyard-v2-cache-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -24,7 +24,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
-          .filter((name) => name !== CACHE_NAME) // Deletes the old 'mufyard-v2-cache'
+          .filter((name) => name !== CACHE_NAME)
           .map((name) => caches.delete(name))
       );
     })
@@ -36,8 +36,14 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Skip non-GET and cross-origin requests
+  // Skip non-GET requests entirely (let browser handle them)
   if (event.request.method !== 'GET') return;
+
+  // Skip cross-origin API requests — don't intercept backend calls
+  if (url.origin !== self.location.origin) return;
+
+  // Skip WebSocket upgrade requests
+  if (event.request.headers.get('Upgrade') === 'websocket') return;
 
   // BYPASS: Skip Service Worker for Radio Streams and Audio
   if (
@@ -67,9 +73,16 @@ self.addEventListener('fetch', (event) => {
         // Fallback to cache if offline
         return caches.match(event.request).then((cached) => {
           if (cached) return cached;
+          // For navigation requests, return cached index.html
           if (event.request.mode === 'navigate') {
             return caches.match('./index.html');
           }
+          // CRITICAL FIX: Always return a valid Response, never undefined
+          return new Response('Offline - Resource not available', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: new Headers({ 'Content-Type': 'text/plain' })
+          });
         });
       })
   );

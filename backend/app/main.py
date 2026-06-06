@@ -54,6 +54,9 @@ from app.services.inspector_service import InspectorService
 # Content Security Policy Middleware for Electron
 class CSPMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
+        # Skip CSP for OPTIONS preflight and API routes
+        if request.method == "OPTIONS" or request.url.path.startswith("/api/"):
+            return await call_next(request)
         response = await call_next(request)
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
@@ -61,7 +64,7 @@ class CSPMiddleware(BaseHTTPMiddleware):
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: https:; "
             "font-src 'self' data:; "
-            "connect-src 'self' https:; "
+            "connect-src 'self' https: wss:; "
             "frame-ancestors 'none'; "
             "base-uri 'self'; "
             "form-action 'self'"
@@ -97,7 +100,8 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "version": "1.0.1-antigravity", "timestamp": asyncio.get_event_loop().time()}
+    from app.lib.firebase_admin import is_mock
+    return {"status": "healthy", "version": "1.0.1-antigravity", "firebase_mode": "mock" if is_mock else "real", "timestamp": asyncio.get_event_loop().time()}
 
 @app.on_event("startup")
 async def startup_event():
@@ -185,14 +189,18 @@ _allowed_origins = [
 _env_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()] if settings.CORS_ORIGINS else []
 _allowed_origins = list(set(_allowed_origins + _env_origins))
 
+# IMPORTANT: FastAPI middleware order is LIFO (last added = outermost = runs first)
+# CORSMiddleware MUST be added LAST so it runs FIRST on incoming requests
+# This ensures CORS headers are added to ALL responses including error responses
+app.add_middleware(CSPMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
-app.add_middleware(CSPMiddleware)
 
 # Routers
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])

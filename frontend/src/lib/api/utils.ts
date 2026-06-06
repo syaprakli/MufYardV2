@@ -44,12 +44,21 @@ export async function getAuthHeaders(baseHeaders: HeadersInit = {}): Promise<Rec
 
     if (currentUser?.getIdToken) {
         try {
-            const token = await currentUser.getIdToken();
+            // Force refresh if token might be stale (prevents 401 cascades)
+            const token = await currentUser.getIdToken(true);
             if (token) {
                 headers.set("Authorization", `Bearer ${token}`);
             }
-        } catch {
-            // Fall through to dev identity headers.
+        } catch (e: any) {
+            console.warn("Token refresh failed, trying cached token:", e?.message);
+            try {
+                const cachedToken = await currentUser.getIdToken(false);
+                if (cachedToken) {
+                    headers.set("Authorization", `Bearer ${cachedToken}`);
+                }
+            } catch {
+                // Fall through to dev identity headers.
+            }
         }
     }
 
