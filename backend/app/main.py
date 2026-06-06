@@ -237,7 +237,7 @@ async def _authenticate_websocket_identity(websocket: WebSocket) -> tuple[str, s
         decoded = None
         for attempt in range(3):
             try:
-                decoded = await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=60))
+                decoded = await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=300))
                 break
             except Exception as e:
                 err_str = str(e).lower()
