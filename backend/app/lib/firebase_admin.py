@@ -14,6 +14,28 @@ _bucket = None
 _messaging = None
 is_mock = True
 
+def clean_private_key(key: str) -> str:
+    if not key:
+        return key
+    key = key.strip()
+    if key.startswith('"') and key.endswith('"'):
+        key = key[1:-1]
+    elif key.startswith("'") and key.endswith("'"):
+        key = key[1:-1]
+    key = key.replace("\\n", "\n").replace("\\r", "\r").replace("\r\n", "\n").replace("\r", "\n")
+    return key.strip()
+
+def log_key_details(source_name: str, key_str: str):
+    if not key_str:
+        logger.info(f"Firebase [{source_name}]: Key is empty.")
+        return
+    clean_k = clean_private_key(key_str)
+    lines_count = clean_k.count('\n')
+    logger.info(
+        f"Firebase [{source_name}]: Key len={len(key_str)} (clean={len(clean_k)}), "
+        f"lines={lines_count}, starts_with='{clean_k[:25]}', ends_with='{clean_k[-25:]}'"
+    )
+
 try:
     cred = None
     _cred_dict: dict = {}
@@ -21,12 +43,20 @@ try:
     # 1. Try from Environment Variable (JSON String) - Best for Railway/Cloud
     if settings.FIREBASE_SERVICE_ACCOUNT_JSON:
         try:
-            cred_dict = json.loads(settings.FIREBASE_SERVICE_ACCOUNT_JSON)
+            json_str = settings.FIREBASE_SERVICE_ACCOUNT_JSON.strip()
+            if json_str.startswith('"') and json_str.endswith('"'):
+                try:
+                    json_str = json.loads(json_str)
+                except Exception:
+                    json_str = json_str[1:-1]
+            
+            cred_dict = json.loads(json_str)
             if isinstance(cred_dict, dict) and cred_dict.get("private_key"):
-                cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n").replace("\r\n", "\n").replace("\r", "\n")
+                log_key_details("FIREBASE_SERVICE_ACCOUNT_JSON", cred_dict["private_key"])
+                cred_dict["private_key"] = clean_private_key(cred_dict["private_key"])
             _cred_dict = cred_dict
             cred = credentials.Certificate(cred_dict)
-            logger.info("Firebase: Using credentials from Environment Variable.")
+            logger.info("Firebase: Using credentials from Environment Variable (JSON).")
         except Exception as json_err:
             logger.error(f"Firebase: Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON: {json_err}")
 
@@ -34,11 +64,10 @@ try:
     if not cred:
         try:
             from app.lib.firebase_secrets import FIREBASE_CONFIG
-            if FIREBASE_CONFIG:
-                # Normalize private key line endings (CRLF → LF for Linux/Docker)
+            if FIREBASE_CONFIG and FIREBASE_CONFIG.get('private_key'):
+                log_key_details("firebase_secrets", FIREBASE_CONFIG['private_key'])
                 config_copy = dict(FIREBASE_CONFIG)
-                if config_copy.get('private_key'):
-                    config_copy['private_key'] = config_copy['private_key'].replace('\r\n', '\n').replace('\r', '\n')
+                config_copy['private_key'] = clean_private_key(config_copy['private_key'])
                 cred = credentials.Certificate(config_copy)
                 logger.info("Firebase: Using credentials from app.lib.firebase_secrets.")
         except (ImportError, Exception) as secrets_err:
@@ -47,6 +76,13 @@ try:
 
     # 3. Try from Local File Path
     if not cred and os.path.exists(settings.FIREBASE_SERVICE_ACCOUNT_PATH):
+        try:
+            with open(settings.FIREBASE_SERVICE_ACCOUNT_PATH, "r", encoding="utf-8") as f:
+                local_data = json.load(f)
+                if local_data.get("private_key"):
+                    log_key_details("Local File", local_data["private_key"])
+        except Exception:
+            pass
         cred = credentials.Certificate(settings.FIREBASE_SERVICE_ACCOUNT_PATH)
         logger.info(f"Firebase: Using credentials from file: {settings.FIREBASE_SERVICE_ACCOUNT_PATH}")
 
