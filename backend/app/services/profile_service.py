@@ -14,8 +14,7 @@ class ProfileService:
     FOUNDER_EMAILS = [
         "sefa.yaprakli@gsb.gov.tr",
         "syaprakli@gmail.com",
-        "sefayaprakli@hotmail.com",
-        "yapraklisefa@gmail.com"
+        "sefayaprakli@hotmail.com"
     ]
 
     @staticmethod
