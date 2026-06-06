@@ -103,6 +103,19 @@ async def health_check():
     from app.lib.firebase_admin import is_mock
     return {"status": "healthy", "version": "1.0.1-antigravity", "firebase_mode": "mock" if is_mock else "real", "timestamp": asyncio.get_event_loop().time()}
 
+@app.get("/api/debug/logs")
+async def get_debug_logs(key: str = ""):
+    if key != "antigravity":
+        return JSONResponse(status_code=403, content={"detail": "Forbidden"})
+    try:
+        if os.path.exists(log_file):
+            with open(log_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                return {"logs": lines[-300:]}
+        return {"logs": ["Log file not found"]}
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.on_event("startup")
 async def startup_event():
     try:
