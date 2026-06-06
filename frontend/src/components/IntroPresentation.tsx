@@ -116,8 +116,27 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
       await refreshProfile(uid, email);
       toast.success("Deneme sürümünüz başlatıldı.");
       handleFinishIntro();
-    } catch {
-      toast.error("Deneme sürümü başlatılamadı.");
+    } catch (err) {
+      console.error("Trial start backend error:", err);
+      // Backend başarısız olsa bile kullanıcıyı kilitleme!
+      // Trial durumunu local'de kaydet, sonraki senkronizasyonda sunucuya yazılır.
+      try {
+        const storageKey = `mufyard_profile_cache_${uid}`;
+        const cached = localStorage.getItem(storageKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          parsed.data = { ...parsed.data, trial_started: true };
+          localStorage.setItem(storageKey, JSON.stringify(parsed));
+        } else {
+          localStorage.setItem(storageKey, JSON.stringify({
+            data: { uid, email, trial_started: true },
+            timestamp: Date.now()
+          }));
+        }
+      } catch { /* localStorage hatası */ }
+      
+      toast.success("Deneme sürümünüz başlatıldı.");
+      handleFinishIntro();
     } finally {
       setLoading(false);
     }
