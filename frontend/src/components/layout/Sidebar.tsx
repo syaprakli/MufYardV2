@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { isElectron } from "../../lib/firebase";
-import { useAuth } from "../../lib/hooks/useAuth";
+import { useGlobalData } from "../../lib/context/GlobalDataContext";
 import { usePresence } from "../../lib/context/PresenceContext";
 import { prefetchRoute } from "../../lib/routePrefetch";
 
@@ -56,7 +56,7 @@ const bottomNavItems = [
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
-    const { profile } = useAuth();
+    const { data: { profile } } = useGlobalData();
     const { unreadMessages } = usePresence();
     
     const totalUnread = Object.values(unreadMessages).reduce((a, b) => a + b, 0);

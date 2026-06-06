@@ -3,13 +3,13 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { LayoutDashboard, CheckSquare, FileText, Settings, Shield } from "lucide-react";
-import { useAuth } from "../../lib/hooks/useAuth";
+import { useGlobalData } from "../../lib/context/GlobalDataContext";
 import { cn } from "../../lib/utils";
 
 const DraggableRadioWidgetLazy = lazy(() => import("./DraggableRadioWidget").then((module) => ({ default: module.DraggableRadioWidget })));
 
 export function MainLayout() {
-    const { profile } = useAuth();
+    const { data: { profile } } = useGlobalData();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const location = useLocation();
     
