@@ -22,6 +22,8 @@ try:
     if settings.FIREBASE_SERVICE_ACCOUNT_JSON:
         try:
             cred_dict = json.loads(settings.FIREBASE_SERVICE_ACCOUNT_JSON)
+            if isinstance(cred_dict, dict) and cred_dict.get("private_key"):
+                cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n").replace("\r\n", "\n").replace("\r", "\n")
             _cred_dict = cred_dict
             cred = credentials.Certificate(cred_dict)
             logger.info("Firebase: Using credentials from Environment Variable.")
