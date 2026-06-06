@@ -427,7 +427,7 @@ async def report_collab_endpoint(websocket: WebSocket, audit_id: str):
         return
     try:
         from firebase_admin import auth as firebase_auth
-        await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=300))
+        await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=60))
     except Exception:
         await websocket.close(code=1008)
         return

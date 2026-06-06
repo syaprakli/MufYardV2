@@ -47,7 +47,7 @@ async def get_current_user(
             decoded = None
             for attempt in range(3):
                 try:
-                    decoded = await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=300))
+                    decoded = await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=60))
                     break
                 except Exception as e:
                     err_str = str(e).lower()
