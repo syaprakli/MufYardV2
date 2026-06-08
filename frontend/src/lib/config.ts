@@ -3,9 +3,7 @@ export const IS_ELECTRON = typeof window !== 'undefined' && /Electron/.test(navi
 const VITE_API_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_PUBLIC_API_URL) as string | undefined;
 const API_URL_OVERRIDE = VITE_API_URL?.trim();
 const HOSTNAME = typeof window !== 'undefined' ? window.location.hostname : '';
-const PROTOCOL = typeof window !== 'undefined' ? window.location.protocol : '';
 const IS_LOCAL_HOST = HOSTNAME === 'localhost' || HOSTNAME === '127.0.0.1';
-const IS_FILE_PROTOCOL = PROTOCOL === 'file:';
 
 // Hostname tabanlı tespit (Web için daha güvenli)
 
@@ -20,7 +18,7 @@ const FORCE_LOCAL = false;
 // 2) FORCE_LOCAL true ise → Local backend
 // 3) Electron'da sadece file:// veya localhost iken → Local backend
 // 4) Diğer her durumda → Railway
-const AUTO_LOCAL = FORCE_LOCAL || (IS_ELECTRON && (IS_FILE_PROTOCOL || IS_LOCAL_HOST)) || (!IS_PROD && IS_LOCAL_HOST);
+const AUTO_LOCAL = FORCE_LOCAL || (!IS_PROD && IS_LOCAL_HOST);
 const PUBLIC_BACKEND_URL = API_URL_OVERRIDE || (
     AUTO_LOCAL 
         ? LOCAL_URL 
