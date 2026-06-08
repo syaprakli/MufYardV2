@@ -92,7 +92,8 @@ export default function Audit() {
         inspector: user?.displayName || user?.email?.split('@')[0] || "Sefa YAPRAKLI",
         status: "Devam Ediyor",
         template: "Boş Rapor",
-        report_seq: 1
+        report_seq: 1,
+        manual_rapor_kodu: ""
     });
 
     // Search Debouncer
@@ -188,9 +189,19 @@ export default function Audit() {
             return;
         }
 
-        if (activeTab === 'ortak' && !selectedFile) {
-            toast.error("Lütfen bir arşiv rapor dosyası (PDF/Word) seçiniz.");
-            return;
+        if (activeTab === 'ortak') {
+            if (!selectedFile) {
+                toast.error("Lütfen bir arşiv rapor dosyası (PDF/Word) seçiniz.");
+                return;
+            }
+            if (!newAudit.manual_rapor_kodu || !newAudit.manual_rapor_kodu.trim()) {
+                toast.error("Lütfen Rapor Numarasını giriniz.");
+                return;
+            }
+            if (!newAudit.date || !newAudit.date.trim()) {
+                toast.error("Lütfen Rapor Bitiş Tarihini giriniz.");
+                return;
+            }
         }
 
         try {
@@ -244,9 +255,34 @@ export default function Audit() {
             
             const created = await createAudit(auditPayload);
             
-            // Görev durumunu güncelle
-            if (selectedTask && selectedTask.rapor_durumu === "Başlanmadı") {
-                await updateTask(selectedTask.id, { rapor_durumu: activeTab === 'ortak' ? "Tamamlandı" : "Devam Ediyor" });
+            // Görev durumunu ve kodunu güncelle
+            if (selectedTask) {
+                const updates: any = {};
+                if (activeTab === 'ortak') {
+                    updates.rapor_durumu = "Tamamlandı";
+                    if (newAudit.manual_rapor_kodu) {
+                        const cleanManualCode = newAudit.manual_rapor_kodu.split(',')
+                            .map(part => {
+                                let p = part.trim();
+                                p = p.replace(/_(\d{4}-)/g, "/$1");
+                                if (p.includes("_") && !p.includes("/")) {
+                                    const lastUnder = p.lastIndexOf("_");
+                                    if (lastUnder !== -1) {
+                                        p = p.substring(0, lastUnder) + "/" + p.substring(lastUnder + 1);
+                                    }
+                                }
+                                return p;
+                            })
+                            .join(", ");
+                        updates.rapor_kodu = cleanManualCode;
+                    }
+                } else if (selectedTask.rapor_durumu === "Başlanmadı") {
+                    updates.rapor_durumu = "Devam Ediyor";
+                }
+                
+                if (Object.keys(updates).length > 0) {
+                    await updateTask(selectedTask.id, updates);
+                }
             }
 
             setIsModalOpen(false);
@@ -258,7 +294,8 @@ export default function Audit() {
                 inspector: user?.displayName || user?.email?.split('@')[0] || "Sefa YAPRAKLI",
                 status: "Devam Ediyor",
                 template: "Boş Rapor",
-                report_seq: 1
+                report_seq: 1,
+                manual_rapor_kodu: ""
             });
             setSelectedFile(null);
             toast.success(activeTab === 'ortak' ? "Arşiv raporu başarıyla yüklendi." : "Denetim başarıyla oluşturuldu.");
@@ -287,10 +324,11 @@ export default function Audit() {
                 task_id: taskId,
                 title: nextSeq === 1 ? selectedTask.rapor_adi : `${selectedTask.rapor_adi} - Ek Rapor`,
                 location: "",
-                report_seq: nextSeq
+                report_seq: nextSeq,
+                manual_rapor_kodu: selectedTask.rapor_kodu || ""
             });
         } else {
-            setNewAudit({ ...newAudit, task_id: taskId, report_seq: 1 });
+            setNewAudit({ ...newAudit, task_id: taskId, report_seq: 1, manual_rapor_kodu: "" });
         }
     };
 
@@ -497,6 +535,56 @@ export default function Audit() {
 
             return matchesSearch && matchesTab && matchesStatus && matchesInspector && matchesTaskType && matchesRole;
         }).sort((a, b) => {
+            const taskA = tasks.find(t => String(t.id).trim() === String(a.task_id).trim());
+            const taskB = tasks.find(t => String(t.id).trim() === String(b.task_id).trim());
+
+            if (activeTab === 'ortak') {
+                const parseRaporKodu = (kodu?: string) => {
+                    if (!kodu) return { year: 0, seq: 0 };
+                    const parts = kodu.split(',').map(p => p.trim()).filter(Boolean);
+                    if (parts.length === 0) return { year: 0, seq: 0 };
+                    
+                    const targetCode = parts[0];
+                    const match = targetCode.match(/(\d{4})-(\d+)/);
+                    if (match) {
+                        return { year: parseInt(match[1]) || 0, seq: parseInt(match[2]) || 0 };
+                    }
+                    const yearMatch = targetCode.match(/(\d{4})/);
+                    if (yearMatch) {
+                        return { year: parseInt(yearMatch[1]) || 0, seq: 0 };
+                    }
+                    return { year: 0, seq: 0 };
+                };
+
+                const parseAuditDate = (dateStr?: string): number => {
+                    if (!dateStr) return 0;
+                    try {
+                        const parts = dateStr.trim().split('.');
+                        if (parts.length === 3) {
+                            return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0])).getTime();
+                        }
+                        const time = new Date(dateStr).getTime();
+                        return isNaN(time) ? 0 : time;
+                    } catch {
+                        return 0;
+                    }
+                };
+
+                const parsedA = parseRaporKodu(taskA?.rapor_kodu);
+                const parsedB = parseRaporKodu(taskB?.rapor_kodu);
+                
+                if (parsedA.year !== parsedB.year) {
+                    return parsedB.year - parsedA.year;
+                }
+                if (parsedA.seq !== parsedB.seq) {
+                    return parsedB.seq - parsedA.seq;
+                }
+                
+                const timeA = parseAuditDate(a.date);
+                const timeB = parseAuditDate(b.date);
+                return timeB - timeA;
+            }
+
             if (a.task_id !== b.task_id) {
                 return (a.task_id || "").localeCompare(b.task_id || "");
             }
@@ -827,7 +915,7 @@ export default function Audit() {
                             <option value="">Görev Seçiniz...</option>
                             {availableTasks.map(t => (
                                 <option key={t.id} value={t.id} className="bg-card">
-                                    {t.rapor_kodu} - {t.rapor_adi} {t.rapor_durumu === 'Tamamlandı' ? '(Tamamlandı)' : ''}
+                                    {t.rapor_adi} ({t.rapor_turu}) {t.rapor_durumu === 'Tamamlandı' ? '— Tamamlandı' : ''}
                                 </option>
                             ))}
                         </select>
@@ -845,15 +933,30 @@ export default function Audit() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Tarih</label>
+                            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">
+                                {activeTab === 'ortak' ? "Rapor Bitiş Tarihi" : "Tarih"}
+                            </label>
                             <input 
+                                required={activeTab === 'ortak'}
                                 className="w-full p-4 bg-muted border border-border rounded-2xl text-sm font-bold text-foreground outline-none focus:ring-4 focus:ring-primary/10 transition-all"
                                 value={newAudit.date}
                                 onChange={(e) => setNewAudit({...newAudit, date: e.target.value})}
                             />
                         </div>
-                        {activeTab === 'ortak' ? (
+                        {activeTab === 'ortak' && (
                             <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Rapor No</label>
+                                <input 
+                                    required
+                                    className="w-full p-4 bg-muted border border-border rounded-2xl text-sm font-bold text-foreground outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                                    placeholder="Örn: S.Y.64/2023-1"
+                                    value={newAudit.manual_rapor_kodu || ""}
+                                    onChange={(e) => setNewAudit({...newAudit, manual_rapor_kodu: e.target.value})}
+                                />
+                            </div>
+                        )}
+                        {activeTab === 'ortak' ? (
+                            <div className="space-y-2 sm:col-span-2">
                                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Arşiv Rapor Dosyası (PDF/DOCX)</label>
                                 <div className="relative group">
                                     <input 

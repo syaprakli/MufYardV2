@@ -44,21 +44,37 @@ from app.routers import (
 from app.services.contact_service import ContactService
 from app.services.inspector_service import InspectorService
 
-# Content Security Policy Middleware for Electron
-class CSPMiddleware(BaseHTTPMiddleware):
+# Security Headers Middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
+        if request.method == "OPTIONS":
+            return await call_next(request)
         response = await call_next(request)
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: https:; "
-            "font-src 'self' data:; "
-            "connect-src 'self' https:; "
-            "frame-ancestors 'none'; "
-            "base-uri 'self'; "
-            "form-action 'self'"
-        )
+        
+        # CSP Configuration (Skip for API routes to avoid blocking swagger/redoc or API preflights)
+        if not request.url.path.startswith("/api/"):
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data: https:; "
+                "font-src 'self' data:; "
+                "connect-src 'self' https: wss:; "
+                "frame-ancestors 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self'"
+            )
+            
+        # Hardened Security Headers
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        
+        # HSTS (Strict-Transport-Security) only over HTTPS
+        if request.url.scheme == "https" or request.headers.get("x-forwarded-proto", "").lower() == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+            
         return response
 
 settings = get_settings()
@@ -187,7 +203,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# app.add_middleware(CSPMiddleware) # Removed as it blocks local frontend connections
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Routers
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])

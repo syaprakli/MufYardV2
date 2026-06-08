@@ -26,13 +26,12 @@ const COLORS = {
 // Mock Chart Data
 
 
-const RAPOR_DURUMLARI = ["Başlanmadı", "Devam Ediyor", "Evrak Bekleniyor", "İncelemede", "Tamamlandı"];
+const RAPOR_DURUMLARI = ["Başlanmadı", "Devam Ediyor", "İncelemede", "Tamamlandı"];
 
 const getDurumColor = (durum: string) => {
     switch (durum) {
         case "Tamamlandı": return "#10b981"; // Yeşil
         case "Başlanmadı": return "#94a3b8"; // Gri
-        case "Evrak Bekleniyor": return "#8b5cf6"; // Mor
         case "İncelemede": return "#f59e0b"; // Turuncu/Sarı
         case "Devam Ediyor": return "#3b82f6"; // Mavi
         default: return "#94a3b8";

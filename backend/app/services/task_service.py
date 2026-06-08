@@ -25,6 +25,21 @@ class TaskService:
         return value if value > 0 else None
 
     @staticmethod
+    def _is_final_code(code: str) -> bool:
+        """S.Y.64/YYYY-N formatında olup olmadığını kontrol eder."""
+        if not code:
+            return False
+        parts = code.split('/')
+        if len(parts) != 2:
+            return False
+        if parts[0] != "S.Y.64":
+            return False
+        tail = parts[1].split('-')
+        if len(tail) != 2:
+            return False
+        return tail[0].isdigit() and len(tail[0]) == 4 and tail[1].isdigit()
+
+    @staticmethod
     async def _generate_rapor_kodu(year: Optional[int] = None) -> str:
         """Auto-generate S.Y.64/YYYY-N format rapor kodu.
 
@@ -140,7 +155,16 @@ class TaskService:
                         task_data['rapor_kodu'] = parent_data.get('rapor_kodu')
 
                 if not task_data.get('rapor_kodu'):
-                    task_data['rapor_kodu'] = await TaskService._generate_rapor_kodu()
+                    status = task_data.get('rapor_durumu', 'Başlanmadı')
+                    bt = task_data.get('baslama_tarihi')
+                    from app.lib.folder_manager import FolderManager
+                    year = int(FolderManager.extract_year(bt))
+                    if status in ('İncelemede', 'Tamamlandı'):
+                        task_data['rapor_kodu'] = await TaskService._generate_rapor_kodu(year)
+                    else:
+                        import uuid
+                        unique_id = uuid.uuid4().hex[:8]
+                        task_data['rapor_kodu'] = f"TASLAK-{year}-{unique_id}"
                 result = await asyncio.to_thread(db.collection('tasks').add, task_data)
                 
             if result and result[1]:
@@ -150,14 +174,7 @@ class TaskService:
                 try:
                     from app.lib.folder_manager import FolderManager
                     bt = task_data.get('baslama_tarihi')
-                    year = datetime.now().year
-                    if bt:
-                        try:
-                            # Handle YYYY-MM-DD or ISO formats
-                            if '-' in bt and len(bt) >= 10:
-                                year = int(bt.split('-')[0])
-                        except Exception:
-                            pass
+                    year = FolderManager.extract_year(bt)
                     
                     await asyncio.to_thread(FolderManager.ensure_audit_folders,
                         year=str(year),
@@ -215,20 +232,102 @@ class TaskService:
             # If parent_task_id is being updated, inherit parent's code
             new_parent_id = update_data.get('parent_task_id')
             if new_parent_id is not None:
-                if new_parent_id:
-                    parent_doc_ref = db.collection('tasks').document(new_parent_id)
-                    parent_doc = await asyncio.to_thread(parent_doc_ref.get)
-                    if parent_doc.exists:
-                        parent_data = parent_doc.to_dict() or {}
-                        update_data['rapor_kodu'] = parent_data.get('rapor_kodu')
-                else:
-                    # Parent cleared, generate a new sequence code if none is provided
-                    if not update_data.get('rapor_kodu'):
-                        update_data['rapor_kodu'] = await TaskService._generate_rapor_kodu()
+                current_parent_id = current_data.get('parent_task_id')
+                if new_parent_id != current_parent_id:
+                    if new_parent_id:
+                        parent_doc_ref = db.collection('tasks').document(new_parent_id)
+                        parent_doc = await asyncio.to_thread(parent_doc_ref.get)
+                        if parent_doc.exists:
+                            parent_data = parent_doc.to_dict() or {}
+                            update_data['rapor_kodu'] = parent_data.get('rapor_kodu')
+                    else:
+                        # Parent cleared, generate a code if we don't have one
+                        if not update_data.get('rapor_kodu') and not current_data.get('rapor_kodu'):
+                            status = update_data.get('rapor_durumu') or current_data.get('rapor_durumu', 'Başlanmadı')
+                            bt = update_data.get('baslama_tarihi') or current_data.get('baslama_tarihi')
+                            from app.lib.folder_manager import FolderManager
+                            year = int(FolderManager.extract_year(bt))
+                            if status in ('İncelemede', 'Tamamlandı'):
+                                update_data['rapor_kodu'] = await TaskService._generate_rapor_kodu(year)
+                            else:
+                                import uuid
+                                unique_id = uuid.uuid4().hex[:8]
+                                update_data['rapor_kodu'] = f"TASLAK-{year}-{unique_id}"
+
+            # Auto-promote to final registry code if status changes to "İncelemede" or "Tamamlandı"
+            new_status = update_data.get('rapor_durumu')
+            if new_status in ('İncelemede', 'Tamamlandı'):
+                current_code = update_data.get('rapor_kodu') or current_data.get('rapor_kodu', '')
+                if not TaskService._is_final_code(current_code):
+                    # Generate next final registry code
+                    parent_id = update_data.get('parent_task_id') or current_data.get('parent_task_id')
+                    if parent_id:
+                        # Inherit parent's code (which might be final or draft)
+                        parent_doc_ref = db.collection('tasks').document(parent_id)
+                        parent_doc = await asyncio.to_thread(parent_doc_ref.get)
+                        if parent_doc.exists:
+                            parent_data = parent_doc.to_dict() or {}
+                            if parent_data.get('rapor_kodu'):
+                                update_data['rapor_kodu'] = parent_data.get('rapor_kodu')
+                    else:
+                        bt = update_data.get('baslama_tarihi') or current_data.get('baslama_tarihi')
+                        from app.lib.folder_manager import FolderManager
+                        year = int(FolderManager.extract_year(bt))
+                        update_data['rapor_kodu'] = await TaskService._generate_rapor_kodu(year)
+
+            # --- Folder Renaming Hook ---
+            old_start_date = current_data.get('baslama_tarihi')
+            old_type = current_data.get('rapor_turu', 'Diger') or 'Diger'
+            old_code = current_data.get('rapor_kodu', 'Kodsuz') or 'Kodsuz'
+            old_title = current_data.get('rapor_adi', 'Basliksiz') or 'Basliksiz'
+
+            new_start_date = update_data.get('baslama_tarihi', old_start_date)
+            new_type = update_data.get('rapor_turu', old_type) or old_type
+            new_code = update_data.get('rapor_kodu', old_code) or old_code
+            new_title = update_data.get('rapor_adi', old_title) or old_title
+
+            from app.lib.folder_manager import FolderManager
+            old_year = FolderManager.extract_year(old_start_date)
+            new_year = FolderManager.extract_year(new_start_date)
+
+            import os
+
+            old_path = FolderManager.get_audit_path(old_year, old_type, old_code, old_title)
+            new_path = FolderManager.get_audit_path(new_year, new_type, new_code, new_title)
+
+            if old_path != new_path and os.path.exists(old_path):
+                try:
+                    os.makedirs(os.path.dirname(new_path), exist_ok=True)
+                    os.rename(old_path, new_path)
+                    print(f"Renamed task folder from {old_path} to {new_path}")
+
+                    # Migrate permissions in file_permissions.json
+                    old_rel_prefix = FolderManager.get_audit_relative_path(old_year, old_type, old_code, old_title)
+                    new_rel_prefix = FolderManager.get_audit_relative_path(new_year, new_type, new_code, new_title)
+
+                    perms = FolderManager.load_permissions()
+                    updated_perms = {}
+                    for file_id, meta in perms.items():
+                        if file_id == old_rel_prefix:
+                            updated_perms[new_rel_prefix] = meta
+                        elif file_id.startswith(old_rel_prefix + "/"):
+                            new_file_id = new_rel_prefix + file_id[len(old_rel_prefix):]
+                            updated_perms[new_file_id] = meta
+                        else:
+                            updated_perms[file_id] = meta
+
+                    FolderManager.save_permissions(updated_perms)
+                except Exception as fe:
+                    print(f"Failed to rename folder: {fe}")
+                    from fastapi import HTTPException
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Klasör veya içindeki bir dosya başka bir programda (örneğin Word, Excel veya Gezgin) açık olduğu için adlandırılamadı. Lütfen açık dosyaları kapatıp tekrar deneyin."
+                    )
 
             await asyncio.to_thread(doc_ref.update, update_data)
 
-            # Cascade: if this task's rapor_kodu changed, update all children's rapor_kodu
+            # Cascade: if this task's rapor_kodu changed, update all children's rapor_kodu and rename their folders
             new_rapor_kodu = update_data.get('rapor_kodu')
             if new_rapor_kodu and new_rapor_kodu != current_data.get('rapor_kodu'):
                 children_docs = await asyncio.to_thread(
@@ -239,8 +338,43 @@ class TaskService:
                     )
                 )
                 for child in children_docs:
+                    child_data = child.to_dict() or {}
+                    child_id = child.id
+
+                    child_start_date = child_data.get('baslama_tarihi')
+                    child_type = child_data.get('rapor_turu', 'Diger') or 'Diger'
+                    child_code = child_data.get('rapor_kodu', 'Kodsuz') or 'Kodsuz'
+                    child_title = child_data.get('rapor_adi', 'Basliksiz') or 'Basliksiz'
+
+                    child_year = FolderManager.extract_year(child_start_date)
+
+                    child_old_path = FolderManager.get_audit_path(child_year, child_type, child_code, child_title)
+                    child_new_path = FolderManager.get_audit_path(child_year, child_type, new_rapor_kodu, child_title)
+
+                    if child_old_path != child_new_path and os.path.exists(child_old_path):
+                        try:
+                            os.makedirs(os.path.dirname(child_new_path), exist_ok=True)
+                            os.rename(child_old_path, child_new_path)
+
+                            child_old_rel = FolderManager.get_audit_relative_path(child_year, child_type, child_code, child_title)
+                            child_new_rel = FolderManager.get_audit_relative_path(child_year, child_type, new_rapor_kodu, child_title)
+
+                            perms = FolderManager.load_permissions()
+                            updated_perms = {}
+                            for file_id, meta in perms.items():
+                                if file_id == child_old_rel:
+                                    updated_perms[child_new_rel] = meta
+                                elif file_id.startswith(child_old_rel + "/"):
+                                    new_file_id = child_new_rel + file_id[len(child_old_rel):]
+                                    updated_perms[new_file_id] = meta
+                                else:
+                                    updated_perms[file_id] = meta
+                            FolderManager.save_permissions(updated_perms)
+                        except Exception as cfe:
+                            print(f"Failed to rename child folder: {cfe}")
+
                     await asyncio.to_thread(
-                        db.collection('tasks').document(child.id).update,
+                        db.collection('tasks').document(child_id).update,
                         {'rapor_kodu': new_rapor_kodu}
                     )
 
@@ -248,6 +382,8 @@ class TaskService:
             updated_doc = updated_doc_res.to_dict() or {}
             updated_doc['id'] = task_id
             return updated_doc
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"Error updating task: {e}")
             return None
@@ -282,13 +418,7 @@ class TaskService:
                 try:
                     from app.lib.folder_manager import FolderManager
                     bt = task_data.get('baslama_tarihi')
-                    year = datetime.now().year
-                    if bt:
-                        try:
-                            if '-' in bt and len(bt) >= 10:
-                                year = int(bt.split('-')[0])
-                        except Exception:
-                            pass
+                    year = FolderManager.extract_year(bt)
                     
                     await asyncio.to_thread(FolderManager.ensure_audit_folders,
                         year=str(year),
@@ -343,12 +473,7 @@ class TaskService:
                     import os
                     
                     bt = task_data.get('baslama_tarihi')
-                    year = datetime.now().year
-                    if bt:
-                        try:
-                            if '-' in bt and len(bt) >= 10:
-                                year = int(bt.split('-')[0])
-                        except: pass
+                    year = FolderManager.extract_year(bt)
                     
                     audit_path = FolderManager.get_audit_path(
                         year=str(year),

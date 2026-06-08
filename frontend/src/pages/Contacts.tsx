@@ -97,11 +97,9 @@ export default function Contacts() {
             
             return { contacts: uniqueContacts, invitations: pending };
         } else {
-            const myName = profile?.full_name?.toLowerCase().trim();
             const corp = (cachedData.contactsCorporate || []).filter(c => {
                 const cEmail = c.email?.toLowerCase().trim();
-                const cName = c.name?.toLowerCase().trim();
-                const isMe = cEmail === userEmail || (cName && myName && cName === myName);
+                const isMe = cEmail === userEmail;
                 return !isMe;
             });
             return { contacts: corp, invitations: [] };

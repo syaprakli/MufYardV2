@@ -85,12 +85,6 @@ function getStatusTone(status: string) {
                 dot: "bg-amber-500",
                 time: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800/40"
             };
-        case "Evrak Bekleniyor":
-            return {
-                pill: "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-300 dark:border-violet-900/40",
-                dot: "bg-violet-500",
-                time: "bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800/40"
-            };
         case "Devam Ediyor":
             return {
                 pill: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-900/40",
@@ -351,7 +345,7 @@ export default function ReportAnalytics() {
                 )}
                 <div className="flex items-start justify-between gap-3 relative z-0">
                     <div>
-                        <p className="text-[11px] font-black text-primary tracking-wider">{task.rapor_kodu}</p>
+                        <p className="text-[11px] font-black text-primary tracking-wider">{task.rapor_turu}</p>
                         <p className="text-base font-black text-slate-800 dark:text-slate-100 mt-1 leading-snug">{task.rapor_adi}</p>
                     </div>
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-black shrink-0 ${currentTone.pill}`}>
@@ -493,7 +487,7 @@ export default function ReportAnalytics() {
                                 >
                                     {mobileFilteredTasks.map((task: any) => (
                                         <option key={task.id} value={task.id}>
-                                            {task.rapor_kodu} - {task.rapor_adi}
+                                            {task.rapor_adi} ({task.rapor_turu})
                                         </option>
                                     ))}
                                 </select>

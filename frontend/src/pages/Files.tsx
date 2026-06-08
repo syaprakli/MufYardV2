@@ -215,35 +215,37 @@ export default function Files() {
     }, []);
 
     useEffect(() => {
-        loadProfiles();
-    }, [user?.uid, user?.email, profile?.uid, profile?.email]);
+        let active = true;
+        const loadProfiles = async () => {
+            try {
+                const data = await fetchAllProfiles();
+                if (!active) return;
+                const meKeys = [
+                    user?.uid,
+                    user?.email?.trim().toLowerCase(),
+                    profile?.uid,
+                    profile?.email?.trim().toLowerCase()
+                ].filter(Boolean).map(v => String(v).toLowerCase());
 
-    const loadProfiles = async () => {
-        try {
-            const data = await fetchAllProfiles();
-            const meKeys = [
-                user?.uid,
-                user?.email?.trim().toLowerCase(),
-                profile?.uid,
-                profile?.email?.trim().toLowerCase()
-            ].filter(Boolean).map(v => String(v).toLowerCase());
-
-            const myName = profile?.full_name?.toLowerCase().trim() || user?.displayName?.toLowerCase().trim();
-
-            setAllProfiles(
-                data.filter(p => {
+                const filtered = data.filter(p => {
                     const pKeys = [p.uid, p.email?.trim().toLowerCase()]
                         .filter(Boolean)
                         .map(v => String(v).toLowerCase());
                     const isMeById = pKeys.some(k => meKeys.includes(k));
-                    const isMeByName = myName && p.full_name && p.full_name.toLowerCase().trim() === myName;
-                    return !isMeById && !isMeByName;
-                })
-            );
-        } catch (error) {
-            console.error("Profiller yüklenemedi:", error);
-        }
-    };
+                    return !isMeById;
+                });
+                if (active) {
+                    setAllProfiles(filtered);
+                }
+            } catch (error) {
+                console.error("Profiller yüklenemedi:", error);
+            }
+        };
+        loadProfiles();
+        return () => {
+            active = false;
+        };
+    }, [user?.uid, user?.email, profile?.uid, profile?.email]);
 
     const loadData = async () => {
         setLoading(true);

@@ -33,7 +33,106 @@ export default function Messages() {
   const itemsPerPage = 8;
 
   useEffect(() => {
+    if (!user) return;
+
+    let active = true;
+
+    const fetchUsers = async () => {
+      try {
+        if (active) setLoading(true);
+        
+        let profiles: Profile[] = [];
+        let directory: any[] = [];
+
+        try {
+          profiles = await fetchAllProfiles();
+        } catch (err) {
+          console.warn("Profiller yüklenemedi, tekrar deneniyor...", err);
+          await new Promise(r => setTimeout(r, 3000));
+          if (!active) return;
+          try {
+            profiles = await fetchAllProfiles();
+          } catch (err2) {
+            console.error("Profiller yine yüklenemedi:", err2);
+            toast.error("Kullanıcı listesi alınamadı.");
+          }
+        }
+
+        if (!active) return;
+
+        try {
+          directory = await fetchInspectors();
+        } catch (err) {
+          console.warn("Rehber verisi alınamadı, sadece kayıtlı kullanıcılar gösteriliyor.");
+        }
+        
+        if (!active) return;
+
+        const unified: UnifiedContact[] = [];
+
+        // Kayıtlı profilleri ekle ve rehber bilgisiyle zenginleştir.
+        const myUid = user?.uid || myProfile?.uid;
+        const myEmail = user?.email?.toLowerCase().trim() || myProfile?.email?.toLowerCase().trim();
+
+        profiles.forEach(profile => {
+          const pUid = profile.uid;
+          const pEmail = profile.email?.toLowerCase().trim();
+          
+          const isMe = !!(
+            (pUid && pUid === myUid) || 
+            (pEmail && pEmail === myEmail)
+          );
+          if (isMe) return;
+          
+          const dirEntry = directory.find(d => {
+              const dEmail = d.email?.toLowerCase().trim();
+              return dEmail && dEmail === pEmail;
+          });
+          
+          unified.push({
+            uid: profile.uid,
+            full_name: profile.full_name,
+            title: profile.title || dirEntry?.title || 'Müfettiş',
+            email: profile.email || '',
+            avatar_url: profile.avatar_url || null,
+            isRegistered: true,
+            isMe: isMe,
+            directoryId: dirEntry?.id || null
+          });
+        });
+
+        // Sadece kayıtlı (profili olan) kullanıcılar gösterilir.
+        // Rehber-only kullanıcılar Mesajlar listesine dahil edilmez.
+
+        // Listeyi alfabetik sırala
+        unified.sort((a, b) => a.full_name.localeCompare(b.full_name));
+
+        // Son güvenlik filtresi: Kendini listede görme
+        const finalContacts = unified.filter(c => {
+          const cUid = c.uid;
+          const cEmail = c.email?.toLowerCase().trim();
+          const isMe = !!(
+            (cUid && cUid === myUid) || 
+            (cEmail && cEmail === myEmail)
+          );
+          return !isMe;
+        });
+
+        if (active) {
+          setContacts(finalContacts);
+        }
+      } catch (error) {
+        console.error("Kullanıcılar yüklenemedi:", error);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
     fetchUsers();
+
+    return () => {
+      active = false;
+    };
   }, [user, myProfile]);
 
   const onlineUids = onlineUsers.map(u => u.uid);
@@ -55,96 +154,6 @@ export default function Messages() {
     window.addEventListener('mufyard:new_message', handler);
     return () => window.removeEventListener('mufyard:new_message', handler);
   }, []);
-
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      
-      let profiles: Profile[] = [];
-      let directory: any[] = [];
-
-      try {
-        profiles = await fetchAllProfiles();
-      } catch (err) {
-        console.warn("Profiller yüklenemedi, tekrar deneniyor...", err);
-        // Kısa gecikme sonrası bir kez daha dene (Railway cold start için)
-        await new Promise(r => setTimeout(r, 3000));
-        try {
-          profiles = await fetchAllProfiles();
-        } catch (err2) {
-          console.error("Profiller yine yüklenemedi:", err2);
-          toast.error("Kullanıcı listesi alınamadı.");
-        }
-      }
-
-      try {
-        directory = await fetchInspectors();
-      } catch (err) {
-        console.warn("Rehber verisi alınamadı, sadece kayıtlı kullanıcılar gösteriliyor.");
-      }
-      
-      const unified: UnifiedContact[] = [];
-
-      // Kayıtlı profilleri ekle ve rehber bilgisiyle zenginleştir.
-      const myUid = user?.uid || myProfile?.uid;
-      const myEmail = user?.email?.toLowerCase().trim() || myProfile?.email?.toLowerCase().trim();
-      const myName = myProfile?.full_name?.toLowerCase().trim();
-
-      profiles.forEach(profile => {
-        const pUid = profile.uid;
-        const pEmail = profile.email?.toLowerCase().trim();
-        const pName = profile.full_name?.toLowerCase().trim();
-        
-        const isMe = !!(
-          (pUid && pUid === myUid) || 
-          (pEmail && pEmail === myEmail) || 
-          (pName && myName && pName === myName)
-        );
-        if (isMe) return;
-        
-        const dirEntry = directory.find(d => {
-            const dEmail = d.email?.toLowerCase().trim();
-            return dEmail && dEmail === pEmail;
-        });
-        
-        unified.push({
-          uid: profile.uid,
-          full_name: profile.full_name,
-          title: profile.title || dirEntry?.title || 'Müfettiş',
-          email: profile.email || '',
-          avatar_url: profile.avatar_url || null,
-          isRegistered: true,
-          isMe: isMe,
-          directoryId: dirEntry?.id || null
-        });
-      });
-
-      // Sadece kayıtlı (profili olan) kullanıcılar gösterilir.
-      // Rehber-only kullanıcılar Mesajlar listesine dahil edilmez.
-
-      // Listeyi alfabetik sırala
-      unified.sort((a, b) => a.full_name.localeCompare(b.full_name));
-
-      // Son güvenlik filtresi: Kendini listede görme
-      const finalContacts = unified.filter(c => {
-        const cUid = c.uid;
-        const cEmail = c.email?.toLowerCase().trim();
-        const cName = c.full_name?.toLowerCase().trim();
-        const isMe = !!(
-          (cUid && cUid === myUid) || 
-          (cEmail && cEmail === myEmail) || 
-          (cName && myName && cName === myName)
-        );
-        return !isMe;
-      });
-
-      setContacts(finalContacts);
-    } catch (error) {
-      console.error("Kullanıcılar yüklenemedi:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleStartChat = (contact: UnifiedContact & { isOnline: boolean }) => {
     if (!user) return;
@@ -323,6 +332,9 @@ export default function Messages() {
                             )}
                           </div>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">{contact.title}</p>
+                          {contact.email && (
+                            <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500 truncate mt-0.5">{contact.email}</p>
+                          )}
                         </div>
                         
                         <div className="flex items-center gap-2">

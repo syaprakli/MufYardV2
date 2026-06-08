@@ -5,6 +5,7 @@ backend/app/lib/credentials.json
 backend/app/lib/*.log
 backend/app/lib/*.bak
 backups/
+scratch/
 server_log*.txt
 backend/app/lib/local_settings.json
 # Dependencies

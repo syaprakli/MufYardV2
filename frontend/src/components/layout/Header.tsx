@@ -20,6 +20,7 @@ interface HeaderProps {
 export function Header({ toggleSidebar }: HeaderProps) {
     const { user, logout } = useAuth();
     const { onlineUsers, wsConnected, restConnected } = usePresence();
+    const filteredOnlineUsers = onlineUsers.filter((u: any) => u.uid !== user?.uid);
     const navigate = useNavigate();
     const confirm = useConfirm();
     const { unreadCount, markAllAsRead } = useNotifications();
@@ -35,8 +36,8 @@ export function Header({ toggleSidebar }: HeaderProps) {
     const [showUserMenu, setShowUserMenu] = useState(false);
     const notificationRef = useRef<HTMLDivElement>(null);
     const userMenuRef = useRef<HTMLDivElement>(null);
-    const presenceReady = wsConnected || restConnected || onlineUsers.length > 0;
-
+    const presenceReady = wsConnected || restConnected || filteredOnlineUsers.length > 0;
+    
     const resolveUrl = (url: string | null) => {
         if (!url) return null;
         let processed = url.trim();
@@ -166,18 +167,18 @@ export function Header({ toggleSidebar }: HeaderProps) {
                     <span className={`w-2 h-2 rounded-full shrink-0 ${presenceReady ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300 animate-pulse'}`} />
                     {!presenceReady ? (
                         <span className="text-slate-400">Durum güncelleniyor...</span>
-                    ) : onlineUsers.length > 0 ? (
+                    ) : filteredOnlineUsers.length > 0 ? (
                         <span className="text-emerald-600 dark:text-emerald-400">
-                            {onlineUsers.length} kişi online
+                            {filteredOnlineUsers.length} kişi online
                         </span>
                     ) : (
                         <span className="text-emerald-600 dark:text-emerald-400">Online</span>
                     )}
-                    {presenceReady && onlineUsers.length > 0 && (
+                    {presenceReady && filteredOnlineUsers.length > 0 && (
                         <div className="pointer-events-none absolute left-0 top-7 z-50 hidden group-hover:block bg-card border border-border rounded-xl shadow-xl p-2 min-w-[220px] max-w-[320px]">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Çevrimiçi ({onlineUsers.length})</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Çevrimiçi ({filteredOnlineUsers.length})</p>
                             <div className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed break-words max-h-44 overflow-y-auto pr-1">
-                                {onlineUsers.map((u: any) => (
+                                {filteredOnlineUsers.map((u: any) => (
                                     <p key={u.uid} className="truncate">
                                         {u.name || u.uid}
                                     </p>

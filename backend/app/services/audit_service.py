@@ -19,12 +19,7 @@ class AuditService:
 
         task_data = task_doc.to_dict() or {}
         start_date_str = task_data.get('baslama_tarihi')
-        year = str(datetime.utcnow().year)
-        if isinstance(start_date_str, str) and start_date_str:
-            try:
-                year = str(datetime.fromisoformat(start_date_str).year)
-            except Exception:
-                pass
+        year = FolderManager.extract_year(start_date_str)
 
         return {
             'year': year,

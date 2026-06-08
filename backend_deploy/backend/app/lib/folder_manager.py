@@ -22,6 +22,63 @@ STANDARD_SUBFOLDERS = [
 
 class FolderManager:
     @staticmethod
+    def extract_year(date_str: Optional[str]) -> str:
+        """Robustly extracts the 4-digit year from any date format string."""
+        if not date_str:
+            return str(datetime.utcnow().year)
+        
+        date_str = str(date_str).strip()
+        if not date_str:
+            return str(datetime.utcnow().year)
+
+        # 1. Try dot notation (DD.MM.YYYY)
+        if '.' in date_str:
+            parts = date_str.split('.')
+            if len(parts) >= 3:
+                year_part = parts[2].split()[0]
+                if year_part.isdigit() and len(year_part) == 4:
+                    return year_part
+
+        # 2. Try hyphen/dash notation (YYYY-MM-DD or DD-MM-YYYY)
+        if '-' in date_str:
+            parts = date_str.split('-')
+            # Check YYYY-MM-DD
+            if len(parts) >= 1 and parts[0].isdigit() and len(parts[0]) == 4:
+                return parts[0]
+            # Check DD-MM-YYYY
+            if len(parts) >= 3:
+                year_part = parts[2].split()[0]
+                if year_part.isdigit() and len(year_part) == 4:
+                    return year_part
+
+        # 3. Try slash notation (DD/MM/YYYY or YYYY/MM/DD)
+        if '/' in date_str:
+            parts = date_str.split('/')
+            # Check YYYY/MM/DD
+            if len(parts) >= 1 and parts[0].isdigit() and len(parts[0]) == 4:
+                return parts[0]
+            # Check DD/MM/YYYY
+            if len(parts) >= 3:
+                year_part = parts[2].split()[0]
+                if year_part.isdigit() and len(year_part) == 4:
+                    return year_part
+
+        # 4. Standard datetime format checks
+        for fmt in ('%Y-%m-%d', '%d.%m.%Y', '%d/%m/%Y', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%S.%fZ'):
+            try:
+                return str(datetime.strptime(date_str, fmt).year)
+            except ValueError:
+                pass
+
+        # 5. Regex search fallback for a 4-digit year
+        import re
+        matches = re.findall(r'\b(20\d{2})\b', date_str)
+        if matches:
+            return matches[0]
+
+        return str(datetime.utcnow().year)
+
+    @staticmethod
     def detect_file_type(file_name: str) -> str:
         ext = os.path.splitext(file_name)[1].lower()
         if ext in {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg"}:
@@ -89,7 +146,14 @@ class FolderManager:
     @staticmethod
     def get_audit_path(year: str, audit_type: str, audit_code: str, audit_title: str) -> str:
         """Generates the hierarchical path: Raporlar/Year/Type/Code - Title"""
-        safe_code = FolderManager.format_safe_name(audit_code)
+        # Clean prefix S.Y.64/ or S.Y.64_
+        clean_code = audit_code
+        if clean_code.upper().startswith("S.Y.64/"):
+            clean_code = clean_code[len("S.Y.64/"):]
+        elif clean_code.upper().startswith("S.Y.64_"):
+            clean_code = clean_code[len("S.Y.64_"):]
+
+        safe_code = FolderManager.format_safe_name(clean_code)
         safe_title = FolderManager.format_safe_name(audit_title)
         
         # Determine Type Label (Turkish)

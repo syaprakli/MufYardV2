@@ -1621,11 +1621,11 @@ export default function DenetimOzel() {
                                                     }`}>
                                                         {task.rapor_durumu}
                                                     </span>
-                                                    <span className="text-[9px] font-bold text-slate-400 font-mono">{task.rapor_kodu}</span>
+
                                                 </div>
                                                 <h4 className="font-bold text-xs text-slate-800 dark:text-slate-200 line-clamp-2 leading-tight">{task.rapor_adi}</h4>
                                                 <div className="flex items-center gap-2 mt-2 text-[9px] text-slate-400 font-semibold">
-                                                    <span>Başlama: {task.baslama_tarihi}</span>
+                                                    <span>Görev Tarihi: {task.baslama_tarihi}</span>
                                                     <span>•</span>
                                                     <span>{task.sure_gun} Gün</span>
                                                 </div>
@@ -1689,8 +1689,6 @@ export default function DenetimOzel() {
                                     <div>
                                         <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 mb-1">
                                             <span>{selectedTask.rapor_turu}</span>
-                                            <ChevronRight size={8} />
-                                            <span className="font-mono text-blue-500">{selectedTask.rapor_kodu}</span>
                                         </div>
                                         <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white leading-snug">{selectedTask.rapor_adi}</h2>
                                         {(cachedData?.audits || []).filter((a: any) => a.task_id === selectedTask.id).length > 1 && (
@@ -1755,10 +1753,7 @@ export default function DenetimOzel() {
                                                         className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-2.5 rounded-lg hover:border-blue-500 transition-colors text-left"
                                                     >
                                                         <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{child.rapor_adi}</span>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[9px] font-mono text-slate-400">{child.rapor_kodu}</span>
-                                                            <ArrowRight size={12} className="text-blue-500" />
-                                                        </div>
+                                                        <ArrowRight size={12} className="text-blue-500" />
                                                     </button>
                                                 ))}
                                             </div>
@@ -1782,10 +1777,7 @@ export default function DenetimOzel() {
                                                 className="flex items-center justify-between w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-2.5 rounded-lg hover:border-blue-500 transition-colors text-left"
                                             >
                                                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{parentIlTask.rapor_adi}</span>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[9px] font-mono text-slate-400">{parentIlTask.rapor_kodu}</span>
-                                                    <ArrowRight size={12} className="text-blue-500" />
-                                                </div>
+                                                <ArrowRight size={12} className="text-blue-500" />
                                             </button>
                                         ) : (
                                             <p className="text-xs text-slate-400 font-medium">Bağlı görev bulunamadı.</p>
@@ -2160,10 +2152,10 @@ export default function DenetimOzel() {
                                                         <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-500">
                                                             {task.rapor_turu}
                                                         </span>
-                                                        <span className="text-[9px] font-mono font-bold text-slate-400">{task.rapor_kodu}</span>
+
                                                     </div>
                                                     <h4 className="font-bold text-xs text-slate-800 dark:text-slate-200 line-clamp-1 leading-tight">{task.rapor_adi}</h4>
-                                                    <span className="text-[9px] text-slate-400 font-semibold mt-1 inline-block">Başlama: {task.baslama_tarihi} • {task.sure_gun} Gün</span>
+                                                    <span className="text-[9px] text-slate-400 font-semibold mt-1 inline-block">Görev Tarihi: {task.baslama_tarihi} • {task.sure_gun} Gün</span>
                                                 </div>
                                                 <ArrowRight size={14} className="text-slate-300 group-hover:text-blue-500 transition-colors flex-shrink-0" />
                                             </button>
@@ -2197,9 +2189,7 @@ export default function DenetimOzel() {
                                                     Tür: {pickerTaskForAudit.rapor_turu}
                                                 </span>
                                             </div>
-                                            <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-200/55 dark:bg-slate-800 px-2 py-0.5 rounded">
-                                                {pickerTaskForAudit.rapor_kodu}
-                                            </span>
+
                                         </div>
                                     </div>
 

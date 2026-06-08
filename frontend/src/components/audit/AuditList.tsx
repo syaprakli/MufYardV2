@@ -8,7 +8,7 @@ import { updateTask, type Task } from "../../lib/api/tasks";
 import type { Audit as AuditType } from "../../lib/api/audit";
 import { VirtualizedList } from "../ui/VirtualizedList";
 
-const RAPOR_DURUMLARI = ["Başlanmadı", "Devam Ediyor", "Evrak Bekleniyor", "İncelemede", "Rapor Yazılıyor", "Tamamlandı"];
+const RAPOR_DURUMLARI = ["Başlanmadı", "Devam Ediyor", "İncelemede", "Tamamlandı"];
 
 type AuditListProps = {
   audits: AuditType[];
@@ -101,9 +101,7 @@ function AuditListItem({
   const statusColors: Record<string, string> = {
     "Başlanmadı": "bg-slate-500/10 text-slate-600 border-slate-500/20",
     "Devam Ediyor": "bg-blue-500/10 text-blue-600 border-blue-500/20",
-    "Evrak Bekleniyor": "bg-purple-500/10 text-purple-600 border-purple-500/20",
     "İncelemede": "bg-amber-500/10 text-amber-600 border-amber-500/20",
-    "Rapor Yazılıyor": "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
     "Tamamlandı": "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
   };
 

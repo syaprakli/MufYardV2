@@ -1,5 +1,5 @@
 import { API_URL as API_BASE_URL } from "../config";
-import { fetchWithTimeout } from "./utils";
+import { fetchWithTimeout, getAuthHeaders } from "./utils";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -31,7 +31,8 @@ export async function fetchInspectors(): Promise<Inspector[]> {
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
-            const response = await fetchWithTimeout(`${API_BASE_URL}/inspectors/`, { timeout: 25000 });
+            const headers = await getAuthHeaders();
+            const response = await fetchWithTimeout(`${API_BASE_URL}/inspectors/`, { timeout: 25000, headers });
             if (!response.ok) {
                 throw new Error("Müfettişler yüklenemedi.");
             }
@@ -49,9 +50,10 @@ export async function fetchInspectors(): Promise<Inspector[]> {
 }
 
 export async function addInspector(inspector: InspectorCreate): Promise<Inspector> {
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
     const response = await fetchWithTimeout(`${API_BASE_URL}/inspectors/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(inspector),
     });
     if (!response.ok) throw new Error("Müfettiş eklenemedi.");
@@ -59,17 +61,20 @@ export async function addInspector(inspector: InspectorCreate): Promise<Inspecto
 }
 
 export async function deleteInspector(id: string): Promise<{ status: string }> {
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${API_BASE_URL}/inspectors/${id}`, {
         method: "DELETE",
+        headers,
     });
     if (!response.ok) throw new Error("Müfettiş silinemedi.");
     return response.json();
 }
 
 export async function addInspectorsBulk(inspectors: InspectorCreate[]): Promise<{ count: number }> {
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
     const response = await fetchWithTimeout(`${API_BASE_URL}/inspectors/bulk`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(inspectors),
     });
     if (!response.ok) throw new Error("Toplu müfettiş ekleme başarısız.");
@@ -77,9 +82,10 @@ export async function addInspectorsBulk(inspectors: InspectorCreate[]): Promise<
 }
 
 export async function updateInspector(id: string, inspector: InspectorCreate): Promise<Inspector> {
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
     const response = await fetchWithTimeout(`${API_BASE_URL}/inspectors/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(inspector),
     });
     if (!response.ok) throw new Error("Müfettiş güncellenemedi.");
@@ -90,8 +96,10 @@ export async function uploadAndSyncInspectors(file: File): Promise<{ status: str
     const formData = new FormData();
     formData.append("file", file);
     
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${API_BASE_URL}/inspectors/upload-and-sync`, {
         method: "POST",
+        headers,
         body: formData,
         timeout: 60000 // 60s timeout for large excel files
     });
@@ -105,8 +113,10 @@ export async function uploadAndSyncInspectors(file: File): Promise<{ status: str
 }
 
 export async function syncInspectorsFromContacts(): Promise<{ status: string, message: string, processed: number }> {
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${API_BASE_URL}/inspectors/sync-from-contacts`, {
         method: "POST",
+        headers,
     });
 
     if (!response.ok) {
@@ -118,9 +128,10 @@ export async function syncInspectorsFromContacts(): Promise<{ status: string, me
 }
 
 export async function linkInspectorToProfile(inspectorId: string, profileUid: string): Promise<Inspector> {
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
     const response = await fetchWithTimeout(`${API_BASE_URL}/inspectors/${inspectorId}/link`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ profile_uid: profileUid }),
     });
     if (!response.ok) throw new Error("Eşleştirme başarısız.");

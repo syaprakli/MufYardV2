@@ -370,12 +370,7 @@ async def open_task_folder(task_id: str, current_user: dict = Depends(get_curren
         
         # Calculate year, type, code, title
         start_date_str = task_data.get('baslama_tarihi')
-        year = str(datetime.utcnow().year)
-        if isinstance(start_date_str, str) and start_date_str:
-            try:
-                year = str(datetime.fromisoformat(start_date_str).year)
-            except Exception:
-                pass
+        year = FolderManager.extract_year(start_date_str)
                 
         audit_type = task_data.get('rapor_turu', 'Diger') or 'Diger'
         audit_code = task_data.get('rapor_kodu', 'Kodsuz') or 'Kodsuz'

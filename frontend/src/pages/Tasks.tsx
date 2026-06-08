@@ -62,7 +62,7 @@ export const RAPOR_SABLONLARI: Record<string, string> = {
     "Spor Kulüpleri": `<h1 style="text-align: center;">SPOR KULÜBÜ DENETİM RAPORU</h1><p><br></p><p><strong>1. GİRİŞ</strong></p><p>7405 sayılı Spor Kulüpleri ve Spor Federasyonları Kanunu kapsamında ....... Spor Kulübü'nün idari ve mali denetimi hakkındadır.</p><p><br></p><p><strong>2. İDARİ YAPI VE İŞLEYİŞ</strong></p><p>Tüzük uygunluğu, üye kayıt defteri, yönetim kurulu karar defterinin incelenmesi.</p><p><br></p><p><strong>3. MALİ İNCELEME</strong></p><p>Gelir-gider tabloları, bağış makbuzları ve bilanço değerleri.</p><p><br></p><p><strong>4. SONUÇ</strong></p><p>İyileştirilmesi gereken alanlar ve mevzuata aykırı eylemlere ilişkin bildirimler.</p>`,
     "Spor Kulüpleri Evrak Talep Yazısı": `<h1 style="text-align: center;">SPOR KULÜBÜ EVRAK TALEP YAZISI</h1><p><br></p><p><strong>İlgi :</strong><br>a) ....... tarihli ve ....... sayılı Makam Oluru.<br>b) ....... tarihli ve ....... sayılı Görevlendirme Yazısı.</p><p><br></p><p>İlgi (a)'da yer alan Bakanlık Makamı Oluru ve ilgi (b)'de kayıtlı Rehberlik ve Denetim Başkanlığının Görev Emri uyarınca, ....... yılı Spor Kulüpleri ve Spor Anonim Şirketleri Genel Denetimi kapsamında aşağıda belirtilen tüm bilgi ve belgelerin madde bazında tasniflenmiş onaylı suretlerinin denetime hazır hale getirilerek 7 (yedi) gün içinde Müfettişliğe teslim edilmesini rica ederim.</p><p><br></p><p><strong>TALEP EDİLEN BİLGİ VE BELGELER:</strong></p><ol><li>Kuruluş ve tescil işlemlerine ilişkin evrak,</li><li>Çek Karnesi,</li><li>Sulh ve İbra Sözleşmeleri,</li><li>Varsa ayni yardım teslim belgesi (dağıtım tutanakları, ayni bağış alındı belgesi),</li><li>Başta tasdikli Yönetim Kurulu Karar defteri olmak üzere tüm yasal defterler ve varsa tutulan yardımcı defterler,</li><li>Bankalar nezdindeki tüm TL ve YP vadeli, vadesiz mevduat, yatırım hesapları, kredi kartı pos cihazı kullanımının bağlı olduğu hesaplar, kullanılan kredi hesapları (denetim dönemi içerisinde işlem görmüş ancak kapatılmış banka hesapları dahil), Kasa hesabı varsa denetime başlanıldığı gün itibariyle buna ilişkin mevcut durum tutanakları,</li><li>Tüzük, Esas Sözleşme ve Genel Kurul toplantı tutanakları (olağan ve olağanüstü kurul toplantıları),</li><li>İç Denetim Raporları (Denetim dönemi itibari ile),</li><li>Varsa Bağımsız Denetim Raporları,</li><li>Finansal Tablolar (Denetim dönemi itibariyle konsolidasyona tabi olan kulüp ve şirketlerde konsolide finansal tablolar ile konsolidasyon tarihinde konsolide olanlara ait olan tablolar birlikte),</li><li>Yasal defterlere ve yardımcı defterlere intikal etmiş işlemlere ait tüm evrak,</li><li>Bağlı ortaklık, iştirak ve iktisadi işletmeler varsa bu şirketlerin kuruluş ve varsa değişiklik ticaret sicil gazeteleri,</li><li>Bağlı bulunulan İl Müdürlüklerine verilen beyannameler,</li><li>Yönetim Kurulu üyelerinin ve personelin dosyaları,</li><li>Hasılat ve gelir kalemleri (UEFA, sporcu satışı, lisanslı ürün, bilet, yayın, loca, sponsor vb. gerçekleşen ile kayıtların uygunluğu, finansal tablolara uygunluk, taraflar vb.),</li><li>Futbolcu, Teknik Direktör ve Temsilci Sözleşmeleri (Tek taraflı-karşılıklı fesihler, tahkim kararları, geciken maaşlar, tazminatlar, vekalet ücretleri ve faiz ödemeleri, bonservis bedeli, amortisman giderleri vb.),</li><li>Bilet satış işlemlerine ilişkin sözleşme ve gelirlerin takibi, bedelsiz verilen biletler,</li><li>Sponsorluklara ilişkin kayıt ve belgeler,</li><li>Tahsisli, kiralık ve mülk olan menkul (araçlar vb.) ve gayrimenkullerin listesi,</li><li>Spor okullarına ilişkin iş ve işlemler,</li><li>Vadesinde Ödenmeyen Vergi ve SGK Borçlarına dair kayıtlar,</li><li>Lisansiyerlerden Tahsil Edilen Royalty Bedellerine ilişkin kayıtlar,</li><li>Verilen avanslar, alacakların takip ve tahsili, dava karşılıklarına ilişkin kayıtlar,</li><li>İnşaatlar, yapım işlerine ilişkin kayıtlar (Haklar, sözleşmeler, tedarikçilere ödemeler, yüklenici kontrolü vb.),</li><li>Kulüp içi talimatların mevcudiyeti, güncel mevzuata uygunluğuna dair bilgiler,</li><li>UEFA ve TFF tarafından Kulübe kesilen cezalar vb. kayıtları,</li><li>Muhatap kalınan icra takipleri, faiz ödemeleri, aleyhteki davalar vb. hakkındaki kayıtlar,</li><li>Satın alma ve gider işlemleri ile ticari ilişkilerde tespit edilen aksaklıklar ve istisnai durumlara ilişkin kayıtlar (yetki durumu, kalıntı değerler, fiziki mevcudiyet, envanter kaydı vb.),</li><li>Nakit ve nakit benzerleri, ticari alacaklar ve borçlar, tahsil kabiliyeti, beklenen zarar, işlemlerin tutar ve niteliği vb. hakkındaki kayıtlar,</li><li>Stoklara ilişkin kayıtlar (devir hızı, kayıt sistemi, uygulanan programlama işlerliği vb., fatura/irsaliye),</li><li>Sabit kıymetlere ilişkin kayıtlar (yeterli açıklama, sınıflandırma, mülkiyet, yapılan tahminler, kredi vb.).</li></ol><p><br></p><p style="text-align: right;">.......<br>Müfettiş</p>`
 };
-const RAPOR_DURUMLARI = ["Başlanmadı", "Devam Ediyor", "Evrak Bekleniyor", "İncelemede", "Tamamlandı"];
+const RAPOR_DURUMLARI = ["Başlanmadı", "Devam Ediyor", "İncelemede", "Tamamlandı"];
 
 function extractTaskSeq(raporKodu: string | undefined, prefix: string, year: number): number | null {
     if (!raporKodu) return null;
@@ -204,31 +204,35 @@ export default function Tasks() {
     const [registeredProfiles, setRegisteredProfiles] = useState<any[]>([]);
 
     useEffect(() => {
+        let active = true;
         const loadProfiles = async () => {
             try {
                 const { fetchAllProfiles } = await import("../lib/api/profiles");
                 const profiles = await fetchAllProfiles();
+                if (!active) return;
                 
                 // Filter out current user from registered profiles
                 const myUid = currentUser?.uid || profile?.uid;
                 const myEmail = currentUser?.email?.toLowerCase().trim() || profile?.email?.toLowerCase().trim();
-                const myName = profile?.full_name?.toLowerCase().trim();
                 const filtered = profiles.filter(p => {
                     const pUid = p.uid;
                     const pEmail = p.email?.toLowerCase().trim();
-                    const pName = p.full_name?.toLowerCase().trim();
                     const isMe = (pUid && pUid === myUid) || 
-                                 (pEmail && pEmail === myEmail) || 
-                                 (pName && myName && pName === myName);
+                                 (pEmail && pEmail === myEmail);
                     return !isMe;
                 });
 
-                setRegisteredProfiles(filtered);
+                if (active) {
+                    setRegisteredProfiles(filtered);
+                }
             } catch (err) {
                 console.error("Profiller yüklenemedi:", err);
             }
         };
         loadProfiles();
+        return () => {
+            active = false;
+        };
     }, [currentUser?.uid, currentUser?.email, profile]);
 
     // Memoized derived data from global cache
@@ -292,6 +296,7 @@ export default function Tasks() {
         rapor_adi: "",
         rapor_turu: "İnceleme",
         baslama_tarihi: new Date().toISOString().split("T")[0],
+        bitis_tarihi: new Date().toISOString().split("T")[0],
         sure_gun: 30,
         assigned_to: [] as string[],
         parent_task_id: ""
@@ -356,19 +361,42 @@ export default function Tasks() {
         if (!form.rapor_adi.trim()) return;
         try {
             setSaving(true);
+            // Legacy modda bitiş tarihinden gün farkını hesapla
+            const legacyCompletedDays = isLegacyMode && form.baslama_tarihi && form.bitis_tarihi
+                ? Math.max(0, Math.ceil((new Date(form.bitis_tarihi).getTime() - new Date(form.baslama_tarihi).getTime()) / (1000 * 3600 * 24)))
+                : form.sure_gun;
+
+            let finalRaporKodu = form.rapor_kodu ? form.rapor_kodu.trim() : "";
+            if (finalRaporKodu) {
+                finalRaporKodu = finalRaporKodu.split(',')
+                    .map(part => {
+                        let p = part.trim();
+                        p = p.replace(/_(\d{4}-)/g, "/$1");
+                        if (p.includes("_") && !p.includes("/")) {
+                            const lastUnder = p.lastIndexOf("_");
+                            if (lastUnder !== -1) {
+                                p = p.substring(0, lastUnder) + "/" + p.substring(lastUnder + 1);
+                            }
+                        }
+                        return p;
+                    })
+                    .join(", ");
+            }
+
             const payload = {
                 ...form,
                 owner_id: effectiveUid,
                 assigned_to: [effectiveUid, ...(form.assigned_to || [])].filter((id): id is string => !!id),
-                rapor_kodu: form.rapor_kodu || autoKodu,
+                rapor_kodu: finalRaporKodu || autoKodu,
                 rapor_durumu: isLegacyMode ? "Tamamlandı" : "Başlanmadı",
                 is_public: false,
                 steps: [],
-                completed_at: isLegacyMode ? new Date().toISOString() : undefined,
-                completed_in_days: isLegacyMode ? form.sure_gun : undefined,
+                completed_at: isLegacyMode ? (form.bitis_tarihi ? new Date(form.bitis_tarihi).toISOString() : new Date().toISOString()) : undefined,
+                completed_in_days: isLegacyMode ? legacyCompletedDays : undefined,
+                sure_gun: isLegacyMode ? legacyCompletedDays : form.sure_gun,
                 status_history: [{
                     status: isLegacyMode ? "Tamamlandı" : "Başlanmadı",
-                    changed_at: new Date().toISOString(),
+                    changed_at: isLegacyMode ? (form.bitis_tarihi ? new Date(form.bitis_tarihi).toISOString() : new Date().toISOString()) : new Date().toISOString(),
                     to: isLegacyMode ? "Tamamlandı" : "Başlanmadı"
                 }]
             };
@@ -379,6 +407,7 @@ export default function Tasks() {
                 rapor_adi: "",
                 rapor_turu: "İnceleme",
                 baslama_tarihi: new Date().toISOString().split("T")[0],
+                bitis_tarihi: new Date().toISOString().split("T")[0],
                 sure_gun: 30,
                 assigned_to: [],
                 parent_task_id: ""
@@ -891,7 +920,24 @@ export default function Tasks() {
     const handleEditSave = async () => {
         if (!editingTask) return;
         try {
+            let cleanRaporKodu = editingTask.rapor_kodu ? editingTask.rapor_kodu.trim() : "";
+            if (cleanRaporKodu) {
+                cleanRaporKodu = cleanRaporKodu.split(',')
+                    .map(part => {
+                        let p = part.trim();
+                        p = p.replace(/_(\d{4}-)/g, "/$1");
+                        if (p.includes("_") && !p.includes("/")) {
+                            const lastUnder = p.lastIndexOf("_");
+                            if (lastUnder !== -1) {
+                                p = p.substring(0, lastUnder) + "/" + p.substring(lastUnder + 1);
+                            }
+                        }
+                        return p;
+                    })
+                    .join(", ");
+            }
             await updateTask(editingTask.id, {
+                rapor_kodu: cleanRaporKodu,
                 rapor_adi: editingTask.rapor_adi,
                 rapor_turu: editingTask.rapor_turu,
                 baslama_tarihi: editingTask.baslama_tarihi,
@@ -1046,6 +1092,33 @@ export default function Tasks() {
         items.sort((a, b) => {
             switch (sortConfig.key) {
                 case "rapor_kodu": {
+                    const parseRaporKodu = (kodu?: string) => {
+                        if (!kodu) return { year: 0, seq: 0 };
+                        const parts = kodu.split(',').map(p => p.trim()).filter(Boolean);
+                        if (parts.length === 0) return { year: 0, seq: 0 };
+                        
+                        const targetCode = parts[0];
+                        const match = targetCode.match(/(\d{4})-(\d+)/);
+                        if (match) {
+                            return { year: parseInt(match[1]) || 0, seq: parseInt(match[2]) || 0 };
+                        }
+                        const yearMatch = targetCode.match(/(\d{4})/);
+                        if (yearMatch) {
+                            return { year: parseInt(yearMatch[1]) || 0, seq: 0 };
+                        }
+                        return { year: 0, seq: 0 };
+                    };
+
+                    const parsedA = parseRaporKodu(a.rapor_kodu);
+                    const parsedB = parseRaporKodu(b.rapor_kodu);
+
+                    if (parsedA.year !== parsedB.year) {
+                        return (parsedA.year - parsedB.year) * directionMultiplier;
+                    }
+                    if (parsedA.seq !== parsedB.seq) {
+                        return (parsedA.seq - parsedB.seq) * directionMultiplier;
+                    }
+
                     const aCode = String(a.rapor_kodu || "");
                     const bCode = String(b.rapor_kodu || "");
                     return aCode.localeCompare(bCode, "tr", { numeric: true, sensitivity: "base" }) * directionMultiplier;
@@ -1092,7 +1165,6 @@ export default function Tasks() {
         switch (durum) {
             case "Tamamlandı": return "#10b981"; // Yeşil
             case "Başlanmadı": return "#94a3b8"; // Gri
-            case "Evrak Bekleniyor": return "#8b5cf6"; // Mor
             case "İncelemede": return "#f59e0b"; // Turuncu/Sarı
             case "Devam Ediyor": return "#3b82f6"; // Mavi
             default: return "#94a3b8";
@@ -1163,10 +1235,10 @@ export default function Tasks() {
         };
 
         const header = [
-            "Görev / Dosya No",
+            "Sıra",
             "Görev Adı",
             "Görev Türü",
-            "Başlama Tarihi",
+            "Görev Tarihi",
             "Süre (Gün)",
             "Durum",
             "Ekip Kişi Sayısı",
@@ -1174,8 +1246,8 @@ export default function Tasks() {
             "Kabul Eden"
         ];
 
-        const lines = baseTasks.map(task => [
-            task.rapor_kodu,
+        const lines = baseTasks.map((task, idx) => [
+            idx + 1,
             task.rapor_adi,
             task.rapor_turu,
             task.baslama_tarihi,
@@ -1337,17 +1409,7 @@ export default function Tasks() {
                     </div>
                     <form onSubmit={handleCreate} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
-                            <div className="md:col-span-3 lg:col-span-2 space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Görev / Dosya No</label>
-                                <input
-                                    disabled={!!form.parent_task_id}
-                                    placeholder={autoKodu}
-                                    value={form.rapor_kodu || autoKodu}
-                                    onChange={e => setForm({ ...form, rapor_kodu: e.target.value })}
-                                    className="w-full px-4 py-3 rounded-xl border border-border bg-muted/30 focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold tracking-tight outline-none disabled:opacity-60 disabled:cursor-not-allowed"
-                                />
-                            </div>
-                            <div className="md:col-span-9 lg:col-span-7 space-y-1.5">
+                            <div className={cn("md:col-span-12 space-y-1.5", isLegacyMode ? "lg:col-span-6" : "lg:col-span-9")}>
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Görev Adı / Konusu</label>
                                 <input
                                     required
@@ -1357,6 +1419,18 @@ export default function Tasks() {
                                     className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold outline-none"
                                 />
                             </div>
+                            {isLegacyMode && (
+                                <div className="md:col-span-12 lg:col-span-3 space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Görev / Rapor No</label>
+                                    <input
+                                        required
+                                        placeholder="Örn: S.Y.64/2023-1"
+                                        value={form.rapor_kodu}
+                                        onChange={e => setForm({ ...form, rapor_kodu: e.target.value })}
+                                        className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold outline-none"
+                                    />
+                                </div>
+                            )}
                             <div className="md:col-span-12 lg:col-span-3 space-y-1.5">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Görev Türü</label>
                                 <select
@@ -1380,7 +1454,7 @@ export default function Tasks() {
                                     >
                                         <option value="">Seçiniz (Bağlı üst görev yoksa boş bırakın)...</option>
                                         {tasks.filter(t => !t.parent_task_id).map(t => (
-                                            <option key={t.id} value={t.id}>{t.rapor_adi} ({t.rapor_kodu}) - {t.rapor_turu}</option>
+                                            <option key={t.id} value={t.id}>{t.rapor_adi} - {t.rapor_turu}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -1389,7 +1463,7 @@ export default function Tasks() {
 
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
                             <div className="md:col-span-6 lg:col-span-3 space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Başlama Tarihi</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">{isLegacyMode ? "Görev Başlangıç Tarihi" : "Görev Tarihi"}</label>
                                 <input
                                     type="date"
                                     value={form.baslama_tarihi}
@@ -1398,14 +1472,23 @@ export default function Tasks() {
                                 />
                             </div>
                             <div className="md:col-span-6 lg:col-span-2 space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Süre (Gün)</label>
-                                <input
-                                    type="number"
-                                    min={1}
-                                    value={form.sure_gun}
-                                    onChange={e => setForm({ ...form, sure_gun: parseInt(e.target.value) || 30 })}
-                                    className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold outline-none"
-                                />
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">{isLegacyMode ? "Görev Bitiş Tarihi" : "Süre (Gün)"}</label>
+                                {isLegacyMode ? (
+                                    <input
+                                        type="date"
+                                        value={form.bitis_tarihi}
+                                        onChange={e => setForm({ ...form, bitis_tarihi: e.target.value })}
+                                        className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold outline-none"
+                                    />
+                                ) : (
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        value={form.sure_gun}
+                                        onChange={e => setForm({ ...form, sure_gun: parseInt(e.target.value) || 30 })}
+                                        className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold outline-none"
+                                    />
+                                )}
                             </div>
                             <div className="md:col-span-12 lg:col-span-7 space-y-1.5 relative" ref={inspectorDropdownRef}>
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Görevde Yer Alan Kişiler</label>
@@ -1516,7 +1599,7 @@ export default function Tasks() {
                                 <div>
                                     <div className="flex justify-between items-start mb-3">
                                         <span className="px-2 py-1 bg-amber-100 text-amber-700 text-[9px] font-black rounded-lg tracking-widest">Yeni Atama</span>
-                                        <span className="text-[10px] font-bold text-amber-500">{inv.rapor_kodu}</span>
+                                        <span className="text-[10px] font-bold text-amber-500">{inv.rapor_turu}</span>
                                     </div>
                                     <h4 className="font-bold text-foreground dark:text-slate-100 text-sm mb-1">{inv.rapor_adi}</h4>
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-4 italic flex items-center gap-1">
@@ -1579,7 +1662,7 @@ export default function Tasks() {
                         <div className="relative w-full lg:w-[320px]">
                             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                             <input
-                                placeholder="Dosya no veya görev adı ile ara..."
+                                placeholder="Görev adı veya konusu ile ara..."
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 className="w-full h-11 pl-10 pr-4 rounded-xl border border-border bg-card text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 transition-all"
@@ -1654,7 +1737,9 @@ export default function Tasks() {
                                         <div className="flex justify-between items-start">
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-black text-primary tracking-widest">{task.rapor_kodu}</span>
+                                                    <span className="text-[10px] font-black text-primary tracking-widest">
+                                                        {activeTab === 'ortak' ? (task.rapor_kodu || "-") : (sortedFiltered.indexOf(task) + 1)}
+                                                    </span>
                                                     <span className="text-[9px] font-bold text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded">{task.rapor_turu}</span>
                                                 </div>
                                                 <h4 className="font-bold text-slate-900 dark:text-slate-100 leading-tight">{task.rapor_adi}</h4>
@@ -1749,7 +1834,7 @@ export default function Tasks() {
                                                                                     <h6 className="text-xs font-bold text-slate-900 dark:text-slate-100">{child.rapor_adi}</h6>
                                                                                     <p className="text-[9px] text-slate-400 font-bold uppercase">{child.rapor_turu}</p>
                                                                                 </div>
-                                                                                <span className="text-[9px] font-black text-slate-500">{child.rapor_kodu}</span>
+                                                                                <span className="text-[9px] font-black text-slate-500">{child.rapor_turu}</span>
                                                                             </div>
                                                                             <div className="flex justify-between items-center">
                                                                                 <select
@@ -1842,7 +1927,7 @@ export default function Tasks() {
                                 </th>
                                 <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
                                     <button type="button" onClick={() => toggleSort("rapor_kodu")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
-                                        Görev / Dosya No <ArrowUpDown size={12} />
+                                        Sıra <ArrowUpDown size={12} />
                                     </button>
                                 </th>
                                 <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
@@ -1895,7 +1980,11 @@ export default function Tasks() {
                                                         className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
                                                     />
                                                 </td>
-                                                <td className="px-4 lg:px-6 py-4"><span className="font-black text-primary text-[11px] tracking-widest font-outfit">{task.rapor_kodu}</span></td>
+                                                <td className="px-4 lg:px-6 py-4">
+                                                    <span className="font-black text-primary text-[11px] tracking-widest font-outfit">
+                                                        {activeTab === 'ortak' ? (task.rapor_kodu || "-") : (sortedFiltered.indexOf(task) + 1)}
+                                                    </span>
+                                                </td>
                                                 <td className="px-4 lg:px-6 py-4"><span className="font-bold text-slate-900 dark:text-slate-100 text-sm">{task.rapor_adi}</span></td>
                                                 <td className="px-4 lg:px-6 py-4"><span className="font-bold text-slate-400 text-[11px]">{task.rapor_turu}</span></td>
                                                 <td className="px-4 lg:px-6 py-4">
@@ -1967,7 +2056,7 @@ export default function Tasks() {
                                                                                 return (
                                                                                     <div key={child.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-card hover:bg-muted/10 transition-colors">
                                                                                         <div className="flex items-center gap-3">
-                                                                                            <span className="text-[10px] font-black text-primary tracking-widest font-outfit">{child.rapor_kodu}</span>
+                                                                                            <span className="text-[10px] font-black text-primary tracking-widest font-outfit">{child.rapor_turu}</span>
                                                                                             <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
                                                                                             <div>
                                                                                                 <h6 className="text-sm font-bold text-slate-900 dark:text-slate-100">{child.rapor_adi}</h6>
@@ -2069,7 +2158,7 @@ export default function Tasks() {
                         <div className="flex items-center justify-between mb-6">
                             <div>
                                 <h3 className="text-xl font-black font-outfit text-foreground dark:text-slate-100">BAĞLI RAPORLAR</h3>
-                                <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">{showReportSelector.rapor_kodu}</p>
+                                <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">{showReportSelector.rapor_adi}</p>
                             </div>
                             <button onClick={() => setShowReportSelector(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
                                 <X size={20} className="text-slate-400" />
@@ -2110,7 +2199,7 @@ export default function Tasks() {
                                             <div>
                                                 <div className="flex items-center gap-2">
                                                     <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest">
-                                                        {showReportSelector.rapor_kodu}{audit.report_seq && audit.report_seq > 1 ? `/${audit.report_seq}` : ''}
+                                                        Rapor {audit.report_seq || 1}
                                                     </p>
                                                     <span className={cn(
                                                         "px-1.5 py-0.5 text-[8px] font-black rounded uppercase tracking-widest",
@@ -2212,7 +2301,7 @@ export default function Tasks() {
                         <div className="flex items-center justify-between mb-6 border-b border-slate-50 dark:border-slate-800 pb-4">
                             <div>
                                 <h3 className="text-xl font-black font-outfit text-foreground dark:text-slate-100">GÖREVİ DÜZENLE</h3>
-                                <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest mt-1">{editingTask.rapor_kodu}</p>
+                                <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest mt-1">{editingTask.rapor_adi}</p>
                             </div>
                             <button onClick={() => setEditingTask(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
                                 <X size={20} className="text-slate-400" />
@@ -2220,15 +2309,7 @@ export default function Tasks() {
                         </div>
                         
                         <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label style={labelStyle}>Görev No</label>
-                                    <input 
-                                        value={editingTask.rapor_kodu} 
-                                        onChange={e => setEditingTask({...editingTask, rapor_kodu: e.target.value})} 
-                                        style={inputStyle} 
-                                    />
-                                </div>
+                            <div className="grid grid-cols-1">
                                 <div>
                                     <label style={labelStyle}>Görev Türü</label>
                                     <select
@@ -2251,25 +2332,38 @@ export default function Tasks() {
                                     >
                                         <option value="">Seçiniz (Bağlı İl Denetimi yoksa boş bırakın)...</option>
                                         {tasks.filter(t => t.rapor_turu === "İl Denetimi" && t.id !== editingTask.id).map(t => (
-                                            <option key={t.id} value={t.id}>{t.rapor_adi} ({t.rapor_kodu})</option>
+                                            <option key={t.id} value={t.id}>{t.rapor_adi} ({t.rapor_turu})</option>
                                         ))}
                                     </select>
                                 </div>
                             )}
 
-                            <div>
-                                <label style={labelStyle}>Görev Adı</label>
-                                <input 
-                                    value={editingTask.rapor_adi} 
-                                    onChange={e => setEditingTask({...editingTask, rapor_adi: e.target.value})} 
-                                    style={inputStyle} 
-                                    placeholder="Görev adını girin..."
-                                />
+                            <div className={cn("grid gap-4", editingTask.rapor_durumu === "Tamamlandı" ? "grid-cols-2" : "grid-cols-1")}>
+                                <div>
+                                    <label style={labelStyle}>Görev Adı</label>
+                                    <input 
+                                        value={editingTask.rapor_adi} 
+                                        onChange={e => setEditingTask({...editingTask, rapor_adi: e.target.value})} 
+                                        style={inputStyle} 
+                                        placeholder="Görev adını girin..."
+                                    />
+                                </div>
+                                {editingTask.rapor_durumu === "Tamamlandı" && (
+                                    <div>
+                                        <label style={labelStyle}>Görev / Rapor No</label>
+                                        <input 
+                                            value={editingTask.rapor_kodu || ""} 
+                                            onChange={e => setEditingTask({...editingTask, rapor_kodu: e.target.value})} 
+                                            style={inputStyle} 
+                                            placeholder="Örn: S.Y.64/2023-1"
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label style={labelStyle}>Başlama Tarihi</label>
+                                    <label style={labelStyle}>Görev Tarihi</label>
                                     <input 
                                         type="date"
                                         value={editingTask.baslama_tarihi} 
@@ -2387,7 +2481,7 @@ export default function Tasks() {
                                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">İşle İlişkili Görev</label>
                                 <div className="w-full p-4 bg-muted/50 border border-border rounded-2xl text-sm font-bold text-muted-foreground flex items-center gap-3 cursor-not-allowed">
                                     <ClipboardList size={18} className="text-primary/40" />
-                                    {isNewAuditModalOpen.rapor_adi} ({isNewAuditModalOpen.rapor_kodu})
+                                    {isNewAuditModalOpen.rapor_adi} ({isNewAuditModalOpen.rapor_turu})
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
