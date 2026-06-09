@@ -7,6 +7,8 @@ with warnings.catch_warnings():
 import asyncio
 import logging
 import os
+import re
+import html
 from io import BytesIO
 from pypdf import PdfReader
 from docx import Document as DocxDocument
@@ -82,8 +84,10 @@ async def _get_user_ai_settings(uid: str) -> tuple[str, str, float, str, bool]:
             res_temp = float(data.get("ai_temperature") or res_temp)
             res_sp = (data.get("ai_system_prompt") or "").strip()
             res_premium = bool(data.get("has_premium_ai") or False)
+    except (KeyError, ValueError, TypeError) as e:
+        logger.warning(f"AI ayarları Firestore'dan alınırken veri hatası: {e}")
     except Exception as e:
-        logger.warning(f"Error fetching Firestore AI settings: {e}")
+        logger.error(f"Firestore bağlantı hatası: {e}")
 
     # 2. Yerel (Local) ayarlara bak ve üzerine yaz
     try:
@@ -97,8 +101,10 @@ async def _get_user_ai_settings(uid: str) -> tuple[str, str, float, str, bool]:
                 res_temp = float(local_data.get("ai_temperature"))
             if local_data.get("ai_system_prompt") is not None:
                 res_sp = local_data.get("ai_system_prompt").strip()
+    except (KeyError, ValueError, TypeError) as e:
+        logger.warning(f"Yerel AI ayarları işlenirken veri hatası: {e}")
     except Exception as e:
-        logger.error(f"Error merging local AI settings: {e}")
+        logger.error(f"Yerel AI ayarları alınırken hata: {e}")
 
     return res_key, res_model, res_temp, res_sp, res_premium
 
@@ -646,3 +652,198 @@ TALİMATLAR:
             context += f"- {d.get('name')} ({d.get('title')}): {d.get('unit')}, Tel: {d.get('phone') or '-'}\n"
 
         return context or "Kurumsal rehberde henüz kayıt bulunmuyor."
+
+    async def proofread(
+        self,
+        text: str,
+        user: Dict[str, Any] | None = None
+    ) -> Dict[str, Any]:
+        """Türkçe rapor içeriğindeki yazım ve dil bilgisi hatalarını tarar ve JSON formatında döner."""
+        if not user or not user.get("uid"):
+            raise ValueError("Kullanıcı doğrulaması eksik.")
+
+        api_key, model_name, _temperature, _user_sp, is_premium = await _get_user_ai_settings(user["uid"])
+        if not api_key:
+            # Fallback to backend config if premium
+            from app.config import settings
+            if is_premium and settings.GEMINI_API_KEY:
+                api_key = settings.GEMINI_API_KEY
+            else:
+                raise ValueError("Henüz bir Gemini API anahtarı tanımlanmamış.")
+
+        prompt = f"""Analiz edilecek Türkçe Rapor Metni:
+\"\"\"
+{text}
+\"\"\"
+
+Görev: Yukarıdaki Türkçe rapor metnini yazım, imla, dil bilgisi ve resmi yazışma kurallarına (resmi dil uyumu) göre analiz et. Metindeki yazım yanlışlarını, dil bilgisi hatalarını veya resmi dil üslubuna uymayan kısımları tespit et ve bunları aşağıdaki JSON formatında döndür. Yalnızca geçerli bir JSON döndürmelisin, başka hiçbir açıklama veya markdown kodu (örn: ```json) ekleme.
+
+Önemli Kurallar:
+- JSON geçerli olmalı ve parse edilebilmelidir.
+- Hatalar listesinde 'error_text' orijinal metinde geçen hatalı kısım olmalıdır.
+- 'replacements' hata yerine önerilen en fazla 3 doğru alternatif kelimeyi içermelidir.
+- 'message' hatanın nedenini açıklayan kısa Türkçe bir cümle olmalıdır.
+- 'context_text' hata içeren cümlenin tamamı olmalıdır.
+
+Dönecek JSON Formatı:
+{{
+  "matches": [
+    {{
+      "message": "Hatanın açıklaması (örn: 'da' bağlacı ayrı yazılmalıdır)",
+      "error_text": "hatalı_kelime",
+      "replacements": ["önerilen_kelime"],
+      "context_text": "Hatalı kelimeyi içeren cümlenin tamamı"
+    }}
+  ]
+}}
+
+Eğer hiçbir hata yoksa, boş bir liste döndür:
+{{
+  "matches": []
+}}
+"""
+        model = _build_model(api_key, model_name)
+        response = await model.generate_content_async(
+            prompt,
+            generation_config={"response_mime_type": "application/json"}
+        )
+        
+        raw_text = (response.text or "").strip()
+        
+        # Clean JSON if model returned markdown codeblock wrappers
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```(?:json)?\n", "", raw_text)
+            raw_text = re.sub(r"\n```$", "", raw_text)
+            raw_text = raw_text.strip()
+            
+        import json
+        try:
+            raw_json = json.loads(raw_text)
+        except Exception as e:
+            logger.error(f"Failed to parse Gemini proofread response: {e}. Raw response: {raw_text}")
+            raise ValueError("AI dil kontrolü yanıtı geçerli JSON formatında değil.")
+            
+        # Programmatically calculate offsets for frontend compatibility
+        plain_text = re.sub(r'<[^>]+>', ' ', text)
+        plain_text = html.unescape(plain_text)
+        
+        final_matches = []
+        for match in raw_json.get("matches", []):
+            error_text = match.get("error_text")
+            message = match.get("message")
+            replacements = match.get("replacements", [])
+            context_text = match.get("context_text") or f"... {error_text} ..."
+            
+            if not error_text or not message:
+                continue
+                
+            index = plain_text.lower().find(error_text.lower())
+            if index != -1:
+                start_char = max(0, index - 25)
+                end_char = min(len(plain_text), index + len(error_text) + 25)
+                final_context = plain_text[start_char:end_char]
+                context_offset = index - start_char
+                offset = index
+            else:
+                # Fallback to using context sentence
+                index_in_context = context_text.lower().find(error_text.lower())
+                if index_in_context != -1:
+                    offset = 0
+                    final_context = context_text
+                    context_offset = index_in_context
+                else:
+                    offset = 0
+                    final_context = f"... {error_text} ..."
+                    context_offset = 4
+                    
+            final_matches.append({
+                "message": message,
+                "offset": offset,
+                "length": len(error_text),
+                "replacements": replacements,
+                "context": {
+                    "text": final_context,
+                    "offset": context_offset,
+                    "length": len(error_text)
+                }
+            })
+            
+        return {"matches": final_matches}
+
+    async def suggest_legislation(
+        self,
+        text: str,
+        user: Dict[str, Any] | None = None
+    ) -> List[Dict[str, Any]]:
+        """Rapor metnine dayanarak en alakalı GSB mevzuat maddelerini ve referanslarını önerir."""
+        if not user or not user.get("uid"):
+            raise ValueError("Kullanıcı doğrulaması eksik.")
+
+        api_key, model_name, _, _, is_premium = await _get_user_ai_settings(user["uid"])
+        if not api_key:
+            from app.config import settings
+            if is_premium and settings.GEMINI_API_KEY:
+                api_key = settings.GEMINI_API_KEY
+            else:
+                raise ValueError("Henüz bir Gemini API anahtarı tanımlanmamış. Ayarlar sayfasından kendi anahtarınızı girin.")
+
+        # Get list of GSB legislations to let Gemini match them
+        legislation_ctx = await self._get_legislation_context(user)
+
+        prompt = f"""Analiz Edilecek Rapor Kesiti:
+\"\"\"
+{text}
+\"\"\"
+
+Sistemdeki Mevcut GSB Mevzuat Listesi:
+\"\"\"
+{legislation_ctx}
+\"\"\"
+
+Görev: Yukarıdaki rapor kesitini incele. Bu rapor kesiti için yasal dayanak oluşturabilecek veya doğrudan/dolaylı olarak ilişkili olan en alakalı GSB mevzuatlarını (Cumhurbaşkanlığı Kararnameleri, Kanunlar, Yönetmelikler, Yönergeler veya Genelgeler) GSB Mevzuat Listesinden tespit et. 
+
+En fazla 4 en alakalı yasal referansı aşağıdaki JSON formatında döndür. Yalnızca geçerli bir JSON döndürmelisin, başka hiçbir açıklama veya markdown kodu (örn: ```json) ekleme.
+
+Kurallar:
+- 'title' mevzuatın adı veya yasa/yönetmelik başlığı olmalıdır (örn: 'Gençlik ve Spor Bakanlığı Teşkilat ve Görevleri Hakkında Cumhurbaşkanlığı Kararnamesi').
+- 'article' ilgili madde numarası veya bölümü olmalıdır (örn: 'Madde 12 (1) / a fıkrası').
+- 'snippet' mevzuat maddesinin içeriğinin kısa bir özeti veya açıklaması olmalıdır.
+- 'relevance_reason' bu maddenin rapordaki kesitle olan ilişkisini açıklayan kısa Türkçe bir gerekçe olmalıdır (örn: 'Rapor kesitinde geçen personel atama yetkileri bu mevzuat maddesinde tanımlanmaktadır').
+
+Dönecek JSON Formatı:
+{{
+  "recommendations": [
+    {{
+      "title": "Mevzuat Başlığı",
+      "article": "Madde No",
+      "snippet": "Maddenin kısa içeriği...",
+      "relevance_reason": "İlişkilendirme gerekçesi..."
+    }}
+  ]
+}}
+
+Eğer hiçbir alakalı mevzuat bulamazsan, boş bir liste döndür:
+{{
+  "recommendations": []
+}}
+"""
+        model = _build_model(api_key, model_name)
+        response = await model.generate_content_async(
+            prompt,
+            generation_config={"response_mime_type": "application/json"}
+        )
+        
+        raw_text = (response.text or "").strip()
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```(?:json)?\n", "", raw_text)
+            raw_text = re.sub(r"\n```$", "", raw_text)
+            raw_text = raw_text.strip()
+            
+        import json
+        try:
+            raw_json = json.loads(raw_text)
+            return raw_json.get("recommendations", [])
+        except Exception as e:
+            logger.error(f"Failed to parse Gemini legislation suggestion response: {e}. Raw response: {raw_text}")
+            return []
+

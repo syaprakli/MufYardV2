@@ -4,6 +4,8 @@ from typing import List, Optional, Dict, Any
 import uuid
 from app.lib.firebase_admin import db
 from app.schemas.task import TaskCreate, TaskUpdate
+import pandas as pd
+import io
 
 _task_creation_lock = asyncio.Lock()
 
@@ -24,18 +26,12 @@ class TaskService:
 
     @staticmethod
     def _is_final_code(code: str) -> bool:
-        """S.Y.64/YYYY-N formatında olup olmadığını kontrol eder."""
+        """S.Y.64/YYYY-N veya TASLAK- formatında olmayan herhangi bir nihai kod formatında olup olmadığını kontrol eder."""
         if not code:
             return False
-        parts = code.split('/')
-        if len(parts) != 2:
+        if code.startswith("TASLAK-"):
             return False
-        if parts[0] != "S.Y.64":
-            return False
-        tail = parts[1].split('-')
-        if len(tail) != 2:
-            return False
-        return tail[0].isdigit() and len(tail[0]) == 4 and tail[1].isdigit()
+        return True
 
     @staticmethod
     async def _generate_rapor_kodu(year: Optional[int] = None) -> str:
@@ -72,6 +68,37 @@ class TaskService:
             count = 1
 
         return f"S.Y.64/{year}-{count}"
+
+    @staticmethod
+    async def _generate_draft_rapor_kodu(year: int) -> str:
+        """Auto-generate TASLAK-YYYY-N format draft code."""
+        try:
+            docs = await asyncio.to_thread(
+                lambda: list(
+                    db.collection('tasks')
+                    .limit(1000)
+                    .select(['rapor_kodu'])
+                    .stream()
+                )
+            )
+            used_seqs = set()
+            prefix = f"TASLAK-{year}-"
+            for doc in docs:
+                kodu = (doc.to_dict() or {}).get('rapor_kodu', '')
+                if kodu and kodu.startswith(prefix):
+                    tail = kodu[len(prefix):].strip()
+                    if tail.isdigit():
+                        used_seqs.add(int(tail))
+
+            count = 1
+            while count in used_seqs:
+                count += 1
+            return f"TASLAK-{year}-{count}"
+        except Exception as e:
+            print(f"draft_rapor_kodu generate error: {e}")
+            import uuid
+            unique_id = uuid.uuid4().hex[:8]
+            return f"TASLAK-{year}-{unique_id}"
 
     @staticmethod
     async def get_tasks(user_id: Optional[str] = None, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -145,6 +172,13 @@ class TaskService:
 
         try:
             async with _task_creation_lock:
+                if task_data.get('parent_task_id'):
+                    parent_doc_ref = db.collection('tasks').document(task_data['parent_task_id'])
+                    parent_doc = await asyncio.to_thread(parent_doc_ref.get)
+                    if parent_doc.exists:
+                        parent_data = parent_doc.to_dict() or {}
+                        task_data['rapor_kodu'] = parent_data.get('rapor_kodu')
+
                 if not task_data.get('rapor_kodu'):
                     status = task_data.get('rapor_durumu', 'Başlanmadı')
                     bt = task_data.get('baslama_tarihi')
@@ -153,9 +187,7 @@ class TaskService:
                     if status in ('İncelemede', 'Tamamlandı'):
                         task_data['rapor_kodu'] = await TaskService._generate_rapor_kodu(year)
                     else:
-                        import uuid
-                        unique_id = uuid.uuid4().hex[:8]
-                        task_data['rapor_kodu'] = f"TASLAK-{year}-{unique_id}"
+                        task_data['rapor_kodu'] = await TaskService._generate_draft_rapor_kodu(year)
                 result = await asyncio.to_thread(db.collection('tasks').add, task_data)
                 
             if result and result[1]:
@@ -241,9 +273,7 @@ class TaskService:
                             if status in ('İncelemede', 'Tamamlandı'):
                                 update_data['rapor_kodu'] = await TaskService._generate_rapor_kodu(year)
                             else:
-                                import uuid
-                                unique_id = uuid.uuid4().hex[:8]
-                                update_data['rapor_kodu'] = f"TASLAK-{year}-{unique_id}"
+                                update_data['rapor_kodu'] = await TaskService._generate_draft_rapor_kodu(year)
 
             # Auto-promote to final registry code if status changes to "İncelemede" or "Tamamlandı"
             new_status = update_data.get('rapor_durumu')
@@ -317,6 +347,95 @@ class TaskService:
                     )
 
             await asyncio.to_thread(doc_ref.update, update_data)
+
+            # Cascade: if task name, code, parent, or start date changed, update associated audit titles
+            if any(k in update_data for k in ('rapor_adi', 'rapor_kodu', 'parent_task_id', 'baslama_tarihi')):
+                try:
+                    audits_ref = db.collection('audits').where('task_id', '==', task_id)
+                    audits_docs = await asyncio.to_thread(audits_ref.get)
+                    
+                    audits = []
+                    for doc in audits_docs:
+                        d = doc.to_dict()
+                        d['id'] = doc.id
+                        audits.append(d)
+                    
+                    if audits:
+                        audits.sort(key=lambda a: (a.get('report_seq') or 1, a.get('created_at') or ''))
+                        
+                        tasks_docs = await asyncio.to_thread(db.collection('tasks').get)
+                        all_tasks = []
+                        for doc in tasks_docs:
+                            d = doc.to_dict()
+                            d['id'] = doc.id
+                            all_tasks.append(d)
+                        
+                        # Find display code
+                        display_code = new_code
+                        is_final = new_code and not new_code.startswith("TASLAK-")
+                        
+                        if not is_final:
+                            # Replicate display index calculation
+                            top_level = []
+                            for t in all_tasks:
+                                if t.get('parent_task_id'):
+                                    continue
+                                bt = t.get('baslama_tarihi')
+                                is_old = False
+                                if bt:
+                                    try:
+                                        from datetime import datetime
+                                        dt = datetime.strptime(bt, "%Y-%m-%d")
+                                        if (datetime.utcnow() - dt).days > 730:
+                                            is_old = True
+                                    except Exception:
+                                        pass
+                                is_archived = (t.get('rapor_durumu') == 'Tamamlandı') and is_old
+                                if not is_archived:
+                                    top_level.append(t)
+                            
+                            def sort_key(t):
+                                code = t.get('rapor_kodu') or ''
+                                is_draft = not code or code.startswith("TASLAK-")
+                                year = 0
+                                seq = 0
+                                if not is_draft:
+                                    try:
+                                        parts = code.split(',')[0].strip().split('/')
+                                        if len(parts) == 2:
+                                            tail = parts[1].split('-')
+                                            if len(tail) == 2:
+                                                year = int(tail[0])
+                                                seq = int(tail[1])
+                                    except Exception:
+                                        pass
+                                return (is_draft, year, seq, t.get('baslama_tarihi') or '', t.get('id') or '')
+                            
+                            top_level.sort(key=sort_key)
+                            
+                            idx = -1
+                            for i, t in enumerate(top_level):
+                                if t['id'] == task_id:
+                                    idx = i
+                                    break
+                            display_code = str(idx + 1) if idx != -1 else "-"
+                        
+                        for i, audit in enumerate(audits):
+                            task_name = new_title or "Raporu"
+                            suffix = "" if task_name.endswith("Raporu") else " Raporu"
+                            base_title = f"{display_code} - {task_name}{suffix}"
+                            if i == 0:
+                                title = base_title
+                            else:
+                                title = f"{base_title} {i + 1}"
+                            
+                            if audit.get('title') != title:
+                                await asyncio.to_thread(
+                                    db.collection('audits').document(audit['id']).update,
+                                    {'title': title}
+                                )
+                except Exception as audit_err:
+                    print(f"Error updating associated audit titles: {audit_err}")
 
             # Cascade: if this task's rapor_kodu changed, update all children's rapor_kodu and rename their folders
             new_rapor_kodu = update_data.get('rapor_kodu')
@@ -452,7 +571,131 @@ class TaskService:
     @staticmethod
     async def delete_task(task_id: str) -> bool:
         try:
-            await asyncio.to_thread(lambda: db.collection('tasks').document(task_id).delete())
-            return True
+            # Önce task verisini al (klasörü silmek için bilgi lazım)
+            doc_ref = db.collection('tasks').document(task_id)
+            doc = await asyncio.to_thread(doc_ref.get)
+            if doc.exists:
+                task_data = doc.to_dict()
+                           # Klasörü de temizle (opsiyonel ama ghost dosya kalmaması için iyi)
+                try:
+                    from app.lib.folder_manager import FolderManager
+                    import shutil
+                    import os
+                    
+                    bt = task_data.get('baslama_tarihi')
+                    year = FolderManager.extract_year(bt)
+                    
+                    audit_path = FolderManager.get_audit_path(
+                        year=str(year),
+                        audit_type=task_data.get('rapor_turu', 'Diger'),
+                        audit_code=task_data.get('rapor_kodu', 'Kodsuz'),
+                        audit_title=task_data.get('rapor_adi', 'Basliksiz')
+                    )
+                    
+                    if os.path.exists(audit_path):
+                        # Klasör boş değilse de siler (rmtree)
+                        await asyncio.to_thread(shutil.rmtree, audit_path)
+                except Exception as ef:
+                    print(f"Task folder deletion failed: {ef}")
+
+                # Alt görevleri de sil (öksüz/ orphaned görev kalmasını önlemek için)
+                try:
+                    children = await asyncio.to_thread(
+                        lambda: list(
+                            db.collection('tasks')
+                            .where('parent_task_id', '==', task_id)
+                            .stream()
+                        )
+                    )
+                    for child in children:
+                        await TaskService.delete_task(child.id)
+                except Exception as ec:
+                    print(f"Child tasks deletion failed: {ec}")
+
+                # İlişkili tüm raporları (audits) sil (Cascading Delete)
+                try:
+                    audits = []
+                    # 1. Query as string
+                    audits_str = await asyncio.to_thread(
+                        lambda: list(
+                            db.collection('audits')
+                            .where('task_id', '==', str(task_id))
+                            .stream()
+                        )
+                    )
+                    audits.extend(audits_str)
+                    
+                    # 2. Query as integer (if applicable)
+                    try:
+                        task_id_int = int(task_id)
+                        audits_int = await asyncio.to_thread(
+                            lambda: list(
+                                db.collection('audits')
+                                .where('task_id', '==', task_id_int)
+                                .stream()
+                            )
+                        )
+                        existing_ids = {a.id for a in audits}
+                        for a in audits_int:
+                            if a.id not in existing_ids:
+                                audits.append(a)
+                    except ValueError:
+                        pass
+
+                    for audit in audits:
+                        await asyncio.to_thread(db.collection('audits').document(audit.id).delete)
+                except Exception as ea:
+                    print(f"Associated audits deletion failed: {ea}")
+
+                await asyncio.to_thread(doc_ref.delete)
+                return True
+            return False
         except Exception:
             return False
+
+    @staticmethod
+    async def import_tasks_from_excel(file_content: bytes, owner_id: str) -> Dict[str, Any]:
+        """Excel dosyasından görevleri içe aktarır."""
+        try:
+            df = await asyncio.to_thread(pd.read_excel, io.BytesIO(file_content))
+            
+            # Kolon isimlerini normalize et (küçük harf ve boşluksuz)
+            df.columns = [str(c).strip().lower().replace(' ', '_').replace('ı', 'i').replace('ş', 's').replace('ç', 'c').replace('ö', 'o').replace('ü', 'u').replace('ğ', 'g') for c in df.columns]
+            
+            # Zorunlu kolonlar: rapor_adi
+            if 'rapor_adi' not in df.columns:
+                # Alternatif isimleri dene
+                for alt in ['rapor_adi', 'konu', 'baslik', 'rapor_ismi']:
+                    if alt in df.columns:
+                        df.rename(columns={alt: 'rapor_adi'}, inplace=True)
+                        break
+            
+            if 'rapor_adi' not in df.columns:
+                return {"status": "error", "message": "Excel'de 'Rapor Adı' kolonu bulunamadı."}
+
+            imported_count = 0
+            for _, row in df.iterrows():
+                if pd.isna(row['rapor_adi']): continue
+                
+                # TaskCreate şemasına uygun veri hazırla
+                task_data = {
+                    "rapor_adi": str(row['rapor_adi']),
+                    "rapor_kodu": str(row.get('rapor_kodu')) if not pd.isna(row.get('rapor_kodu')) else None,
+                    "rapor_turu": str(row.get('rapor_turu', 'Genel Denetim')),
+                    "baslama_tarihi": str(row.get('baslama_tarihi')) if not pd.isna(row.get('baslama_tarihi')) else datetime.utcnow().isoformat().split('T')[0],
+                    "sure_gun": int(row.get('sure_gun', 30)),
+                    "rapor_durumu": str(row.get('durum', 'Tamamlandı')), # İçe aktarılanlar genelde tamamlanmıştır
+                    "owner_id": owner_id,
+                    "assigned_to": [owner_id],
+                    "steps": []
+                }
+                
+                # TaskCreate nesnesi oluştur ve kaydet
+                task_obj = TaskCreate(**task_data)
+                await TaskService.create_task(task_obj)
+                imported_count += 1
+                
+            return {"status": "success", "imported": imported_count}
+        except Exception as e:
+            print(f"Excel import error: {e}")
+            return {"status": "error", "message": str(e)}

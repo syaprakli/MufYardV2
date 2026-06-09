@@ -156,12 +156,8 @@ class FolderManager:
     @staticmethod
     def get_audit_path(year: str, audit_type: str, audit_code: str, audit_title: str) -> str:
         """Generates the hierarchical path: Raporlar/Year/Type/Code - Title"""
-        # Clean prefix S.Y.64/ or S.Y.64_
-        clean_code = audit_code
-        if clean_code.upper().startswith("S.Y.64/"):
-            clean_code = clean_code[len("S.Y.64/"):]
-        elif clean_code.upper().startswith("S.Y.64_"):
-            clean_code = clean_code[len("S.Y.64_"):]
+        # Replace '/' with '-' to keep prefixes like S.Y.64/ safe on Windows
+        clean_code = audit_code.replace("/", "-")
 
         safe_code = FolderManager.format_safe_name(clean_code)
         safe_title = FolderManager.format_safe_name(audit_title)

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Any
+from typing import Optional, List, Dict, Literal, Any
 from datetime import datetime
 
 class AuditBase(BaseModel):
@@ -15,10 +15,18 @@ class AuditBase(BaseModel):
     owner_id: Optional[str] = None
     assigned_to: List[str] = Field(default_factory=list)
     shared_with: List[str] = Field(default_factory=list)
+    shared_roles: Dict[str, Literal["view", "comment", "edit"]] = Field(default_factory=dict)
     pending_collaborators: List[str] = Field(default_factory=list)
     accepted_collaborators: List[str] = Field(default_factory=list)
     is_public: bool = False
     report_seq: Optional[int] = 1
+    attachment_url: Optional[str] = None
+    file_name: Optional[str] = None
+    doc_header: Optional[str] = Field(default="T.C. GENÇLİK VE SPOR BAKANLIĞI")
+    doc_footer: Optional[str] = Field(default="Müfettişlik Raporu")
+    show_page_numbers: Optional[bool] = Field(default=True)
+    audit_data: Optional[Dict[str, Any]] = None
+    report_created: Optional[bool] = None
 
 class AuditCreate(AuditBase):
     pass
@@ -35,9 +43,17 @@ class AuditUpdate(BaseModel):
     owner_id: Optional[str] = None
     assigned_to: Optional[List[str]] = None
     shared_with: Optional[List[str]] = None
+    shared_roles: Optional[Dict[str, Literal["view", "comment", "edit"]]] = None
     pending_collaborators: Optional[List[str]] = None
     accepted_collaborators: Optional[List[str]] = None
     is_public: Optional[bool] = None
+    attachment_url: Optional[str] = None
+    file_name: Optional[str] = None
+    doc_header: Optional[str] = None
+    doc_footer: Optional[str] = None
+    show_page_numbers: Optional[bool] = None
+    audit_data: Optional[Dict[str, Any]] = None
+    report_created: Optional[bool] = None
 
 
 class AuditResponse(AuditBase):

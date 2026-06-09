@@ -385,6 +385,7 @@ export default function Notes() {
                     setEditingNote(null);
                 }}
                 title={editingNote ? "Notu Düzenle" : "Yeni Not Ekle"}
+                closeOnBackdropClick={false}
             >
                 <form onSubmit={handleSave} className="space-y-4">
                     <div className="space-y-2">

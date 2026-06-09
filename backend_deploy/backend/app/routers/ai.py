@@ -1,13 +1,15 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File, Request
+from pydantic import BaseModel, field_validator
 from typing import List, Optional
 from app.services.ai_service import AIService
 from app.lib.auth import get_current_user, require_roles
+from app.lib.rate_limiter import limiter
 from app.config import BASE_DIR
 import os
 import re
 import logging
 import traceback
+import asyncio
 
 logger = logging.getLogger("ai_router")
 
@@ -22,10 +24,12 @@ class SearchResult(BaseModel):
 class AISearchRequest(BaseModel):
     query: str
 
+from app.lib.auth import get_current_user
+
 @router.post("/search", response_model=List[SearchResult])
 async def ai_search(
     req: AISearchRequest,
-    user_id: str = Depends(lambda: "user_1")
+    current_user: dict = Depends(get_current_user)
 ):
     """
     AI destekli dosya/folder arama. Şimdilik sadece isimlerde basit benzerlik, ileride içerik ve embedding ile genişletilebilir.
@@ -34,6 +38,7 @@ async def ai_search(
     import difflib
     all_items = await asyncio.to_thread(FolderManager.get_tree)
     results = []
+    user_id = current_user.get("uid")
     for item in all_items:
         # Sadece okuma izni olanlar
         if item["type"] == "folder" or FolderManager.check_permission(item["id"], user_id, "read"):
@@ -98,6 +103,20 @@ class ChatRequest(BaseModel):
     context: str = ""
     history: Optional[List[ChatMessage]] = None
 
+    @field_validator('message')
+    @classmethod
+    def validate_message_length(cls, v: str) -> str:
+        if len(v) > 10000:
+            raise ValueError('Mesaj çok uzun (max 10.000 karakter).')
+        return v
+
+    @field_validator('history')
+    @classmethod
+    def validate_history_length(cls, v):
+        if v and len(v) > 30:
+            return v[-30:]
+        return v
+
 class ChatResponse(BaseModel):
     response: str
     actions: Optional[List[dict]] = None
@@ -151,18 +170,20 @@ async def get_my_ai_settings(
 
 
 @router.post("/chat", response_model=ChatResponse)
+@limiter.limit("5/minute")
 async def chat_with_assistant(
-    request: ChatRequest,
+    request_body: ChatRequest,
+    request: Request,
     current_user: dict = Depends(get_current_user),
 ):
     try:
         history = None
-        if request.history:
-            history = [{"role": m.role, "text": m.text} for m in request.history]
+        if request_body.history:
+            history = [{"role": m.role, "text": m.text} for m in request_body.history]
         result = await ai_service.chat(
-            request.message,
+            request_body.message,
             history=history,
-            context_type=request.context,
+            context_type=request_body.context,
             user=current_user,
         )
         return {
@@ -181,16 +202,18 @@ async def chat_with_assistant(
 
 
 @router.post("/generate-report")
+@limiter.limit("3/minute")
 async def generate_report(
-    request: GenerateReportRequest,
+    request_body: GenerateReportRequest,
+    request: Request,
     current_user: dict = Depends(get_current_user),
 ):
     """AI ile denetim raporu taslağı oluşturur."""
     try:
         html = await ai_service.generate_report(
-            audit_id=request.audit_id,
-            instructions=request.instructions,
-            section=request.section,
+            audit_id=request_body.audit_id,
+            instructions=request_body.instructions,
+            section=request_body.section,
             user=current_user,
         )
         return {"html": html}
@@ -202,15 +225,17 @@ async def generate_report(
 
 
 @router.post("/analyze-legislation")
+@limiter.limit("5/minute")
 async def analyze_legislation(
-    request: AnalyzeLegislationRequest,
+    request_body: AnalyzeLegislationRequest,
+    request: Request,
     current_user: dict = Depends(get_current_user),
 ):
     """Mevzuat analizi yapar."""
     try:
         result = await ai_service.analyze_legislation(
-            query=request.query,
-            legislation_id=request.legislation_id,
+            query=request_body.query,
+            legislation_id=request_body.legislation_id,
             user=current_user,
         )
         return {"response": result}
@@ -306,3 +331,142 @@ async def test_gemini_connection(
         status_code, message = _normalize_gemini_error(e)
         message = f"HATA DETAYI: {type(e).__name__} - {str(e)}"
         return {"connected": False, "message": message, "code": status_code}
+
+@router.post("/transcribe")
+@limiter.limit("3/minute")
+async def transcribe_audio(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Ses dosyasını (audio/webm veya audio/wav) alır, Gemini API ile Türkçe metne dönüştürür.
+    """
+    import shutil
+    import tempfile
+    import google.generativeai as genai
+    from app.config import get_settings
+
+    # Dosya boyutu kontrolü (25MB max for audio)
+    contents = await file.read()
+    if len(contents) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Ses dosyası çok büyük (max 25MB).")
+    await file.seek(0)
+    
+    api_key, model_name, _, _, is_premium = await _get_user_ai_settings(current_user["uid"])
+    
+    if not api_key:
+        settings_val = get_settings()
+        if is_premium and settings_val.GEMINI_API_KEY:
+            api_key = settings_val.GEMINI_API_KEY
+        else:
+            raise HTTPException(
+                status_code=400, 
+                detail="Henüz bir Gemini API anahtarı tanımlanmamış. Ayarlar sayfasından kendi anahtarınızı girin."
+            )
+
+    suffix = os.path.splitext(file.filename)[1] or ".webm"
+    mime_type = file.content_type or "audio/webm"
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+        try:
+            shutil.copyfileobj(file.file, temp_file)
+            temp_path = temp_file.name
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Ses dosyası kaydedilemedi: {e}")
+
+    try:
+        genai.configure(api_key=api_key)
+        
+        logger.info(f"[TRANSCRIBE] Uploading audio file: {temp_path} ({mime_type})")
+        audio_file = genai.upload_file(path=temp_path, mime_type=mime_type)
+        
+        # Ses deşifre için flash modeli mükemmel çalışır.
+        model = genai.GenerativeModel("models/gemini-2.5-flash")
+        
+        prompt = (
+            "Sana bir ses dosyası veriyorum. Bu ses dosyasında konuşulanları BİREBİR Türkçe metin olarak deşifre (transcribe) et. "
+            "Ekstra yorum ekleme, sadece konuşulanları yaz."
+        )
+        
+        response = model.generate_content([audio_file, prompt])
+        
+        try:
+            audio_file.delete()
+        except Exception as del_err:
+            logger.warning(f"[TRANSCRIBE] Google file deletion failed: {del_err}")
+            
+        transcription = response.text.strip() if response and response.text else ""
+        return {"text": transcription}
+        
+    except Exception as e:
+        logger.error(f"[TRANSCRIBE] Transcription failed: {e}")
+        logger.error(traceback.format_exc())
+        status_code, message = _normalize_gemini_error(e)
+        raise HTTPException(status_code=status_code, detail=f"Ses deşifre edilemedi: {message}")
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+class ProofreadRequest(BaseModel):
+    text: str
+
+    @field_validator('text')
+    @classmethod
+    def validate_text_length(cls, v: str) -> str:
+        if len(v) > 50000:
+            raise ValueError('Metin çok uzun (max 50.000 karakter).')
+        return v
+
+@router.post("/proofread")
+@limiter.limit("5/minute")
+async def proofread_text(
+    req: ProofreadRequest,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Rapor metnini AI ile Türkçe dil bilgisi ve imla kontrolünden geçirir.
+    """
+    try:
+        return await ai_service.proofread(req.text, current_user)
+    except ValueError as e:
+        logger.error(f"[AI PROOFREAD] ValueError: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[AI PROOFREAD] Exception type={type(e).__name__}: {e}")
+        logger.error(traceback.format_exc())
+        status_code, message = _normalize_gemini_error(e)
+        raise HTTPException(status_code=status_code, detail=message)
+
+class SuggestLegislationRequest(BaseModel):
+    text: str
+
+    @field_validator('text')
+    @classmethod
+    def validate_text_length(cls, v: str) -> str:
+        if len(v) > 50000:
+            raise ValueError('Metin çok uzun (max 50.000 karakter).')
+        return v
+
+@router.post("/suggest-legislation")
+@limiter.limit("5/minute")
+async def suggest_legislation_endpoint(
+    req: SuggestLegislationRequest,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Yazılan rapora göre GSB mevzuat önerileri ve referansları getirir.
+    """
+    try:
+        recommendations = await ai_service.suggest_legislation(req.text, current_user)
+        return {"recommendations": recommendations}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[AI LEGISLATION SUGGEST] Exception: {e}")
+        status_code, message = _normalize_gemini_error(e)
+        raise HTTPException(status_code=status_code, detail=message)
+
+

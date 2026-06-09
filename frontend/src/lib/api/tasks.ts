@@ -67,13 +67,13 @@ export interface TaskCreate {
 let taskCache: { [key: string]: { data: Task[], timestamp: number } } = {};
 const CACHE_DURATION = 60 * 1000;
 
-export async function fetchTasks(userId?: string, userEmail?: string): Promise<Task[]> {
+export async function fetchTasks(userId?: string, userEmail?: string, forceRefresh: boolean = false): Promise<Task[]> {
     const cacheKey = `${userId || ""}|${userEmail || ""}`;
     const storageKey = `mufyard_tasks_cache_${userId || 'guest'}`;
     
     // 1. Memory Cache Check
     const cached = taskCache[cacheKey];
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
         return cached.data;
     }
 

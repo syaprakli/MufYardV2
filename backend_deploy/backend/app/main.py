@@ -1,13 +1,20 @@
 import os
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
 import json
 import asyncio
 import logging
 import shutil
-from fastapi import FastAPI
+from datetime import datetime
+from fastapi import FastAPI, Depends
+from slowapi.middleware import SlowAPIMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import get_settings, BASE_DIR, DATA_DIR
+from app.lib.rate_limiter import limiter
+from app.lib.auth import get_current_user
+from typing import Any, Dict
 
 # --- KARAKUTU (LOG) SİSTEMİ ---
 if not os.path.exists(DATA_DIR):
@@ -38,7 +45,7 @@ from app.routers import (
     dashboard, audit, tasks, contacts, 
     inspectors, profiles, legislation, 
     notes, ai_knowledge, backup, files,
-    calendar, notifications, ai, collaboration, feedback, online, settings as settings_router
+    calendar, notifications, ai, collaboration, feedback, online, settings as settings_router, licenses, search, audit_trail
 )
 
 from app.services.contact_service import ContactService
@@ -80,6 +87,21 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 settings = get_settings()
 app = FastAPI(title=settings.APP_NAME)
 
+# --- Rate Limiting ---
+app.state.limiter = limiter
+
+# Rate limit exceeded handler
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request, exc):
+    # Güvenlik logu: Rate limit ihlali
+    logger.warning(f"RATE LIMIT EXCEEDED: IP={request.client.host}, Path={request.url.path}, Headers={dict(request.headers)}")
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Çok fazla istek gönderdiniz. Lütfen daha sonra tekrar deneyin."}
+    )
+
+app.add_middleware(SlowAPIMiddleware)
+
 @app.get("/")
 async def root():
     return {
@@ -91,39 +113,35 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "version": "1.0.1-antigravity", "timestamp": asyncio.get_event_loop().time()}
+    from app.lib.firebase_admin import is_mock
+    return {"status": "healthy", "version": "1.0.4-antigravity", "firebase_mode": "mock" if is_mock else "real", "timestamp": asyncio.get_event_loop().time()}
+
+@app.get("/api/debug/logs")
+async def get_debug_logs(key: str = "", limit: int = 300):
+    if key != "antigravity":
+        return JSONResponse(status_code=403, content={"detail": "Forbidden"})
+    try:
+        if os.path.exists(log_file):
+            with open(log_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                if limit > 0:
+                    return {"logs": lines[-limit:]}
+                return {"logs": lines}
+        return {"logs": ["Log file not found"]}
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.on_event("startup")
 async def startup_event():
     try:
-        logger.info("Startup süreci başladı...")
+        logger.info("Startup süreci başladı (MINIMAL MODE)...")
+        # Tüm ağır işleri devre dışı bıraktık
+        logger.info("Ağır senkronizasyon görevleri geçici olarak devre dışı.")
         
-        # Kritik dosya kontrolleri
-        files_to_check = {
-            "Firebase Anahtarı": settings.FIREBASE_SERVICE_ACCOUNT_PATH,
-            "Rehber Excel": os.path.join(BASE_DIR, "rehber.xlsx"),
-            ".env Dosyası": os.path.join(BASE_DIR, ".env")
-        }
-        
-        for name, path in files_to_check.items():
-            if os.path.exists(path):
-                logger.info(f"KONTROL: {name} bulundu -> {path}")
-            else:
-                logger.error(f"KONTROL: {name} BULUNAMADI! -> {path}")
-
-        if settings.STARTUP_SYNC_ENABLED:
-            try:
-                logger.info("Otomatik senkronizasyon başlatılıyor...")
-                asyncio.create_task(ContactService.sync_from_rdb_rehber_v6())
-                asyncio.create_task(InspectorService.sync_from_excel())
-                logger.info("Senkronizasyon görevleri arka plana atıldı.")
-            except Exception as e:
-                logger.error(f"Startup senkronizasyon hatası: {str(e)}")
-        else:
-            logger.info("Startup senkronizasyonu ayarlar gereği devre dışı.")
-
-        # Bundled content sync to DATA_DIR (Background)
-        asyncio.create_task(sync_bundled_content())
+        # Sadece kritik dosyaları kontrol et ama bir şey yapma
+        if not os.path.exists(settings.FIREBASE_SERVICE_ACCOUNT_PATH):
+             logger.warning("Firebase anahtarı yok, Mock DB kullanılabilir.")
+             
     except Exception as e:
         logger.error(f"KRİTİK STARTUP HATASI: {e}")
 
@@ -185,7 +203,9 @@ mount_static_dir("Raporlar", "/Raporlar")
 mount_static_dir("Mevzuat", "/Mevzuat")
 
 # Middleware
-_default_origins = [
+
+# Güvenli CORS: Sadece güvenilir domainler izinli. Yeni domain eklemek için aşağıya ekleyin.
+_allowed_origins = [
     "http://localhost:5173",
     "http://localhost:3000",
     "http://127.0.0.1:5173",
@@ -193,17 +213,22 @@ _default_origins = [
     "https://mufyardv2.web.app",
     "https://mufyardv2.firebaseapp.com",
 ]
+# Ortam değişkeniyle ek domain eklemek için: .env dosyasında CORS_ORIGINS kullanın.
 _env_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()] if settings.CORS_ORIGINS else []
-_allowed_origins = list(set(_default_origins + _env_origins))
+_allowed_origins = list(set(_allowed_origins + _env_origins))
 
+# IMPORTANT: FastAPI middleware order is LIFO (last added = outermost = runs first)
+# CORSMiddleware MUST be added LAST so it runs FIRST on incoming requests
+# This ensures CORS headers are added to ALL responses including error responses
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
-app.add_middleware(SecurityHeadersMiddleware)
 
 # Routers
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
@@ -213,6 +238,7 @@ app.include_router(legislation.router, prefix="/api/legislation", tags=["Legisla
 app.include_router(notes.router, prefix="/api/notes", tags=["Notes"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
 app.include_router(profiles.router, prefix="/api/profiles", tags=["Profiles"])
+app.include_router(licenses.router, prefix="/api/licenses", tags=["Licenses"])
 app.include_router(inspectors.router, prefix="/api/inspectors", tags=["Inspectors"])
 app.include_router(files.router, prefix="/api/files", tags=["Files"])
 app.include_router(ai.router, prefix="/api/ai", tags=["AI"])
@@ -224,93 +250,239 @@ app.include_router(notifications.router, prefix="/api/notifications", tags=["Not
 app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["Settings"])
+app.include_router(search.router, prefix="/api/search", tags=["Search"])
+app.include_router(audit_trail.router, prefix="/api/audit-trail", tags=["AuditTrail"])
 
 # --- WEBSOCKET CHAT ENDPOINT ---
 # Moved here to avoid 404 issues with router prefixes in production
 from fastapi import WebSocket, WebSocketDisconnect, Query
 from app.routers.collaboration import chat_manager, CollaborationService, DirectMessageCreate, NotificationService, NotificationCreate
+from app.lib.firebase_admin import db
+from firebase_admin import auth as firebase_auth
+
+
+async def _authenticate_websocket_identity(websocket: WebSocket) -> tuple[str, str | None, str]:
+    token = websocket.query_params.get("token")
+    requested_name = websocket.query_params.get("name", "Müfettiş")
+
+    if not token:
+        await websocket.close(code=1008)
+        raise WebSocketDisconnect(code=1008)
+
+    try:
+        decoded = None
+        for attempt in range(3):
+            try:
+                decoded = await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=60))
+                break
+            except Exception as e:
+                err_str = str(e).lower()
+                if "too early" in err_str or "clock" in err_str or "time" in err_str:
+                    if attempt < 2:
+                        await asyncio.sleep(1.0)
+                        continue
+                raise e
+    except Exception as e:
+        import logging
+        logging.getLogger("app.websocket").error(f"WS authentication failed: {e}", exc_info=True)
+        await websocket.close(code=1008)
+        raise WebSocketDisconnect(code=1008)
+
+    if not decoded:
+        await websocket.close(code=1008)
+        raise WebSocketDisconnect(code=1008)
+
+    uid = decoded.get("uid")
+    if not uid:
+        await websocket.close(code=1008)
+        raise WebSocketDisconnect(code=1008)
+
+    user_email = decoded.get("email")
+    display_name = decoded.get("name") or requested_name or (user_email.split("@")[0] if user_email else "Müfettiş")
+    return uid, user_email, display_name
+
+
+async def _resolve_audit_chat_role(audit_id: str, uid: str, user_email: str = None) -> str:
+    """audit chat room icin kullanici rolunu cozer: none/view/comment/edit."""
+    doc_ref = db.collection('audits').document(audit_id)
+    doc = await asyncio.to_thread(doc_ref.get)
+    if not doc.exists:
+        return "none"
+
+    data = doc.to_dict() or {}
+    owner_id = data.get("owner_id")
+    identities = [value for value in [uid, user_email] if value]
+
+    if any(identity in [owner_id, "admin", "sefa.yaprakli@gsb.gov.tr"] for identity in identities):
+        return "edit"
+
+    shared_roles = data.get("shared_roles") or {}
+    for identity in identities:
+        role = shared_roles.get(identity)
+        if role in ["view", "comment", "edit"]:
+            return role
+
+    # Eski kayitlarla geriye uyumluluk: role map yoksa bu listeleri edit kabul et.
+    shared_with = data.get("shared_with") or []
+    assigned_to = data.get("assigned_to") or []
+    accepted = data.get("accepted_collaborators") or []
+    if any(identity in shared_with or identity in assigned_to or identity in accepted for identity in identities):
+        return "edit"
+
+    if data.get("is_public"):
+        return "view"
+    return "none"
 
 @app.websocket("/ws")
 async def websocket_chat_endpoint(websocket: WebSocket):
-    uid = websocket.query_params.get("uid", "guest")
-    name = websocket.query_params.get("name", "Müfettiş")
+    import logging
+    ws_logger = logging.getLogger("app.websocket")
+    uid, user_email, name = await _authenticate_websocket_identity(websocket)
     room_id = websocket.query_params.get("room_id", "global")
-    
+    audit_chat_role = "none"
+
     # DM Odası Normalizasyonu: dm_UID1_UID2 formatını alfabetik sırala
     if room_id.startswith("dm_"):
         parts = room_id.split("_")
         if len(parts) >= 3:
-            # "dm" öneki dışındaki parçaları sırala
             uids = sorted(parts[1:])
             room_id = f"dm_{'_'.join(uids)}"
-            logger.info(f"DM Odası Normalize Edildi: {room_id}")
+            ws_logger.info(f"DM Odası Normalize Edildi: {room_id}")
 
+    if room_id.startswith("audit_"):
+        audit_id = room_id.replace("audit_", "", 1)
+        audit_chat_role = await _resolve_audit_chat_role(audit_id, uid, user_email)
+        if audit_chat_role == "none":
+            ws_logger.warning(f"YETKISIZ CHAT ERISIMI: uid={uid}, email={user_email}, room_id={room_id}")
+            await websocket.close(code=1008)
+            return
+
+    ws_logger.info(f"WS CONNECT: uid={uid}, name={name}, room_id={room_id}")
     await chat_manager.connect(websocket, room_id, uid, name)
     try:
         while True:
-            raw_data = await websocket.receive_text()
-            data = json.loads(raw_data)
-
-            # Ping/pong heartbeat - Railway WS timeout'unu önler
-            if data.get("type") == "ping":
-                await websocket.send_text(json.dumps({"type": "pong"}))
-                continue
-            
-            # Eğer DM odasıysa ve mesaj geliyorsa, veri tabanına kaydet
-            is_dm = room_id.startswith("dm_")
-            msg_type = data.get("type", "message")
-            
-            if is_dm and msg_type == "message":
-                logger.info(f"DM Mesajı alınıyor: {uid} -> {room_id}")
-                # Alıcıyı room_id'den bul (dm_uid1_uid2)
-                parts = room_id.split("_")
-                recipient_id = parts[1] if parts[2] == uid else parts[2]
-                
-                # Servis üzerinden kaydet (persistent)
-                dm_create = DirectMessageCreate(
-                    recipient_id=recipient_id,
-                    content=data.get("content", ""),
-                    attachment=data.get("attachment")
-                )
-                new_db_msg = await CollaborationService.save_private_message(uid, name, dm_create)
-                
-                # Bildirim gönder (async)
-                notif = NotificationCreate(
-                    user_id=recipient_id,
-                    title=f"Yeni Mesaj: {name}",
-                    message=data.get("content", "")[:100],
-                    type="dm",
-                    chat_room_id=room_id
-                )
-                asyncio.create_task(NotificationService.create_notification(notif))
-                
-                # Mesajın ID'sini geri dönen dataya ekle
-                data["id"] = new_db_msg["id"]
-                data["timestamp"] = new_db_msg["timestamp"]
-                # DM ise oda bilgisini de ekle (frontend'in yakalaması için)
-                data["room_id"] = room_id
-                raw_data = json.dumps(data)
-                
-                # DM: sadece oda bazlı broadcast (send_to_user + broadcast = çift mesaj)
-                await chat_manager.broadcast(room_id, raw_data)
-                logger.info(f"DM Broadcast tamamlandı: {room_id}")
-                continue
-            
-            # Global mesaj: odaya yayınla
-            await chat_manager.broadcast(room_id, raw_data)
-            logger.info(f"Broadcast tamamlandı: {room_id}")
+            try:
+                raw_data = await websocket.receive_text()
+            except Exception as e:
+                ws_logger.warning(f"WS RECEIVE ERROR: uid={uid}, room_id={room_id}, error={str(e)}")
+                raise e
+            try:
+                data = json.loads(raw_data)
+                # Ping/pong heartbeat - Railway WS timeout'unu önler
+                if data.get("type") == "ping":
+                    await websocket.send_text(json.dumps({"type": "pong"}))
+                    continue
+                msg_text = data.get("text") or data.get("content") or ""
+                msg_attachments = data.get("attachments", [])
+                if not msg_attachments and data.get("attachment"):
+                    msg_attachments = [data.get("attachment")]
+                is_dm = room_id.startswith("dm_")
+                msg_type = data.get("type", "message")
+                if msg_type == "message":
+                    if room_id.startswith("audit_") and audit_chat_role not in ["comment", "edit"]:
+                        ws_logger.warning(f"YETKISIZ CHAT MESAJI: uid={uid}, room_id={room_id}, role={audit_chat_role}")
+                        await websocket.send_text(json.dumps({
+                            "type": "error",
+                            "code": "forbidden",
+                            "message": "Bu odada mesaj gonderme yetkiniz yok.",
+                            "room_id": room_id
+                        }))
+                        continue
+                    ws_logger.info(f"CHAT MESSAGE: uid={uid}, name={name}, room_id={room_id}, text={msg_text[:100]}")
+                    if is_dm:
+                        recipient_id = data.get("recipient_id")
+                        # Fallback: room_id'den ayıkla
+                        if not recipient_id:
+                            parts = room_id.split("_")
+                            if len(parts) >= 3:
+                                recipient_id = parts[1] if parts[2] == uid else parts[2]
+                        if not recipient_id:
+                            ws_logger.error(f"Alıcı bulunamadı! Room: {room_id}, UID: {uid}")
+                            continue
+                        # Servis üzerinden kaydet (persistent)
+                        dm_create = DirectMessageCreate(
+                            recipient_id=recipient_id,
+                            content=msg_text,
+                            attachment=msg_attachments[0] if msg_attachments else None
+                        )
+                        new_db_msg = await CollaborationService.save_private_message(uid, name, dm_create)
+                        # Bildirim gönder (async)
+                        notif = NotificationCreate(
+                            user_id=recipient_id,
+                            title=f"Yeni Mesaj: {name}",
+                            message=msg_text[:100],
+                            type="dm",
+                            chat_room_id=room_id
+                        )
+                        asyncio.create_task(NotificationService.create_notification(notif))
+                        # Mesaj verisini zenginleştir
+                        data["id"] = new_db_msg["id"]
+                        data["timestamp"] = new_db_msg["timestamp"]
+                        data["room_id"] = room_id
+                        data["content"] = msg_text
+                        data["text"] = msg_text
+                        data["sender_id"] = uid
+                        data["sender_name"] = name
+                        raw_data = json.dumps(data)
+                        # 1. Mevcut odaya bas (FloatingChat)
+                        await chat_manager.broadcast(room_id, raw_data)
+                        # 2. Alıcının TÜM diğer bağlantılarına bas (Bildirim ve diğer sekmeler)
+                        await chat_manager.send_to_user(recipient_id, raw_data)
+                        # 3. GÖNDERENİN diğer bağlantılarına da bas (Diğer sekmeler senkron kalsın)
+                        await chat_manager.send_to_user(uid, raw_data)
+                        ws_logger.info(f"DM İletimi tamamlandı: {uid} -> {recipient_id}")
+                    else:
+                        if room_id == "global":
+                            # Global mesaj (Canlı Müzakere): Veritabanına kaydet
+                            ws_logger.info(f"Global Mesaj alınıyor: {uid} -> {room_id}")
+                            from app.schemas.messaging import MessageCreate
+                            global_msg = MessageCreate(
+                                text=msg_text,
+                                author_id=uid,
+                                author_name=name,
+                                author_role="Müfettiş"
+                            )
+                            new_db_msg = await CollaborationService.save_message(global_msg)
+                            # Veriyi zenginleştir
+                            data["id"] = new_db_msg["id"]
+                            data["timestamp"] = new_db_msg["timestamp"].isoformat() if hasattr(new_db_msg["timestamp"], "isoformat") else new_db_msg["timestamp"]
+                            data["author_id"] = uid
+                            data["author_name"] = name
+                            data["text"] = msg_text
+                            data["content"] = msg_text
+                            data["room_id"] = "global"
+                            raw_data = json.dumps(data)
+                            # Herkese yayınla
+                            await chat_manager.broadcast(room_id, raw_data)
+                            ws_logger.info(f"Global Broadcast tamamlandı: {room_id}")
+                        else:
+                            # Audit gibi oda bazlı sohbetler: dogrudan odaya yayinla.
+                            data["id"] = data.get("id") or f"ws_{int(asyncio.get_event_loop().time() * 1000)}"
+                            data["timestamp"] = datetime.utcnow().isoformat() + "Z"
+                            data["sender_id"] = uid
+                            data["sender_name"] = name
+                            data["content"] = msg_text
+                            data["text"] = msg_text
+                            data["room_id"] = room_id
+                            raw_data = json.dumps(data)
+                            await chat_manager.broadcast(room_id, raw_data)
+                        continue
+                else:
+                    # Diğer tipler için sadece broadcast
+                    await chat_manager.broadcast(room_id, raw_data)
+            except Exception as e:
+                ws_logger.error(f"WebSocket döngü hatası (mesaj işleme): {str(e)}")
     except WebSocketDisconnect:
-        logger.info(f"WS Bağlantısı kesildi: {name} (Oda: {room_id})")
-        await chat_manager.disconnect(websocket, room_id)
-    except Exception as e:
-        logger.error(f"Chat WS Hatası: {e}")
-        await chat_manager.disconnect(websocket, room_id)
+        ws_logger.info(f"WS Bağlantısı kesildi: {name} (Oda: {room_id})")
 
 # Health endpoints moved up for visibility
 
 @app.get("/health/detail")
-async def health_detail():
+async def health_detail(current_user: Dict[str, Any] = Depends(get_current_user)):
     from app.lib.firebase_admin import is_mock
+    caller_role = (current_user.get("role") or "user").strip().lower()
+    if caller_role != "admin":
+        return {"status": "healthy", "firebase_mode": "mock" if is_mock else "real"}
     return {
         "status": "healthy",
         "firebase_mode": "mock" if is_mock else "real",

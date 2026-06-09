@@ -349,7 +349,8 @@ export default function PublicSpace() {
         });
         if (!confirmed) return;
         try {
-            await fetchWithTimeout(`${API_URL}/collaboration/posts/${selectedPost.id}/comments/${commentId}`, { method: 'DELETE' });
+            const headers = await getAuthHeaders();
+            await fetchWithTimeout(`${API_URL}/collaboration/posts/${selectedPost.id}/comments/${commentId}`, { method: 'DELETE', headers });
             setComments(prev => prev.filter(c => c.id !== commentId));
             toast.success("Yorum silindi.");
         } catch {
@@ -361,9 +362,10 @@ export default function PublicSpace() {
         if (!selectedPost || !user?.uid) return;
         setIsCommenting(true);
         try {
+            const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
             const res = await fetchWithTimeout(`${API_URL}/collaboration/posts/${selectedPost.id}/comments`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({
                     content: `[MAP_PLACE]:${JSON.stringify(place)}`,
                     author_id: user.uid,
@@ -386,7 +388,8 @@ export default function PublicSpace() {
     const handleDeleteMapPlace = async (commentId: string) => {
         if (!selectedPost) return;
         try {
-            await fetchWithTimeout(`${API_URL}/collaboration/posts/${selectedPost.id}/comments/${commentId}`, { method: 'DELETE' });
+            const headers = await getAuthHeaders();
+            await fetchWithTimeout(`${API_URL}/collaboration/posts/${selectedPost.id}/comments/${commentId}`, { method: 'DELETE', headers });
             setComments(prev => prev.filter(c => c.id !== commentId));
             toast.success("Mekan silindi.");
         } catch {
@@ -397,9 +400,10 @@ export default function PublicSpace() {
     const handleAddMapReview = async (review: any) => {
         if (!selectedPost || !user?.uid) return;
         try {
+            const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
             const res = await fetchWithTimeout(`${API_URL}/collaboration/posts/${selectedPost.id}/comments`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({
                     content: `[MAP_REVIEW]:${JSON.stringify(review)}`,
                     author_id: user.uid,
@@ -420,7 +424,8 @@ export default function PublicSpace() {
     const handleDeleteMapReview = async (commentId: string) => {
         if (!selectedPost) return;
         try {
-            await fetchWithTimeout(`${API_URL}/collaboration/posts/${selectedPost.id}/comments/${commentId}`, { method: 'DELETE' });
+            const headers = await getAuthHeaders();
+            await fetchWithTimeout(`${API_URL}/collaboration/posts/${selectedPost.id}/comments/${commentId}`, { method: 'DELETE', headers });
             setComments(prev => prev.filter(c => c.id !== commentId));
             toast.success("Değerlendirme silindi.");
         } catch {
@@ -432,9 +437,10 @@ export default function PublicSpace() {
         if (!newComment.trim() || !selectedPost || !user?.uid) return;
         setIsCommenting(true);
         try {
+            const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
             const res = await fetchWithTimeout(`${API_URL}/collaboration/posts/${selectedPost.id}/comments`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({
                     content: newComment,
                     author_id: user.uid,
@@ -458,9 +464,10 @@ export default function PublicSpace() {
     const handleUpdateComment = async (commentId: string) => {
         if (!editCommentText.trim() || !selectedPost) return;
         try {
+            const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
             const res = await fetchWithTimeout(`${API_URL}/collaboration/posts/${selectedPost.id}/comments/${commentId}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({ content: editCommentText })
             });
             if (!res.ok) throw new Error();
@@ -656,9 +663,10 @@ export default function PublicSpace() {
         setSelectedPost(post);
         setComments([]);
         try {
-            const res = await fetchWithTimeout(`${API_URL}/collaboration/posts/${post.id}/comments`);
+            const headers = await getAuthHeaders();
+            const res = await fetchWithTimeout(`${API_URL}/collaboration/posts/${post.id}/comments`, { headers });
             const data = await res.json();
-            setComments(data);
+            setComments(Array.isArray(data) ? data : []);
         } catch (err) {}
     };
 
@@ -1507,7 +1515,7 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
     const isMapPost = post?.title?.includes("İnteraktif Denetim Haritası");
 
     const mapPlaces = useMemo(() => {
-        if (!isMapPost) return [];
+        if (!isMapPost || !Array.isArray(comments)) return [];
         return comments
             .filter((c: any) => c.content?.startsWith("[MAP_PLACE]:"))
             .map((c: any) => {
@@ -1528,7 +1536,7 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
     }, [comments, isMapPost]);
 
     const mapReviews = useMemo(() => {
-        if (!isMapPost) return [];
+        if (!isMapPost || !Array.isArray(comments)) return [];
         return comments
             .filter((c: any) => c.content?.startsWith("[MAP_REVIEW]:"))
             .map((c: any) => {
@@ -1549,6 +1557,7 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
     }, [comments, isMapPost]);
 
     const nonMapComments = useMemo(() => {
+        if (!Array.isArray(comments)) return [];
         if (!isMapPost) return comments;
         return comments.filter((c: any) => !c.content?.startsWith("[MAP_PLACE]:") && !c.content?.startsWith("[MAP_REVIEW]:"));
     }, [comments, isMapPost]);

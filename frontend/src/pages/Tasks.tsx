@@ -96,6 +96,81 @@ function getNextReportSequence(audits: Array<{ report_seq?: number }>): number {
     return seq;
 }
 
+const getTaskDisplayCode = (task: any, allTasks: any[]): string => {
+    if (task.rapor_kodu && !task.rapor_kodu.startsWith("TASLAK-")) {
+        return task.rapor_kodu;
+    }
+    
+    if (task.parent_task_id) {
+        const parent = allTasks.find(t => String(t.id).trim() === String(task.parent_task_id).trim());
+        if (parent) {
+            return getTaskDisplayCode(parent, allTasks);
+        }
+    }
+    
+    const topLevelTasks = allTasks.filter(t => {
+        if (t.parent_task_id) return false;
+        const isOld = t.baslama_tarihi ? (Date.now() - new Date(t.baslama_tarihi).getTime() > 730 * 24 * 60 * 60 * 1000) : false;
+        const isArchived = (t.rapor_durumu === "Tamamlandı") && isOld;
+        return !isArchived;
+    });
+
+    topLevelTasks.sort((a, b) => {
+        const isDraftA = !a.rapor_kodu || a.rapor_kodu.startsWith("TASLAK-");
+        const isDraftB = !b.rapor_kodu || b.rapor_kodu.startsWith("TASLAK-");
+        
+        if (isDraftA !== isDraftB) {
+            return isDraftA ? 1 : -1;
+        }
+
+        const parseRaporKodu = (kodu?: string) => {
+            if (!kodu) return { year: 0, seq: 0 };
+            const parts = kodu.split(',').map(p => p.trim()).filter(Boolean);
+            if (parts.length === 0) return { year: 0, seq: 0 };
+            
+            const targetCode = parts[0];
+            const match = targetCode.match(/(\d{4})-(\d+)/);
+            if (match) {
+                return { year: parseInt(match[1]) || 0, seq: parseInt(match[2]) || 0 };
+            }
+            const yearMatch = targetCode.match(/(\d{4})/);
+            if (yearMatch) {
+                return { year: parseInt(yearMatch[1]) || 0, seq: 0 };
+            }
+            return { year: 0, seq: 0 };
+        };
+
+        const parsedA = parseRaporKodu(a.rapor_kodu);
+        const parsedB = parseRaporKodu(b.rapor_kodu);
+
+        if (parsedA.year !== parsedB.year) {
+            return parsedA.year - parsedB.year;
+        }
+        if (parsedA.seq !== parsedB.seq) {
+            return parsedA.seq - parsedB.seq;
+        }
+
+        const aCode = String(a.rapor_kodu || "");
+        const bCode = String(b.rapor_kodu || "");
+        return aCode.localeCompare(bCode, "tr", { numeric: true, sensitivity: "base" });
+    });
+
+    const index = topLevelTasks.findIndex(t => String(t.id).trim() === String(task.id).trim());
+    return index !== -1 ? String(index + 1) : "-";
+};
+
+const getNextReportTitle = (task: any, allTasks: any[], existingReportsCount: number): string => {
+    const displayCode = getTaskDisplayCode(task, allTasks);
+    const taskName = task.rapor_adi || "Raporu";
+    const suffix = taskName.endsWith("Raporu") ? "" : " Raporu";
+    const baseTitle = `${displayCode} - ${taskName}${suffix}`;
+    if (existingReportsCount === 0) {
+        return baseTitle;
+    } else {
+        return `${baseTitle} ${existingReportsCount + 1}`;
+    }
+};
+
 import { useGlobalData } from "../lib/context/GlobalDataContext";
 
 export default function Tasks() {
@@ -321,7 +396,7 @@ export default function Tasks() {
 
     useEffect(() => { 
         if (effectiveUid) {
-            refreshAll(effectiveUid, currentUser?.email || undefined, currentUser?.displayName || undefined);
+            refreshAll(effectiveUid, currentUser?.email || undefined, currentUser?.displayName || undefined, true);
         }
     }, [effectiveUid, refreshAll, currentUser]);
 
@@ -331,6 +406,14 @@ export default function Tasks() {
             setIsLegacyMode(false);
         }
     }, [searchParams, activeTab]);
+
+    useEffect(() => {
+        setSelectedTaskIds([]);
+    }, [activeTab]);
+
+    useEffect(() => {
+        setSelectedTaskIds(prev => prev.filter(id => tasks.some(t => t.id === id)));
+    }, [tasks]);
 
 
     // Web sürümü uyarısı - Kullanıcı isteğiyle kaldırıldı
@@ -387,7 +470,11 @@ export default function Tasks() {
                 ...form,
                 owner_id: effectiveUid,
                 assigned_to: [effectiveUid, ...(form.assigned_to || [])].filter((id): id is string => !!id),
-                rapor_kodu: finalRaporKodu || autoKodu,
+                rapor_kodu: isLegacyMode 
+                    ? (finalRaporKodu || autoKodu) 
+                    : (form.parent_task_id 
+                        ? (tasks.find(t => t.id === form.parent_task_id)?.rapor_kodu || "") 
+                        : ""),
                 rapor_durumu: isLegacyMode ? "Tamamlandı" : "Başlanmadı",
                 is_public: false,
                 steps: [],
@@ -518,7 +605,9 @@ export default function Tasks() {
 
             const results = await Promise.allSettled(
                 selectedTasks.map(async (task) => {
-                    const associatedAudits = allAudits.filter(a => a.task_id === task.id);
+                    const associatedAudits = allAudits.filter(a => 
+                        String(a.task_id).trim() === String(task.id).trim()
+                    );
                     if (associatedAudits.length > 0) {
                         const auditDeleteResults = await Promise.allSettled(associatedAudits.map(a => deleteAudit(a.id)));
                         const hasAuditDeleteFailure = auditDeleteResults.some(result => result.status === "rejected");
@@ -685,7 +774,9 @@ export default function Tasks() {
             setSaving(true);
             // 1. Find and delete all associated audits first (Cascading Delete)
             const allAudits = await fetchAudits(effectiveUid, effectiveEmail, true);
-            const associatedAudits = allAudits.filter(a => a.task_id === deleteConfirmId);
+            const associatedAudits = allAudits.filter(a => 
+                String(a.task_id).trim() === String(deleteConfirmId).trim()
+            );
             
             if (associatedAudits.length > 0) {
                 await Promise.all(associatedAudits.map(a => deleteAudit(a.id)));
@@ -806,7 +897,7 @@ export default function Tasks() {
             } else {
                 setNewAudit({
                     ...newAudit,
-                    title: task.rapor_adi,
+                    title: getNextReportTitle(task, tasks, 0),
                     location: "",
                     report_seq: nextSeq
                 });
@@ -852,9 +943,11 @@ export default function Tasks() {
             
             const created = await createAudit(auditPayload);
             
-            // Görev durumunu otomatik olarak "Devam Ediyor" yap
+            // Görev durumunu otomatik olarak "Devam Ediyor" yap (arkaplanda)
             if (isNewAuditModalOpen.rapor_durumu === "Başlanmadı") {
-                await updateTask(isNewAuditModalOpen.id, { rapor_durumu: "Devam Ediyor" });
+                updateTask(isNewAuditModalOpen.id, { rapor_durumu: "Devam Ediyor" }).catch(err => {
+                    console.error("Failed to update task status:", err);
+                });
             }
 
             setIsNewAuditModalOpen(null);
@@ -886,7 +979,7 @@ export default function Tasks() {
 
             const auditPayload: any = {
                 task_id: taskId,
-                title: taskAudits.length === 0 ? task.rapor_adi : `${task.rapor_adi} - Ek Rapor`,
+                title: getNextReportTitle(task, tasks, taskAudits.length),
                 location: "",
                 date: new Date().toLocaleDateString("tr-TR"),
                 status: "Rapor Yazılıyor",
@@ -902,9 +995,11 @@ export default function Tasks() {
 
             const newAudit = await createAudit(auditPayload);
             
-            // Görev durumunu güncelle
+            // Görev durumunu güncelle (arkaplanda)
             if (task.rapor_durumu === "Başlanmadı") {
-                await updateTask(task.id, buildStatusUpdatePayload(task, "Devam Ediyor"));
+                updateTask(task.id, buildStatusUpdatePayload(task, "Devam Ediyor")).catch(err => {
+                    console.error("Failed to update task status:", err);
+                });
             }
 
             toast.success(`Rapor #${nextSeq} oluşturuldu.`);
@@ -1018,6 +1113,21 @@ export default function Tasks() {
     };
 
     const updateTaskStatus = async (task: Task, newStatus: string) => {
+        const currentCode = task.rapor_kodu || "";
+        const isDraft = !currentCode || currentCode.startsWith("TASLAK-");
+        if ((newStatus === "İncelemede" || newStatus === "Tamamlandı") && isDraft) {
+            const confirmed = await confirm({
+                title: "Rapor Kodu Oluşturulacak",
+                message: "Bu görevi ilk kez 'İncelemede' veya 'Tamamlandı' aşamasına aldığınızda resmi Rapor Kodu (Görev No) üretilecektir. Daha sonra bu işlemi geri alsanız dahi atanan Rapor Kodu korunacaktır. Devam etmek istiyor musunuz?",
+                confirmText: "Devam Et",
+                cancelText: "İptal",
+                variant: "warning"
+            });
+            if (!confirmed) {
+                if (effectiveUid) refreshTasks(effectiveUid);
+                return;
+            }
+        }
         const payload = buildStatusUpdatePayload(task, newStatus);
         await updateTask(task.id, payload);
     };
@@ -1092,6 +1202,13 @@ export default function Tasks() {
         items.sort((a, b) => {
             switch (sortConfig.key) {
                 case "rapor_kodu": {
+                    const isDraftA = !a.rapor_kodu || a.rapor_kodu.startsWith("TASLAK-");
+                    const isDraftB = !b.rapor_kodu || b.rapor_kodu.startsWith("TASLAK-");
+                    
+                    if (isDraftA !== isDraftB) {
+                        return (isDraftA ? 1 : -1) * directionMultiplier;
+                    }
+
                     const parseRaporKodu = (kodu?: string) => {
                         if (!kodu) return { year: 0, seq: 0 };
                         const parts = kodu.split(',').map(p => p.trim()).filter(Boolean);
@@ -1738,7 +1855,7 @@ export default function Tasks() {
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[10px] font-black text-primary tracking-widest">
-                                                        {activeTab === 'ortak' ? (task.rapor_kodu || "-") : (sortedFiltered.indexOf(task) + 1)}
+                                                        {task.rapor_kodu && !task.rapor_kodu.startsWith("TASLAK-") ? task.rapor_kodu : (activeTab === 'ortak' ? (task.rapor_kodu || "-") : (sortedFiltered.indexOf(task) + 1))}
                                                     </span>
                                                     <span className="text-[9px] font-bold text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded">{task.rapor_turu}</span>
                                                 </div>
@@ -1982,7 +2099,7 @@ export default function Tasks() {
                                                 </td>
                                                 <td className="px-4 lg:px-6 py-4">
                                                     <span className="font-black text-primary text-[11px] tracking-widest font-outfit">
-                                                        {activeTab === 'ortak' ? (task.rapor_kodu || "-") : (sortedFiltered.indexOf(task) + 1)}
+                                                        {task.rapor_kodu && !task.rapor_kodu.startsWith("TASLAK-") ? task.rapor_kodu : (activeTab === 'ortak' ? (task.rapor_kodu || "-") : (sortedFiltered.indexOf(task) + 1))}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 lg:px-6 py-4"><span className="font-bold text-slate-900 dark:text-slate-100 text-sm">{task.rapor_adi}</span></td>
@@ -2242,7 +2359,7 @@ export default function Tasks() {
                                         const nextSeq = Math.max(0, ...taskAudits.map(a => a.report_seq || 0)) + 1;
                                     setNewAudit({
                                         ...newAudit,
-                                        title: `${showReportSelector.rapor_adi} - Ek Rapor`,
+                                        title: getNextReportTitle(showReportSelector, tasks, taskAudits.length),
                                         location: taskAudits[0]?.location || "",
                                         report_seq: nextSeq,
                                         template: "Boş Rapor"
@@ -2338,7 +2455,7 @@ export default function Tasks() {
                                 </div>
                             )}
 
-                            <div className={cn("grid gap-4", editingTask.rapor_durumu === "Tamamlandı" ? "grid-cols-2" : "grid-cols-1")}>
+                            <div className={cn("grid gap-4", (editingTask.rapor_durumu === "Tamamlandı" || editingTask.rapor_durumu === "İncelemede") ? "grid-cols-2" : "grid-cols-1")}>
                                 <div>
                                     <label style={labelStyle}>Görev Adı</label>
                                     <input 
@@ -2348,7 +2465,7 @@ export default function Tasks() {
                                         placeholder="Görev adını girin..."
                                     />
                                 </div>
-                                {editingTask.rapor_durumu === "Tamamlandı" && (
+                                {(editingTask.rapor_durumu === "Tamamlandı" || editingTask.rapor_durumu === "İncelemede") && (
                                     <div>
                                         <label style={labelStyle}>Görev / Rapor No</label>
                                         <input 
@@ -2465,8 +2582,8 @@ export default function Tasks() {
 
             {/* Yeni Denetim Başlat Modalı (İlk Rapor İçin) */}
             {isNewAuditModalOpen && createPortal(
-                <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/65 backdrop-blur-md" onClick={() => setIsNewAuditModalOpen(null)}>
-                    <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/65 backdrop-blur-md">
+                    <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-6 border-b border-border flex items-center justify-between bg-muted/30">
                             <div>
                                 <h3 className="text-xl font-black font-outfit text-foreground tracking-tight">Yeni Rapor Başlat</h3>

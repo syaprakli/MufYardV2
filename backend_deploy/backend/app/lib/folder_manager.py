@@ -20,6 +20,8 @@ STANDARD_SUBFOLDERS = [
     "05_Diger_Belgeler"
 ]
 
+REPORT_SUBFOLDER = "04_Rapor_ve_Ekleri"
+
 class FolderManager:
     @staticmethod
     def extract_year(date_str: Optional[str]) -> str:
@@ -89,6 +91,14 @@ class FolderManager:
             return "audio"
         if ext == ".pdf":
             return "pdf"
+        if ext in {".doc", ".docx"}:
+            return "word"
+        if ext in {".xls", ".xlsx", ".csv"}:
+            return "excel"
+        if ext in {".ppt", ".pptx"}:
+            return "powerpoint"
+        if ext in {".txt", ".md", ".json", ".xml", ".js", ".ts", ".py", ".css", ".html", ".log", ".sql"}:
+            return "text"
         return "file"
 
     @staticmethod
@@ -117,7 +127,7 @@ class FolderManager:
         permissions = FolderManager.load_permissions()
         file_meta = permissions.get(file_id)
         if not file_meta:
-            # Metadata yoksa herkese açık kabul edilebilir veya False dönebilir
+            # Metadata yoksa erişim izni verilmez (daha güvenli varsayılan)
             return False
         allowed = file_meta.get("permissions", {}).get(action, [])
         return user_id in allowed or user_id == file_meta.get("owner_id")
@@ -146,12 +156,8 @@ class FolderManager:
     @staticmethod
     def get_audit_path(year: str, audit_type: str, audit_code: str, audit_title: str) -> str:
         """Generates the hierarchical path: Raporlar/Year/Type/Code - Title"""
-        # Clean prefix S.Y.64/ or S.Y.64_
-        clean_code = audit_code
-        if clean_code.upper().startswith("S.Y.64/"):
-            clean_code = clean_code[len("S.Y.64/"):]
-        elif clean_code.upper().startswith("S.Y.64_"):
-            clean_code = clean_code[len("S.Y.64_"):]
+        # Replace '/' with '-' to keep prefixes like S.Y.64/ safe on Windows
+        clean_code = audit_code.replace("/", "-")
 
         safe_code = FolderManager.format_safe_name(clean_code)
         safe_title = FolderManager.format_safe_name(audit_title)
@@ -171,6 +177,12 @@ class FolderManager:
         
         folder_name = f"{safe_code} - {safe_title}"
         return os.path.join(BASE_REPORTS_DIR, year, type_folder, folder_name)
+
+    @staticmethod
+    def get_audit_relative_path(year: str, audit_type: str, audit_code: str, audit_title: str) -> str:
+        """Generates the hierarchical path relative to BASE_REPORTS_DIR"""
+        full_path = FolderManager.get_audit_path(year, audit_type, audit_code, audit_title)
+        return os.path.relpath(full_path, BASE_REPORTS_DIR).replace("\\", "/")
 
     @staticmethod
     def ensure_audit_folders(year: str, audit_type: str, audit_code: str, audit_title: str) -> str:
@@ -193,6 +205,23 @@ class FolderManager:
         return audit_path
 
     @staticmethod
+    def ensure_report_subfolder(year: str, audit_type: str, audit_code: str, audit_title: str) -> str:
+        """
+        Göreve bağlı ana klasörü ve sadece 04_Rapor_ve_Ekleri alt klasörünü oluşturur.
+        Rapor oluşturma/paylaşma akışında kullanılır.
+        """
+        audit_path = FolderManager.get_audit_path(year, audit_type, audit_code, audit_title)
+
+        if not os.path.exists(audit_path):
+            os.makedirs(audit_path, exist_ok=True)
+
+        report_path = os.path.join(audit_path, REPORT_SUBFOLDER)
+        if not os.path.exists(report_path):
+            os.makedirs(report_path, exist_ok=True)
+
+        return report_path
+
+    @staticmethod
     def get_tree(start_path: str = BASE_REPORTS_DIR):
         """Recursively scans the Raporlar directory and returns a tree structure."""
         if not os.path.exists(start_path):
@@ -203,30 +232,39 @@ class FolderManager:
             items = []
             try:
                 for entry in os.scandir(current_path):
-                    if entry.name.startswith("."):
+                    try:
+                        if entry.name.startswith("."):
+                            continue
+
+                        item_id = os.path.relpath(entry.path, BASE_REPORTS_DIR).replace("\\", "/")
+                        is_dir = entry.is_dir()
+
+                        node = {
+                            "id": item_id,
+                            "name": entry.name,
+                            "type": "folder" if is_dir else "file",
+                            "parentId": parent_id
+                        }
+
+                        if not is_dir:
+                            stats = entry.stat()
+                            try:
+                                rel_path_from_data = os.path.relpath(entry.path, settings.DATA_DIR).replace("\\", "/")
+                                node["url"] = f"/{rel_path_from_data}"
+                            except Exception:
+                                rel_path_from_reports = os.path.relpath(entry.path, BASE_REPORTS_DIR).replace("\\", "/")
+                                node["url"] = f"/Raporlar/{rel_path_from_reports}"
+
+                            node["size"] = FolderManager.format_size(stats.st_size)
+                            node["date"] = datetime.fromtimestamp(stats.st_mtime).strftime("%d.%m.%Y %H:%M")
+                            node["type"] = FolderManager.detect_file_type(entry.name)
+
+                        items.append(node)
+                        if is_dir:
+                            items.extend(scan(entry.path, item_id))
+                    except Exception:
+                        # Tek bir bozuk giriş yüzünden tüm klasör listesini düşürme.
                         continue
-                    
-                    item_id = os.path.relpath(entry.path, BASE_REPORTS_DIR).replace("\\", "/")
-                    is_dir = entry.is_dir()
-                    
-                    node = {
-                        "id": item_id,
-                        "name": entry.name,
-                        "type": "folder" if is_dir else "file",
-                        "parentId": parent_id
-                    }
-                    
-                    if not is_dir:
-                        stats = entry.stat()
-                        rel_path_from_data = os.path.relpath(entry.path, settings.DATA_DIR).replace("\\", "/")
-                        node["size"] = FolderManager.format_size(stats.st_size)
-                        node["date"] = datetime.fromtimestamp(stats.st_mtime).strftime("%d.%m.%Y %H:%M")
-                        node["type"] = FolderManager.detect_file_type(entry.name)
-                        node["url"] = f"/{rel_path_from_data}"
-                    
-                    items.append(node)
-                    if is_dir:
-                        items.extend(scan(entry.path, item_id))
             except Exception:
                 pass
             return items

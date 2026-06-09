@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { sanitizeHtml } from "../lib/sanitize";
 import { useNavigate } from "react-router-dom";
 import {
@@ -62,6 +62,81 @@ function stripHtml(html: string): string {
     return text.trim().replace(/\n{3,}/g, "\n\n");
 }
 
+const getTaskDisplayCode = (task: any, allTasks: any[]): string => {
+    if (task.rapor_kodu && !task.rapor_kodu.startsWith("TASLAK-")) {
+        return task.rapor_kodu;
+    }
+    
+    if (task.parent_task_id) {
+        const parent = allTasks.find(t => String(t.id).trim() === String(task.parent_task_id).trim());
+        if (parent) {
+            return getTaskDisplayCode(parent, allTasks);
+        }
+    }
+    
+    const topLevelTasks = allTasks.filter(t => {
+        if (t.parent_task_id) return false;
+        const isOld = t.baslama_tarihi ? (Date.now() - new Date(t.baslama_tarihi).getTime() > 730 * 24 * 60 * 60 * 1000) : false;
+        const isArchived = (t.rapor_durumu === "Tamamlandı") && isOld;
+        return !isArchived;
+    });
+
+    topLevelTasks.sort((a, b) => {
+        const isDraftA = !a.rapor_kodu || a.rapor_kodu.startsWith("TASLAK-");
+        const isDraftB = !b.rapor_kodu || b.rapor_kodu.startsWith("TASLAK-");
+        
+        if (isDraftA !== isDraftB) {
+            return isDraftA ? 1 : -1;
+        }
+
+        const parseRaporKodu = (kodu?: string) => {
+            if (!kodu) return { year: 0, seq: 0 };
+            const parts = kodu.split(',').map(p => p.trim()).filter(Boolean);
+            if (parts.length === 0) return { year: 0, seq: 0 };
+            
+            const targetCode = parts[0];
+            const match = targetCode.match(/(\d{4})-(\d+)/);
+            if (match) {
+                return { year: parseInt(match[1]) || 0, seq: parseInt(match[2]) || 0 };
+            }
+            const yearMatch = targetCode.match(/(\d{4})/);
+            if (yearMatch) {
+                return { year: parseInt(yearMatch[1]) || 0, seq: 0 };
+            }
+            return { year: 0, seq: 0 };
+        };
+
+        const parsedA = parseRaporKodu(a.rapor_kodu);
+        const parsedB = parseRaporKodu(b.rapor_kodu);
+
+        if (parsedA.year !== parsedB.year) {
+            return parsedA.year - parsedB.year;
+        }
+        if (parsedA.seq !== parsedB.seq) {
+            return parsedA.seq - parsedB.seq;
+        }
+
+        const aCode = String(a.rapor_kodu || "");
+        const bCode = String(b.rapor_kodu || "");
+        return aCode.localeCompare(bCode, "tr", { numeric: true, sensitivity: "base" });
+    });
+
+    const index = topLevelTasks.findIndex(t => String(t.id).trim() === String(task.id).trim());
+    return index !== -1 ? String(index + 1) : "-";
+};
+
+const getNextReportTitle = (task: any, allTasks: any[], existingReportsCount: number): string => {
+    const displayCode = getTaskDisplayCode(task, allTasks);
+    const taskName = task.rapor_adi || "Raporu";
+    const suffix = taskName.endsWith("Raporu") ? "" : " Raporu";
+    const baseTitle = `${displayCode} - ${taskName}${suffix}`;
+    if (existingReportsCount === 0) {
+        return baseTitle;
+    } else {
+        return `${baseTitle} ${existingReportsCount + 1}`;
+    }
+};
+
 export default function DenetimOzel() {
     const confirm = useConfirm();
     const navigate = useNavigate();
@@ -107,6 +182,35 @@ export default function DenetimOzel() {
     const [reportSaving, setReportSaving] = useState(false);
     const [showReportSelectModal, setShowReportSelectModal] = useState(false);
     const [showPreviewModal, setShowPreviewModal] = useState(false);
+
+    // Custom Prompt States
+    const [promptState, setPromptState] = useState<{
+        isOpen: boolean;
+        title: string;
+        placeholder: string;
+        defaultValue: string;
+    }>({
+        isOpen: false,
+        title: "",
+        placeholder: "",
+        defaultValue: ""
+    });
+    const [promptInputValue, setPromptInputValue] = useState("");
+    const promptResolver = useRef<((value: string | null) => void) | null>(null);
+
+    // @ts-ignore
+    const customPrompt = (title: string, defaultValue: string = "") => {
+        setPromptState({
+            isOpen: true,
+            title,
+            placeholder: "Örn: S.Y.2026/1",
+            defaultValue
+        });
+        setPromptInputValue(defaultValue);
+        return new Promise<string | null>((resolve) => {
+            promptResolver.current = resolve;
+        });
+    };
     const [isSendingToEditor, setIsSendingToEditor] = useState(false);
 
     // 5. Tenkit Bank search inside Report view
@@ -1206,7 +1310,14 @@ export default function DenetimOzel() {
         }
 
         let writeMode: "append" | "replace" = "replace";
-        if (report.report_content && report.report_content.replace(/<[^>]*>/g, "").trim().length > 0) {
+        const strippedContent = (report.report_content || "").replace(/<[^>]*>/g, "").trim();
+        const cleanTitle = (report.title || "").replace(/<[^>]*>/g, "").trim();
+        const cleanContent = strippedContent.replace(cleanTitle, "").trim();
+        const isPlaceholder = !cleanContent || 
+                              cleanContent.includes("Denetim bulguları ve tespitleri buraya kaydedilecektir") ||
+                              cleanContent.length < 5;
+        
+        if (report.report_content && !isPlaceholder) {
             const overwrite = await confirm({
                 title: "Bulgu Aktarımı",
                 message: "Seçtiğiniz raporda mevcut içerik bulunuyor. Üzerine yazmak (mevcut içeriği silmek) istiyor musunuz?",
@@ -1232,7 +1343,7 @@ export default function DenetimOzel() {
             });
             toast.success("Bulgular başarıyla rapora aktarıldı.");
             if (user?.uid) {
-                await refreshAudits(user.uid, user.email || undefined);
+                refreshAudits(user.uid, user.email || undefined);
             }
             navigate(`/audit/${report.id}/report`);
         } catch (error) {
@@ -1243,8 +1354,8 @@ export default function DenetimOzel() {
 
     const handleCreateNewReportAndTransfer = async () => {
         if (!selectedTask) return;
-        const newReportNo = window.prompt("Lütfen oluşturmak istediğiniz rapor numarasını girin (Örn: S.Y.2026/1):");
-        if (!newReportNo) return;
+        const reports = (cachedData?.audits || []).filter((a: any) => a.task_id === selectedTask.id && a.report_created !== false);
+        const newReportNo = getNextReportTitle(selectedTask, cachedData?.tasks || [], reports.length);
         setIsSendingToEditor(true);
         try {
             const newAuditPayload = {
@@ -1261,11 +1372,9 @@ export default function DenetimOzel() {
                 report_created: true
             };
             const createdAudit = await createAudit(newAuditPayload);
-            try {
-                await updateTask(selectedTask.id, { rapor_durumu: "Devam Ediyor" });
-            } catch (err) {
+            updateTask(selectedTask.id, { rapor_durumu: "Devam Ediyor" }).catch(err => {
                 console.error("Task status update error:", err);
-            }
+            });
             setShowReportSelectModal(false);
             await transferFindingsToReport(createdAudit);
         } catch (err) {
@@ -1290,14 +1399,14 @@ export default function DenetimOzel() {
             return;
         }
 
+        setShowPreviewModal(false);
         await handleSaveAuditData(localAuditData);
 
         const reports = (cachedData?.audits || []).filter((a: any) => a.task_id === selectedTask.id && a.report_created !== false);
         const draftAudit = (cachedData?.audits || []).find((a: any) => a.task_id === selectedTask.id && a.report_created === false);
 
         if (reports.length === 0) {
-            const newReportNo = window.prompt("Bu göreve ait henüz bir rapor bulunmamaktadır. Lütfen oluşturmak istediğiniz rapor numarasını girin (Örn: S.Y.2026/1):");
-            if (!newReportNo) return;
+            const newReportNo = getNextReportTitle(selectedTask, cachedData?.tasks || [], 0);
             setIsSendingToEditor(true);
             try {
                 if (draftAudit) {
@@ -1327,11 +1436,9 @@ export default function DenetimOzel() {
                         report_created: true
                     };
                     const createdAudit = await createAudit(newAuditPayload);
-                    try {
-                        await updateTask(selectedTask.id, { rapor_durumu: "Devam Ediyor" });
-                    } catch (err) {
+                    updateTask(selectedTask.id, { rapor_durumu: "Devam Ediyor" }).catch(err => {
                         console.error("Task status update error:", err);
-                    }
+                    });
                     await transferFindingsToReport(createdAudit);
                 }
             } catch (err) {
@@ -2362,6 +2469,53 @@ export default function DenetimOzel() {
                             >
                                 {isSendingToEditor ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
                                 Onayla ve Editöre Gönder
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {promptState.isOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200 p-6 space-y-4">
+                        <div className="space-y-2">
+                            <h3 className="text-base font-black text-slate-900 dark:text-white font-outfit">{promptState.title}</h3>
+                            <input
+                                type="text"
+                                value={promptInputValue}
+                                onChange={(e) => setPromptInputValue(e.target.value)}
+                                placeholder={promptState.placeholder}
+                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white dark:bg-slate-955/20 text-slate-900 dark:text-white font-medium"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        setPromptState(prev => ({ ...prev, isOpen: false }));
+                                        promptResolver.current?.(promptInputValue);
+                                    } else if (e.key === "Escape") {
+                                        setPromptState(prev => ({ ...prev, isOpen: false }));
+                                        promptResolver.current?.(null);
+                                    }
+                                }}
+                            />
+                        </div>
+                        <div className="flex items-center justify-end gap-3 pt-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setPromptState(prev => ({ ...prev, isOpen: false }));
+                                    promptResolver.current?.(null);
+                                }}
+                                className="rounded-xl h-10 px-5 text-slate-650 dark:text-slate-350 font-bold text-xs"
+                            >
+                                İptal
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    setPromptState(prev => ({ ...prev, isOpen: false }));
+                                    promptResolver.current?.(promptInputValue);
+                                }}
+                                className="rounded-xl h-10 px-5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20"
+                            >
+                                Tamam
                             </Button>
                         </div>
                     </div>

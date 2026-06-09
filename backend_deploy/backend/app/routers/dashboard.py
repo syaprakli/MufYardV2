@@ -1,6 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from app.schemas.dashboard import DashboardStats, NewsItem
 from app.services.collaboration_service import CollaborationService
+from app.lib.auth import get_current_user
+from typing import Dict, Any
 from datetime import datetime, timezone
 
 router = APIRouter(tags=["dashboard"])
@@ -49,9 +51,16 @@ def format_relative_time(dt):
         return str(dt)
 
 @router.get("/stats", response_model=DashboardStats)
-async def get_dashboard_stats(user_id: str = None):
+async def get_dashboard_stats(user_id: str = None, current_user: Dict[str, Any] = Depends(get_current_user)):
+    effective_user_id = current_user.get("uid")
+    caller_role = (current_user.get("role") or "user").strip().lower()
+    if user_id and user_id != effective_user_id and caller_role not in {"admin", "moderator"}:
+        raise HTTPException(status_code=403, detail="Başka kullanıcı adına gösterge paneli verisi alamazsınız.")
+    if user_id and caller_role in {"admin", "moderator"}:
+        effective_user_id = user_id
+
     try:
-        duyurular = await CollaborationService.get_posts(category="Duyurular", user_uid=user_id, limit=5)
+        duyurular = await CollaborationService.get_posts(category="Duyurular", user_uid=effective_user_id, limit=5)
         news_items = []
         for d in duyurular:
             news_items.append({
@@ -61,7 +70,7 @@ async def get_dashboard_stats(user_id: str = None):
                 "category": d.get('category', 'Duyuru')
             })
             
-        all_posts_raw = await CollaborationService.get_posts(user_uid=user_id, limit=20)
+        all_posts_raw = await CollaborationService.get_posts(user_uid=effective_user_id, limit=20)
         forum_items = []
         for f in all_posts_raw:
             cat = f.get('category', 'Genel')

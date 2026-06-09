@@ -3,13 +3,14 @@ import json
 import asyncio
 import base64
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Depends
 from fastapi.responses import RedirectResponse, HTMLResponse
 from pydantic import BaseModel
 from typing import List, Any, Optional
 from google_auth_oauthlib.flow import InstalledAppFlow
 from app.services.google_service import GoogleCalendarService, SCOPES
 from app.lib.firebase_admin import db
+from app.lib.auth import get_current_user
 
 router = APIRouter(tags=["calendar"])
 
@@ -17,7 +18,6 @@ router = APIRouter(tags=["calendar"])
 # ── Calendar Notes Schemas ─────────────────────────────────────────────────────
 
 class CalendarNoteCreate(BaseModel):
-    uid: str
     date_key: str   # format: "YYYY-M-D"
     text: str
     time: str       # e.g. "14:30"
@@ -34,10 +34,10 @@ class CalendarNoteResponse(BaseModel):
 # ── Calendar Notes Endpoints ───────────────────────────────────────────────────
 
 @router.get("/notes", response_model=List[CalendarNoteResponse])
-async def get_calendar_notes(uid: str = Query(...)):
+async def get_calendar_notes(current_user: dict = Depends(get_current_user)):
     """Fetch all calendar notes for a given user."""
     try:
-        query = db.collection("calendar_notes").where("owner_id", "==", uid)
+        query = db.collection("calendar_notes").where("owner_id", "==", current_user.get("uid"))
         docs = await asyncio.to_thread(query.stream)
         result = []
         for doc in docs:
@@ -47,16 +47,16 @@ async def get_calendar_notes(uid: str = Query(...)):
                 data["created_at"] = data["created_at"].isoformat()
             result.append(data)
         return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Takvim notları alınırken bir hata oluştu.")
 
 
 @router.post("/notes", response_model=CalendarNoteResponse)
-async def create_calendar_note(note: CalendarNoteCreate):
+async def create_calendar_note(note: CalendarNoteCreate, current_user: dict = Depends(get_current_user)):
     """Create a new calendar note for a user."""
     try:
         data = {
-            "owner_id": note.uid,
+            "owner_id": current_user.get("uid"),
             "date_key": note.date_key,
             "text": note.text,
             "time": note.time,
@@ -69,26 +69,26 @@ async def create_calendar_note(note: CalendarNoteCreate):
         if "created_at" in result and hasattr(result["created_at"], "isoformat"):
             result["created_at"] = result["created_at"].isoformat()
         return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Takvim notu eklenirken bir hata oluştu.")
 
 
 @router.delete("/notes/{note_id}")
-async def delete_calendar_note(note_id: str, uid: str = Query(...)):
+async def delete_calendar_note(note_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a calendar note, verifying ownership."""
     try:
         doc_ref = db.collection("calendar_notes").document(note_id)
         doc = await asyncio.to_thread(doc_ref.get)
         if not doc.exists:
             raise HTTPException(status_code=404, detail="Not bulunamadı.")
-        if doc.to_dict().get("owner_id") != uid:
+        if doc.to_dict().get("owner_id") != current_user.get("uid"):
             raise HTTPException(status_code=403, detail="Bu notu silme yetkiniz yok.")
         await asyncio.to_thread(doc_ref.delete)
         return {"status": "success"}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Takvim notu silinirken bir hata oluştu.")
 
 
 # ── OAuth Helpers ──────────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ def _popup_result_page(frontend_url: str, query: str) -> HTMLResponse:
         return HTMLResponse(content=html)
 
 @router.get("/auth-url")
-async def get_auth_url(uid: str = Query(...), return_url: str | None = Query(default=None)):
+async def get_auth_url(return_url: str | None = Query(default=None), current_user: dict = Depends(get_current_user)):
     """Generates the Google OAuth2 authorization URL for a specific user."""
     if not os.path.exists('credentials.json'):
         raise HTTPException(status_code=500, detail="credentials.json file missing on server.")
@@ -160,7 +160,7 @@ async def get_auth_url(uid: str = Query(...), return_url: str | None = Query(def
     flow.redirect_uri = f"{backend_url}/api/calendar/callback"
     
     state_payload = {
-        "uid": uid,
+        "uid": current_user.get("uid"),
         "return_url": return_url
     }
     encoded_state = base64.urlsafe_b64encode(json.dumps(state_payload).encode("utf-8")).decode("utf-8")
@@ -216,22 +216,22 @@ async def oauth_callback(
         return _popup_result_page(frontend_url, "error=auth_failed")
 
 @router.get("/events")
-async def get_google_events(uid: str = Query(...), max_results: int = Query(20, ge=1)):
+async def get_google_events(max_results: int = Query(20, ge=1), current_user: dict = Depends(get_current_user)):
     """Fetches upcoming events from the user's Google Calendar."""
     try:
-        cal_service = GoogleCalendarService(uid)
+        cal_service = GoogleCalendarService(current_user.get("uid"))
         events = await cal_service.get_upcoming_events(max_results=max_results)
         return events
     except Exception as e:
-        print(f"Error fetching Google events for {uid}: {e}")
+        print(f"Error fetching Google events for {current_user.get('uid')}: {e}")
         return []
 
 @router.get("/status")
-async def get_calendar_status(uid: str = Query(...)):
+async def get_calendar_status(current_user: dict = Depends(get_current_user)):
     """Checks if the user has a linked Google token in Firestore."""
     from app.lib.firebase_admin import db
     
-    doc_ref = db.collection('profiles').document(uid).collection('calendar_tokens').document('google')
+    doc_ref = db.collection('profiles').document(current_user.get("uid")).collection('calendar_tokens').document('google')
     doc = await asyncio.to_thread(doc_ref.get)
     
     return {

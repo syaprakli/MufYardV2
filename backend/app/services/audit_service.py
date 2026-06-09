@@ -116,13 +116,9 @@ class AuditService:
             # Add to Firestore (returns (update_time, doc_ref) tuple)
             result = await asyncio.to_thread(db.collection('audits').add, audit_data)
             if result and result[1]:
-                doc = await asyncio.to_thread(result[1].get)
-                if doc and doc.exists:
-                    new_audit = doc.to_dict() or {}
-                    new_audit['id'] = result[1].id
-                    new_audit.setdefault('created_at', datetime.utcnow().isoformat() + "Z")
-                    await AuditService._ensure_report_subfolder_for_audit(new_audit)
-                    return new_audit
+                audit_data['id'] = result[1].id
+                await AuditService._ensure_report_subfolder_for_audit(audit_data)
+                return audit_data
         except Exception:
             pass
         
@@ -240,10 +236,6 @@ class AuditService:
     @staticmethod
     async def delete_audit(audit_id: str) -> bool:
         doc_ref = db.collection('audits').document(audit_id)
-        exists = await asyncio.to_thread(lambda: doc_ref.get().exists)
-        if not exists:
-            return False
-            
         await asyncio.to_thread(doc_ref.delete)
         return True
 

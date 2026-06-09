@@ -7,16 +7,28 @@ from firebase_admin import auth as firebase_auth
 from app.lib.firebase_admin import db, is_mock
 
 
+_ROLE_CACHE: Dict[str, tuple[str, float]] = {} # uid -> (role, timestamp)
+_CACHE_TTL = 300 # 5 dakika cache
+
 async def _get_role_for_uid(uid: str) -> str:
+    now = asyncio.get_event_loop().time()
+    if uid in _ROLE_CACHE:
+        role, ts = _ROLE_CACHE[uid]
+        if now - ts < _CACHE_TTL:
+            return role
+
     try:
         doc_ref = db.collection("profiles").document(uid)
         doc = await asyncio.to_thread(doc_ref.get)
         if doc.exists:
             profile = doc.to_dict() or {}
             role = (profile.get("role") or "user").strip().lower()
-            return role or "user"
-    except Exception:
-        pass
+            found_role = role or "user"
+            _ROLE_CACHE[uid] = (found_role, now)
+            return found_role
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Auth role fetch error (uid={uid}): {e}")
     return "user"
 
 
@@ -35,7 +47,7 @@ async def get_current_user(
             decoded = None
             for attempt in range(3):
                 try:
-                    decoded = await asyncio.to_thread(firebase_auth.verify_id_token, token)
+                    decoded = await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=60))
                     break
                 except Exception as e:
                     err_str = str(e).lower()
@@ -57,7 +69,9 @@ async def get_current_user(
             return {"uid": uid, "email": email, "role": role}
         except HTTPException:
             raise
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Token verification failed: {e}", exc_info=True)
             raise HTTPException(status_code=401, detail="Kimlik doğrulama başarısız.")
 
     # Dev fallback: only when backend runs with mock Firebase

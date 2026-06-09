@@ -333,24 +333,26 @@ export function TurkeyMap({
 
   // Filtered places for selected city
   const selectedCityPlaces = useMemo(() => {
-    return places.filter((p) => p.city.toLowerCase() === selectedCity.toLowerCase());
+    if (!Array.isArray(places)) return [];
+    return places.filter((p) => p && p.city && p.city.toLowerCase() === selectedCity.toLowerCase());
   }, [places, selectedCity]);
 
   // Selected Place details
   const selectedPlace = useMemo(() => {
-    if (!selectedPlaceId) return null;
-    return places.find((p) => p.id === selectedPlaceId);
+    if (!selectedPlaceId || !Array.isArray(places)) return null;
+    return places.find((p) => p && p.id === selectedPlaceId);
   }, [places, selectedPlaceId]);
 
   // Reviews for the selected place
   const selectedPlaceReviews = useMemo(() => {
-    if (!selectedPlaceId) return [];
-    return reviews.filter((r) => r.placeId === selectedPlaceId);
+    if (!selectedPlaceId || !Array.isArray(reviews)) return [];
+    return reviews.filter((r) => r && r.placeId === selectedPlaceId);
   }, [reviews, selectedPlaceId]);
 
   // Compute average rating and count for each place
   const getPlaceRatingStats = (placeId: string, initialRating: number) => {
-    const pReviews = reviews.filter((r) => r.placeId === placeId);
+    if (!Array.isArray(reviews)) return { avg: initialRating, count: 0 };
+    const pReviews = reviews.filter((r) => r && r.placeId === placeId);
     if (pReviews.length === 0) {
       return { avg: initialRating, count: 0 };
     }

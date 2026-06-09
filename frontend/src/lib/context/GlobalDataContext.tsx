@@ -35,7 +35,7 @@ interface GlobalDataContextType {
     isTrialExpired: boolean;
     refreshAll: (uid: string, email?: string, displayName?: string, force?: boolean) => Promise<void>;
     refreshProfile: (uid: string, email?: string, displayName?: string) => Promise<any>;
-    refreshTasks: (uid: string) => Promise<void>;
+    refreshTasks: (uid: string, force?: boolean) => Promise<void>;
     refreshAudits: (uid: string, email?: string) => Promise<void>;
     refreshContactsCorporate: () => Promise<void>;
     refreshContactsPersonal: (uid: string, email?: string) => Promise<void>;
@@ -132,7 +132,7 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         try {
             const [statsRes, tasksRes, profileRes, auditsRes, contactsCorpRes, contactsPersRes] = await Promise.allSettled([
                 fetchStats(uid),
-                tasksApi.fetchTasks(uid),
+                tasksApi.fetchTasks(uid, undefined, force),
                 fetchProfile(uid, email, displayName),
                 auditsApi.fetchAudits(uid, email, true),
                 fetchContacts('corporate'),
@@ -194,9 +194,9 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Sync queue processing handled by triggerQueueSync listeners above
 
-    const refreshTasks = useCallback(async (uid: string) => {
+    const refreshTasks = useCallback(async (uid: string, force = true) => {
         try {
-            const tasks = await tasksApi.fetchTasks(uid);
+            const tasks = await tasksApi.fetchTasks(uid, undefined, force);
             setData(prev => ({ ...prev, tasks }));
         } catch (error) {
             console.error("Tasks refresh error:", error);

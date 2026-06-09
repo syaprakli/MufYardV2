@@ -3,16 +3,52 @@ import asyncio
 from typing import List, Optional, Dict, Any
 import uuid
 from app.lib.firebase_admin import db
+from app.lib.folder_manager import FolderManager
 from app.schemas.audit import AuditCreate, AuditUpdate
 
 class AuditService:
+    @staticmethod
+    async def _resolve_task_folder_context(task_id: Optional[str]) -> Optional[Dict[str, str]]:
+        if not task_id:
+            return None
+
+        task_ref = db.collection('tasks').document(str(task_id))
+        task_doc = await asyncio.to_thread(task_ref.get)
+        if not task_doc.exists:
+            return None
+
+        task_data = task_doc.to_dict() or {}
+        start_date_str = task_data.get('baslama_tarihi')
+        year = FolderManager.extract_year(start_date_str)
+
+        return {
+            'year': year,
+            'audit_type': task_data.get('rapor_turu', 'Diger') or 'Diger',
+            'audit_code': task_data.get('rapor_kodu', 'Kodsuz') or 'Kodsuz',
+            'audit_title': task_data.get('rapor_adi', 'Basliksiz') or 'Basliksiz'
+        }
+
+    @staticmethod
+    async def _ensure_report_subfolder_for_audit(audit_data: Dict[str, Any]) -> None:
+        context = await AuditService._resolve_task_folder_context(audit_data.get('task_id'))
+        if not context:
+            return
+
+        await asyncio.to_thread(
+            FolderManager.ensure_report_subfolder,
+            context['year'],
+            context['audit_type'],
+            context['audit_code'],
+            context['audit_title']
+        )
+
     @staticmethod
     async def get_all_audits(user_id: Optional[str] = None, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
         audits_ref = db.collection('audits')
         
         if not user_id and not user_email:
             fields = ['title', 'date', 'status', 'inspector', 'location', 'owner_id', 
-                      'assigned_to', 'shared_with', 'task_id', 'report_seq', 'is_public', 'created_at', 'audit_data']
+                      'assigned_to', 'shared_with', 'shared_roles', 'task_id', 'report_seq', 'is_public', 'created_at', 'audit_data', 'report_created']
             docs = await asyncio.to_thread(lambda: audits_ref.where('is_public', '==', True).limit(200).select(fields).stream())
             return [ {**doc.to_dict(), 'id': doc.id} for doc in docs]
 
@@ -20,7 +56,7 @@ class AuditService:
         admin_id = "sefa.yaprakli@gsb.gov.tr"
         if user_id == admin_id or user_email == admin_id or user_id == "admin":
             fields = ['title', 'date', 'status', 'inspector', 'location', 'owner_id', 
-                      'assigned_to', 'shared_with', 'task_id', 'report_seq', 'is_public', 'created_at', 'audit_data']
+                      'assigned_to', 'shared_with', 'shared_roles', 'task_id', 'report_seq', 'is_public', 'created_at', 'audit_data', 'report_created']
             docs = await asyncio.to_thread(lambda: audits_ref.order_by('created_at', direction='DESCENDING').limit(500).select(fields).stream())
             return [ {**doc.to_dict(), 'id': doc.id} for doc in docs]
 
@@ -29,7 +65,7 @@ class AuditService:
             if q is None: return []
             # Optimization: Select only metadata fields to avoid fetching large 'report_content'
             fields = ['title', 'date', 'status', 'inspector', 'location', 'owner_id', 
-                      'assigned_to', 'shared_with', 'task_id', 'report_seq', 'is_public', 'created_at', 'audit_data']
+                      'assigned_to', 'shared_with', 'shared_roles', 'task_id', 'report_seq', 'is_public', 'created_at', 'audit_data', 'report_created']
             return await asyncio.to_thread(lambda: list(q.select(fields).stream()))
 
         queries = [
@@ -74,28 +110,26 @@ class AuditService:
     @staticmethod
     async def create_audit(audit: AuditCreate) -> Dict[str, Any]:
         audit_data = audit.dict()
-        audit_data['created_at'] = datetime.utcnow().isoformat()
+        audit_data['created_at'] = datetime.utcnow().isoformat() + "Z"
         
         try:
             # Add to Firestore (returns (update_time, doc_ref) tuple)
             result = await asyncio.to_thread(db.collection('audits').add, audit_data)
             if result and result[1]:
-                doc = await asyncio.to_thread(result[1].get)
-                if doc and doc.exists:
-                    new_audit = doc.to_dict() or {}
-                    new_audit['id'] = result[1].id
-                    new_audit.setdefault('created_at', datetime.utcnow().isoformat())
-                    return new_audit
+                audit_data['id'] = result[1].id
+                await AuditService._ensure_report_subfolder_for_audit(audit_data)
+                return audit_data
         except Exception:
             pass
         
         # Fallback for Mock DB or any failure
         new_id = str(uuid.uuid4())
         audit_data['id'] = new_id
+        await AuditService._ensure_report_subfolder_for_audit(audit_data)
         return audit_data
 
     @staticmethod
-    async def update_audit(audit_id: str, audit: AuditUpdate) -> Optional[Dict[str, Any]]:
+    async def update_audit(audit_id: str, audit: AuditUpdate, force_version: Optional[bool] = None) -> Optional[Dict[str, Any]]:
         doc_ref = db.collection('audits').document(audit_id)
         current_doc = await asyncio.to_thread(doc_ref.get)
         if not current_doc.exists:
@@ -104,43 +138,57 @@ class AuditService:
             
         update_data = {k: v for k, v in audit.dict().items() if v is not None}
         now = datetime.utcnow()
-        update_data['updated_at'] = now.isoformat()
+        update_data['updated_at'] = now.isoformat() + "Z"
         
+
         # --- Smart Versioning Logic ---
         if 'report_content' in update_data:
             versions_ref = doc_ref.collection('versions')
-            # blocking queries wrapped in thread
-            last_version_docs = await asyncio.to_thread(lambda: list(versions_ref.order_by('created_at', direction='DESCENDING').limit(1).get()))
-            
             should_create_version = True
-            if last_version_docs:
-                last_v = last_version_docs[0].to_dict()
-                last_time_raw = last_v.get('created_at')
-                try:
-                    if isinstance(last_time_raw, str):
-                        last_time = datetime.fromisoformat(last_time_raw)
-                    else:
-                        last_time = last_time_raw # Firestore Timestamp if exists
-                    
-                    if (now - last_time) < timedelta(minutes=30):
-                        should_create_version = False
-                except Exception:
-                    pass
-            
+            custom_version_name = update_data.pop('version_name', None)
+            if force_version is not True:
+                # blocking queries wrapped in thread
+                last_version_docs = await asyncio.to_thread(lambda: list(versions_ref.order_by('created_at', direction='DESCENDING').limit(1).get()))
+                if last_version_docs:
+                    last_v = last_version_docs[0].to_dict()
+                    last_time_raw = last_v.get('created_at')
+                    try:
+                        if isinstance(last_time_raw, str):
+                            # Remove optional trailing Z if present to parse with fromisoformat
+                            raw_str = last_time_raw.rstrip('Z')
+                            last_time = datetime.fromisoformat(raw_str)
+                        else:
+                            last_time = last_time_raw # Firestore Timestamp if exists
+                        time_diff = now - last_time
+                        new_content = update_data.get('report_content', '')
+                        last_content = last_v.get('report_content', '')
+                        char_diff = abs(len(new_content) - len(last_content))
+                        # Eger 1 saat gecmediyse VE karakter farki 1000'den az ise yeni surum olusturma
+                        if time_diff < timedelta(hours=1) and char_diff < 1000:
+                            should_create_version = False
+                    except Exception:
+                        pass
             if should_create_version:
+                existing_versions = await asyncio.to_thread(lambda: list(versions_ref.get()))
+                v_num = len(existing_versions) + 1
                 version_data = {
-                    "version_name": f"v.{now.strftime('%H:%M')}",
+                    "version_name": custom_version_name or f"v.{v_num:02d}",
                     "report_content": current_data.get('report_content', ''),
-                    "created_at": now.isoformat(),
-                    "user": "Müfettiş"
+                    "created_at": now.isoformat() + "Z",
+                    "user": update_data.get('inspector') or current_data.get('inspector') or "Müfettiş"
                 }
                 await asyncio.to_thread(versions_ref.add, version_data)
-
+ 
         await asyncio.to_thread(doc_ref.update, update_data)
         
         updated_doc_res = await asyncio.to_thread(doc_ref.get)
         updated_doc = updated_doc_res.to_dict()
         updated_doc['id'] = audit_id
+
+        # Rapor içerigi kaydedildiginde ilgili görevde sadece 04_Rapor_ve_Ekleri klasörünü garanti et.
+        if 'report_content' in update_data:
+            await AuditService._ensure_report_subfolder_for_audit(updated_doc)
+
         return updated_doc
 
     @staticmethod
@@ -165,22 +213,29 @@ class AuditService:
             return None
             
         v_data = v_doc.to_dict()
-        restore_content = v_data.get('report_content', '')
+        # Fallback to 'content' for legacy versions before schema change
+        restore_content = v_data.get('report_content', v_data.get('content', ''))
         
         await asyncio.to_thread(audit_ref.update, {
             "report_content": restore_content,
-            "updated_at": datetime.utcnow().isoformat()
+            "updated_at": datetime.utcnow().isoformat() + "Z"
         })
         
         return await AuditService.get_audit(audit_id)
-
+        
     @staticmethod
-    async def delete_audit(audit_id: str) -> bool:
-        doc_ref = db.collection('audits').document(audit_id)
+    async def delete_audit_version(audit_id: str, version_id: str) -> bool:
+        doc_ref = db.collection('audits').document(audit_id).collection('versions').document(version_id)
         exists = await asyncio.to_thread(lambda: doc_ref.get().exists)
         if not exists:
             return False
             
+        await asyncio.to_thread(doc_ref.delete)
+        return True
+
+    @staticmethod
+    async def delete_audit(audit_id: str) -> bool:
+        doc_ref = db.collection('audits').document(audit_id)
         await asyncio.to_thread(doc_ref.delete)
         return True
 
@@ -209,6 +264,7 @@ class AuditService:
                     'pending_collaborators': pending,
                     'accepted_collaborators': accepted
                 })
+                await AuditService._ensure_report_subfolder_for_audit(audit_data)
                 return True
             return False
         except Exception:

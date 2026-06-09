@@ -259,11 +259,8 @@ class CollaborationService:
         post_data['created_at'] = datetime.utcnow()
         post_data['likes_count'] = 0
         
-        # Onay mekanizması
-        if not is_admin and post_data.get('is_public', True):
-            post_data['is_approved'] = False
-        else:
-            post_data['is_approved'] = True
+        # Herkesin paylaştığı doğrudan onaylı olacak
+        post_data['is_approved'] = True
             
         doc_ref = await asyncio.to_thread(db.collection('posts').add, post_data)
         new_post_doc = await asyncio.to_thread(doc_ref[1].get)
@@ -297,10 +294,14 @@ class CollaborationService:
         return True
 
     @staticmethod
-    async def delete_post(post_id: str) -> bool:
+    async def delete_post(post_id: str, requester_uid: str = None, is_admin: bool = False) -> bool:
         doc_ref = db.collection('posts').document(post_id)
-        exists = await asyncio.to_thread(lambda: doc_ref.get().exists)
-        if not exists:
+        doc = await asyncio.to_thread(doc_ref.get)
+        if not doc.exists:
+            return False
+            
+        data = doc.to_dict() or {}
+        if not is_admin and data.get('author_id') != requester_uid:
             return False
             
         await asyncio.to_thread(doc_ref.delete)
@@ -353,8 +354,14 @@ class CollaborationService:
         if not doc.exists:
             return False
 
+        # Admin/Founder bypass
+        founders = ["sefa.yaprakli@gsb.gov.tr", "syaprakli@gmail.com", "yasir.yaprakli@gsb.gov.tr", "admin", "user_1", "VKV8SfuNkWf9WeTYeSCTizd4oG83"]
+        if is_admin or requester_uid in founders or requester_uid.lower() in [f.lower() for f in founders]:
+            await asyncio.to_thread(doc_ref.delete)
+            return True
+
         data = doc.to_dict() or {}
-        if not is_admin and data.get('author_id') != requester_uid:
+        if data.get('author_id') != requester_uid:
             return False
             
         await asyncio.to_thread(doc_ref.delete)
@@ -367,8 +374,12 @@ class CollaborationService:
         if not doc.exists:
             return None
 
+        # Admin/Founder bypass
+        founders = ["sefa.yaprakli@gsb.gov.tr", "syaprakli@gmail.com", "yasir.yaprakli@gsb.gov.tr", "admin", "user_1", "VKV8SfuNkWf9WeTYeSCTizd4oG83"]
+        is_bypass = is_admin or requester_uid in founders or requester_uid.lower() in [f.lower() for f in founders]
+
         existing = doc.to_dict() or {}
-        if not is_admin and existing.get('author_id') != requester_uid:
+        if not is_bypass and existing.get('author_id') != requester_uid:
             return None
 
         update_data = {
@@ -449,18 +460,23 @@ class CollaborationService:
             return None
 
     @staticmethod
-    async def toggle_like(post_id: str) -> Dict[str, Any]:
+    async def toggle_like(post_id: str, user_id: str = None) -> Dict[str, Any]:
         doc_ref = db.collection('posts').document(post_id)
         post = await asyncio.to_thread(doc_ref.get)
         if not post.exists:
             return {"error": "Post bulunamadı."}
         
         post_data = post.to_dict()
-        current_likes = post_data.get('likes_count', 0)
-        new_likes = current_likes + 1
+        liked_by = post_data.get('liked_by', [])
         
-        await asyncio.to_thread(doc_ref.update, {'likes_count': new_likes})
-        return {"id": post_id, "likes_count": new_likes}
+        if user_id and user_id in liked_by:
+            liked_by.remove(user_id)
+        elif user_id:
+            liked_by.append(user_id)
+        
+        new_likes = len(liked_by)
+        await asyncio.to_thread(doc_ref.update, {'likes_count': new_likes, 'liked_by': liked_by})
+        return {"id": post_id, "likes_count": new_likes, "liked": user_id in liked_by}
 
     # --- Category Management ---
     @staticmethod

@@ -7,6 +7,7 @@ import { cn } from "../../lib/utils";
 import { updateTask, type Task } from "../../lib/api/tasks";
 import type { Audit as AuditType } from "../../lib/api/audit";
 import { VirtualizedList } from "../ui/VirtualizedList";
+import { useConfirm } from "../../lib/context/ConfirmContext";
 
 const RAPOR_DURUMLARI = ["Başlanmadı", "Devam Ediyor", "İncelemede", "Tamamlandı"];
 
@@ -41,6 +42,7 @@ export default function AuditList({
 }: AuditListProps) {
   const taskById = useMemo(() => new Map(tasks.map((task) => [String(task.id).trim(), task])), [tasks]);
 
+
   return (
     <VirtualizedList
       items={audits}
@@ -50,22 +52,30 @@ export default function AuditList({
       className="max-h-[78vh] overflow-y-auto pr-1"
       itemClassName="space-y-4"
       emptyState={null}
-      renderItem={(audit) => (
-        <AuditListItem
-          audit={audit}
-          currentUserKeys={currentUserKeys}
-          task={taskById.get(String(audit.task_id).trim())}
-          isSelected={selectedIds.includes(audit.id)}
-          isElectron={isElectron}
-          onToggleSelect={() => onToggleSelect(audit.id)}
-          onExportWord={() => onExportWord(audit.id)}
-          onEdit={() => onEdit(audit.id)}
-          onUpdate={onUpdate}
-          onDelete={() => onDelete(audit.id)}
-          onShare={() => onShare(audit.id)}
-          onRefresh={onRefresh}
-        />
-      )}
+      renderItem={(audit) => {
+        const t = taskById.get(String(audit.task_id).trim());
+        const hasFinalCode = t && t.rapor_kodu && t.rapor_kodu.includes("S.Y.64/");
+        const resolvedTitle = hasFinalCode
+          ? (audit.report_seq && audit.report_seq > 1 ? `${t.rapor_kodu} - ${audit.report_seq}` : t.rapor_kodu)
+          : audit.title;
+        return (
+          <AuditListItem
+            audit={audit}
+            currentUserKeys={currentUserKeys}
+            task={t}
+            resolvedTitle={resolvedTitle}
+            isSelected={selectedIds.includes(audit.id)}
+            isElectron={isElectron}
+            onToggleSelect={() => onToggleSelect(audit.id)}
+            onExportWord={() => onExportWord(audit.id)}
+            onEdit={() => onEdit(audit.id)}
+            onUpdate={onUpdate}
+            onDelete={() => onDelete(audit.id)}
+            onShare={() => onShare(audit.id)}
+            onRefresh={onRefresh}
+          />
+        );
+      }}
     />
   );
 }
@@ -74,6 +84,7 @@ function AuditListItem({
   audit,
   currentUserKeys,
   task,
+  resolvedTitle,
   isSelected,
   isElectron,
   onToggleSelect,
@@ -87,6 +98,7 @@ function AuditListItem({
   audit: AuditType;
   currentUserKeys: string[];
   task?: Task;
+  resolvedTitle: string;
   isSelected: boolean;
   isElectron: boolean;
   onToggleSelect: () => void;
@@ -97,7 +109,8 @@ function AuditListItem({
   onShare: () => void;
   onRefresh: () => Promise<void> | void;
 }) {
-  const { title, date, status, inspector, location } = audit;
+  const { date, status, inspector, location } = audit;
+  const confirm = useConfirm();
   const statusColors: Record<string, string> = {
     "Başlanmadı": "bg-slate-500/10 text-slate-600 border-slate-500/20",
     "Devam Ediyor": "bg-blue-500/10 text-blue-600 border-blue-500/20",
@@ -167,6 +180,21 @@ function AuditListItem({
                 const newStatus = e.target.value;
                 try {
                   if (task) {
+                    const currentCode = task.rapor_kodu || "";
+                    const isDraft = !currentCode || currentCode.startsWith("TASLAK-");
+                    if ((newStatus === "İncelemede" || newStatus === "Tamamlandı") && isDraft) {
+                      const confirmed = await confirm({
+                        title: "Rapor Kodu Oluşturulacak",
+                        message: "Bu görevi ilk kez 'İncelemede' veya 'Tamamlandı' aşamasına aldığınızda resmi Rapor Kodu (Görev No) üretilecektir. Daha sonra bu işlemi geri alsanız dahi atanan Rapor Kodu korunacaktır. Devam etmek istiyor musunuz?",
+                        confirmText: "Devam Et",
+                        cancelText: "İptal",
+                        variant: "warning"
+                      });
+                      if (!confirmed) {
+                        await onRefresh();
+                        return;
+                      }
+                    }
                     await updateTask(task.id, { rapor_durumu: newStatus });
                     toast.success("Görev durumu güncellendi.");
                   } else {
@@ -194,14 +222,14 @@ function AuditListItem({
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 mb-1">
             <h4 className="font-bold text-xs md:text-sm text-secondary group-hover:text-primary transition-colors font-outfit tracking-tight truncate">
-              {title}
+              {resolvedTitle}
             </h4>
             {roleBadge.label && (
               <span className={cn("w-fit px-2 py-0.5 text-[9px] md:text-[10px] font-black rounded-lg border uppercase tracking-widest whitespace-nowrap", roleBadge.className)}>
                 {roleBadge.label}
               </span>
             )}
-            {task && (
+            {task && task.rapor_kodu && !task.rapor_kodu.startsWith("TASLAK-") && (
               <span className="w-fit px-2 py-0.5 bg-primary/5 text-primary text-[9px] md:text-[10px] font-black rounded-lg border border-primary/10 uppercase tracking-widest whitespace-nowrap">
                 Görev: {task.rapor_kodu}
                 {audit.report_seq && audit.report_seq > 1 ? `-${audit.report_seq}` : ""}
@@ -234,6 +262,21 @@ function AuditListItem({
               const newStatus = e.target.value;
               try {
                 if (task) {
+                  const currentCode = task.rapor_kodu || "";
+                  const isDraft = !currentCode || currentCode.startsWith("TASLAK-");
+                  if ((newStatus === "İncelemede" || newStatus === "Tamamlandı") && isDraft) {
+                    const confirmed = await confirm({
+                      title: "Rapor Kodu Oluşturulacak",
+                      message: "Bu görevi ilk kez 'İncelemede' veya 'Tamamlandı' aşamasına aldığınızda resmi Rapor Kodu (Görev No) üretilecektir. Daha sonra bu işlemi geri alsanız dahi atanan Rapor Kodu korunacaktır. Devam etmek istiyor musunuz?",
+                      confirmText: "Devam Et",
+                      cancelText: "İptal",
+                      variant: "warning"
+                    });
+                    if (!confirmed) {
+                      await onRefresh();
+                      return;
+                    }
+                  }
                   await updateTask(task.id, { rapor_durumu: newStatus });
                   toast.success("Görev durumu güncellendi.");
                 } else {

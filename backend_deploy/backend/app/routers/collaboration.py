@@ -1,10 +1,12 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query, Depends
+import asyncio
 from typing import List, Dict, Optional, Any
 from app.services.collaboration_service import CollaborationService
 from app.schemas.messaging import MessageCreate, MessageResponse, DirectMessageCreate, DirectMessageResponse
 from app.schemas.post import PostCreate, PostResponse, PostUpdate, CommentUpdate
 from app.services.notification_service import NotificationService
 from app.schemas.notification import NotificationCreate
+from app.lib.auth import get_current_user
 import json
 
 router = APIRouter(prefix="", tags=["collaboration"])
@@ -12,58 +14,84 @@ router = APIRouter(prefix="", tags=["collaboration"])
 # --- PERSISTENT MESSAGING (CHAT) ---
 
 @router.get("/messages", response_model=List[MessageResponse])
-async def get_message_history(limit: int = 50):
+async def get_message_history(limit: int = 50, current_user: Dict[str, Any] = Depends(get_current_user)):
     try:
         return await CollaborationService.get_messages(limit)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Mesajlar alınırken bir hata oluştu.")
 
 @router.post("/messages", response_model=MessageResponse)
-async def save_global_message(message: MessageCreate):
+async def save_global_message(message: MessageCreate, current_user: Dict[str, Any] = Depends(get_current_user)):
     try:
         return await CollaborationService.save_message(message)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Mesaj kaydedilirken bir hata oluştu.")
 
 @router.delete("/messages/{message_id}")
-async def delete_message(message_id: str, uid: str = Query(...), role: str = Query("user")):
-    is_admin = (role or "").strip().lower() == "admin"
+async def delete_message(message_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    uid = current_user.get("uid")
+    role = (current_user.get("role") or "user").strip().lower()
+    is_admin = role in ["admin", "moderator"]
     if await CollaborationService.delete_message(message_id, uid, is_admin):
+        # WebSocket üzerinden herkese bildir
+        delete_event = json.dumps({
+            "type": "delete_message",
+            "message_id": message_id,
+            "room_id": "global"
+        })
+        await chat_manager.broadcast("global", delete_event)
         return {"status": "success", "message": "Mesaj silindi."}
     raise HTTPException(status_code=403, detail="Mesaj silinemedi veya yetkiniz yok.")
 
 @router.patch("/messages/{message_id}")
-async def update_message(message_id: str, payload: Dict[str, Any], uid: str = Query(...), role: str = Query("user")):
+async def update_message(message_id: str, payload: Dict[str, Any], current_user: Dict[str, Any] = Depends(get_current_user)):
     text = (payload.get("text") or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="Mesaj metni boş olamaz.")
 
-    is_admin = (role or "").strip().lower() == "admin"
+    uid = current_user.get("uid")
+    role = (current_user.get("role") or "user").strip().lower()
+    is_admin = role in ["admin", "moderator"]
     updated = await CollaborationService.update_message(message_id, text, uid, is_admin)
     if updated:
+        # WebSocket üzerinden herkese bildir
+        update_event = json.dumps({
+            "type": "update_message",
+            "message_id": message_id,
+            "room_id": "global",
+            "text": text,
+            "message": updated
+        })
+        await chat_manager.broadcast("global", update_event)
         return updated
     raise HTTPException(status_code=403, detail="Mesaj düzenlenemedi veya yetkiniz yok.")
 
 @router.delete("/messages")
-async def clear_messages(uid: str = Query(...), role: str = Query("user")):
-    is_admin = (role or "").strip().lower() == "admin"
+async def clear_messages(current_user: Dict[str, Any] = Depends(get_current_user)):
+    uid = current_user.get("uid")
+    role = (current_user.get("role") or "user").strip().lower()
+    is_admin = role in ["admin", "moderator"]
     deleted_count = await CollaborationService.clear_messages(uid, is_admin)
     return {"status": "success", "deleted": deleted_count, "scope": "all" if is_admin else "mine"}
 
 # --- PRIVATE MESSAGING (DM) ---
 
 @router.get("/dm/history", response_model=List[DirectMessageResponse])
-async def get_dm_history(uid1: str, uid2: str, limit: int = 50):
+async def get_dm_history(uid1: str, uid2: str, limit: int = 50, current_user: Dict[str, Any] = Depends(get_current_user)):
+    requester_uid = current_user.get("uid")
+    if requester_uid not in [uid1, uid2]:
+        raise HTTPException(status_code=403, detail="Bu görüşme geçmişine erişim yetkiniz yok.")
     try:
         return await CollaborationService.get_private_messages(uid1, uid2, limit)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Özel mesajlar alınırken bir hata oluştu.")
 
 @router.post("/dm/send", response_model=DirectMessageResponse)
-async def send_dm(msg: DirectMessageCreate, uid: str, name: str):
+async def send_dm(msg: DirectMessageCreate, current_user: Dict[str, Any] = Depends(get_current_user)):
+    uid = current_user.get("uid")
+    name = (current_user.get("email") or "Müfettiş")
     try:
         new_msg = await CollaborationService.save_private_message(uid, name, msg)
-        
         # Alıcıyı bilgilendir
         notif = NotificationCreate(
             user_id=msg.recipient_id,
@@ -72,14 +100,14 @@ async def send_dm(msg: DirectMessageCreate, uid: str, name: str):
             type="collaboration",
             chat_room_id="dm_" + "_".join(sorted([uid, msg.recipient_id]))
         )
-        await NotificationService.create_notification(notif)
-        
+        await NotificationService.create_throttled_notification(notif, cooldown_minutes=30)
         return new_msg
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Özel mesaj gönderilirken bir hata oluştu.")
 
 @router.delete("/dm/{room_id}/clear")
-async def clear_dm(room_id: str, uid: str):
+async def clear_dm(room_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    uid = current_user.get("uid")
     deleted_count = await CollaborationService.clear_private_messages(room_id, uid)
     clear_event = json.dumps({
         "type": "clear_messages",
@@ -90,11 +118,12 @@ async def clear_dm(room_id: str, uid: str):
     return {"status": "success", "deleted": deleted_count}
 
 @router.delete("/dm/{room_id}")
-async def clear_dm_legacy(room_id: str, uid: str):
-    return await clear_dm(room_id, uid)
+async def clear_dm_legacy(room_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    return await clear_dm(room_id, current_user)
 
 @router.delete("/dm/{room_id}/{message_id}")
-async def delete_dm(room_id: str, message_id: str, uid: str):
+async def delete_dm(room_id: str, message_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    uid = current_user.get("uid")
     success = await CollaborationService.delete_private_message(room_id, message_id, uid)
     if success:
         # WebSocket üzerinden diğer tarafa bildir
@@ -108,7 +137,8 @@ async def delete_dm(room_id: str, message_id: str, uid: str):
     raise HTTPException(status_code=403, detail="Mesaj silinemedi veya yetkiniz yok.")
 
 @router.patch("/dm/{room_id}/{message_id}")
-async def update_dm(room_id: str, message_id: str, payload: Dict[str, Any], uid: str):
+async def update_dm(room_id: str, message_id: str, payload: Dict[str, Any], current_user: Dict[str, Any] = Depends(get_current_user)):
+    uid = current_user.get("uid")
     content = (payload.get("content") or "").strip()
     if not content:
         raise HTTPException(status_code=400, detail="Mesaj metni boş olamaz.")
@@ -130,71 +160,97 @@ async def update_dm(room_id: str, message_id: str, payload: Dict[str, Any], uid:
 # --- FORUM / PUBLIC FEED ---
 
 @router.get("/posts", response_model=List[PostResponse])
-async def get_public_posts(category: Optional[str] = Query(None), user_id: Optional[str] = Query(None)):
+async def get_public_posts(
+    category: Optional[str] = Query(None),
+    user_id: Optional[str] = Query(None),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
     try:
-        return await CollaborationService.get_posts(category, user_id)
+        role = (current_user.get("role") or "user").strip().lower()
+        effective_user_id = "admin" if role in ["admin", "moderator"] else current_user.get("uid")
+        return await CollaborationService.get_posts(category, effective_user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/posts", response_model=PostResponse)
-async def create_public_post(post: PostCreate, role: str = Query("user")):
+async def create_public_post(post: PostCreate, current_user: Dict[str, Any] = Depends(get_current_user)):
     try:
-        is_admin = (role or "").strip().lower() in ["admin", "moderator"]
+        role = (current_user.get("role") or "user").strip().lower()
+        is_admin = role in ["admin", "moderator"]
+        post.author_id = current_user.get("uid")
+        post.author_name = current_user.get("email") or post.author_name
+        post.author_role = role.upper()
         return await CollaborationService.create_post(post, is_admin)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/posts/{post_id}/approve")
-async def approve_post(post_id: str, admin_name: str = Query(...)):
-    success = await CollaborationService.approve_post(post_id, admin_name)
+async def approve_post(
+    post_id: str,
+    admin_name: Optional[str] = Query(default=None),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    role = (current_user.get("role") or "user").strip().lower()
+    if role not in ["admin", "moderator"]:
+        raise HTTPException(status_code=403, detail="Bu işlem için yetkiniz yok.")
+    effective_admin_name = admin_name or current_user.get("email") or current_user.get("uid")
+    success = await CollaborationService.approve_post(post_id, effective_admin_name)
     if not success:
         raise HTTPException(status_code=404, detail="Paylaşım bulunamadı.")
     return {"status": "success"}
 
 @router.post("/posts/{post_id}/reject")
-async def reject_post(post_id: str):
+async def reject_post(post_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    role = (current_user.get("role") or "user").strip().lower()
+    if role not in ["admin", "moderator"]:
+        raise HTTPException(status_code=403, detail="Bu işlem için yetkiniz yok.")
     success = await CollaborationService.reject_post(post_id)
     if not success:
         raise HTTPException(status_code=404, detail="Paylaşım bulunamadı.")
     return {"status": "success"}
 
 @router.delete("/posts/{post_id}")
-async def delete_public_post(post_id: str):
-    if await CollaborationService.delete_post(post_id):
+async def delete_public_post(post_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    uid = current_user.get("uid")
+    role = (current_user.get("role") or "user").strip().lower()
+    is_admin = role in ["admin", "moderator"]
+    if await CollaborationService.delete_post(post_id, uid, is_admin):
         return {"status": "success", "message": "Paylaşım silindi."}
-    raise HTTPException(status_code=404, detail="Paylaşım bulunamadı.")
+    raise HTTPException(status_code=403, detail="Paylaşım bulunamadı veya silme yetkiniz yok.")
 
 @router.post("/posts/{post_id}/like")
-async def like_public_post(post_id: str):
-    result = await CollaborationService.toggle_like(post_id)
+async def like_public_post(post_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    uid = current_user.get("uid")
+    result = await CollaborationService.toggle_like(post_id, uid)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
 
 @router.get("/posts/{post_id}/comments")
-async def get_post_comments(post_id: str):
+async def get_post_comments(post_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     try:
         return await CollaborationService.get_comments(post_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/posts/{post_id}/comments")
-async def add_post_comment(post_id: str, comment: Dict[str, Any]):
+async def add_post_comment(post_id: str, comment: Dict[str, Any], current_user: Dict[str, Any] = Depends(get_current_user)):
+    comment["author_id"] = current_user.get("uid")
+    comment["author_name"] = current_user.get("email") or comment.get("author_name", "Anonim")
     try:
         return await CollaborationService.add_comment(post_id, comment)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.patch("/posts/{post_id}")
-async def update_public_post(post_id: str, post_update: PostUpdate):
+async def update_public_post(post_id: str, post_update: PostUpdate, current_user: Dict[str, Any] = Depends(get_current_user)):
     result = await CollaborationService.update_post(post_id, post_update)
     if result:
         return result
     raise HTTPException(status_code=404, detail="Paylaşım bulunamadı.")
 
 @router.patch("/posts/{post_id}/comments/{comment_id}")
-async def update_post_comment(post_id: str, comment_id: str, comment: Dict[str, Any]):
-    # Note: Use comment.get('content') if it's passed as a dict
+async def update_post_comment(post_id: str, comment_id: str, comment: Dict[str, Any], current_user: Dict[str, Any] = Depends(get_current_user)):
     content = comment.get('content')
     if not content:
         raise HTTPException(status_code=400, detail="İçerik boş olamaz.")
@@ -205,7 +261,7 @@ async def update_post_comment(post_id: str, comment_id: str, comment: Dict[str, 
     raise HTTPException(status_code=404, detail="Yorum bulunamadı.")
 
 @router.delete("/posts/{post_id}/comments/{comment_id}")
-async def delete_post_comment(post_id: str, comment_id: str):
+async def delete_post_comment(post_id: str, comment_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     if await CollaborationService.delete_comment(post_id, comment_id):
         return {"status": "success", "message": "Yorum silindi."}
     raise HTTPException(status_code=404, detail="Yorum bulunamadı.")
@@ -327,7 +383,7 @@ class ChatConnectionManager:
 chat_manager = ChatConnectionManager()
 
 @router.get("/online-users")
-async def get_online_users():
+async def get_online_users(current_user: Dict[str, Any] = Depends(get_current_user)):
     return chat_manager.get_online_uids()
 
 # --- WEBSOCKET HANDLER MOVED TO main.py FOR STABILITY ---
@@ -364,6 +420,18 @@ doc_manager = DocumentConnectionManager()
 
 @router.websocket("/report/{audit_id}")
 async def report_collab_endpoint(websocket: WebSocket, audit_id: str):
+    # Auth: token doğrulama
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=1008)
+        return
+    try:
+        from firebase_admin import auth as firebase_auth
+        await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=60))
+    except Exception:
+        await websocket.close(code=1008)
+        return
+
     await doc_manager.connect(websocket, audit_id)
     try:
         while True:
@@ -375,11 +443,11 @@ async def report_collab_endpoint(websocket: WebSocket, audit_id: str):
 # --- CATEGORY MANAGEMENT ---
 
 @router.get("/categories", response_model=List[str])
-async def get_collaboration_categories():
+async def get_collaboration_categories(current_user: Dict[str, Any] = Depends(get_current_user)):
     return await CollaborationService.get_categories()
 
 @router.post("/categories")
-async def add_collaboration_category(payload: Dict[str, str]):
+async def add_collaboration_category(payload: Dict[str, str], current_user: Dict[str, Any] = Depends(get_current_user)):
     if await CollaborationService.add_category(payload.get("name")):
         return {"status": "success"}
     raise HTTPException(status_code=400, detail="Kategori eklenemedi.")
@@ -387,25 +455,33 @@ async def add_collaboration_category(payload: Dict[str, str]):
 # --- PENDING COLLABORATION REQUESTS ---
 
 @router.get("/pending-requests")
-async def get_pending_collaboration_requests(uid: str = Query(...), email: Optional[str] = Query(None)):
+async def get_pending_collaboration_requests(current_user: Dict[str, Any] = Depends(get_current_user)):
     """Kullanıcının onay bekleyen tüm paylaşım isteklerini (Görev, Not, Rehber) getirir."""
     try:
-        return await CollaborationService.get_pending_requests(uid, email)
+        return await CollaborationService.get_pending_requests(current_user.get("uid"), current_user.get("email"))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/pending-requests/{resource_type}/{resource_id}/accept")
-async def accept_collaboration_request(resource_type: str, resource_id: str, uid: str = Query(...)):
+async def accept_collaboration_request(
+    resource_type: str,
+    resource_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
     """Paylaşım isteğini kabul eder."""
-    success = await CollaborationService.accept_resource(resource_type, resource_id, uid)
+    success = await CollaborationService.accept_resource(resource_type, resource_id, current_user.get("uid"))
     if success:
         return {"status": "success", "message": "Paylaşım kabul edildi."}
     raise HTTPException(status_code=400, detail="İşlem başarısız veya yetki yok.")
 
 @router.post("/pending-requests/{resource_type}/{resource_id}/reject")
-async def reject_collaboration_request(resource_type: str, resource_id: str, uid: str = Query(...)):
+async def reject_collaboration_request(
+    resource_type: str,
+    resource_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
     """Paylaşım isteğini reddeder."""
-    success = await CollaborationService.reject_resource(resource_type, resource_id, uid)
+    success = await CollaborationService.reject_resource(resource_type, resource_id, current_user.get("uid"))
     if success:
         return {"status": "success", "message": "Paylaşım reddedildi."}
     raise HTTPException(status_code=400, detail="İşlem başarısız veya yetki yok.")

@@ -8,9 +8,17 @@ interface ModalProps {
     title: string;
     children: React.ReactNode;
     size?: 'small' | 'medium' | 'large';
+    closeOnBackdropClick?: boolean;
 }
 
-export function Modal({ isOpen, onClose, title, children, size = 'medium' }: ModalProps) {
+export function Modal({ 
+    isOpen, 
+    onClose, 
+    title, 
+    children, 
+    size = 'medium',
+    closeOnBackdropClick = true 
+}: ModalProps) {
     const sizes = {
         small: 'max-w-md',
         medium: 'max-w-lg',
@@ -36,7 +44,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'medium' }: Mod
         <div 
             className="fixed inset-0 z-[100000] flex items-center justify-center p-2 sm:p-4 bg-black/65 backdrop-blur-md" 
             onMouseDown={(e) => {
-                if (e.target === e.currentTarget) {
+                if (closeOnBackdropClick && e.target === e.currentTarget) {
                     onClose();
                 }
             }}

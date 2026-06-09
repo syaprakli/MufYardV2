@@ -34,6 +34,81 @@ type ReportTemplateItem = {
     html: string;
 };
 
+const getTaskDisplayCode = (task: any, allTasks: any[]): string => {
+    if (task.rapor_kodu && !task.rapor_kodu.startsWith("TASLAK-")) {
+        return task.rapor_kodu;
+    }
+    
+    if (task.parent_task_id) {
+        const parent = allTasks.find(t => String(t.id).trim() === String(task.parent_task_id).trim());
+        if (parent) {
+            return getTaskDisplayCode(parent, allTasks);
+        }
+    }
+    
+    const topLevelTasks = allTasks.filter(t => {
+        if (t.parent_task_id) return false;
+        const isOld = t.baslama_tarihi ? (Date.now() - new Date(t.baslama_tarihi).getTime() > 730 * 24 * 60 * 60 * 1000) : false;
+        const isArchived = (t.rapor_durumu === "Tamamlandı") && isOld;
+        return !isArchived;
+    });
+
+    topLevelTasks.sort((a, b) => {
+        const isDraftA = !a.rapor_kodu || a.rapor_kodu.startsWith("TASLAK-");
+        const isDraftB = !b.rapor_kodu || b.rapor_kodu.startsWith("TASLAK-");
+        
+        if (isDraftA !== isDraftB) {
+            return isDraftA ? 1 : -1;
+        }
+
+        const parseRaporKodu = (kodu?: string) => {
+            if (!kodu) return { year: 0, seq: 0 };
+            const parts = kodu.split(',').map(p => p.trim()).filter(Boolean);
+            if (parts.length === 0) return { year: 0, seq: 0 };
+            
+            const targetCode = parts[0];
+            const match = targetCode.match(/(\d{4})-(\d+)/);
+            if (match) {
+                return { year: parseInt(match[1]) || 0, seq: parseInt(match[2]) || 0 };
+            }
+            const yearMatch = targetCode.match(/(\d{4})/);
+            if (yearMatch) {
+                return { year: parseInt(yearMatch[1]) || 0, seq: 0 };
+            }
+            return { year: 0, seq: 0 };
+        };
+
+        const parsedA = parseRaporKodu(a.rapor_kodu);
+        const parsedB = parseRaporKodu(b.rapor_kodu);
+
+        if (parsedA.year !== parsedB.year) {
+            return parsedA.year - parsedB.year;
+        }
+        if (parsedA.seq !== parsedB.seq) {
+            return parsedA.seq - parsedB.seq;
+        }
+
+        const aCode = String(a.rapor_kodu || "");
+        const bCode = String(b.rapor_kodu || "");
+        return aCode.localeCompare(bCode, "tr", { numeric: true, sensitivity: "base" });
+    });
+
+    const index = topLevelTasks.findIndex(t => String(t.id).trim() === String(task.id).trim());
+    return index !== -1 ? String(index + 1) : "-";
+};
+
+const getNextReportTitle = (task: any, allTasks: any[], existingReportsCount: number): string => {
+    const displayCode = getTaskDisplayCode(task, allTasks);
+    const taskName = task.rapor_adi || "Raporu";
+    const suffix = taskName.endsWith("Raporu") ? "" : " Raporu";
+    const baseTitle = `${displayCode} - ${taskName}${suffix}`;
+    if (existingReportsCount === 0) {
+        return baseTitle;
+    } else {
+        return `${baseTitle} ${existingReportsCount + 1}`;
+    }
+};
+
 export default function Audit() {
     const { user } = useAuth();
     const confirm = useConfirm();
@@ -124,7 +199,7 @@ export default function Audit() {
 
     useEffect(() => {
         if (user?.uid) {
-            refreshAll(user.uid, user.email || undefined, user.displayName || undefined);
+            refreshAll(user.uid, user.email || undefined, user.displayName || undefined, true);
         }
     }, [user, refreshAll]);
 
@@ -281,7 +356,9 @@ export default function Audit() {
                 }
                 
                 if (Object.keys(updates).length > 0) {
-                    await updateTask(selectedTask.id, updates);
+                    updateTask(selectedTask.id, updates).catch(err => {
+                        console.error("Failed to update task status:", err);
+                    });
                 }
             }
 
@@ -322,7 +399,7 @@ export default function Audit() {
             setNewAudit({
                 ...newAudit,
                 task_id: taskId,
-                title: nextSeq === 1 ? selectedTask.rapor_adi : `${selectedTask.rapor_adi} - Ek Rapor`,
+                title: getNextReportTitle(selectedTask, tasks, taskAudits.length),
                 location: "",
                 report_seq: nextSeq,
                 manual_rapor_kodu: selectedTask.rapor_kodu || ""
@@ -394,15 +471,12 @@ export default function Audit() {
         });
         if (!confirmed) return;
         try {
-            setLoading(true);
             await deleteAudit(id);
             toast.success("Denetim başarıyla silindi.");
-            await loadData();
+            loadData(true);
         } catch (error) {
             console.error(error);
             toast.error("Silme işlemi sırasında bir hata oluştu.");
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -418,16 +492,13 @@ export default function Audit() {
         if (!confirmed) return;
         
         try {
-            setLoading(true);
             await Promise.all(selectedIds.map(id => deleteAudit(id)));
             setSelectedIds([]);
             toast.success(`${selectedIds.length} adet denetim başarıyla silindi.`);
-            await loadData();
+            loadData(true);
         } catch (error) {
             console.error("Silme hatası:", error);
             toast.error("Silme işlemi sırasında bir hata oluştu.");
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -901,6 +972,7 @@ export default function Audit() {
             <ModalLazy
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
+                closeOnBackdropClick={false}
                 title={activeTab === 'ortak' ? "Arşiv Rapor Ekle (Dosya Yükle)" : "Yeni Rapor Başlat"}
             >
                 <form onSubmit={handleCreateAudit} className="space-y-5">
