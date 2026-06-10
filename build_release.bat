@@ -40,11 +40,9 @@ echo ===================================================
 echo [!] BASARILI: Yeni kurulum dosyasi olusturuldu.
 echo     Cikti Klasoru: %~dp0frontend\release
 echo ===================================================
-pause
 goto :eof
 
 :fail
 echo.
 echo [X] HATA: Build islemi sirasinda bir sorun olustu.
-pause
 exit /b 1

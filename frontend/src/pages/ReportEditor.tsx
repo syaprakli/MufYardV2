@@ -779,6 +779,43 @@ export default function ReportEditor() {
         }
     };
 
+    const handleReplaceProofreadText = (contextText: string, errorText: string, replacement: string) => {
+        if (!editorRef.current) return false;
+        const editor = editorRef.current;
+        const bodyHtml = editor.getContent();
+        
+        try {
+            const doc = editor.getDoc();
+            const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null);
+            let node;
+            while (node = walker.nextNode()) {
+                const val = node.nodeValue || "";
+                if (val.includes(errorText)) {
+                    const parentText = node.parentElement?.textContent || "";
+                    if (parentText.includes(contextText.trim().substring(0, 10)) || val.trim() === errorText.trim()) {
+                        node.nodeValue = val.replace(errorText, replacement);
+                        editor.undoManager.add();
+                        editor.fire('change');
+                        setContent(editor.getContent());
+                        return true;
+                    }
+                }
+            }
+            
+            if (bodyHtml.includes(errorText)) {
+                const nextHtml = bodyHtml.replace(errorText, replacement);
+                editor.setContent(nextHtml);
+                editor.undoManager.add();
+                editor.fire('change');
+                setContent(nextHtml);
+                return true;
+            }
+        } catch (e) {
+            console.error("Text replacement error:", e);
+        }
+        return false;
+    };
+
     const handleSaveVersion = async () => {
         if (!id) return;
         if (!canEditContent) {
@@ -1333,18 +1370,19 @@ export default function ReportEditor() {
                         
                         {/* TÜM BUTONLAR VE PANELLER AKTİF */}
                         <Button variant="ghost" onClick={() => { openShareModal(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Paylaş</Button>
-                        <Button variant="ghost" onClick={() => { openAuditTrail(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Denetim İzi</Button>
-                        <Button variant="ghost" onClick={() => { openHistory(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center"><History size={14} className="mr-1.5" /> Sürümler</Button>
                         <Button variant="ghost" onClick={() => { openChat(`audit_${id}`, audit?.title || "Rapor Odası", "audit"); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><MessageSquare size={14} className="mr-1.5" /> Rapor Odası</Button>
                         <Button variant="ghost" onClick={() => { openTemplateModal(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><LayoutGrid size={14} className="mr-1.5" /> Şablon Seç</Button>
                         <Button variant="ghost" onClick={() => { openProofread(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><CheckCircle size={14} className="mr-1.5" /> Dil Kontrolü</Button>
-                        <Button variant="ghost" onClick={() => { openLegislation(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><BookOpen size={14} className="mr-1.5" /> Mevzuat Öner</Button>
                         <Button variant="ghost" onClick={() => { openSnippetBank(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Taslak Metinler</Button>
                         <Button variant="ghost" onClick={() => { openVoiceInput(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Sesli Not</Button>
                         <Button variant="ghost" onClick={() => { handleImportFindings(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><ClipboardCheck size={14} className="mr-1.5 text-violet-600 dark:text-violet-400" /> <span className="inline md:hidden xl:inline">Bulguları Aktar</span></Button>
-                        <Button variant="ghost" onClick={() => { openAiSuggestion(); setShowMobileActions(false); }} disabled={!canEditContent} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed justify-start md:justify-center"><Sparkles size={14} className="mr-1.5" /> <span className="inline md:hidden xl:inline">AI Öneri</span></Button>
+                        <Button variant="ghost" disabled={true} className="h-8 px-3 text-[11px] font-bold rounded-lg bg-slate-100 text-slate-400 opacity-50 cursor-not-allowed justify-start md:justify-center"><Sparkles size={14} className="mr-1.5 text-slate-400" /> <span className="inline md:hidden xl:inline">AI Öneri (Yakında)</span></Button>
                         <Button variant="outline" onClick={() => { handleSave(); setShowMobileActions(false); }} disabled={saving || !canEditContent} className="h-8 px-2 md:px-3 text-[11px] font-bold border-primary/20 rounded-lg justify-start md:justify-center">{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" />} <span className="inline md:hidden lg:inline">Kaydet</span></Button>
+                        
+                        <Button variant="ghost" onClick={() => { openAuditTrail(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center">Denetim İzi</Button>
+                        <Button variant="ghost" onClick={() => { openHistory(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><History size={14} className="mr-1.5" /> Sürümler</Button>
                         <Button variant="outline" onClick={() => { handleSaveVersion(); setShowMobileActions(false); }} disabled={saving || !canEditContent} className="h-8 px-2 md:px-3 text-[11px] font-bold border-emerald-300 text-emerald-700 rounded-lg justify-start md:justify-center"><History size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" /> <span className="inline md:hidden lg:inline">Sürüm Kaydet</span></Button>
+                        
                         <Button onClick={() => { handleExportWord(); setShowMobileActions(false); }} className="h-8 px-2 md:px-3 text-[11px] font-black bg-slate-900 text-white rounded-lg shadow-sm justify-start md:justify-center"><Download size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" /> <span className="inline md:hidden lg:inline">Word</span></Button>
                         <Button variant="outline" onClick={() => { handlePrintPreview(); setShowMobileActions(false); }} className="h-8 px-2 md:px-3 text-[11px] font-bold rounded-lg border-slate-300 justify-start md:justify-center"><span className="mr-1.5 md:mr-0 lg:mr-1.5">🖨️</span> <span className="inline md:hidden lg:inline">Önizleme</span></Button>
                     </div>
@@ -1517,15 +1555,14 @@ export default function ReportEditor() {
                         </div>
                     </div>
 
-                    <Card onClick={(e) => { if (e.target === e.currentTarget && editorRef.current) editorRef.current.focus(); }} style={{ zoom: `${zoom}%` }} className="p-4 md:p-16 min-h-[1100px] bg-white shadow-2xl border-none rounded-none prose max-w-none relative mb-20 overflow-visible cursor-text">
-                        <div className="absolute -top-1 left-0 w-full h-1 bg-primary/10" />
-                        <div className="mb-4 pb-2 border border-dashed border-slate-200 hover:border-violet-300 hover:bg-slate-50/50 rounded-lg p-2 transition-all group relative">
-                            <span className="absolute -top-2 left-3 bg-white px-1 text-[9px] font-bold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">✍️ RAPOR ÜST BİLGİSİ</span>
+                    <Card onClick={(e) => { if (e.target === e.currentTarget && editorRef.current) editorRef.current.focus(); }} style={{ zoom: `${zoom}%` }} className="p-0 bg-transparent border-none shadow-none prose max-w-none relative mb-20 overflow-visible cursor-text">
+                        <div className="mb-4 pb-2 border border-slate-200 bg-white shadow-sm rounded-xl p-3 transition-all group relative">
+                            <span className="absolute -top-2 left-3 bg-slate-100 border border-slate-200 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">✍️ RAPOR ÜST BİLGİSİ</span>
                             <input
                                 value={docHeader}
                                 onChange={(e) => setDocHeader(e.target.value)}
                                 readOnly={isReadOnlyEditor}
-                                className="w-full text-center text-xs font-semibold text-slate-500 bg-transparent outline-none cursor-pointer focus:cursor-text"
+                                className="w-full text-center text-xs font-bold text-slate-600 bg-transparent outline-none cursor-pointer focus:cursor-text"
                                 placeholder="Rapor Üst Bilgisi Eklemek İçin Buraya Tıklayın..."
                             />
                         </div>
@@ -1581,7 +1618,7 @@ export default function ReportEditor() {
                                 menubar: 'file edit view insert format tools table help',
                                 toolbar_sticky: true,
                                 toolbar_mode: 'wrap',
-                                toolbar: 'undo redo | blocks | fontfamily fontsize | lineheightselect textcase | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist checklist outdent indent | blockquote link image media table | subscript superscript | removeformat | code fullscreen preview',
+                                toolbar: 'undo redo | blocks styles | fontfamily fontsize | lineheightselect textcase | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist checklist outdent indent | blockquote link image media table | subscript superscript | removeformat | code fullscreen preview',
                                 plugins: [
                                     'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
                                     'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
@@ -1591,9 +1628,14 @@ export default function ReportEditor() {
                                 fontsize_formats: '8pt 9pt 10pt 10.5pt 11pt 12pt 14pt 16pt 18pt 20pt 22pt 24pt 26pt 28pt 36pt 48pt 72pt',
                                 block_formats: 'Paragraf=p; Başlık 1=h1; Başlık 2=h2; Başlık 3=h3; Başlık 4=h4; Alıntı=blockquote',
                                 line_height_formats: '1 1.15 1.5 2 2.5 3',
+                                style_formats: [
+                                    { title: 'Normal Paragraf', block: 'p', styles: { 'text-indent': '0cm', 'padding-left': '0cm' } },
+                                    { title: 'İlk Satır Girintisi (1.25cm)', block: 'p', styles: { 'text-indent': '1.25cm', 'padding-left': '0cm' } },
+                                    { title: 'Asılı Girinti (1.25cm)', block: 'p', styles: { 'text-indent': '-1.25cm', 'padding-left': '1.25cm' } }
+                                ],
                                 contextmenu: 'undo redo | inserttable | cell row column deletetable | link image',
                                 quickbars_selection_toolbar: 'bold italic underline | forecolor backcolor | blocks | quicklink blockquote',
-                                quickbars_insert_toolbar: 'quickimage quicktable',
+                                quickbars_insert_toolbar: false,
                                 table_default_attributes: {
                                     border: '1'
                                 },
@@ -1602,12 +1644,47 @@ export default function ReportEditor() {
                                     borderCollapse: 'collapse'
                                 },
                                 table_toolbar: 'tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol',
-                                content_style: 'body { font-family: Times New Roman, serif; font-size: 12pt; line-height: 1.6; padding: 24px; } p { margin: 0 0 12px 0; } table td, table th { border: 1px solid #cbd5e1; padding: 8px; }',
+                                content_style: 'html { background-color: #f1f5f9 !important; } body { font-family: Times New Roman, serif !important; font-size: 12pt !important; line-height: 1.6 !important; padding: 2.5cm !important; width: 21cm !important; margin: 1.5cm auto !important; background-image: linear-gradient(to bottom, #ffffff 29.7cm, #f1f5f9 29.7cm, #f1f5f9 30.7cm) !important; background-size: 100% 30.7cm !important; background-repeat: repeat-y !important; background-color: #ffffff !important; box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; box-sizing: border-box !important; } p { margin: 0 0 12px 0; } table td, table th { border: 1px solid #cbd5e1; padding: 8px; }',
                                 language: 'tr',
                                 language_url: '/langs/tr.js',
                                 branding: false,
                                 promotion: false,
                                 setup: (editor: any) => {
+                                    // Tab tuşuyla İlk Satır Girintisi veya Spacing ekleme
+                                    editor.on('keydown', (e: KeyboardEvent) => {
+                                        if (e.key === 'Tab') {
+                                            const node = editor.selection.getNode();
+                                            const isList = editor.dom.getParent(node, 'li,ul,ol');
+                                            if (!isList && node && (node.nodeName === 'P' || node.nodeName === 'DIV')) {
+                                                e.preventDefault();
+                                                
+                                                const range = editor.selection.getRng();
+                                                const preRange = range.cloneRange();
+                                                preRange.selectNodeContents(node);
+                                                preRange.setEnd(range.startContainer, range.startOffset);
+                                                const textBefore = preRange.toString();
+                                                const isAtStart = textBefore.trim() === '';
+
+                                                if (isAtStart) {
+                                                    if (e.shiftKey) {
+                                                        // Shift+Tab: Girintiyi kaldır
+                                                        editor.dom.setStyle(node, 'text-indent', '');
+                                                        editor.dom.setStyle(node, 'padding-left', '');
+                                                    } else {
+                                                        // Tab: İlk Satır Girintisi ekle (1.25cm)
+                                                        editor.dom.setStyle(node, 'text-indent', '1.25cm');
+                                                        editor.dom.setStyle(node, 'padding-left', '');
+                                                    }
+                                                } else {
+                                                    // Paragrafın ortasındayken normal tab boşluğu ekle
+                                                    if (!e.shiftKey) {
+                                                        editor.insertContent('&nbsp;&nbsp;&nbsp;&nbsp;');
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+
                                     editor.ui.registry.addMenuButton('lineheightselect', {
                                         text: 'Satır Aralığı',
                                         fetch: (callback: any) => {
@@ -1644,23 +1721,44 @@ export default function ReportEditor() {
                                     editor.addShortcut('ctrl+s', 'Kaydet', () => {
                                         if (!isReadOnlyEditor) handleSave();
                                     });
+                                    editor.addShortcut('ctrl+k', 'Kalın', () => {
+                                        editor.execCommand('Bold');
+                                    });
+                                    editor.addShortcut('ctrl+t', 'İtalik', () => {
+                                        editor.execCommand('Italic');
+                                    });
+                                    editor.addShortcut('ctrl+y', 'Altı Çizili', () => {
+                                        editor.execCommand('Underline');
+                                    });
+                                    editor.addShortcut('ctrl+l', 'Sola Hizala', () => {
+                                        editor.execCommand('JustifyLeft');
+                                    });
+                                    editor.addShortcut('ctrl+g', 'Sağa Hizala', () => {
+                                        editor.execCommand('JustifyRight');
+                                    });
+                                    editor.addShortcut('ctrl+r', 'Ortala', () => {
+                                        editor.execCommand('JustifyCenter');
+                                    });
+                                    editor.addShortcut('ctrl+d', 'İki Yana Yasla', () => {
+                                        editor.execCommand('JustifyFull');
+                                    });
                                 }
                                 }}
                             />
                             </div>
                         </Suspense>
 
-                        <div className="mt-8 pt-2 border border-dashed border-slate-200 hover:border-violet-300 hover:bg-slate-50/50 rounded-lg p-2.5 transition-all group relative flex items-center justify-between">
-                            <span className="absolute -top-2 left-3 bg-white px-1 text-[9px] font-bold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">✍️ RAPOR ALT BİLGİSİ</span>
+                        <div className="mt-8 p-3 border border-slate-200 bg-white shadow-sm rounded-xl transition-all group relative flex items-center justify-between flex-wrap gap-3">
+                            <span className="absolute -top-2 left-3 bg-slate-100 border border-slate-200 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">✍️ RAPOR ALT BİLGİSİ</span>
                             <input
                                 value={docFooter}
                                 onChange={(e) => setDocFooter(e.target.value)}
                                 readOnly={isReadOnlyEditor}
-                                className="w-[50%] text-xs font-semibold text-slate-500 bg-transparent outline-none cursor-pointer focus:cursor-text"
+                                className="w-[50%] text-xs font-bold text-slate-600 bg-transparent outline-none cursor-pointer focus:cursor-text"
                                 placeholder="Rapor Alt Bilgisi Eklemek İçin Buraya Tıklayın..."
                             />
                             <div className="flex items-center gap-4">
-                                <label className="flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-bold text-slate-400 hover:text-slate-600 transition-colors">
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-black text-slate-500 hover:text-slate-700 transition-colors">
                                     <input
                                         type="checkbox"
                                         checked={showPageNumbers}
@@ -1670,7 +1768,7 @@ export default function ReportEditor() {
                                     />
                                     Sayfa No Ekle
                                 </label>
-                                <span className="text-xs font-bold text-slate-400">Sayfa 1 / {estimatedPages}</span>
+                                <span className="text-xs font-bold text-slate-500">Sayfa 1 / {estimatedPages}</span>
                             </div>
                         </div>
                     </Card>
@@ -1689,7 +1787,14 @@ export default function ReportEditor() {
                         onOpenDiff={handleOpenDiff}
                         onDeleteVersions={async (ids: string[]) => {
                             if (!id || !ids.length) return;
-                            if (!window.confirm("Seçili sürümleri silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) return;
+                            const confirmed = await confirm({
+                                title: "Sürümleri Sil",
+                                message: "Seçili sürümleri silmek istediğinize emin misiniz? Bu işlem geri alınamaz.",
+                                confirmText: "Evet, Sil",
+                                cancelText: "Vazgeç",
+                                variant: "danger"
+                            });
+                            if (!confirmed) return;
                             try {
                                 const { deleteAuditVersion } = await import("../lib/api/audit");
                                 for (const vid of ids) {
@@ -1996,6 +2101,7 @@ export default function ReportEditor() {
                 <ReportEditorProofreadPanel
                     content={content || ""}
                     onClose={() => setIsProofreadOpen(false)}
+                    onReplaceText={handleReplaceProofreadText}
                 />
             )}
 

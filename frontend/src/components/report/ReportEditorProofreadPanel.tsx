@@ -3,6 +3,7 @@ import { Button } from "../ui/Button";
 import { API_URL as API_BASE_URL } from "../../lib/config";
 import { getAuthHeaders, fetchWithTimeout } from "../../lib/api/utils";
 import { ChevronLeft, ChevronRight, X, AlertCircle } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 export type ProofreadResult = {
   matches: Array<{
@@ -44,15 +45,38 @@ const getPages = (htmlContent: string): string[] => {
 export default function ReportEditorProofreadPanel({
   content,
   onClose,
+  onReplaceText,
 }: {
   content: string;
   onClose: () => void;
+  onReplaceText: (context: string, error: string, replacement: string) => boolean;
 }) {
   const pages = useMemo(() => getPages(content), [content]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ProofreadResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const handleApplyReplacement = (matchIndex: number, replacement: string) => {
+    const match = result?.matches[matchIndex];
+    if (!match) return;
+
+    const errorText = match.context.text.substr(match.context.offset, match.context.length);
+    const success = onReplaceText(match.context.text, errorText, replacement);
+
+    if (success) {
+      setResult(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          matches: prev.matches.filter((_, idx) => idx !== matchIndex)
+        };
+      });
+      toast.success("Düzeltme uygulandı!");
+    } else {
+      toast.error("Metin editörde bulunamadı veya değiştirilemedi.");
+    }
+  };
 
   const handleCheck = async (index: number) => {
     setLoading(true);
@@ -169,7 +193,13 @@ export default function ReportEditorProofreadPanel({
                     {m.replacements.length > 0 && (
                       <div className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold mt-2.5 flex items-center gap-1.5 flex-wrap">
                         Öneriler: {m.replacements.slice(0, 3).map((rep, idx) => (
-                          <span key={idx} className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/30 px-2.5 py-1 rounded-xl text-[10px] font-black">{rep}</span>
+                          <button
+                            key={idx}
+                            onClick={() => handleApplyReplacement(i, rep)}
+                            className="bg-emerald-50 hover:bg-emerald-100 active:scale-95 transition-all dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/30 px-2.5 py-1 rounded-xl text-[10px] font-black text-emerald-800 dark:text-emerald-300 cursor-pointer"
+                          >
+                            {rep}
+                          </button>
                         ))}
                       </div>
                     )}

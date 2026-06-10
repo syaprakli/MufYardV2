@@ -129,7 +129,8 @@ function App() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
-          if (!firebaseUser.emailVerified) {
+          const isGsbEmail = firebaseUser.email?.toLowerCase().endsWith("@gsb.gov.tr") || firebaseUser.email?.toLowerCase().endsWith("@gbs.gov.tr");
+          if (!firebaseUser.emailVerified && !isGsbEmail) {
               console.log("🔒 Onaysız e-posta tespit edildi, oturum kapatılıyor.");
               await auth.signOut();
               setUser(null);

@@ -3,7 +3,7 @@ import os
 import io
 import pandas as pd
 from docx import Document
-from docx.shared import Pt, Inches
+from docx.shared import Pt, Inches, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_COLOR_INDEX
 from docx.shared import RGBColor
 from docx.oxml import OxmlElement
@@ -397,12 +397,11 @@ class ReportService:
                     p.paragraph_format.space_before = Pt(0)
                     
                     style_attr = element.get('style')
-                    if style_attr:
-                        parsed = parse_style(style_attr)
-                        if 'text-align' in parsed:
-                            alignment = get_alignment(parsed['text-align'])
-                            if alignment is not None:
-                                p.alignment = alignment
+                    parsed = parse_style(style_attr) if style_attr else {}
+                    if 'text-align' in parsed:
+                        alignment = get_alignment(parsed['text-align'])
+                        if alignment is not None:
+                            p.alignment = alignment
                                 
                     left_indent = None
                     if element.get('class'):
@@ -413,8 +412,22 @@ class ReportService:
                                     left_indent = Inches(0.5 * level)
                                 except:
                                     pass
-                    if left_indent:
-                        p.paragraph_format.left_indent = left_indent
+                    
+                    if 'text-indent' in parsed:
+                        indent_val = parsed['text-indent']
+                        if '-' in indent_val:
+                            # Asılı Girinti (Hanging Indent)
+                            p.paragraph_format.first_line_indent = Cm(-1.25)
+                            base_left = left_indent if left_indent else Cm(0)
+                            p.paragraph_format.left_indent = base_left + Cm(1.25)
+                        else:
+                            # İlk Satır Girintisi (First Line Indent)
+                            p.paragraph_format.first_line_indent = Cm(1.25)
+                            if left_indent:
+                                p.paragraph_format.left_indent = left_indent
+                    else:
+                        if left_indent:
+                            p.paragraph_format.left_indent = left_indent
                         
                     for child in element.children:
                         process_inline_element(child, p, inherited_styles)

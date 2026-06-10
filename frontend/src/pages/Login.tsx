@@ -59,9 +59,10 @@ export default function Login() {
                 userUid = result.user?.uid;
                 userName = result.user?.displayName || "";
                 userEmail = result.user?.email || email;
-                // E-posta doğrulaması olmayan hesapların girişini engelle.
+                // E-posta doğrulaması olmayan hesapların girişini engelle (GSB mailleri hariç).
                 const fbUser = result.user as any;
-                if (fbUser?.emailVerified === false) {
+                const isGsbEmail = fbUser?.email?.toLowerCase().endsWith("@gsb.gov.tr") || fbUser?.email?.toLowerCase().endsWith("@gbs.gov.tr");
+                if (fbUser?.emailVerified === false && !isGsbEmail) {
                     import("firebase/auth").then(({ getAuth, signOut }) => {
                         signOut(getAuth());
                     });
