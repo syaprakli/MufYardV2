@@ -1609,7 +1609,7 @@ export default function ReportEditor() {
                                 init={{
                                 height: 800,
                                 menubar: 'file edit view insert format tools table help',
-                                toolbar_sticky: true,
+                                toolbar_sticky: false,
                                 toolbar_mode: 'wrap',
                                 toolbar: 'undo redo | blocks styles | fontfamily fontsize | lineheightselect textcase | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist checklist outdent indent | blockquote link image media table | subscript superscript | removeformat | code fullscreen preview',
                                 plugins: [
