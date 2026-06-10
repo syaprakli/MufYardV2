@@ -576,10 +576,9 @@ class TaskService:
             doc = await asyncio.to_thread(doc_ref.get)
             if doc.exists:
                 task_data = doc.to_dict()
-                           # Klasörü de temizle (opsiyonel ama ghost dosya kalmaması için iyi)
+                           # Klasörü silmek yerine ismini değiştirerek arşivle (Geri dönüşüm)
                 try:
                     from app.lib.folder_manager import FolderManager
-                    import shutil
                     import os
                     
                     bt = task_data.get('baslama_tarihi')
@@ -593,10 +592,25 @@ class TaskService:
                     )
                     
                     if os.path.exists(audit_path):
-                        # Klasör boş değilse de siler (rmtree)
-                        await asyncio.to_thread(shutil.rmtree, audit_path)
+                        # Klasör ismine [SİLİNDİ - GG.AA.YYYY] ibaresi ekleyerek yeniden adlandır
+                        from datetime import datetime
+                        today_str = datetime.now().strftime("%d.%m.%Y")
+                        parent_dir = os.path.dirname(audit_path)
+                        base_name = os.path.basename(audit_path)
+                        new_base_name = f"{base_name} [SİLİNDİ - {today_str}]"
+                        new_audit_path = os.path.join(parent_dir, new_base_name)
+                        
+                        # Eğer bu isimde bir klasör zaten varsa çakışmayı önlemek için sonuna sayı ekle
+                        counter = 1
+                        while os.path.exists(new_audit_path):
+                            new_base_name = f"{base_name} [SİLİNDİ - {today_str}]_{counter}"
+                            new_audit_path = os.path.join(parent_dir, new_base_name)
+                            counter += 1
+                            
+                        await asyncio.to_thread(os.rename, audit_path, new_audit_path)
+                        print(f"Archived task folder on deletion: {audit_path} -> {new_audit_path}")
                 except Exception as ef:
-                    print(f"Task folder deletion failed: {ef}")
+                    print(f"Task folder archiving failed: {ef}")
 
                 # Alt görevleri de sil (öksüz/ orphaned görev kalmasını önlemek için)
                 try:
