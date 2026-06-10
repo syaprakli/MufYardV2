@@ -1,5 +1,5 @@
 import { API_URL as API_BASE_URL } from "../config";
-import { fetchWithTimeout } from "./utils";
+import { fetchWithTimeout, getAuthHeaders } from "./utils";
 
 export interface Legislation {
     id: string;
@@ -25,8 +25,10 @@ export interface Legislation {
 }
 
 export const promoteToPublic = async (id: string, userName: string): Promise<Legislation> => {
+    const headers = await getAuthHeaders();
     const res = await fetchWithTimeout(`${API_BASE_URL}/legislation/${id}/promote?user_name=${encodeURIComponent(userName)}`, {
-        method: "POST"
+        method: "POST",
+        headers
     });
     return res.json();
 };
@@ -53,8 +55,9 @@ export async function fetchLegislations(uid?: string, category?: string, isAdmin
     if (isAdmin) params.append("is_admin", "true");
     
     const url = `${API_BASE_URL}/legislation/${params.toString() ? '?' + params.toString() : ''}`;
+    const headers = await getAuthHeaders();
     
-    const response = await fetchWithTimeout(url);
+    const response = await fetchWithTimeout(url, { headers });
     if (!response.ok) {
         throw new Error("Mevzuat yüklenemedi.");
     }
@@ -75,11 +78,12 @@ export async function uploadLegislationFile(
     if (uid) formData.append("uid", uid);
     formData.append("is_public", is_public ? "true" : "false");
 
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${API_BASE_URL}/legislation/upload`, {
         method: "POST",
+        headers,
         body: formData,
     });
-
 
     if (!response.ok) {
         const err = await response.json();
@@ -91,11 +95,12 @@ export async function uploadLegislationFile(
 
 export async function createLegislation(legislation: Partial<Legislation>, isAdmin: boolean = false): Promise<Legislation> {
     const url = `${API_BASE_URL}/legislation/${isAdmin ? '?is_admin=true' : ''}`;
+    const headers = await getAuthHeaders({
+        "Content-Type": "application/json",
+    });
     const response = await fetchWithTimeout(url, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(legislation),
     });
     if (!response.ok) {
@@ -105,25 +110,30 @@ export async function createLegislation(legislation: Partial<Legislation>, isAdm
 }
 
 export async function approveLegislation(id: string, adminName: string): Promise<void> {
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${API_BASE_URL}/legislation/${id}/approve?admin_name=${encodeURIComponent(adminName)}`, {
-        method: "POST"
+        method: "POST",
+        headers
     });
     if (!response.ok) throw new Error("Onaylanamadı.");
 }
 
 export async function rejectLegislation(id: string): Promise<void> {
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${API_BASE_URL}/legislation/${id}/reject`, {
-        method: "POST"
+        method: "POST",
+        headers
     });
     if (!response.ok) throw new Error("Reddedilemedi.");
 }
 
 export async function updateLegislation(id: string, update: Partial<LegislationCreate>): Promise<Legislation> {
+    const headers = await getAuthHeaders({
+        "Content-Type": "application/json",
+    });
     const response = await fetchWithTimeout(`${API_BASE_URL}/legislation/${id}`, {
         method: "PATCH",
-        headers: {
-            "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(update),
     });
     if (!pop_response_ok(response)) {
@@ -137,8 +147,10 @@ function pop_response_ok(response: Response) {
 }
 
 export async function deleteLegislation(id: string): Promise<{status: string, message: string}> {
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${API_BASE_URL}/legislation/${id}`, {
         method: "DELETE",
+        headers
     });
     if (!response.ok) {
         throw new Error("Mevzuat silinemedi.");
@@ -156,9 +168,11 @@ export async function openLegislationFolder(category?: string, doc_type?: string
     }
     
     const url = `${API_BASE_URL}/legislation/open-folder${params.toString() ? '?' + params.toString() : ''}`;
+    const headers = await getAuthHeaders();
     
     const response = await fetchWithTimeout(url, {
-        method: "POST"
+        method: "POST",
+        headers
     });
     
     if (!response.ok) {
@@ -172,8 +186,10 @@ export async function extractLegislationText(file: File): Promise<string> {
     const formData = new FormData();
     formData.append("file", file);
     
+    const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${API_BASE_URL}/legislation/extract-text`, {
         method: "POST",
+        headers,
         body: formData,
     });
     
@@ -187,11 +203,12 @@ export async function extractLegislationText(file: File): Promise<string> {
 }
 
 export async function fetchExternalLegislation(url: string): Promise<Partial<Legislation>> {
+    const headers = await getAuthHeaders({
+        "Content-Type": "application/json"
+    });
     const response = await fetchWithTimeout(`${API_BASE_URL}/legislation/fetch-external`, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
+        headers,
         body: JSON.stringify({ url }),
         timeout: 45000
     });

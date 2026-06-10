@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { TagSelector, type TagType } from "./TagSelector";
 import { Button } from "../ui/Button";
 import { Star, MapPin, Search, Plus, Home, Utensils, X, ArrowLeft, Trash2, MessageSquare, Camera } from "lucide-react";
-import { API_URL } from "../../lib/config";
+import { API_URL, BASE_URL } from "../../lib/config";
 
 const resolveAttachmentUrl = (url: string | null | undefined) => {
   if (!url) return '';
@@ -13,7 +13,7 @@ const resolveAttachmentUrl = (url: string | null | undefined) => {
   const cleanRaw = raw.startsWith('/') ? raw : `/${raw}`;
   const parts = cleanRaw.split('/');
   const encodedRaw = parts.map(p => encodeURIComponent(p)).join('/');
-  return `https://mufyardv2.up.railway.app${encodedRaw}`;
+  return `${BASE_URL}${encodedRaw}`;
 };
 
 const compressImage = (file: File): Promise<Blob> => {
@@ -318,7 +318,7 @@ export function TurkeyMap({
 
   // Fetch the SVG Turkey map
   useEffect(() => {
-    fetch("/turkey.svg")
+    fetch("./turkey.svg")
       .then((res) => res.text())
       .then((text) => {
         const parser = new DOMParser();
