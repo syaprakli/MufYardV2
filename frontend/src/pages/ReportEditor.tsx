@@ -191,17 +191,10 @@ export default function ReportEditor() {
         closeAllSidebarsAndModals();
         setIsSnippetBankOpen(true);
     };
-    const openLegislation = () => {
-        closeAllSidebarsAndModals();
-        setIsLegislationOpen(true);
-    };
+
     const openProofread = () => {
         closeAllSidebarsAndModals();
         setIsProofreadOpen(true);
-    };
-    const openAiSuggestion = () => {
-        closeAllSidebarsAndModals();
-        setIsAiSuggestionOpen(true);
     };
     const openTemplateModal = () => {
         closeAllSidebarsAndModals();
