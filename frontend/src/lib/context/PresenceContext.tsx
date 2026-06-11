@@ -79,11 +79,12 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const retryCountRef = useRef(0);
     const activeNameRef = useRef<string>('Kullanıcı');
 
-    const [pollingMode, setPollingMode] = useState(false);
     const pollingTimer = useRef<any>(null);
     const pollingIntervalRef = useRef(5000);
     const lastPolledMessageId = useRef<string | null>(null);
     const toastShownRef = useRef(false);
+    const [connectionFailed, setConnectionFailed] = useState(false);
+
 
     // Reset messages when user changes to avoid ghost messages
     useEffect(() => {
@@ -203,15 +204,30 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (!user?.uid) {
+            setConnectionFailed(false);
+            return;
+        }
+
+        if (wsConnected) {
+            setConnectionFailed(false);
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            setConnectionFailed(true);
+        }, 5000);
+
+        return () => clearTimeout(timer);
+    }, [wsConnected, user?.uid]);
+
+    useEffect(() => {
+        if (!user?.uid) {
             clearTimeout(pollingTimer.current);
-            setPollingMode(false);
             return;
         }
 
         if (!wsConnected) {
-            setPollingMode(true);
-            
-            if (!toastShownRef.current) {
+            if (connectionFailed && !toastShownRef.current) {
                 toast.error("Canlı bağlantı kurulamadı. Arka plan sorgulama (HTTP Polling) moduna geçildi.", {
                     id: 'ws-fallback-warning',
                     duration: 4000,
@@ -230,14 +246,13 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             runPolling();
         } else {
             clearTimeout(pollingTimer.current);
-            setPollingMode(false);
             toastShownRef.current = false;
         }
 
         return () => {
             clearTimeout(pollingTimer.current);
         };
-    }, [wsConnected, user?.uid, pollGlobalMessages]);
+    }, [wsConnected, connectionFailed, user?.uid, pollGlobalMessages]);
 
     // WebSocket Connection Logic
     useEffect(() => {

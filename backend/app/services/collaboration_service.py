@@ -592,72 +592,99 @@ class CollaborationService:
     @staticmethod
     async def get_pending_requests(user_id: str, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
         """Kullanıcının onay bekleyen tüm paylaşım isteklerini getirir."""
-        results = []
-        user_keys = [user_id]
-        if user_email:
-            user_keys.append(user_email.lower())
-        
-        # 1. Bekleyen Görevler/Raporlar
-        # Firestore where array_contains multiple criteria workaround: fetch for each key
-        for key in user_keys:
-            tasks = await asyncio.to_thread(
-                lambda k=key: list(db.collection('tasks').where('pending_collaborators', 'array_contains', k).stream())
-            )
-            for t in tasks:
-                td = t.to_dict()
-                if not any(r['id'] == t.id for r in results):
-                    results.append({
-                        'id': t.id,
-                        'type': 'TASK',
-                        'title': td.get('rapor_adi') or td.get('title') or 'İsimsiz Görev',
-                        'sender_name': td.get('owner_name') or 'Bir Müfettiş',
-                        'created_at': td.get('created_at')
-                    })
+        def fetch_sync():
+            results = []
+            user_keys = [user_id]
+            if user_email:
+                user_keys.append(user_email.lower())
 
-            # 2. Bekleyen Notlar
-            notes = await asyncio.to_thread(
-                lambda k=key: list(db.collection('notes').where('pending_collaborators', 'array_contains', k).stream())
-            )
-            for n in notes:
-                nd = n.to_dict()
-                if not any(r['id'] == n.id for r in results):
-                    results.append({
-                        'id': n.id,
-                        'type': 'NOTE',
-                        'title': nd.get('title') or 'İsimsiz Not',
-                        'sender_name': nd.get('owner_name') or 'Bir Müfettiş',
-                        'created_at': nd.get('created_at')
-                    })
+            # Profile names cache to avoid duplicate queries
+            profile_cache = {}
+            def get_name(uid_or_email):
+                if not uid_or_email:
+                    return None
+                if uid_or_email in profile_cache:
+                    return profile_cache[uid_or_email]
 
-            # 3. Bekleyen Rehber Kayıtları
-            contacts = await asyncio.to_thread(
-                lambda k=key: list(db.collection('contacts').where('pending_collaborators', 'array_contains', k).stream())
-            )
-            for c in contacts:
-                cd = c.to_dict()
-                if not any(r['id'] == c.id for r in results):
-                    results.append({
-                        'id': c.id,
-                        'type': 'CONTACT',
-                        'title': cd.get('name') or 'İsimsiz Kişi',
-                        'sender_name': cd.get('owner_name') or 'Bir Müfettiş',
-                        'created_at': cd.get('created_at')
-                    })
+                name = None
+                try:
+                    # Try as UID
+                    doc = db.collection('profiles').document(uid_or_email).get()
+                    if doc.exists:
+                        name = doc.to_dict().get('full_name')
+                    else:
+                        # Try as Email
+                        if '@' in uid_or_email:
+                            q = db.collection('profiles').where('email', '==', uid_or_email.lower().trim()).limit(1).get()
+                            if q:
+                                name = q[0].to_dict().get('full_name')
+                except Exception as e:
+                    print(f"Error resolving profile name for {uid_or_email}: {e}")
 
-            # 4. Bekleyen Raporlar/Denetimler (Audits)
-            audits = await asyncio.to_thread(
-                lambda k=key: list(db.collection('audits').where('pending_collaborators', 'array_contains', k).stream())
-            )
-            for a in audits:
-                ad = a.to_dict()
-                if not any(r['id'] == a.id for r in results):
-                    results.append({
-                        'id': a.id,
-                        'type': 'AUDIT',
-                        'title': ad.get('title') or 'İsimsiz Rapor',
-                        'sender_name': ad.get('inspector') or ad.get('owner_name') or 'Bir Müfettiş',
-                        'created_at': ad.get('created_at')
-                    })
+                profile_cache[uid_or_email] = name
+                return name
 
-        return results
+            for key in user_keys:
+                # 1. Tasks
+                tasks = db.collection('tasks').where('pending_collaborators', 'array_contains', key).stream()
+                for t in tasks:
+                    td = t.to_dict()
+                    if not any(r['id'] == t.id for r in results):
+                        owner_id = td.get('owner_id')
+                        sender = get_name(owner_id) or td.get('owner_name') or 'Bir Müfettiş'
+                        results.append({
+                            'id': t.id,
+                            'type': 'TASK',
+                            'title': td.get('rapor_adi') or td.get('title') or 'İsimsiz Görev',
+                            'sender_name': sender,
+                            'created_at': td.get('created_at')
+                        })
+
+                # 2. Notes
+                notes = db.collection('notes').where('pending_collaborators', 'array_contains', key).stream()
+                for n in notes:
+                    nd = n.to_dict()
+                    if not any(r['id'] == n.id for r in results):
+                        owner_id = nd.get('owner_id')
+                        sender = get_name(owner_id) or nd.get('owner_name') or 'Bir Müfettiş'
+                        results.append({
+                            'id': n.id,
+                            'type': 'NOTE',
+                            'title': nd.get('title') or 'İsimsiz Not',
+                            'sender_name': sender,
+                            'created_at': nd.get('created_at')
+                        })
+
+                # 3. Contacts
+                contacts = db.collection('contacts').where('pending_collaborators', 'array_contains', key).stream()
+                for c in contacts:
+                    cd = c.to_dict()
+                    if not any(r['id'] == c.id for r in results):
+                        owner_id = cd.get('owner_id')
+                        sender = get_name(owner_id) or cd.get('owner_name') or 'Bir Müfettiş'
+                        results.append({
+                            'id': c.id,
+                            'type': 'CONTACT',
+                            'title': cd.get('name') or 'İsimsiz Kişi',
+                            'sender_name': sender,
+                            'created_at': cd.get('created_at')
+                        })
+
+                # 4. Audits
+                audits = db.collection('audits').where('pending_collaborators', 'array_contains', key).stream()
+                for a in audits:
+                    ad = a.to_dict()
+                    if not any(r['id'] == a.id for r in results):
+                        owner_id = ad.get('owner_id') or ad.get('owner_email')
+                        sender = get_name(owner_id) or ad.get('inspector') or ad.get('owner_name') or 'Bir Müfettiş'
+                        results.append({
+                            'id': a.id,
+                            'type': 'AUDIT',
+                            'title': ad.get('title') or 'İsimsiz Rapor',
+                            'sender_name': sender,
+                            'created_at': ad.get('created_at')
+                        })
+            return results
+
+        return await asyncio.to_thread(fetch_sync)
 

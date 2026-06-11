@@ -135,7 +135,6 @@ export default function FloatingChat({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const gifSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [pollingMode, setPollingMode] = useState(false);
   const pollingTimer = useRef<any>(null);
   const pollingIntervalRef = useRef(5000);
   const lastPolledMsgId = useRef<string | null>(null);
@@ -356,13 +355,10 @@ export default function FloatingChat({
   useEffect(() => {
     if (!user || type !== 'dm') {
       clearTimeout(pollingTimer.current);
-      setPollingMode(false);
       return;
     }
 
     if (!isConnected) {
-      setPollingMode(true);
-      
       pollDmMessages();
 
       const runPolling = () => {
@@ -374,7 +370,6 @@ export default function FloatingChat({
       runPolling();
     } else {
       clearTimeout(pollingTimer.current);
-      setPollingMode(false);
     }
 
     return () => {
@@ -430,7 +425,6 @@ export default function FloatingChat({
       console.warn("Chat WS not connected. Sending via REST API fallback.");
       if (type === 'dm' && recipientId) {
         try {
-          const senderName = profile?.full_name || user?.displayName || user?.email?.split('@')[0] || 'Müfettiş';
           const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
           const res = await fetch(`${API_URL}/collaboration/dm/send`, {
             method: 'POST',

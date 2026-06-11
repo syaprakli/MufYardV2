@@ -1503,6 +1503,7 @@ export default function DenetimKyk() {
             item.description.toLowerCase().includes(knowledgeSearch.toLowerCase()) ||
             item.standard_remark.toLowerCase().includes(knowledgeSearch.toLowerCase()) ||
             item.category.toLowerCase().includes(knowledgeSearch.toLowerCase());
+        const matchCat = !knowledgeCategoryFilter || item.category === knowledgeCategoryFilter;
         return matchSearch && matchCat;
     });
 

@@ -702,11 +702,11 @@ function ContactCard({ contact, isOwner, isFavorite, onToggleFavorite, onEdit, o
                 )}
 
                 <div className="space-y-3 pt-5 border-t border-border/50">
-                    <a href={`tel:${contact.phone}`} className="flex items-center gap-3 text-sm text-primary font-bold hover:text-indigo-600 transition-colors">
-                        <Phone size={18} className="text-secondary" /> {contact.phone}
+                    <a href={`tel:${contact.phone}`} className="flex items-center gap-3 text-xs text-primary font-medium hover:text-indigo-600 transition-colors w-full" title={contact.phone}>
+                        <Phone size={16} className="text-secondary shrink-0" /> <span className="truncate">{contact.phone}</span>
                     </a>
-                    <a href={`mailto:${contact.email}`} className="flex items-center gap-3 text-sm text-primary font-bold hover:text-indigo-600 transition-colors">
-                        <Mail size={18} className="text-secondary" /> {contact.email}
+                    <a href={`mailto:${contact.email}`} className="flex items-center gap-3 text-xs text-primary font-medium hover:text-indigo-600 transition-colors w-full" title={contact.email}>
+                        <Mail size={16} className="text-secondary shrink-0" /> <span className="truncate">{contact.email}</span>
                     </a>
                 </div>
                 

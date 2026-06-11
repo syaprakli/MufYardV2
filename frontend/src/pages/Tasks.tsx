@@ -3,7 +3,7 @@ import { Suspense, lazy, useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History, ArrowUpDown, FolderOpen, WifiOff
+    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History, ArrowUpDown, FolderOpen, WifiOff, MoreVertical
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -277,6 +277,19 @@ export default function Tasks() {
     const [inspectorSearch, setInspectorSearch] = useState("");
     const inspectorDropdownRef = useRef<HTMLDivElement>(null);
     const [registeredProfiles, setRegisteredProfiles] = useState<any[]>([]);
+    const [activeDropdownTaskId, setActiveDropdownTaskId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!activeDropdownTaskId) return;
+        const handleOutsideClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest(".action-dropdown-container")) {
+                setActiveDropdownTaskId(null);
+            }
+        };
+        document.addEventListener("mousedown", handleOutsideClick);
+        return () => document.removeEventListener("mousedown", handleOutsideClick);
+    }, [activeDropdownTaskId]);
 
     useEffect(() => {
         let active = true;
@@ -355,6 +368,24 @@ export default function Tasks() {
                 created_at: new Date().toISOString()
             }));
     }, [cachedData.contactsCorporate, registeredProfiles, currentUser?.uid, currentUser?.email]);
+
+    const getSenderName = (inv: any) => {
+        if (!inv.owner_id) return "Bir Müfettiş";
+        if (inv.owner_name && inv.owner_name !== inv.owner_id) {
+            return inv.owner_name;
+        }
+        
+        // Search in registeredProfiles
+        const prof = registeredProfiles.find(p => p.uid === inv.owner_id || p.email === inv.owner_id);
+        if (prof?.full_name) return prof.full_name;
+
+        // Search in inspectors
+        const ins = inspectors.find(i => i.id === inv.owner_id || i.email === inv.owner_id);
+        if (ins?.name) return ins.name;
+
+        // Fallback to owner_id
+        return inv.owner_id;
+    };
 
     const raporOnek = localStorage.getItem('raporKoduOnek') || 'S.Y.64';
     const currentYear = new Date().getFullYear();
@@ -1720,7 +1751,7 @@ export default function Tasks() {
                                     </div>
                                     <h4 className="font-bold text-foreground dark:text-slate-100 text-sm mb-1">{inv.rapor_adi}</h4>
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-4 italic flex items-center gap-1">
-                                        <UserPlus size={10} /> Gönderen: {inspectors.find(i => i.id === inv.owner_id || i.email === inv.owner_id)?.name || inv.owner_id}
+                                        <UserPlus size={10} /> Gönderen: {getSenderName(inv)}
                                     </p>
                                 </div>
                                 <button 
@@ -2137,7 +2168,8 @@ export default function Tasks() {
                                                     </select>
                                                 </td>
                                                 <td className="px-2 lg:px-3 xl:px-6 py-4">
-                                                    <div className="grid grid-cols-4 xl:flex xl:flex-row gap-1 w-fit">
+                                                    {/* Desktop Action Buttons (Visible only on xl and above) */}
+                                                    <div className="hidden xl:flex xl:flex-row gap-1 w-fit">
                                                         <ActionBtn title="İş Adımları" color="#3b82f6" onClick={() => setExpandedRow(expandedRow === task.id ? null : task.id)}>
                                                             <ClipboardList size={16} />
                                                         </ActionBtn>
@@ -2159,6 +2191,103 @@ export default function Tasks() {
                                                         <ActionBtn title="Sil" color="#ef4444" onClick={() => isElectron ? handleDelete(task.id) : toast.error("Silme işlemi sadece masaüstü uygulamasında aktiftir.")}>
                                                             <Trash2 size={16} />
                                                         </ActionBtn>
+                                                    </div>
+
+                                                    {/* Tablet/Mobile Action Dropdown (Visible below xl) */}
+                                                    <div className="xl:hidden relative action-dropdown-container inline-block text-left">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setActiveDropdownTaskId(activeDropdownTaskId === task.id ? null : task.id);
+                                                            }}
+                                                            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 border border-border"
+                                                        >
+                                                            <MoreVertical size={16} />
+                                                        </button>
+                                                        {activeDropdownTaskId === task.id && (
+                                                            <div className="absolute right-0 bottom-full mb-2 w-48 bg-card border border-border rounded-[18px] shadow-xl py-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setExpandedRow(expandedRow === task.id ? null : task.id);
+                                                                        setActiveDropdownTaskId(null);
+                                                                    }}
+                                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-primary/5 transition-all"
+                                                                >
+                                                                    <ClipboardList size={14} className="text-blue-500" /> İş Adımları
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        handleOpenTaskFolder(task);
+                                                                        setActiveDropdownTaskId(null);
+                                                                    }}
+                                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-primary/5 transition-all"
+                                                                >
+                                                                    <FolderOpen size={14} className="text-slate-500" /> Dosya Aç
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        handleOpenReportSelector(task);
+                                                                        setActiveDropdownTaskId(null);
+                                                                    }}
+                                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-primary/5 transition-all"
+                                                                >
+                                                                    <FileText size={14} className="text-emerald-500" /> Raporları Gör
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (isElectron) {
+                                                                            setEditingTask(task);
+                                                                        } else {
+                                                                            toast.error("Düzenleme sadece masaüstü uygulamasında aktiftir.");
+                                                                        }
+                                                                        setActiveDropdownTaskId(null);
+                                                                    }}
+                                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-primary/5 transition-all"
+                                                                >
+                                                                    <Edit3 size={14} className="text-amber-500" /> Görevi Düzenle
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (isElectron) {
+                                                                            setShareTask(task);
+                                                                        } else {
+                                                                            toast.error("Paylaşım sadece masaüstü uygulamasında aktiftir.");
+                                                                        }
+                                                                        setActiveDropdownTaskId(null);
+                                                                    }}
+                                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-primary/5 transition-all"
+                                                                >
+                                                                    <UserPlus size={14} className="text-violet-500" /> Paylaş
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (isElectron) {
+                                                                            setAnalysisTask(task);
+                                                                        } else {
+                                                                            toast.error("Analiz sadece masaüstü uygulamasında aktiftir.");
+                                                                        }
+                                                                        setActiveDropdownTaskId(null);
+                                                                    }}
+                                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-primary/5 transition-all"
+                                                                >
+                                                                    <FileDigit size={14} className="text-sky-500" /> Analiz Et
+                                                                </button>
+                                                                <div className="h-px bg-border my-1" />
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (isElectron) {
+                                                                            handleDelete(task.id);
+                                                                        } else {
+                                                                            toast.error("Silme işlemi sadece masaüstü uygulamasında aktiftir.");
+                                                                        }
+                                                                        setActiveDropdownTaskId(null);
+                                                                    }}
+                                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
+                                                                >
+                                                                    <Trash2 size={14} /> Sil
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
