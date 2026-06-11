@@ -9,9 +9,10 @@ export interface AISearchResult {
 }
 
 export const aiSearch = async (query: string): Promise<AISearchResult[]> => {
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
     const response = await fetchWithTimeout(`${API_URL}/ai/search`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ query })
     });
     if (!response.ok) throw new Error("AI arama başarısız");
