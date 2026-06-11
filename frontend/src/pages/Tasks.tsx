@@ -2120,7 +2120,7 @@ export default function Tasks() {
                                     return (
                                         <React.Fragment key={task.id}>
                                             <tr className={cn("hover:bg-muted/50 transition-colors", isExpanded ? "bg-muted/50" : "bg-transparent")}>
-                                                <td className="px-2 lg:px-3 xl:px-6 py-4 align-top">
+                                                <td className="px-2 lg:px-3 xl:px-6 py-4 align-middle">
                                                     <input
                                                         type="checkbox"
                                                         checked={isSelected}
@@ -2133,8 +2133,8 @@ export default function Tasks() {
                                                         {task.rapor_kodu && !task.rapor_kodu.startsWith("TASLAK-") ? task.rapor_kodu : (activeTab === 'ortak' ? (task.rapor_kodu || "-") : (sortedFiltered.indexOf(task) + 1))}
                                                     </span>
                                                 </td>
-                                                <td className="px-2 lg:px-3 xl:px-6 py-4 max-w-[150px] lg:max-w-[200px] xl:max-w-[320px]">
-                                                    <div className="font-bold text-slate-900 dark:text-slate-100 text-sm truncate" title={task.rapor_adi}>
+                                                <td className="px-2 lg:px-3 xl:px-6 py-4 max-w-[100px] md:max-w-[150px] lg:max-w-[200px] xl:max-w-[320px]">
+                                                    <div className="font-bold text-slate-900 dark:text-slate-100 text-sm break-words whitespace-normal line-clamp-2" title={task.rapor_adi}>
                                                         {task.rapor_adi}
                                                     </div>
                                                 </td>
