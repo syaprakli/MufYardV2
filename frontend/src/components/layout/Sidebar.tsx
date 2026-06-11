@@ -114,7 +114,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     return (
         <aside className={cn(
             "w-64 bg-slate-950 text-white h-[100dvh] flex flex-col fixed left-0 top-0 z-50 border-r border-slate-900/50 transition-all duration-300 ease-in-out",
-            "lg:translate-x-0", // Always show on desktop
+            "xl:translate-x-0", // Always show on desktop
             isOpen ? "translate-x-0" : "-translate-x-full" // Toggle on mobile
         )}>
             <div className="p-6 border-b border-primary-light flex items-center justify-between">
@@ -124,7 +124,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     onFocus={() => prefetchNavRoute("/")}
                     onTouchStart={() => prefetchNavRoute("/")}
                     onClick={() => {
-                        if (window.innerWidth < 1024) onClose();
+                        if (window.innerWidth < 1280) onClose();
                     }}
                     className="hover:opacity-80 transition-opacity"
                 >
@@ -134,7 +134,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 {/* Close button for mobile */}
                 <button 
                     onClick={onClose}
-                    className="lg:hidden p-2 text-white/50 hover:text-white transition-colors"
+                    className="xl:hidden p-2 text-white/50 hover:text-white transition-colors"
                 >
                     <X size={20} />
                 </button>
@@ -153,7 +153,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         onFocus={() => prefetchNavRoute(item.href)}
                         onTouchStart={() => prefetchNavRoute(item.href)}
                         onClick={() => {
-                            if (window.innerWidth < 1024) onClose();
+                            if (window.innerWidth < 1280) onClose();
                         }}
                         className={({ isActive }) => cn(
                             "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200",
@@ -200,7 +200,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                             onFocus={() => prefetchNavRoute("/admin")}
                             onTouchStart={() => prefetchNavRoute("/admin")}
                             onClick={() => {
-                                if (window.innerWidth < 1024) onClose();
+                                if (window.innerWidth < 1280) onClose();
                             }}
                             className={({ isActive }) => cn(
                                 "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 border border-amber-500/20 bg-amber-500/5",
@@ -226,7 +226,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                             onFocus={() => prefetchNavRoute(item.href)}
                             onTouchStart={() => prefetchNavRoute(item.href)}
                             onClick={() => {
-                                if (window.innerWidth < 1024) onClose();
+                                if (window.innerWidth < 1280) onClose();
                             }}
                             className={({ isActive }) => cn(
                                 "flex items-center gap-2.5 px-3.5 py-2 rounded-lg transition-all duration-200",

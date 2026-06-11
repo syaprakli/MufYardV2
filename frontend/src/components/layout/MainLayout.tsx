@@ -24,7 +24,7 @@ export function MainLayout() {
             {/* Sidebar Overlay for Mobile */}
             {isSidebarOpen && !isFullScreen && (
                 <div 
-                    className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-[2px] transition-all"
+                    className="fixed inset-0 bg-black/40 z-40 xl:hidden backdrop-blur-[2px] transition-all"
                     onClick={closeSidebar}
                 />
             )}
@@ -34,7 +34,7 @@ export function MainLayout() {
             {/* The main content area */}
             <main className={cn(
                 "flex-1 flex flex-col min-w-0 relative h-full transition-all duration-300",
-                !isFullScreen ? "pt-16 lg:ml-64 ml-0" : "pt-0 ml-0"
+                !isFullScreen ? "pt-16 xl:ml-64 ml-0" : "pt-0 ml-0"
             )}>
                 {!isFullScreen && <Header toggleSidebar={toggleSidebar} />}
                 
@@ -43,14 +43,14 @@ export function MainLayout() {
                     id="main-scroll-container"
                     className={cn(
                     "flex-1 overflow-y-auto relative bg-slate-50 dark:bg-slate-950 scrollbar-none transition-colors duration-300",
-                    !isFullScreen ? "px-4 lg:px-8 py-6 lg:py-8 pb-24 lg:pb-8" : "p-0"
+                    !isFullScreen ? "px-4 xl:px-8 py-6 xl:py-8 pb-24 xl:pb-8" : "p-0"
                 )}>
                     <Outlet />
                 </div>
                 
                 {/* Mobile Bottom Navigation */}
                 {!isFullScreen && (
-                    <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-around px-2 z-40 pb-safe">
+                    <div className="xl:hidden fixed bottom-0 left-0 right-0 h-16 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-around px-2 z-40 pb-safe">
                         <NavLink 
                             to="/" 
                             className={({ isActive }) => cn(

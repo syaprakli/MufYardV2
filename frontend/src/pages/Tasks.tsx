@@ -2133,7 +2133,7 @@ export default function Tasks() {
                                                         {task.rapor_kodu && !task.rapor_kodu.startsWith("TASLAK-") ? task.rapor_kodu : (activeTab === 'ortak' ? (task.rapor_kodu || "-") : (sortedFiltered.indexOf(task) + 1))}
                                                     </span>
                                                 </td>
-                                                <td className="px-1 md:px-2 xl:px-4 py-3 max-w-[100px] md:max-w-[150px] lg:max-w-[200px] xl:max-w-[320px]">
+                                                <td className="px-1 md:px-2 xl:px-4 py-3 max-w-[100px] md:max-w-[150px] lg:max-w-[200px] xl:max-w-[320px] landscape:max-w-[120px] md:landscape:max-w-[180px] lg:landscape:max-w-[240px] xl:landscape:max-w-[320px]">
                                                     <div className="font-bold text-slate-900 dark:text-slate-100 text-sm break-words whitespace-normal line-clamp-2" title={task.rapor_adi}>
                                                         {task.rapor_adi}
                                                     </div>
@@ -2161,15 +2161,15 @@ export default function Tasks() {
                                                                 toast.success("Durum güncellendi.");
                                                             } catch { toast.error("Hata oluştu."); }
                                                         }}
-                                                        className={cn("bg-transparent text-[11px] font-black tracking-widest outline-none cursor-pointer p-1 rounded-lg hover:bg-slate-100 w-[72px] whitespace-normal break-words leading-tight", !isElectron && "opacity-50 cursor-not-allowed")}
+                                                        className={cn("bg-transparent text-[11px] font-black tracking-widest outline-none cursor-pointer p-1 rounded-lg hover:bg-slate-100 whitespace-nowrap", !isElectron && "opacity-50 cursor-not-allowed")}
                                                         style={{ color: getDurumColor(task.rapor_durumu) }}
                                                     >
                                                         {RAPOR_DURUMLARI.map(d => <option key={d} value={d} className="text-slate-900">{d}</option>)}
                                                     </select>
                                                 </td>
                                                 <td className="px-1 md:px-2 xl:px-4 py-3">
-                                                    {/* Desktop Action Buttons (Visible only on xl and above) */}
-                                                    <div className="hidden xl:flex xl:flex-row gap-1 w-fit">
+                                                    {/* Desktop Action Buttons (Visible only on xl and above, or landscape below xl as a grid) */}
+                                                    <div className="hidden xl:flex xl:flex-row gap-1 w-fit landscape:grid landscape:grid-cols-4 landscape:gap-1 landscape:w-fit xl:landscape:flex xl:landscape:flex-row">
                                                         <ActionBtn title="İş Adımları" color="#3b82f6" onClick={() => setExpandedRow(expandedRow === task.id ? null : task.id)}>
                                                             <ClipboardList size={16} />
                                                         </ActionBtn>
@@ -2193,8 +2193,8 @@ export default function Tasks() {
                                                         </ActionBtn>
                                                     </div>
 
-                                                    {/* Tablet/Mobile Action Dropdown (Visible below xl) */}
-                                                    <div className="xl:hidden relative action-dropdown-container inline-block text-left">
+                                                    {/* Tablet/Mobile Action Dropdown (Visible below xl, except in landscape) */}
+                                                    <div className="xl:hidden relative action-dropdown-container inline-block text-left landscape:hidden">
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();

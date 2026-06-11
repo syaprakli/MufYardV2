@@ -139,14 +139,14 @@ export function Header({ toggleSidebar }: HeaderProps) {
 
     return (
         <header className={cn(
-            "fixed top-0 right-0 h-16 border-b border-border bg-background flex items-center justify-between px-4 lg:px-8 z-40 transition-all duration-300",
-            "lg:left-64 left-0"
+            "fixed top-0 right-0 h-16 border-b border-border bg-background flex items-center justify-between px-4 xl:px-8 z-40 transition-all duration-300",
+            "xl:left-64 left-0"
         )}>
             <div className="flex items-center gap-4">
                 {/* Menu Toggle for Mobile */}
                 <button 
                     onClick={toggleSidebar}
-                    className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    className="xl:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
                     <Menu size={24} />
                 </button>
