@@ -92,3 +92,16 @@ def require_roles(*allowed_roles: str) -> Callable:
         return current_user
 
     return dependency
+
+
+async def require_founder_admin(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    user_role = (current_user.get("role") or "user").strip().lower()
+    user_email = (current_user.get("email") or "").strip().lower()
+    
+    from app.services.profile_service import ProfileService
+    founder_emails = {email.strip().lower() for email in ProfileService.FOUNDER_EMAILS}
+    
+    if user_role != "admin" or user_email not in founder_emails:
+        raise HTTPException(status_code=403, detail="Bu işlem yalnızca kurucu yönetici hesaplarına açıktır.")
+    return current_user
+

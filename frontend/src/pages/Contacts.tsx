@@ -473,7 +473,7 @@ export default function Contacts() {
                                         </p>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                     {(groupedContacts[groupName] || []).map(contact => (
                                             <ContactCard
                                                 key={contact.id}
@@ -498,7 +498,7 @@ export default function Contacts() {
                         ))}
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         {paginatedContacts.map(contact => (
                             <ContactCard
                                 key={contact.id}

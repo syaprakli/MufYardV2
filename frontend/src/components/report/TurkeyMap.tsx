@@ -519,7 +519,7 @@ export function TurkeyMap({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 w-full min-h-[500px]">
+    <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 w-full min-h-[500px]">
       {/* Sol Panel: Harita Alanı */}
       <div className="flex flex-col gap-4 bg-slate-900 border border-slate-800 rounded-3xl p-6 relative overflow-hidden shadow-xl text-white">
         {/* Header inside Map Box */}
@@ -569,9 +569,9 @@ export function TurkeyMap({
         </div>
 
         {/* Turkey Map Stylized Canvas Area */}
-        <div className="w-full h-[325px] lg:h-auto lg:flex-1 bg-slate-950/45 rounded-2xl border border-slate-850/40 overflow-x-auto overflow-y-hidden">
+        <div className="w-full h-auto aspect-[2/1] lg:h-auto lg:flex-1 bg-slate-950/45 rounded-2xl border border-slate-850/40 overflow-hidden">
           {/* Actual Turkey Map SVG Outline */}
-          <div className="min-w-[650px] w-full aspect-[2/1] p-2 flex items-center justify-center relative lg:min-w-0">
+          <div className="w-full aspect-[2/1] p-2 flex items-center justify-center relative">
             {svgContent ? (
               <svg
                 viewBox="0 0 1005 490"

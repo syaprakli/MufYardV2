@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { fetchGlobalMessages } from '../api/collaboration';
+import { fetchGlobalMessages, sendGlobalMessage } from '../api/collaboration';
 import { fetchOnlineUsers } from '../api/online';
 import { API_URL, WS_URL } from '../config';
 import { useAuth } from '../hooks/useAuth';
@@ -78,6 +78,12 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     const pongTimer = useRef<any>(null);
     const retryCountRef = useRef(0);
     const activeNameRef = useRef<string>('Kullanıcı');
+
+    const [pollingMode, setPollingMode] = useState(false);
+    const pollingTimer = useRef<any>(null);
+    const pollingIntervalRef = useRef(5000);
+    const lastPolledMessageId = useRef<string | null>(null);
+    const toastShownRef = useRef(false);
 
     // Reset messages when user changes to avoid ghost messages
     useEffect(() => {
@@ -157,6 +163,81 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         loadHistory();
     }, [user?.uid]);
 
+    // Poll Global Messages (REST Fallback)
+    const pollGlobalMessages = useCallback(async () => {
+        if (!user?.uid) return;
+        try {
+            const history = await fetchGlobalMessages(25);
+            if (Array.isArray(history) && history.length > 0) {
+                const normalized = history.map((m: any) => ({
+                    id: m.id,
+                    text: m.text || m.content || '',
+                    author_id: m.author_id,
+                    author_name: m.author_name,
+                    author_role: m.author_role || 'Müfettiş',
+                    timestamp: m.timestamp,
+                    attachments: m.attachments || []
+                }));
+                
+                const lastMsg = normalized[normalized.length - 1];
+                if (lastPolledMessageId.current && lastMsg && lastMsg.id !== lastPolledMessageId.current) {
+                    pollingIntervalRef.current = 5000;
+                } else {
+                    pollingIntervalRef.current = Math.min(pollingIntervalRef.current * 1.5, 20000);
+                }
+                if (lastMsg) {
+                    lastPolledMessageId.current = lastMsg.id;
+                }
+                
+                setMessages(prev => {
+                    const existingIds = new Set(prev.map(m => m.id));
+                    const newMsgs = normalized.filter(m => !existingIds.has(m.id));
+                    if (newMsgs.length === 0) return prev;
+                    return [...prev, ...newMsgs];
+                });
+            }
+        } catch (err) {
+            console.error("Error polling global messages:", err);
+        }
+    }, [user?.uid]);
+
+    useEffect(() => {
+        if (!user?.uid) {
+            clearTimeout(pollingTimer.current);
+            setPollingMode(false);
+            return;
+        }
+
+        if (!wsConnected) {
+            setPollingMode(true);
+            
+            if (!toastShownRef.current) {
+                toast.error("Canlı bağlantı kurulamadı. Arka plan sorgulama (HTTP Polling) moduna geçildi.", {
+                    id: 'ws-fallback-warning',
+                    duration: 4000,
+                });
+                toastShownRef.current = true;
+            }
+
+            pollGlobalMessages();
+
+            const runPolling = () => {
+                pollingTimer.current = setTimeout(async () => {
+                    await pollGlobalMessages();
+                    runPolling();
+                }, pollingIntervalRef.current);
+            };
+            runPolling();
+        } else {
+            clearTimeout(pollingTimer.current);
+            setPollingMode(false);
+            toastShownRef.current = false;
+        }
+
+        return () => {
+            clearTimeout(pollingTimer.current);
+        };
+    }, [wsConnected, user?.uid, pollGlobalMessages]);
 
     // WebSocket Connection Logic
     useEffect(() => {
@@ -346,6 +427,8 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 
     const sendMessage = useCallback((content: string, attachments: any[] = []): string => {
         const msgId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+        const senderName = activeNameRef.current || resolvePresenceName(user);
+        
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             const payload = {
                 type: 'message',
@@ -355,15 +438,32 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                 text: content, // Fallback for legacy
                 attachments,
                 author_id: user?.uid,
-                author_name: activeNameRef.current || resolvePresenceName(user),
+                author_name: senderName,
                 timestamp: new Date().toISOString()
             };
             wsRef.current.send(JSON.stringify(payload));
         } else {
-            console.warn("WS not open, message not sent");
+            console.warn("WS not open, fallback to REST API");
+            
+            // Optimistic UI updates
+            const newMsg: Message = {
+                id: msgId,
+                text: content,
+                author_id: user?.uid || '',
+                author_name: senderName,
+                author_role: 'Müfettiş',
+                timestamp: new Date().toISOString(),
+                attachments
+            };
+            setMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
+            
+            sendGlobalMessage(content, senderName).catch((err) => {
+                console.error("Failed to send global message via REST:", err);
+                toast.error("Mesaj gönderilemedi.");
+            });
         }
         return msgId;
-    }, [user?.uid]);
+    }, [user, user?.uid]);
 
 
     const clearGlobalMessages = useCallback(async () => {

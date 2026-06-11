@@ -2034,7 +2034,7 @@ export default function Tasks() {
                     <table className="hidden lg:table w-full border-collapse">
                         <thead>
                             <tr className="bg-muted/30">
-                                <th className="px-4 lg:px-6 py-4 text-left w-12 border-b border-border font-outfit">
+                                <th className="px-2 lg:px-3 xl:px-6 py-4 text-left w-12 border-b border-border font-outfit">
                                     <input
                                         type="checkbox"
                                         checked={sortedFiltered.length > 0 && sortedFiltered.every(task => selectedTaskIds.includes(task.id))}
@@ -2042,32 +2042,32 @@ export default function Tasks() {
                                         className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
                                     />
                                 </th>
-                                <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                <th className="px-2 lg:px-3 xl:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
                                     <button type="button" onClick={() => toggleSort("rapor_kodu")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
                                         Sıra <ArrowUpDown size={12} />
                                     </button>
                                 </th>
-                                <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                <th className="px-2 lg:px-3 xl:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
                                     <button type="button" onClick={() => toggleSort("rapor_adi")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
                                         Görev Adı <ArrowUpDown size={12} />
                                     </button>
                                 </th>
-                                <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                <th className="px-2 lg:px-3 xl:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
                                     <button type="button" onClick={() => toggleSort("rapor_turu")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
                                         Görev Türü <ArrowUpDown size={12} />
                                     </button>
                                 </th>
-                                <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                <th className="px-2 lg:px-3 xl:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
                                     <button type="button" onClick={() => toggleSort("sure")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
                                         Süre <ArrowUpDown size={12} />
                                     </button>
                                 </th>
-                                <th className="px-4 lg:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
+                                <th className="px-2 lg:px-3 xl:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">
                                     <button type="button" onClick={() => toggleSort("rapor_durumu")} className="inline-flex items-center gap-1 hover:text-primary transition-colors">
                                         Durum <ArrowUpDown size={12} />
                                     </button>
                                 </th>
-                                <th className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">İşlemler</th>
+                                <th className="px-2 lg:px-3 xl:px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest border-b border-border font-outfit">İşlemler</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -2089,7 +2089,7 @@ export default function Tasks() {
                                     return (
                                         <React.Fragment key={task.id}>
                                             <tr className={cn("hover:bg-muted/50 transition-colors", isExpanded ? "bg-muted/50" : "bg-transparent")}>
-                                                <td className="px-4 lg:px-6 py-4 align-top">
+                                                <td className="px-2 lg:px-3 xl:px-6 py-4 align-top">
                                                     <input
                                                         type="checkbox"
                                                         checked={isSelected}
@@ -2097,14 +2097,18 @@ export default function Tasks() {
                                                         className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
                                                     />
                                                 </td>
-                                                <td className="px-4 lg:px-6 py-4">
+                                                <td className="px-2 lg:px-3 xl:px-6 py-4">
                                                     <span className="font-black text-primary text-[11px] tracking-widest font-outfit">
                                                         {task.rapor_kodu && !task.rapor_kodu.startsWith("TASLAK-") ? task.rapor_kodu : (activeTab === 'ortak' ? (task.rapor_kodu || "-") : (sortedFiltered.indexOf(task) + 1))}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 lg:px-6 py-4"><span className="font-bold text-slate-900 dark:text-slate-100 text-sm">{task.rapor_adi}</span></td>
-                                                <td className="px-4 lg:px-6 py-4"><span className="font-bold text-slate-400 text-[11px]">{task.rapor_turu}</span></td>
-                                                <td className="px-4 lg:px-6 py-4">
+                                                <td className="px-2 lg:px-3 xl:px-6 py-4 max-w-[150px] lg:max-w-[200px] xl:max-w-[320px]">
+                                                    <div className="font-bold text-slate-900 dark:text-slate-100 text-sm truncate" title={task.rapor_adi}>
+                                                        {task.rapor_adi}
+                                                    </div>
+                                                </td>
+                                                <td className="px-2 lg:px-3 xl:px-6 py-4"><span className="font-bold text-slate-400 text-[11px]">{task.rapor_turu}</span></td>
+                                                <td className="px-2 lg:px-3 xl:px-6 py-4">
                                                     {sureInfo ? (
                                                         <span 
                                                             className="text-[11px] font-black px-2 py-1 rounded-lg"
@@ -2114,7 +2118,7 @@ export default function Tasks() {
                                                         </span>
                                                     ) : "—"}
                                                 </td>
-                                                <td className="px-4 lg:px-6 py-4">
+                                                <td className="px-2 lg:px-3 xl:px-6 py-4">
                                                     <select
                                                         disabled={!isElectron}
                                                         value={task.rapor_durumu}
@@ -2132,8 +2136,8 @@ export default function Tasks() {
                                                         {RAPOR_DURUMLARI.map(d => <option key={d} value={d} className="text-slate-900">{d}</option>)}
                                                     </select>
                                                 </td>
-                                                <td className="px-4 lg:px-6 py-4">
-                                                    <div className="grid grid-cols-4 xl:flex xl:flex-row gap-1.5 w-fit">
+                                                <td className="px-2 lg:px-3 xl:px-6 py-4">
+                                                    <div className="grid grid-cols-4 xl:flex xl:flex-row gap-1 w-fit">
                                                         <ActionBtn title="İş Adımları" color="#3b82f6" onClick={() => setExpandedRow(expandedRow === task.id ? null : task.id)}>
                                                             <ClipboardList size={16} />
                                                         </ActionBtn>

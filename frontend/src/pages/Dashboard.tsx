@@ -142,8 +142,10 @@ export default function Dashboard() {
     const tasks = useMemo(() => {
         if (!cachedData.tasks || !effectiveUid) return [];
         return cachedData.tasks.filter((t: any) => 
-            t.owner_id === effectiveUid || 
-            t.accepted_collaborators?.includes(effectiveUid)
+            !t.parent_task_id && (
+                t.owner_id === effectiveUid || 
+                t.accepted_collaborators?.includes(effectiveUid)
+            )
         );
     }, [cachedData.tasks, effectiveUid]);
 

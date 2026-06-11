@@ -56,3 +56,17 @@ export async function fetchGlobalMessages(limit: number = 50) {
     return await res.json();
 }
 
+export async function sendGlobalMessage(content: string, authorName: string, authorRole: string = "Müfettiş") {
+    const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
+    const res = await fetchWithTimeout(`${API_URL}/collaboration/messages`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+            text: content,
+            author_name: authorName,
+            author_role: authorRole
+        })
+    });
+    return res.ok;
+}
+

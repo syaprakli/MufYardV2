@@ -348,6 +348,40 @@ class TaskService:
 
             await asyncio.to_thread(doc_ref.update, update_data)
 
+            # Share notification logic
+            if 'pending_collaborators' in update_data:
+                old_pending = current_data.get('pending_collaborators', [])
+                new_pending = update_data['pending_collaborators'] or []
+                added_collaborators = [c for c in new_pending if c not in old_pending]
+                
+                if added_collaborators:
+                    try:
+                        from app.services.notification_service import NotificationService
+                        from app.services.profile_service import ProfileService
+                        
+                        owner_profile = await ProfileService.get_profile(current_data.get('owner_id'))
+                        owner_display = owner_profile.get('full_name') if owner_profile else current_data.get('owner_id')
+                        
+                        for collaborator_id in added_collaborators:
+                            try:
+                                target_uid = collaborator_id
+                                if "@" in collaborator_id:
+                                    profiles_query = db.collection('profiles').where('email', '==', collaborator_id.lower().trim()).limit(1)
+                                    profiles = await asyncio.to_thread(lambda: list(profiles_query.stream()))
+                                    if profiles:
+                                        target_uid = profiles[0].id
+                                
+                                await NotificationService.notify_task_invitation(
+                                    task_id=task_id,
+                                    task_name=current_data.get('rapor_adi', 'Yeni Görev'),
+                                    owner_name=owner_display,
+                                    collaborator_id=target_uid
+                                )
+                            except Exception as inner_err:
+                                print(f"[NOTIF] Update task inner notify error: {inner_err}")
+                    except Exception as outer_err:
+                        print(f"[NOTIF] Update task outer notify error: {outer_err}")
+
             # Cascade: if task name, code, parent, or start date changed, update associated audit titles
             if any(k in update_data for k in ('rapor_adi', 'rapor_kodu', 'parent_task_id', 'baslama_tarihi')):
                 try:

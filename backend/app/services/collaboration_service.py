@@ -512,7 +512,9 @@ class CollaborationService:
         collection_map = {
             'TASK': 'tasks',
             'NOTE': 'notes',
-            'CONTACT': 'contacts'
+            'CONTACT': 'contacts',
+            'AUDIT': 'audits',
+            'REPORT': 'audits'
         }
         collection_name = collection_map.get(resource_type.upper())
         if not collection_name:
@@ -549,7 +551,9 @@ class CollaborationService:
         collection_map = {
             'TASK': 'tasks',
             'NOTE': 'notes',
-            'CONTACT': 'contacts'
+            'CONTACT': 'contacts',
+            'AUDIT': 'audits',
+            'REPORT': 'audits'
         }
         collection_name = collection_map.get(resource_type.upper())
         if not collection_name:
@@ -638,6 +642,21 @@ class CollaborationService:
                         'title': cd.get('name') or 'İsimsiz Kişi',
                         'sender_name': cd.get('owner_name') or 'Bir Müfettiş',
                         'created_at': cd.get('created_at')
+                    })
+
+            # 4. Bekleyen Raporlar/Denetimler (Audits)
+            audits = await asyncio.to_thread(
+                lambda k=key: list(db.collection('audits').where('pending_collaborators', 'array_contains', k).stream())
+            )
+            for a in audits:
+                ad = a.to_dict()
+                if not any(r['id'] == a.id for r in results):
+                    results.append({
+                        'id': a.id,
+                        'type': 'AUDIT',
+                        'title': ad.get('title') or 'İsimsiz Rapor',
+                        'sender_name': ad.get('inspector') or ad.get('owner_name') or 'Bir Müfettiş',
+                        'created_at': ad.get('created_at')
                     })
 
         return results

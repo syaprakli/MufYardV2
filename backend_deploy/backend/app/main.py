@@ -414,7 +414,7 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                             type="dm",
                             chat_room_id=room_id
                         )
-                        asyncio.create_task(NotificationService.create_notification(notif))
+                        asyncio.create_task(NotificationService.create_throttled_notification(notif, cooldown_minutes=30))
                         # Mesaj verisini zenginleştir
                         data["id"] = new_db_msg["id"]
                         data["timestamp"] = new_db_msg["timestamp"]

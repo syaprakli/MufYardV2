@@ -857,7 +857,7 @@ export default function DenetimOzel() {
                                 className="w-full pl-9 pr-3.5 h-9.5 rounded-xl border border-slate-250 dark:border-slate-800 text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                             />
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                             <select
                                 value={checklistStatusFilter}
                                 onChange={e => setChecklistStatusFilter(e.target.value)}
@@ -1530,6 +1530,14 @@ export default function DenetimOzel() {
                         <h1 className="text-lg font-black text-slate-900 dark:text-white tracking-tight mt-0.5">Özel Yurt Denetimi</h1>
                     </div>
                 </div>
+                
+                <button
+                    onClick={() => setShowTaskPicker(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-px active:translate-y-0 flex-shrink-0 group"
+                >
+                    <Play size={11} className="group-hover:scale-110 transition-transform" />
+                    <span>Denetimi Başlat</span>
+                </button>
             </div>
 
             {/* Main content split */}
@@ -1679,21 +1687,14 @@ export default function DenetimOzel() {
                 </div>
             ) : (
                 // Standard Audit Category - Lists tasks and reports
-                <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
+                <div className="flex-1 flex flex-col xl:flex-row gap-6 overflow-hidden">
                     {/* 2. Tasks list pane */}
-                    <div className="w-full lg:w-80 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex flex-col gap-3 flex-shrink-0 overflow-y-auto">
+                    <div className={`w-full xl:w-80 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-col gap-3 flex-shrink-0 overflow-y-auto ${selectedTaskId ? "hidden xl:flex" : "flex"}`}>
                         <div className="px-1 flex items-start justify-between gap-2">
                             <div>
                                 <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">{currentRaporTuru}</h3>
                                 <p className="text-[10px] text-slate-400 font-bold">Aktif denetim görevleri listesi</p>
                             </div>
-                            <button
-                                onClick={() => setShowTaskPicker(true)}
-                                className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-px active:translate-y-0 flex-shrink-0 group"
-                            >
-                                <Play size={11} className="group-hover:scale-110 transition-transform" />
-                                <span>Denetimi Başlat</span>
-                            </button>
                         </div>
 
                         <div className="h-px bg-slate-100 dark:bg-slate-800/50" />
@@ -1776,7 +1777,7 @@ export default function DenetimOzel() {
                     </div>
 
                     {/* 3. Detail Pane */}
-                    <div className="flex-1 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-6 flex flex-col overflow-y-auto">
+                    <div className={`flex-1 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-6 flex-col overflow-y-auto ${selectedTaskId ? "flex" : "hidden xl:flex"}`}>
                         {!selectedTask ? (
                             <div className="flex-1 flex flex-col items-center justify-center text-center gap-3">
                                 <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-950/20 flex items-center justify-center">
@@ -1792,53 +1793,65 @@ export default function DenetimOzel() {
                         ) : (
                             <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-1">
                                 {/* Header */}
-                                <div className="flex flex-col md:flex-row justify-between gap-4 border-b border-slate-100 dark:border-slate-800/50 pb-4">
-                                    <div>
-                                        <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 mb-1">
-                                            <span>{selectedTask.rapor_turu}</span>
-                                        </div>
-                                        <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white leading-snug">{selectedTask.rapor_adi}</h2>
-                                        {(cachedData?.audits || []).filter((a: any) => a.task_id === selectedTask.id).length > 1 && (
-                                            <div className="mt-2 flex items-center gap-2">
-                                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aktif Form:</label>
-                                                <select
-                                                    value={selectedAuditId || ""}
-                                                    onChange={(e) => setSelectedAuditId(e.target.value)}
-                                                    className="text-xs font-bold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 outline-none text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-blue-500"
-                                                >
-                                                    {(cachedData?.audits || [])
-                                                        .filter((a: any) => a.task_id === selectedTask.id)
-                                                        .map((a: any) => (
-                                                            <option key={a.id} value={a.id}>
-                                                                {a.title} {a.report_created === false ? "(Taslak)" : "(Editörde)"}
-                                                            </option>
-                                                        ))}
-                                                </select>
+                                <div className="flex flex-col border-b border-slate-100 dark:border-slate-800/50 pb-4 gap-4">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedTaskId(null);
+                                            setSelectedAuditId(null);
+                                        }}
+                                        className="xl:hidden flex items-center gap-1.5 text-xs font-black text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors uppercase tracking-wider mb-2 self-start"
+                                    >
+                                        <ArrowLeft size={14} className="mr-1" />
+                                        <span>GÖREV LİSTESİNE DÖN</span>
+                                    </button>
+                                    <div className="flex flex-col md:flex-row justify-between gap-4 w-full">
+                                        <div>
+                                            <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 mb-1">
+                                                <span>{selectedTask.rapor_turu}</span>
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                        <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-lg ${
-                                            selectedTask.rapor_durumu === "Tamamlandı"
-                                                ? "bg-green-500/10 text-green-500"
-                                                : selectedTask.rapor_durumu === "Devam Ediyor"
-                                                ? "bg-amber-500/10 text-amber-500"
-                                                : "bg-slate-500/10 text-slate-400"
-                                        }`}>
-                                            Durum: {selectedTask.rapor_durumu}
-                                        </span>
-                                        {selectedReport && (
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-7 px-2.5 rounded-lg border-red-500/20 bg-red-500/5 hover:bg-red-600 hover:text-white text-red-600 dark:text-red-400 text-[10px] font-black flex items-center gap-1 transition-all"
-                                                onClick={handleDeleteReport}
-                                                disabled={isSavingAuditData}
-                                            >
-                                                <Trash2 size={12} />
-                                                <span>DENETİMİ SİL / SIFIRLA</span>
-                                            </Button>
-                                        )}
+                                            <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white leading-snug">{selectedTask.rapor_adi}</h2>
+                                            {(cachedData?.audits || []).filter((a: any) => a.task_id === selectedTask.id).length > 1 && (
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aktif Form:</label>
+                                                    <select
+                                                        value={selectedAuditId || ""}
+                                                        onChange={(e) => setSelectedAuditId(e.target.value)}
+                                                        className="text-xs font-bold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 outline-none text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-blue-500"
+                                                    >
+                                                        {(cachedData?.audits || [])
+                                                            .filter((a: any) => a.task_id === selectedTask.id)
+                                                            .map((a: any) => (
+                                                                <option key={a.id} value={a.id}>
+                                                                    {a.title} {a.report_created === false ? "(Taslak)" : "(Editörde)"}
+                                                                </option>
+                                                            ))}
+                                                    </select>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-lg ${
+                                                selectedTask.rapor_durumu === "Tamamlandı"
+                                                    ? "bg-green-500/10 text-green-500"
+                                                    : selectedTask.rapor_durumu === "Devam Ediyor"
+                                                    ? "bg-amber-500/10 text-amber-500"
+                                                    : "bg-slate-500/10 text-slate-400"
+                                            }`}>
+                                                Durum: {selectedTask.rapor_durumu}
+                                            </span>
+                                            {selectedReport && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-7 px-2.5 rounded-lg border-red-500/20 bg-red-500/5 hover:bg-red-600 hover:text-white text-red-600 dark:text-red-400 text-[10px] font-black flex items-center gap-1 transition-all"
+                                                    onClick={handleDeleteReport}
+                                                    disabled={isSavingAuditData}
+                                                >
+                                                    <Trash2 size={12} />
+                                                    <span>DENETİMİ SİL / SIFIRLA</span>
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1924,12 +1937,23 @@ export default function DenetimOzel() {
                                 )}
 
                                 {!selectedReport ? (
-                                    <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center gap-3">
-                                        <AlertCircle size={24} className="text-slate-350 dark:text-slate-650" />
-                                        <div>
-                                            <h4 className="font-bold text-xs text-slate-850 dark:text-slate-250">Henüz Rapor Oluşturulmamış</h4>
-                                            <p className="text-[11px] text-slate-400 mt-0.5">Bu görev için denetim başlatmak için soldaki <span className="font-bold text-blue-500">Denetimi Başlat</span> butonunu kullanın.</p>
+                                    <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center gap-4 min-h-[300px]">
+                                        <AlertCircle size={28} className="text-blue-500 animate-bounce" />
+                                        <div className="space-y-1">
+                                            <h4 className="font-bold text-sm text-slate-850 dark:text-slate-250">Henüz Rapor Oluşturulmamış</h4>
+                                            <p className="text-xs text-slate-400 max-w-sm mx-auto">Bu görev için denetim formunu ve rapor dosyasını şimdi başlatabilirsiniz.</p>
                                         </div>
+                                        <Button
+                                            onClick={() => {
+                                                setPrepAuditName(`${selectedTask.rapor_adi} Denetim Formu`);
+                                                setPickerTaskForAudit(selectedTask);
+                                                setShowTaskPicker(true);
+                                            }}
+                                            className="px-6 h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-blue-500/20"
+                                        >
+                                            <Play size={14} className="fill-white" />
+                                            <span>Denetimi Başlat</span>
+                                        </Button>
                                     </div>
                                 ) : (
                                     <div className="flex-1 flex flex-col overflow-y-auto">

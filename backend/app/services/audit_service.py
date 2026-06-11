@@ -181,6 +181,39 @@ class AuditService:
  
         await asyncio.to_thread(doc_ref.update, update_data)
         
+        # Share notification logic
+        if 'pending_collaborators' in update_data:
+            old_pending = current_data.get('pending_collaborators', [])
+            new_pending = update_data['pending_collaborators'] or []
+            added_collaborators = [c for c in new_pending if c not in old_pending]
+            
+            if added_collaborators:
+                from app.services.notification_service import NotificationService
+                from app.schemas.notification import NotificationCreate
+                
+                title = current_data.get('title', 'İsimsiz Rapor')
+                owner_name = current_data.get('inspector') or 'Bir Müfettiş'
+                
+                for collaborator_id in added_collaborators:
+                    try:
+                        target_uid = collaborator_id
+                        if "@" in collaborator_id:
+                            profiles_query = db.collection('profiles').where('email', '==', collaborator_id.lower().trim()).limit(1)
+                            profiles = await asyncio.to_thread(lambda: list(profiles_query.stream()))
+                            if profiles:
+                                target_uid = profiles[0].id
+                        
+                        notif = NotificationCreate(
+                            user_id=target_uid,
+                            title="Rapor Paylaşım Daveti",
+                            message=f"{owner_name} sizinle '{title}' raporunu paylaştı.",
+                            type="collaboration",
+                            task_id=audit_id
+                        )
+                        await NotificationService.create_notification(notif)
+                    except Exception as notif_err:
+                        print(f"[NOTIF] Share audit error: {notif_err}")
+        
         updated_doc_res = await asyncio.to_thread(doc_ref.get)
         updated_doc = updated_doc_res.to_dict()
         updated_doc['id'] = audit_id

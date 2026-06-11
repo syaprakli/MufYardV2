@@ -135,6 +135,11 @@ export default function FloatingChat({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const gifSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [pollingMode, setPollingMode] = useState(false);
+  const pollingTimer = useRef<any>(null);
+  const pollingIntervalRef = useRef(5000);
+  const lastPolledMsgId = useRef<string | null>(null);
+
   // ── sound ──────────────────────────────────────────────────────────────
   useEffect(() => {
     // Zil sesi
@@ -307,6 +312,76 @@ export default function FloatingChat({
     };
   }, [normalizedRoomId, roomId, user, profile?.full_name, type, isMinimized]);
 
+  // Poll DM Messages (REST Fallback)
+  const pollDmMessages = useCallback(async () => {
+    if (!user || type !== 'dm') return;
+    try {
+      const [uid1, uid2] = getDirectRoomUserIds(roomId, user.uid);
+      const otherUid = uid1 === user.uid ? uid2 : uid1;
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${API_URL}/collaboration/dm/history?uid1=${user.uid}&uid2=${otherUid}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        const normalized = data.map((m: any) => ({
+          id: m.id,
+          sender_id: m.sender_id,
+          sender_name: m.sender_name,
+          content: m.content,
+          timestamp: m.timestamp,
+          attachment: m.attachment
+        }));
+
+        const lastMsg = normalized[normalized.length - 1];
+        if (lastPolledMsgId.current && lastMsg && lastMsg.id !== lastPolledMsgId.current) {
+          pollingIntervalRef.current = 5000;
+        } else {
+          pollingIntervalRef.current = Math.min(pollingIntervalRef.current * 1.5, 20000);
+        }
+        if (lastMsg) {
+          lastPolledMsgId.current = lastMsg.id;
+        }
+
+        setMessages(prev => {
+          const existingIds = new Set(prev.map(m => m.id));
+          const newMsgs = normalized.filter((m: any) => !existingIds.has(m.id));
+          if (newMsgs.length === 0) return prev;
+          return [...prev, ...newMsgs];
+        });
+      }
+    } catch (e) {
+      console.error("Error polling DM history:", e);
+    }
+  }, [roomId, type, user]);
+
+  useEffect(() => {
+    if (!user || type !== 'dm') {
+      clearTimeout(pollingTimer.current);
+      setPollingMode(false);
+      return;
+    }
+
+    if (!isConnected) {
+      setPollingMode(true);
+      
+      pollDmMessages();
+
+      const runPolling = () => {
+        pollingTimer.current = setTimeout(async () => {
+          await pollDmMessages();
+          runPolling();
+        }, pollingIntervalRef.current);
+      };
+      runPolling();
+    } else {
+      clearTimeout(pollingTimer.current);
+      setPollingMode(false);
+    }
+
+    return () => {
+      clearTimeout(pollingTimer.current);
+    };
+  }, [isConnected, user, type, pollDmMessages]);
+
   // ── auto-scroll ────────────────────────────────────────────────────────
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -339,8 +414,8 @@ export default function FloatingChat({
   };
 
   // ── send helpers ───────────────────────────────────────────────────────
-  const pushMessage = useCallback((msg: Message) => {
-    setMessages(prev => [...prev, msg]);
+  const pushMessage = useCallback(async (msg: Message) => {
+    setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({
         type: 'message',
@@ -351,9 +426,34 @@ export default function FloatingChat({
         content: msg.content,
         attachment: msg.attachment,
       }));
-
+    } else {
+      console.warn("Chat WS not connected. Sending via REST API fallback.");
+      if (type === 'dm' && recipientId) {
+        try {
+          const senderName = profile?.full_name || user?.displayName || user?.email?.split('@')[0] || 'Müfettiş';
+          const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
+          const res = await fetch(`${API_URL}/collaboration/dm/send`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              recipient_id: recipientId,
+              content: msg.content,
+              attachment: msg.attachment
+            })
+          });
+          if (!res.ok) {
+            toast.error("Mesaj gönderilemedi.");
+          } else {
+            pollingIntervalRef.current = 5000;
+            pollDmMessages();
+          }
+        } catch (err) {
+          console.error("REST fallback send error:", err);
+          toast.error("Bağlantı hatası: Mesaj gönderilemedi.");
+        }
+      }
     }
-  }, [normalizedRoomId]);
+  }, [normalizedRoomId, user?.uid, recipientId, type, pollDmMessages, profile?.full_name]);
 
   const sendMessage = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -540,7 +640,7 @@ export default function FloatingChat({
         style={{ borderRadius: '12px 12px 0 0' }}
       >
         <div className="relative">
-          <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'}`} />
+          <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]'}`} />
           {hasNew && <div className="absolute inset-0 bg-blue-400 rounded-full animate-ping" />}
         </div>
         <span className="flex-1 text-[11px] font-black uppercase tracking-widest truncate">{title}</span>
@@ -567,13 +667,13 @@ export default function FloatingChat({
       <div className="bg-[#1E293B] p-4 flex items-center justify-between text-white border-b border-white/10 shrink-0" style={inline ? { borderRadius: '23px 23px 0 0' } : { borderRadius: '23px 23px 0 0' }}>
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className={`w-3 h-3 rounded-full border-2 border-[#1E293B] ${isConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-400'}`} />
+            <div className={`w-3 h-3 rounded-full border-2 border-[#1E293B] ${isConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]'}`} />
             {isOnline && <div className="absolute inset-0 bg-emerald-400 rounded-full animate-ping opacity-20" />}
           </div>
           <div className="flex flex-col">
             <span className="text-[11px] font-black uppercase tracking-widest truncate max-w-[140px]">{title}</span>
             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter flex items-center gap-1">
-              {isOnline ? 'Çevrimiçi' : 'Çevrimdışı'} 
+              {isConnected ? (isOnline ? 'Çevrimiçi' : 'Çevrimdışı') : 'Yedek Mod (HTTP)'} 
               <span className="w-1 h-1 bg-slate-600 rounded-full" /> 
               {type === 'dm' ? 'Özel' : type === 'audit' ? 'Denetim' : 'Genel'}
             </span>

@@ -847,3 +847,210 @@ Eğer hiçbir alakalı mevzuat bulamazsan, boş bir liste döndür:
             logger.error(f"Failed to parse Gemini legislation suggestion response: {e}. Raw response: {raw_text}")
             return []
 
+    async def analyze_report_structure(
+        self,
+        content: str,
+        report_type: str,
+        user: Dict[str, Any]
+    ) -> str:
+        """Kullanıcının yüklediği örnek raporun yapısal ve üslup kurallarını (extracted_rules) çıkarır."""
+        if not user or not user.get("uid"):
+            raise ValueError("Kullanıcı doğrulaması eksik.")
+
+        api_key, model_name, _, _, is_premium = await _get_user_ai_settings(user["uid"])
+        if not api_key:
+            from app.config import settings
+            if is_premium and settings.GEMINI_API_KEY:
+                api_key = settings.GEMINI_API_KEY
+            else:
+                raise ValueError("Henüz bir Gemini API anahtarı tanımlanmamış.")
+
+        system_prompt = f"""Sen uzman bir Türk idari teftiş ve denetim metodolojisi analistisin. 
+Sana verilen gerçek bir denetim/teftiş/inceleme/soruşturma raporu örneğini inceleyeceksin.
+Bu rapordaki yazım dili kurallarını, kullanılan hukuki ve resmi terminolojiyi, raporun genel yapısını (bölümleri, sıralamasını, başlık formatlarını) ve kullanılan HTML biçimlendirme standartlarını çıkarıp analiz edeceksin.
+Örnek raporun türü: {report_type}
+
+Lütfen çıktıyı şu başlıklar altında Türkçe olarak ve maddeler halinde bir kılavuz formatında ver:
+1. YAPISAL DÜZEN: Rapor hangi ana bölümlerden ve başlıklardan oluşuyor? (Örn: Giriş, Önceki Denetim, Bulgular, Sonuç...)
+2. ÜSLUP VE HİTAP KURALLARI: Nasıl bir dil kullanılmış? Resmiyet derecesi, cümle uzunlukları, müfettiş dili ("anlaşılmıştır", "tespit edilmiştir", "arz ederiz") analizi.
+3. BİÇİMLENDİRME STANDARTLARI: Hangi HTML etiketleri (örn: h1, strong, ul/li, table) ve stil ögeleri yoğunlukta kullanılmış?
+"""
+
+        model = _build_model(api_key, model_name, system_instruction=system_prompt)
+        response = await model.generate_content_async(
+            f"Analiz edilecek Örnek Rapor İçeriği:\n\n{content}",
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.2,
+                max_output_tokens=4096,
+            ),
+        )
+        return response.text
+
+    async def save_report_example(
+        self,
+        title: str,
+        report_type: str,
+        content: str,
+        user: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Yeni bir örnek rapor kaydeder, otomatik olarak yapısal analizini çıkarıp Firestore'a kaydeder."""
+        if not user or not user.get("uid"):
+            raise ValueError("Kullanıcı doğrulaması eksik.")
+
+        # Yapısal analizi çıkart
+        extracted_rules = await self.analyze_report_structure(content, report_type, user)
+
+        doc_data = {
+            "title": title,
+            "report_type": report_type,
+            "content": content,
+            "extracted_rules": extracted_rules,
+            "owner_id": user["uid"],
+            "created_at": datetime.now().isoformat()
+        }
+
+        # Firestore'a kaydet
+        doc_ref = db.collection("report_examples").document()
+        await asyncio.to_thread(doc_ref.set, doc_data)
+
+        # Geriye id'yi de ekleyip dön
+        doc_data["id"] = doc_ref.id
+        return doc_data
+
+    async def get_report_examples(self, user: Dict[str, Any], report_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Kullanıcının kayıtlı tüm örnek raporlarını listeler."""
+        if not user or not user.get("uid"):
+            raise ValueError("Kullanıcı doğrulaması eksik.")
+
+        coll_ref = db.collection("report_examples").where("owner_id", "==", user["uid"])
+        if report_type:
+            coll_ref = coll_ref.where("report_type", "==", report_type)
+
+        docs = await asyncio.to_thread(lambda: list(coll_ref.stream()))
+        
+        results = []
+        for doc in docs:
+            d = doc.to_dict()
+            d["id"] = doc.id
+            results.append(d)
+            
+        results.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        return results
+
+    async def delete_report_example(self, example_id: str, user: Dict[str, Any]) -> bool:
+        """Kayıtlı örnek raporu siler."""
+        if not user or not user.get("uid"):
+            raise ValueError("Kullanıcı doğrulaması eksik.")
+
+        doc_ref = db.collection("report_examples").document(example_id)
+        doc = await asyncio.to_thread(doc_ref.get)
+        if not doc.exists:
+            raise ValueError("Örnek rapor bulunamadı.")
+            
+        data = doc.to_dict()
+        if data.get("owner_id") != user["uid"]:
+            raise ValueError("Bu örnek raporu silme yetkiniz yok.")
+
+        await asyncio.to_thread(doc_ref.delete)
+        return True
+
+    async def generate_report_from_wizard(
+        self,
+        audit_id: str,
+        example_id: Optional[str],
+        report_type: str,
+        selected_findings: List[str],
+        instructions: str,
+        user: Dict[str, Any]
+    ) -> str:
+        """Rapor sihirbazından gelen bilgilere ve seçilen şablonun kurallarına göre rapor taslağı hazırlar."""
+        if not user or not user.get("uid"):
+            raise ValueError("Kullanıcı doğrulaması eksik.")
+
+        api_key, model_name, _temperature, _user_sp, is_premium = await _get_user_ai_settings(user["uid"])
+        if not api_key:
+            from app.config import settings
+            if is_premium and settings.GEMINI_API_KEY:
+                api_key = settings.GEMINI_API_KEY
+            else:
+                raise ValueError("Henüz bir Gemini API anahtarı tanımlanmamış.")
+
+        # Denetim verisini çek
+        audit = await AuditService.get_audit(audit_id)
+        if not audit:
+            raise ValueError("Denetim kaydı bulunamadı.")
+
+        # Seçilen şablon kurallarını çek (varsa)
+        example_rules = ""
+        if example_id:
+            example_ref = db.collection("report_examples").document(example_id)
+            example_doc = await asyncio.to_thread(example_ref.get)
+            if example_doc.exists:
+                d = example_doc.to_dict()
+                example_rules = d.get("extracted_rules", "")
+
+        # Mevzuat + bilgi bankası bağlamı
+        knowledge_ctx, legislation_ctx = await asyncio.gather(
+            self._get_knowledge_context(),
+            self._get_legislation_context(user),
+        )
+
+        audit_info = f"""
+DENETİM BİLGİLERİ:
+- Kurum: {audit.get('title', '')}
+- Konum: {audit.get('location', '')}
+- Tarih: {audit.get('date', '')}
+- Müfettiş: {audit.get('inspector', '')}
+- Durum: {audit.get('status', '')}
+- Kurum Türü: {audit.get('institution', '')}
+- Rapor Tipi: {report_type}
+"""
+
+        # Bulguları listele
+        findings_ctx = "\nSEÇİLEN BULGULAR VE DETAYLARI:\n"
+        if selected_findings:
+            for idx, finding in enumerate(selected_findings, 1):
+                findings_ctx += f"{idx}. {finding}\n"
+        else:
+            findings_ctx += "- Belirtilen özel bir bulgu bulunmuyor.\n"
+
+        system_prompt = f"""Sen deneyimli bir GSB (Gençlik ve Spor Bakanlığı) Müfettişisin. Resmi kurallara ve mevzuata uygun denetim raporu taslağı yazıyorsun.
+
+YAPISAL VE ÜSLUP KURALLARI (BU KURALLARA MUTLAKA UYACAKSIN):
+{example_rules or "Standart resmi müfettişlik üslubunu kullan. Giriş, Bulgular, Tenkitler ve Sonuç bölümlerini oluştur."}
+
+RAPOR YAZIM YÖNERGELERİ:
+1. DİL: Resmi Türkçe, müfettişlik raporu dili. Net, hukuki cümleler kullan.
+2. FORMAT: HTML formatında yaz. YALNIZCA <h1>, <h2>, <h3>, <p>, <ul>, <li>, <strong>, <table>, <tr>, <td> etiketlerini kullan. 
+3. BÖLÜM YAPISI: Yukarıdaki "Yapısal ve Üslup Kuralları"nda belirtilen bölümleri (Giriş, Bulgular vb.) birebir oluştur.
+4. YASAL DAYANAK: Bulguları yazarken aşağıdaki Mevzuat Belgelerinden ve Tenkit Kural Bankasından yararlanarak yasal dayanak (kanun/yönetmelik madde numarası) ekle.
+
+═══════════════════════════════════════
+MEVZUAT BELGELERİ:
+═══════════════════════════════════════
+{legislation_ctx}
+
+═══════════════════════════════════════
+TENKİT MADDELERİ BİLGİ BANKASI:
+═══════════════════════════════════════
+{knowledge_ctx}
+
+{audit_info}
+{findings_ctx}
+
+GÜNCEL TARİH: {datetime.now().strftime('%d.%m.%Y')}
+"""
+
+        user_prompt = f"Lütfen yukarıdaki kurallara, seçilen bulgulara ve yapı şablonuna göre taslak rapor oluştur.\n\nKullanıcı Ek Talimatları:\n{instructions or 'Eksiksiz, resmi ve detaylı bir taslak rapor hazırla.'}"
+
+        model = _build_model(api_key, model_name, system_instruction=system_prompt)
+        response = await model.generate_content_async(
+            user_prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.4,
+                max_output_tokens=16384,
+            ),
+        )
+        return response.text
+
+

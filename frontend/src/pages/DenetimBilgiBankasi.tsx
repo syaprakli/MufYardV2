@@ -1349,9 +1349,9 @@ export default function DenetimBilgiBankasi() {
                 </div>
             ) : (
                 // Standard Audit Category - Lists tasks and reports
-                <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
+                <div className="flex-1 flex flex-col xl:flex-row gap-6 overflow-hidden">
                     {/* 2. Tasks list pane */}
-                    <div className="w-full lg:w-80 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex flex-col gap-3 flex-shrink-0 overflow-y-auto">
+                    <div className={`w-full xl:w-80 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-col gap-3 flex-shrink-0 overflow-y-auto ${selectedTaskId ? "hidden xl:flex" : "flex"}`}>
                         <div className="px-1 flex items-start justify-between gap-2">
                             <div>
                                 <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">{currentRaporTuru}</h3>
@@ -1446,7 +1446,7 @@ export default function DenetimBilgiBankasi() {
                     </div>
 
                     {/* 3. Detail Pane */}
-                    <div className="flex-1 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-6 flex flex-col overflow-y-auto">
+                    <div className={`flex-1 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-6 flex-col overflow-y-auto ${selectedTaskId ? "flex" : "hidden xl:flex"}`}>
                         {!selectedTask ? (
                             <div className="flex-1 flex flex-col items-center justify-center text-center gap-3">
                                 <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-950/20 flex items-center justify-center">
@@ -1462,41 +1462,53 @@ export default function DenetimBilgiBankasi() {
                         ) : (
                             <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-1">
                                 {/* Header */}
-                                <div className="flex flex-col md:flex-row justify-between gap-4 border-b border-slate-100 dark:border-slate-800/50 pb-4">
-                                    <div>
-                                        <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 mb-1">
-                                            <span>{selectedTask.rapor_turu}</span>
-                                        </div>
-                                        <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white leading-snug">{selectedTask.rapor_adi}</h2>
-                                        {(cachedData?.audits || []).filter((a: any) => a.task_id === selectedTask.id).length > 1 && (
-                                            <div className="mt-2 flex items-center gap-2">
-                                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aktif Form:</label>
-                                                <select
-                                                    value={selectedAuditId || ""}
-                                                    onChange={(e) => setSelectedAuditId(e.target.value)}
-                                                    className="text-xs font-bold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 outline-none text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-blue-500"
-                                                >
-                                                    {(cachedData?.audits || [])
-                                                        .filter((a: any) => a.task_id === selectedTask.id)
-                                                        .map((a: any) => (
-                                                            <option key={a.id} value={a.id}>
-                                                                {a.title} {a.report_created === false ? "(Taslak)" : "(Editörde)"}
-                                                            </option>
-                                                        ))}
-                                                </select>
+                                <div className="flex flex-col border-b border-slate-100 dark:border-slate-800/50 pb-4 gap-4">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedTaskId(null);
+                                            setSelectedAuditId(null);
+                                        }}
+                                        className="xl:hidden flex items-center gap-1.5 text-xs font-black text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors uppercase tracking-wider mb-2 self-start"
+                                    >
+                                        <ArrowLeft size={14} className="mr-1" />
+                                        <span>GÖREV LİSTESİNE DÖN</span>
+                                    </button>
+                                    <div className="flex flex-col md:flex-row justify-between gap-4 w-full">
+                                        <div>
+                                            <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 mb-1">
+                                                <span>{selectedTask.rapor_turu}</span>
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                        <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-lg ${
-                                            selectedTask.rapor_durumu === "Tamamlandı"
-                                                ? "bg-green-500/10 text-green-500"
-                                                : selectedTask.rapor_durumu === "Devam Ediyor"
-                                                ? "bg-amber-500/10 text-amber-500"
-                                                : "bg-slate-500/10 text-slate-400"
-                                        }`}>
-                                            Durum: {selectedTask.rapor_durumu}
-                                        </span>
+                                            <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white leading-snug">{selectedTask.rapor_adi}</h2>
+                                            {(cachedData?.audits || []).filter((a: any) => a.task_id === selectedTask.id).length > 1 && (
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aktif Form:</label>
+                                                    <select
+                                                        value={selectedAuditId || ""}
+                                                        onChange={(e) => setSelectedAuditId(e.target.value)}
+                                                        className="text-xs font-bold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 outline-none text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-blue-500"
+                                                    >
+                                                        {(cachedData?.audits || [])
+                                                            .filter((a: any) => a.task_id === selectedTask.id)
+                                                            .map((a: any) => (
+                                                                <option key={a.id} value={a.id}>
+                                                                    {a.title} {a.report_created === false ? "(Taslak)" : "(Editörde)"}
+                                                                </option>
+                                                            ))}
+                                                    </select>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-lg ${
+                                                selectedTask.rapor_durumu === "Tamamlandı"
+                                                    ? "bg-green-500/10 text-green-500"
+                                                    : selectedTask.rapor_durumu === "Devam Ediyor"
+                                                    ? "bg-amber-500/10 text-amber-500"
+                                                    : "bg-slate-500/10 text-slate-400"
+                                            }`}>
+                                                Durum: {selectedTask.rapor_durumu}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 

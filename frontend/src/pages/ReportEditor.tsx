@@ -28,6 +28,8 @@ const ReportEditorTinyMCELazy = lazy(() => import("../components/report/ReportEd
 const ReportEditorHistoryPanelLazy = lazy(() => import("../components/report/ReportEditorHistoryPanel"));
 const ReportEditorChecklistPanelLazy = lazy(() => import("../components/report/ReportEditorChecklistPanel"));
 const ReportEditorAiSuggestionPanelLazy = lazy(() => import("../components/report/ReportEditorAiSuggestionPanel"));
+const ReportWizardModalLazy = lazy(() => import("../components/report/ReportWizardModal"));
+const ReportExamplePoolModalLazy = lazy(() => import("../components/report/ReportExamplePoolModal"));
 
 const AI_PROMPT_PRESETS = [
     {
@@ -82,7 +84,18 @@ export default function ReportEditor() {
     const AUTOSAVE_INTERVAL_MS = 60 * 1000;
 
     const confirm = useConfirm();
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
+    const isAdmin = profile?.role === "admin";
+    
+    // Yalnızca admin olan ve aşağıdaki kurucu e-postalarına sahip olan kullanıcılar AI Sihirbazına erişebilir.
+    const founderEmails = [
+        "sefa.yaprakli@gsb.gov.tr",
+        "syaprakli@gmail.com",
+        "sefayaprakli@hotmail.com"
+    ];
+    const userEmail = (user?.email || "").toLowerCase().trim();
+    const isFounder = founderEmails.includes(userEmail);
+    const isWizardAllowed = isAdmin && isFounder;
     const { openChat } = useChat();
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
     const [isProofreadOpen, setIsProofreadOpen] = useState(false);
@@ -140,6 +153,10 @@ export default function ReportEditor() {
     const [showMergeReportModal, setShowMergeReportModal] = useState(false);
     const [mergeReportOptions, setMergeReportOptions] = useState<any[]>([]);
     const [selectedMergeAuditIds, setSelectedMergeAuditIds] = useState<string[]>([]);
+
+    const [isWizardOpen, setIsWizardOpen] = useState(false);
+    const [isExamplePoolOpen, setIsExamplePoolOpen] = useState(false);
+    const [extractedFindings, setExtractedFindings] = useState<Array<{ id: string; text: string; note: string; area: string }>>([]);
 
     const isChecklistEmpty = useMemo(() => {
         if (!audit) return true;
@@ -207,6 +224,10 @@ export default function ReportEditor() {
     const openShareModal = () => {
         closeAllSidebarsAndModals();
         setIsShareModalOpen(true);
+    };
+    const openLegislation = () => {
+        closeAllSidebarsAndModals();
+        setIsLegislationOpen(true);
     };
     const openChecklist = () => {
         closeAllSidebarsAndModals();
@@ -683,6 +704,54 @@ export default function ReportEditor() {
             } finally {
                 setSaving(false);
             }
+         })();
+    };
+
+    const handleApplyWizardResult = (htmlResult: string, mode: "append" | "replace" | "selection") => {
+        void (async () => {
+            if (!editorRef.current || !htmlResult.trim() || !id) return;
+            const editor = editorRef.current;
+            const currentHtml = editor.getContent() || content;
+
+            try {
+                setSaving(true);
+
+                let updatedHtml = "";
+                if (mode === "selection") {
+                    const selectedHtml = String(editor.selection?.getContent?.({ format: "html" }) || "").trim();
+                    if (!selectedHtml) {
+                        toast.error("Seçili paragraf bulunamadı. Önce editörde bir paragraf veya metin seçin.");
+                        return;
+                    }
+                    editor.selection.setContent(htmlResult);
+                    updatedHtml = editor.getContent();
+                } else if (mode === "replace") {
+                    updatedHtml = htmlResult;
+                    editor.setContent(htmlResult);
+                } else {
+                    updatedHtml = `${currentHtml}${currentHtml.trim() ? "<p><br></p>" : ""}${htmlResult}`;
+                    editor.setContent(updatedHtml);
+                }
+
+                setContent(updatedHtml);
+                lastAutosaveSnapshotRef.current = updatedHtml;
+                await updateAudit(id, {
+                    report_content: updatedHtml,
+                    doc_header: docHeader,
+                    doc_footer: docFooter,
+                    show_page_numbers: showPageNumbers
+                }, true, userIdentity);
+                
+                lastVersionAtRef.current = Date.now();
+                changedCharsSinceVersionRef.current = 0;
+                await loadVersions(id);
+                setLastSaved(new Date());
+                toast.success("AI sihirbaz raporu taslağı başarıyla uygulandı ve yeni sürüm kaydedildi.");
+            } catch (error) {
+                toast.error("AI raporu taslağı uygulanırken hata oluştu.");
+            } finally {
+                setSaving(false);
+            }
         })();
     };
 
@@ -941,6 +1010,56 @@ export default function ReportEditor() {
         setIsDiffOpen(true);
     };
 
+    const handleOpenWizard = () => {
+        if (!audit) return;
+
+        const task = cachedData?.tasks?.find((t: any) => t.id === audit.task_id);
+        if (!task) {
+            toast.error("İlişkili görev bulunamadı.");
+            return;
+        }
+
+        const childTasks = (cachedData?.tasks || []).filter((t: any) => t.parent_task_id === task.id);
+        const parentAudit = audit;
+        const childAudits = (cachedData?.audits || []).filter((a: any) => childTasks.some(ct => ct.id === a.task_id));
+
+        const selectedAudits = [parentAudit, ...childAudits];
+        const categoryMap: Record<string, string> = {
+            "İl Denetimi": "il",
+            "Federasyon Denetimi": "federasyon",
+            "Kyk Yurt Denetimi": "kyk",
+            "Özel Yurt Denetimi": "ozel",
+            "Spor Kulüpleri Denetimi": "spor"
+        };
+
+        const findings: Array<{ id: string; text: string; note: string; area: string }> = [];
+
+        selectedAudits.forEach(aud => {
+            const t = cachedData?.tasks?.find((taskObj: any) => taskObj.id === aud.task_id);
+            if (!t) return;
+            const path = categoryMap[t.rapor_turu] || "il";
+            const questions = AUDIT_TEMPLATES[path] || [];
+            const form = aud.audit_data?.form || {};
+
+            questions.forEach((q: any) => {
+                const answer = form[q.id];
+                const note = form[`inspector_note_${q.id}`];
+                if (answer === "no") {
+                    findings.push({ 
+                        id: `${aud.id}_${q.id}`, 
+                        text: q.text, 
+                        note: note || "", 
+                        area: q.area 
+                    });
+                }
+            });
+        });
+
+        setExtractedFindings(findings);
+        setIsWizardOpen(true);
+        setShowMobileActions(false);
+    };
+
     const handleImportFindings = () => {
         if (!audit) return;
 
@@ -1110,7 +1229,24 @@ export default function ReportEditor() {
 
                 ydoc = new Y.Doc();
                 const baseWs = WS_URL.endsWith('/') ? WS_URL.slice(0, -1) : WS_URL;
-                provider = new WebsocketProvider(`${baseWs}/api/collaboration/report`, id, ydoc);
+                
+                let token = "";
+                if (user) {
+                    try {
+                        token = await user.getIdToken();
+                    } catch (tokenErr) {
+                        console.error("Failed to get idToken for collab:", tokenErr);
+                    }
+                }
+
+                provider = new WebsocketProvider(
+                    `${baseWs}/api/collaboration/report`, 
+                    id, 
+                    ydoc,
+                    {
+                        params: token ? { token } : {}
+                    }
+                );
 
                 provider.on('status', (event: any) => {
                     setProviderStatus(event.status);
@@ -1350,11 +1486,11 @@ export default function ReportEditor() {
                         </Button>
                     </div>
 
-                    <div className={`${showMobileActions ? "flex animate-in slide-in-from-top-2 duration-200" : "hidden"} md:flex flex-col md:flex-row items-stretch md:items-center gap-2 flex-wrap w-full md:w-auto bg-slate-50 md:bg-transparent p-2.5 md:p-0 rounded-xl border border-slate-200 md:border-none mt-2 md:mt-0`}>
+                    <div className={`${showMobileActions ? "flex animate-in slide-in-from-top-2 duration-200" : "hidden"} md:flex flex-col md:flex-row items-stretch md:items-center gap-2 md:flex-nowrap md:overflow-x-auto md:scrollbar-none w-full md:w-auto bg-slate-50 md:bg-transparent p-2.5 md:p-0 rounded-xl border border-slate-200 md:border-none mt-2 md:mt-0 max-w-full pb-1`}>
                         {providerStatus === 'connected' && onlineUsers.length > 0 && (
-                            <div className="flex -space-x-1.5 mr-2 mb-2 md:mb-0 justify-center md:justify-start">
+                            <div className="flex -space-x-1.5 mr-2 mb-2 md:mb-0 justify-center md:justify-start flex-shrink-0">
                                 {onlineUsers.map((u, i) => (
-                                    <div key={i} title={u.name} className="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[9px] font-black text-white shadow-sm" style={{ backgroundColor: u.color }}>
+                                    <div key={i} title={u.name} className="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[9px] font-black text-white shadow-sm shrink-0" style={{ backgroundColor: u.color }}>
                                         {u.name.substring(0, 2).toUpperCase()}
                                     </div>
                                 ))}
@@ -1362,22 +1498,28 @@ export default function ReportEditor() {
                         )}
                         
                         {/* TÜM BUTONLAR VE PANELLER AKTİF */}
-                        <Button variant="ghost" onClick={() => { openShareModal(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Paylaş</Button>
-                        <Button variant="ghost" onClick={() => { openChat(`audit_${id}`, audit?.title || "Rapor Odası", "audit"); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><MessageSquare size={14} className="mr-1.5" /> Rapor Odası</Button>
-                        <Button variant="ghost" onClick={() => { openTemplateModal(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><LayoutGrid size={14} className="mr-1.5" /> Şablon Seç</Button>
-                        <Button variant="ghost" onClick={() => { openProofread(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><CheckCircle size={14} className="mr-1.5" /> Dil Kontrolü</Button>
-                        <Button variant="ghost" onClick={() => { openSnippetBank(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Taslak Metinler</Button>
-                        <Button variant="ghost" onClick={() => { openVoiceInput(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center">Sesli Not</Button>
-                        <Button variant="ghost" onClick={() => { handleImportFindings(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><ClipboardCheck size={14} className="mr-1.5 text-violet-600 dark:text-violet-400" /> <span className="inline md:hidden xl:inline">Bulguları Aktar</span></Button>
-                        <Button variant="ghost" disabled={true} className="h-8 px-3 text-[11px] font-bold rounded-lg bg-slate-100 text-slate-400 opacity-50 cursor-not-allowed justify-start md:justify-center"><Sparkles size={14} className="mr-1.5 text-slate-400" /> <span className="inline md:hidden xl:inline">AI Öneri (Yakında)</span></Button>
-                        <Button variant="outline" onClick={() => { handleSave(); setShowMobileActions(false); }} disabled={saving || !canEditContent} className="h-8 px-2 md:px-3 text-[11px] font-bold border-primary/20 rounded-lg justify-start md:justify-center">{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" />} <span className="inline md:hidden lg:inline">Kaydet</span></Button>
+                        <Button variant="ghost" onClick={() => { openShareModal(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center flex-shrink-0">Paylaş</Button>
+                        <Button variant="ghost" onClick={() => { openChat(`audit_${id}`, audit?.title || "Rapor Odası", "audit"); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center flex-shrink-0"><MessageSquare size={14} className="mr-1.5" /> Rapor Odası</Button>
+                        <Button variant="ghost" onClick={() => { openTemplateModal(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center flex-shrink-0"><LayoutGrid size={14} className="mr-1.5" /> Şablon Seç</Button>
+                        <Button variant="ghost" onClick={() => { openProofread(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center flex-shrink-0"><CheckCircle size={14} className="mr-1.5" /> Dil Kontrolü</Button>
+                        <Button variant="ghost" onClick={() => { openLegislation(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center flex-shrink-0"><BookOpen size={14} className="mr-1.5" /> Mevzuat Öner</Button>
+                        <Button variant="ghost" onClick={() => { openSnippetBank(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center flex-shrink-0">Taslak Metinler</Button>
+                        <Button variant="ghost" onClick={() => { openVoiceInput(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center flex-shrink-0">Sesli Not</Button>
+                        <Button variant="ghost" onClick={() => { handleImportFindings(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center flex-shrink-0"><ClipboardCheck size={14} className="mr-1.5 text-violet-600 dark:text-violet-400" /> <span className="inline md:hidden xl:inline">Bulguları Aktar</span></Button>
+                        {isWizardAllowed && (
+                            <>
+                                <Button variant="ghost" onClick={handleOpenWizard} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center flex-shrink-0"><Sparkles size={14} className="mr-1.5 text-violet-600 dark:text-violet-400 animate-pulse" /> <span className="inline md:hidden xl:inline">AI Sihirbazı</span></Button>
+                                <Button variant="ghost" onClick={() => { setIsExamplePoolOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center flex-shrink-0">AI Öğretim Havuzu</Button>
+                            </>
+                        )}
+                        <Button variant="outline" onClick={() => { handleSave(); setShowMobileActions(false); }} disabled={saving || !canEditContent} className="h-8 px-2 md:px-3 text-[11px] font-bold border-primary/20 rounded-lg justify-start md:justify-center flex-shrink-0">{saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" />} <span className="inline md:hidden lg:inline">Kaydet</span></Button>
                         
-                        <Button variant="ghost" onClick={() => { openAuditTrail(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center">Denetim İzi</Button>
-                        <Button variant="ghost" onClick={() => { openHistory(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center"><History size={14} className="mr-1.5" /> Sürümler</Button>
-                        <Button variant="outline" onClick={() => { handleSaveVersion(); setShowMobileActions(false); }} disabled={saving || !canEditContent} className="h-8 px-2 md:px-3 text-[11px] font-bold border-emerald-300 text-emerald-700 rounded-lg justify-start md:justify-center"><History size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" /> <span className="inline md:hidden lg:inline">Sürüm Kaydet</span></Button>
+                        <Button variant="ghost" onClick={() => { openAuditTrail(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center flex-shrink-0">Denetim İzi</Button>
+                        <Button variant="ghost" onClick={() => { openHistory(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center flex-shrink-0"><History size={14} className="mr-1.5" /> Sürümler</Button>
+                        <Button variant="outline" onClick={() => { handleSaveVersion(); setShowMobileActions(false); }} disabled={saving || !canEditContent} className="h-8 px-2 md:px-3 text-[11px] font-bold border-emerald-300 text-emerald-700 rounded-lg justify-start md:justify-center flex-shrink-0"><History size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" /> <span className="inline md:hidden lg:inline">Sürüm Kaydet</span></Button>
                         
-                        <Button onClick={() => { handleExportWord(); setShowMobileActions(false); }} className="h-8 px-2 md:px-3 text-[11px] font-black bg-slate-900 text-white rounded-lg shadow-sm justify-start md:justify-center"><Download size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" /> <span className="inline md:hidden lg:inline">Word</span></Button>
-                        <Button variant="outline" onClick={() => { handlePrintPreview(); setShowMobileActions(false); }} className="h-8 px-2 md:px-3 text-[11px] font-bold rounded-lg border-slate-300 justify-start md:justify-center"><span className="mr-1.5 md:mr-0 lg:mr-1.5">🖨️</span> <span className="inline md:hidden lg:inline">Önizleme</span></Button>
+                        <Button onClick={() => { handleExportWord(); setShowMobileActions(false); }} className="h-8 px-2 md:px-3 text-[11px] font-black bg-slate-900 text-white rounded-lg shadow-sm justify-start md:justify-center flex-shrink-0"><Download size={14} className="mr-1.5 md:mr-0 lg:mr-1.5" /> <span className="inline md:hidden lg:inline">Word</span></Button>
+                        <Button variant="outline" onClick={() => { handlePrintPreview(); setShowMobileActions(false); }} className="h-8 px-2 md:px-3 text-[11px] font-bold rounded-lg border-slate-300 justify-start md:justify-center flex-shrink-0"><span className="mr-1.5 md:mr-0 lg:mr-1.5">🖨️</span> <span className="inline md:hidden lg:inline">Önizleme</span></Button>
                     </div>
 
                     <ReportEditorVersionLabelModal isOpen={isVersionLabelModalOpen} onClose={() => setIsVersionLabelModalOpen(false)} onSave={handleConfirmSaveVersion} />
@@ -1639,7 +1781,7 @@ export default function ReportEditor() {
                                 table_toolbar: 'tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol',
                                 content_style: 'html { background-color: #f1f5f9 !important; } body { font-family: Times New Roman, serif !important; font-size: 12pt !important; line-height: 1.6 !important; padding: 2.5cm !important; width: 21cm !important; margin: 1.5cm auto !important; background-image: linear-gradient(to bottom, #ffffff 29.7cm, #f1f5f9 29.7cm, #f1f5f9 30.7cm) !important; background-size: 100% 30.7cm !important; background-repeat: repeat-y !important; background-color: #ffffff !important; box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; box-sizing: border-box !important; } p { margin: 0 0 12px 0; } table td, table th { border: 1px solid #cbd5e1; padding: 8px; }',
                                 language: 'tr',
-                                language_url: '/langs/tr.js',
+                                language_url: 'langs/tr.js',
                                 branding: false,
                                 promotion: false,
                                 setup: (editor: any) => {
@@ -1840,6 +1982,27 @@ export default function ReportEditor() {
             )}
 
 
+
+            {isWizardAllowed && isWizardOpen && (
+                <Suspense fallback={null}>
+                    <ReportWizardModalLazy
+                        isOpen={isWizardOpen}
+                        onClose={() => setIsWizardOpen(false)}
+                        auditId={id || ""}
+                        findings={extractedFindings}
+                        onApply={handleApplyWizardResult}
+                    />
+                </Suspense>
+            )}
+
+            {isWizardAllowed && isExamplePoolOpen && (
+                <Suspense fallback={null}>
+                    <ReportExamplePoolModalLazy
+                        isOpen={isExamplePoolOpen}
+                        onClose={() => setIsExamplePoolOpen(false)}
+                    />
+                </Suspense>
+            )}
 
             {isAiSuggestionOpen && (
                 <Suspense fallback={null}>

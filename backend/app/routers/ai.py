@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File, Request
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File, Request, Form
 from pydantic import BaseModel, field_validator
 from typing import List, Optional
 from app.services.ai_service import AIService
-from app.lib.auth import get_current_user, require_roles
+from app.services.extractor_service import ExtractorService
+from app.lib.auth import get_current_user, require_roles, require_founder_admin
 from app.lib.rate_limiter import limiter
 from app.config import BASE_DIR
 import os
@@ -468,5 +469,103 @@ async def suggest_legislation_endpoint(
         logger.error(f"[AI LEGISLATION SUGGEST] Exception: {e}")
         status_code, message = _normalize_gemini_error(e)
         raise HTTPException(status_code=status_code, detail=message)
+
+
+# ──────────── ÖRNEK RAPOR HAVUZU & SİHİRBAZ ROUTERLARI ────────────
+
+class GenerateWizardReportRequest(BaseModel):
+    audit_id: str
+    example_id: Optional[str] = None
+    report_type: str
+    selected_findings: List[str] = []
+    instructions: str = ""
+
+@router.get("/report-examples")
+async def get_report_examples(
+    report_type: Optional[str] = Query(None),
+    current_user: dict = Depends(require_founder_admin)
+):
+    """Kullanıcının kayıtlı örnek rapor şablonlarını listeler."""
+    try:
+        return await ai_service.get_report_examples(current_user, report_type)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/report-examples")
+async def create_report_example(
+    title: str = Form(...),
+    report_type: str = Form(...),
+    content: Optional[str] = Form(None),
+    file: Optional[UploadFile] = File(None),
+    current_user: dict = Depends(require_founder_admin)
+):
+    """Yeni bir örnek rapor kaydeder (Dosyadan okuyarak veya doğrudan metin alarak)."""
+    try:
+        report_content = ""
+        if file:
+            # Dosyadan metni çıkar
+            report_content = await ExtractorService.extract_text(file)
+        elif content:
+            report_content = content
+        else:
+            raise HTTPException(status_code=400, detail="Dosya veya metin içeriği sağlanmalıdır.")
+
+        if not report_content.strip():
+            raise HTTPException(status_code=400, detail="Örnek rapor içeriği boş olamaz.")
+
+        result = await ai_service.save_report_example(
+            title=title,
+            report_type=report_type,
+            content=report_content,
+            user=current_user
+        )
+        return result
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Örnek rapor kaydedilirken hata oluştu: {str(e)}")
+
+@router.delete("/report-examples/{example_id}")
+async def delete_report_example(
+    example_id: str,
+    current_user: dict = Depends(require_founder_admin)
+):
+    """Kayıtlı örnek raporu siler."""
+    try:
+        await ai_service.delete_report_example(example_id, current_user)
+        return {"status": "success", "message": "Örnek rapor başarıyla silindi."}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/generate-wizard-report")
+@limiter.limit("2/minute")
+async def generate_wizard_report(
+    req: GenerateWizardReportRequest,
+    request: Request,
+    current_user: dict = Depends(require_founder_admin)
+):
+    """Rapor sihirbazından alınan parametrelerle taslak rapor üretir."""
+    try:
+        html_content = await ai_service.generate_report_from_wizard(
+            audit_id=req.audit_id,
+            example_id=req.example_id,
+            report_type=req.report_type,
+            selected_findings=req.selected_findings,
+            instructions=req.instructions,
+            user=current_user
+        )
+        return {"html": html_content}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        status_code, message = _normalize_gemini_error(e)
+        raise HTTPException(status_code=status_code, detail=message)
+
 
 
