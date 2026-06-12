@@ -382,6 +382,22 @@ class TaskService:
                     except Exception as outer_err:
                         print(f"[NOTIF] Update task outer notify error: {outer_err}")
 
+            # Cascade: if task collaboration fields changed, update associated audits
+            collab_fields = ('pending_collaborators', 'accepted_collaborators', 'assigned_to', 'shared_with')
+            if any(k in update_data for k in collab_fields):
+                try:
+                    audits_ref = db.collection('audits').where('task_id', '==', task_id)
+                    audits_docs = await asyncio.to_thread(audits_ref.get)
+                    
+                    audit_updates = {k: update_data[k] for k in collab_fields if k in update_data}
+                    
+                    if audit_updates:
+                        for doc in audits_docs:
+                            audit_doc_ref = db.collection('audits').document(doc.id)
+                            await asyncio.to_thread(audit_doc_ref.update, audit_updates)
+                except Exception as ce:
+                    print(f"Failed to cascade task collaboration fields to audits: {ce}")
+
             # Cascade: if task name, code, parent, or start date changed, update associated audit titles
             if any(k in update_data for k in ('rapor_adi', 'rapor_kodu', 'parent_task_id', 'baslama_tarihi')):
                 try:
@@ -558,6 +574,19 @@ class TaskService:
                     'accepted_collaborators': accepted
                 })
 
+                # Update associated audits
+                try:
+                    audits_ref = db.collection('audits').where('task_id', '==', task_id)
+                    audits_docs = await asyncio.to_thread(audits_ref.get)
+                    for doc in audits_docs:
+                        audit_doc_ref = db.collection('audits').document(doc.id)
+                        await asyncio.to_thread(audit_doc_ref.update, {
+                            'pending_collaborators': pending,
+                            'accepted_collaborators': accepted
+                        })
+                except Exception as ae:
+                    print(f"Failed to update audit collaborators on task acceptance: {ae}")
+
                 # --- Auto Folder Creation Hook (On Acceptance) ---
                 try:
                     from app.lib.folder_manager import FolderManager
@@ -597,6 +626,17 @@ class TaskService:
                 await asyncio.to_thread(doc_ref.update, {
                     'pending_collaborators': pending
                 })
+                # Update associated audits
+                try:
+                    audits_ref = db.collection('audits').where('task_id', '==', task_id)
+                    audits_docs = await asyncio.to_thread(audits_ref.get)
+                    for doc in audits_docs:
+                        audit_doc_ref = db.collection('audits').document(doc.id)
+                        await asyncio.to_thread(audit_doc_ref.update, {
+                            'pending_collaborators': pending
+                        })
+                except Exception as re:
+                    print(f"Failed to update audit collaborators on task rejection: {re}")
                 return True
             return False
         except Exception:

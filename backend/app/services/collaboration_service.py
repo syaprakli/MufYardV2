@@ -539,6 +539,28 @@ class CollaborationService:
                     'pending_collaborators': pending,
                     'accepted_collaborators': accepted
                 })
+                
+                # Cascade to associated audits if the accepted resource is a task
+                if collection_name == 'tasks':
+                    try:
+                        audits_ref = db.collection('audits').where('task_id', '==', resource_id)
+                        audits_docs = await asyncio.to_thread(audits_ref.get)
+                        for doc in audits_docs:
+                            audit_doc_ref = db.collection('audits').document(doc.id)
+                            audit_data = doc.to_dict()
+                            a_pending = audit_data.get('pending_collaborators', [])
+                            a_accepted = audit_data.get('accepted_collaborators', [])
+                            if user_id in a_pending:
+                                a_pending.remove(user_id)
+                            if user_id not in a_accepted:
+                                a_accepted.append(user_id)
+                            await asyncio.to_thread(audit_doc_ref.update, {
+                                'pending_collaborators': a_pending,
+                                'accepted_collaborators': a_accepted
+                            })
+                    except Exception as ae:
+                        print(f"Error cascading task acceptance to audits in collaboration_service: {ae}")
+                
                 return True
             return False
         except Exception as e:
@@ -583,6 +605,32 @@ class CollaborationService:
                     'pending_collaborators': pending,
                     'shared_with': shared_with
                 })
+                
+                # Cascade to associated audits if the rejected resource is a task
+                if collection_name == 'tasks':
+                    try:
+                        audits_ref = db.collection('audits').where('task_id', '==', resource_id)
+                        audits_docs = await asyncio.to_thread(audits_ref.get)
+                        for doc in audits_docs:
+                            audit_doc_ref = db.collection('audits').document(doc.id)
+                            audit_data = doc.to_dict()
+                            a_pending = audit_data.get('pending_collaborators', [])
+                            a_shared_with = audit_data.get('shared_with', [])
+                            a_changed = False
+                            if user_id in a_pending:
+                                a_pending.remove(user_id)
+                                a_changed = True
+                            if user_id in a_shared_with:
+                                a_shared_with.remove(user_id)
+                                a_changed = True
+                            if a_changed:
+                                await asyncio.to_thread(audit_doc_ref.update, {
+                                    'pending_collaborators': a_pending,
+                                    'shared_with': a_shared_with
+                                })
+                    except Exception as re:
+                        print(f"Error cascading task rejection to audits in collaboration_service: {re}")
+                
                 return True
             return False
         except Exception as e:
