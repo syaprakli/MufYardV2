@@ -14,7 +14,7 @@ import { useConfirm } from "../lib/context/ConfirmContext";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useGlobalData } from "../lib/context/GlobalDataContext";
 import { createAudit, updateAudit, deleteAudit, fetchAuditById } from "../lib/api/audit";
-import { updateTask } from "../lib/api/tasks";
+import { updateTask, createTask } from "../lib/api/tasks";
 
 interface KnowledgeItem {
     id: string;
@@ -281,13 +281,17 @@ export default function DenetimKyk() {
 
     const pickerTasks = useMemo(() => {
         if (!accessibleTasks.length || !currentRaporTuru) return [];
-        return accessibleTasks.filter((task: any) => task.rapor_turu === currentRaporTuru);
+        return accessibleTasks.filter((task: any) => 
+            task.rapor_turu === currentRaporTuru || task.rapor_turu === "İl Denetimi"
+        );
     }, [accessibleTasks, currentRaporTuru]);
 
     // Get tasks from global context
     const filteredTasks = useMemo(() => {
         if (!accessibleTasks.length || !currentRaporTuru) return [];
-        return accessibleTasks.filter((t: any) => t.rapor_turu === currentRaporTuru);
+        return accessibleTasks.filter((t: any) => 
+            t.rapor_turu === currentRaporTuru || t.rapor_turu === "İl Denetimi"
+        );
     }, [accessibleTasks, currentRaporTuru]);
 
     // Selected Task Details
@@ -295,6 +299,21 @@ export default function DenetimKyk() {
         if (!selectedTaskId || !cachedData?.tasks) return null;
         return cachedData.tasks.find(t => t.id === selectedTaskId) || null;
     }, [selectedTaskId, cachedData?.tasks]);
+
+    // Eğer seçili görev İl Denetimi ise ve buna bağlı bir KYK alt görevi zaten varsa, otomatik olarak o KYK görevini seç
+    useEffect(() => {
+        if (selectedTaskId && cachedData?.tasks) {
+            const task = cachedData.tasks.find(t => t.id === selectedTaskId);
+            if (task && task.rapor_turu === "İl Denetimi") {
+                const childKyk = cachedData.tasks.find(
+                    t => t.rapor_turu === "Kyk Yurt Denetimi" && t.parent_task_id === selectedTaskId
+                );
+                if (childKyk) {
+                    setSelectedTaskId(childKyk.id);
+                }
+            }
+        }
+    }, [selectedTaskId, cachedData?.tasks, setSelectedTaskId]);
 
     // Resolve the correct tab ID for the selected task (may differ from activeTab)
     const taskTabId = useMemo(() => {
@@ -1197,13 +1216,57 @@ export default function DenetimKyk() {
     // Create Report / Start Audit
     // Accepts an optional taskOverride to support starting audits from the task picker flow
     const handleCreateReport = async (customTitle: string, taskOverride?: any) => {
-        const targetTask = taskOverride || selectedTask;
+        let targetTask = taskOverride || selectedTask;
         if (!targetTask) return;
 
         const canStartThisTask = pickerTasks.some((t: any) => t.id === targetTask.id);
         if (!canStartThisTask) {
             toast.error("Bu görev bu sekmede görünmüyor veya erişim yetkiniz yok.");
             return;
+        }
+
+        // Eğer İl Denetimi görevi seçilmişse, KYK Yurt Denetimi alt görevi oluştur veya bul
+        if (targetTask.rapor_turu === "İl Denetimi") {
+            setIsCreatingReport(true);
+            try {
+                // Önce bu İl Denetimi görevinin altında mevcut bir KYK görevi var mı kontrol edelim
+                const existingKyk = (cachedData?.tasks || []).find(
+                    (t: any) => t.rapor_turu === "Kyk Yurt Denetimi" && t.parent_task_id === targetTask.id
+                );
+                
+                if (existingKyk) {
+                    targetTask = existingKyk;
+                } else {
+                    // Yoksa arka planda yeni bir KYK Yurt Denetimi görevi oluşturup iliştirelim
+                    const newTaskPayload = {
+                        rapor_kodu: `${targetTask.rapor_kodu || "KYK"}-YURT`,
+                        rapor_adi: `${targetTask.rapor_adi} - KYK Yurt Denetimi`,
+                        rapor_turu: "Kyk Yurt Denetimi",
+                        baslama_tarihi: new Date().toLocaleDateString("tr-TR"),
+                        sure_gun: targetTask.sure_gun || 30,
+                        rapor_durumu: "Devam Ediyor",
+                        steps: [
+                            { text: "KYK Yurt Denetim Formu Doldurma", done: false },
+                            { text: "Bulguların Çıkartılması ve Analiz", done: false },
+                            { text: "Rapor Taslağının Oluşturulması", done: false }
+                        ],
+                        inspector: targetTask.inspector || profile?.full_name || user?.displayName || "Müfettiş",
+                        owner_id: user?.uid,
+                        assigned_to: targetTask.assigned_to || [user?.uid].filter(Boolean) as string[],
+                        parent_task_id: targetTask.id
+                    };
+                    const createdTask = await createTask(newTaskPayload);
+                    if (cachedData?.tasks) {
+                        cachedData.tasks.push(createdTask);
+                    }
+                    targetTask = createdTask;
+                }
+            } catch (err) {
+                console.error("KYK alt görevi oluşturma hatası:", err);
+                toast.error("Görevinize bağlı KYK alt görevi oluşturulamadı.");
+                setIsCreatingReport(false);
+                return;
+            }
         }
 
         const existingDraft = (cachedData?.audits || []).find((a: any) => a.task_id === targetTask.id && a.report_created === false);
@@ -2278,13 +2341,13 @@ export default function DenetimKyk() {
                                                 key={task.id}
                                                 onClick={() => {
                                                     setPickerTaskForAudit(task);
-                                                    setPrepAuditName(`${task.rapor_adi} Denetim Formu`);
+                                                    setPrepAuditName(task.rapor_turu === "İl Denetimi" ? `${task.rapor_adi} - KYK Yurt Denetimi` : `${task.rapor_adi} Denetim Formu`);
                                                 }}
                                                 className="w-full p-4 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/10 hover:border-blue-400 hover:bg-blue-50/30 dark:hover:bg-blue-950/10 transition-all duration-200 text-left group flex items-center justify-between gap-3"
                                             >
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-500">
+                                                        <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${task.rapor_turu === "İl Denetimi" ? "bg-blue-100 text-blue-700 font-bold" : "bg-slate-200/60 dark:bg-slate-800 text-slate-500"}`}>
                                                             {task.rapor_turu}
                                                         </span>
 
