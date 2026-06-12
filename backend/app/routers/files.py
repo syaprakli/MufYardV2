@@ -449,3 +449,79 @@ async def open_task_folder(task_id: str, current_user: dict = Depends(get_curren
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/create-task-folder/{task_id}")
+async def create_task_folder_endpoint(task_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Belirli bir göreve (Task) ait klasör yapısını (kabul edildiğinde) işletim sisteminde oluşturur (açmaz).
+    """
+    try:
+        from app.lib.firebase_admin import db
+        task_ref = db.collection('tasks').document(str(task_id))
+        task_doc = await asyncio.to_thread(task_ref.get)
+        if not task_doc.exists:
+            raise HTTPException(status_code=404, detail="Göreve ait klasör bilgisi bulunamadı.")
+            
+        task_data = task_doc.to_dict() or {}
+        
+        # Calculate year, type, code, title
+        start_date_str = task_data.get('baslama_tarihi')
+        year = FolderManager.extract_year(start_date_str)
+                
+        audit_type = task_data.get('rapor_turu', 'Diger') or 'Diger'
+        audit_code = task_data.get('rapor_kodu', 'Kodsuz') or 'Kodsuz'
+        audit_title = task_data.get('rapor_adi', 'Basliksiz') or 'Basliksiz'
+        
+        # Calculate full path
+        full_path = await asyncio.to_thread(
+            FolderManager.get_audit_path,
+            year,
+            audit_type,
+            audit_code,
+            audit_title
+        )
+        
+        # Register/Sync permissions in file_permissions.json
+        owner_id = task_data.get('owner_id')
+        assigned_to = task_data.get('assigned_to') or []
+        accepted_collaborators = task_data.get('accepted_collaborators') or []
+        shared_with = task_data.get('shared_with') or []
+        
+        uid = current_user["uid"]
+        allowed_users = list(set([owner_id or uid] + assigned_to + accepted_collaborators + shared_with))
+        permissions_dict = {
+            "read": allowed_users,
+            "write": allowed_users,
+            "delete": [owner_id or uid]
+        }
+        
+        audit_rel_path = FolderManager.get_audit_relative_path(
+            year,
+            audit_type,
+            audit_code,
+            audit_title
+        )
+        await asyncio.to_thread(
+            FolderManager.set_permission,
+            audit_rel_path,
+            owner_id or uid,
+            allowed_users,
+            permissions_dict
+        )
+        
+        if not await asyncio.to_thread(os.path.exists, full_path):
+            await asyncio.to_thread(os.makedirs, full_path, exist_ok=True)
+            await asyncio.to_thread(
+                FolderManager.ensure_audit_folders,
+                year,
+                audit_type,
+                audit_code,
+                audit_title
+            )
+            
+        return {"status": "success", "path": full_path, "message": "Klasörler oluşturuldu."}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

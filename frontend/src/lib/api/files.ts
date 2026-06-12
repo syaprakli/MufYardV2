@@ -109,6 +109,18 @@ export const openTaskFolder = async (taskId: string): Promise<any> => {
     return response.json();
 };
 
+export const createTaskFolder = async (taskId: string): Promise<any> => {
+    const baseUrl = IS_ELECTRON ? LOCAL_API_URL : API_URL;
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${baseUrl}/files/create-task-folder/${taskId}`, {
+        method: "POST",
+        headers
+    });
+    
+    if (!response.ok) throw new Error("Görev klasörü oluşturulamadı");
+    return response.json();
+};
+
 export const shareFileToUser = async (fileId: string, recipientId: string): Promise<any> => {
     const headers = await getAuthHeaders({ "Content-Type": "application/json" });
     const response = await fetchWithTimeout(`${API_URL}/files/share-to-user`, {

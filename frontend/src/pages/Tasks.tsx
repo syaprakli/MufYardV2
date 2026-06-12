@@ -15,10 +15,10 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { cn } from "../lib/utils";
 import { createTask, updateTask, deleteTask, acceptTask, rejectTask, importTasksFromExcel, type Task, type TaskStep } from "../lib/api/tasks";
-import { fetchAudits, createAudit, deleteAudit, invalidateAuditCache } from "../lib/api/audit";
+import { fetchAudits, createAudit, invalidateAuditCache } from "../lib/api/audit";
 import { searchReports, type SearchResult } from "../lib/api/search";
 
-import { openTaskFolder } from "../lib/api/files";
+import { openTaskFolder, createTaskFolder } from "../lib/api/files";
 
 const ShareModalLazy = lazy(() => import("../components/ShareModal"));
 const TaskAnalysisModalLazy = lazy(() => import("../components/tasks/TaskAnalysisModal"));
@@ -553,6 +553,14 @@ export default function Tasks() {
         try {
             setSaving(true);
             await acceptTask(taskId, effectiveUid || "", effectiveEmail);
+            
+            // local folder creation for electron desktop app
+            try {
+                await createTaskFolder(taskId);
+            } catch (folderError) {
+                console.error("Yerel klasör oluşturulamadı:", folderError);
+            }
+
             toast.success("Görev kabul edildi ve listenize eklendi.");
             if (effectiveUid) refreshTasks(effectiveUid);
         } catch (error) {
@@ -659,21 +667,8 @@ export default function Tasks() {
             setBulkActionLoading(true);
             const selectedTasks = tasks.filter(task => selectedTaskIds.includes(task.id));
 
-            const allAudits = await fetchAudits(effectiveUid, effectiveEmail, true);
-
             const results = await Promise.allSettled(
                 selectedTasks.map(async (task) => {
-                    const associatedAudits = allAudits.filter(a => 
-                        String(a.task_id).trim() === String(task.id).trim()
-                    );
-                    if (associatedAudits.length > 0) {
-                        const auditDeleteResults = await Promise.allSettled(associatedAudits.map(a => deleteAudit(a.id)));
-                        const hasAuditDeleteFailure = auditDeleteResults.some(result => result.status === "rejected");
-                        if (hasAuditDeleteFailure) {
-                            throw new Error("Bazı ilişkili raporlar silinemedi");
-                        }
-                    }
-
                     await deleteTask(task.id);
                 })
             );
@@ -830,19 +825,11 @@ export default function Tasks() {
         if (!deleteConfirmId) return;
         try {
             setSaving(true);
-            // 1. Find and delete all associated audits first (Cascading Delete)
-            const allAudits = await fetchAudits(effectiveUid, effectiveEmail, true);
-            const associatedAudits = allAudits.filter(a => 
-                String(a.task_id).trim() === String(deleteConfirmId).trim()
-            );
             
-            if (associatedAudits.length > 0) {
-                await Promise.all(associatedAudits.map(a => deleteAudit(a.id)));
-                invalidateAuditCache();
-            }
-
-            // 2. Delete the task itself
+            // Delete the task itself (backend automatically performs cascading delete on audits)
             await deleteTask(deleteConfirmId);
+            invalidateAuditCache();
+            
             toast.success("Görev ve ilişkili tüm raporlar başarıyla silindi.");
             if (effectiveUid) refreshTasks(effectiveUid);
         } catch (error) { 

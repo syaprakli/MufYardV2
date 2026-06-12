@@ -103,13 +103,63 @@ async def delete_task(task_id: str, current_user: Dict[str, Any] = Depends(get_c
         if not doc.exists:
             raise HTTPException(status_code=404, detail="Görev bulunamadı.")
 
-        owner_id = (doc.to_dict() or {}).get("owner_id")
-        can_delete = role in ["admin", "moderator"] or owner_id in identity_keys
-        if not can_delete:
-            raise HTTPException(status_code=403, detail="Bu görevi silme yetkiniz yok.")
+        task_data = doc.to_dict() or {}
+        owner_id = task_data.get("owner_id")
+        is_owner_or_admin = role in ["admin", "moderator"] or owner_id in identity_keys
 
-        await TaskService.delete_task(task_id)
-        return {"status": "success", "message": "Görev silindi."}
+        if is_owner_or_admin:
+            await TaskService.delete_task(task_id)
+            return {"status": "success", "message": "Görev silindi."}
+        else:
+            assigned_to = task_data.get("assigned_to", [])
+            shared_with = task_data.get("shared_with", [])
+            pending_collaborators = task_data.get("pending_collaborators", [])
+            accepted_collaborators = task_data.get("accepted_collaborators", [])
+
+            is_collaborator = (
+                any(id in assigned_to for id in identity_keys) or
+                any(id in shared_with for id in identity_keys) or
+                any(id in pending_collaborators for id in identity_keys) or
+                any(id in accepted_collaborators for id in identity_keys)
+            )
+
+            if is_collaborator:
+                new_assigned = [id for id in assigned_to if id not in identity_keys]
+                new_shared = [id for id in shared_with if id not in identity_keys]
+                new_pending = [id for id in pending_collaborators if id not in identity_keys]
+                new_accepted = [id for id in accepted_collaborators if id not in identity_keys]
+
+                await asyncio.to_thread(doc_ref.update, {
+                    "assigned_to": new_assigned,
+                    "shared_with": new_shared,
+                    "pending_collaborators": new_pending,
+                    "accepted_collaborators": new_accepted
+                })
+
+                # Also remove from associated audits
+                try:
+                    audits_ref = db.collection('audits').where('task_id', '==', task_id)
+                    audits_docs = await asyncio.to_thread(audits_ref.get)
+                    for doc_aud in audits_docs:
+                        audit_data = doc_aud.to_dict() or {}
+                        aud_assigned = audit_data.get("assigned_to", [])
+                        aud_shared = audit_data.get("shared_with", [])
+                        aud_pending = audit_data.get("pending_collaborators", [])
+                        aud_accepted = audit_data.get("accepted_collaborators", [])
+
+                        aud_doc_ref = db.collection('audits').document(doc_aud.id)
+                        await asyncio.to_thread(aud_doc_ref.update, {
+                            "assigned_to": [id for id in aud_assigned if id not in identity_keys],
+                            "shared_with": [id for id in aud_shared if id not in identity_keys],
+                            "pending_collaborators": [id for id in aud_pending if id not in identity_keys],
+                            "accepted_collaborators": [id for id in aud_accepted if id not in identity_keys]
+                        })
+                except Exception as ae:
+                    print(f"Failed to remove collaborator from associated audits: {ae}")
+
+                return {"status": "success", "message": "Görev paylaşımlarınızdan kaldırıldı."}
+            else:
+                raise HTTPException(status_code=403, detail="Bu görevi silme veya terk etme yetkiniz yok.")
     except HTTPException:
         raise
     except Exception:
