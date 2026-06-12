@@ -169,6 +169,17 @@ export async function acceptTask(id: string, _userId: string, _userEmail?: strin
     return response.json();
 }
 
+export async function rejectTask(id: string, _userId: string, _userEmail?: string): Promise<{ status: string; message: string }> {
+    const headers = await getAuthHeaders();
+    const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/${id}/reject`, {
+        method: "POST",
+        headers,
+    });
+    if (!response.ok) throw new Error("Görev reddedilemedi.");
+    taskCache = {}; // Invalidate
+    return response.json();
+}
+
 export async function importTasksFromExcel(_userId: string, file: File): Promise<any> {
     const formData = new FormData();
     formData.append("file", file);

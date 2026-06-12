@@ -14,7 +14,7 @@ import { isElectron } from "../lib/firebase";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { cn } from "../lib/utils";
-import { createTask, updateTask, deleteTask, acceptTask, importTasksFromExcel, type Task, type TaskStep } from "../lib/api/tasks";
+import { createTask, updateTask, deleteTask, acceptTask, rejectTask, importTasksFromExcel, type Task, type TaskStep } from "../lib/api/tasks";
 import { fetchAudits, createAudit, deleteAudit, invalidateAuditCache } from "../lib/api/audit";
 import { searchReports, type SearchResult } from "../lib/api/search";
 
@@ -545,11 +545,6 @@ export default function Tasks() {
     };
 
     const handleAcceptInvitation = async (taskId: string) => {
-        if (!isElectron) {
-            toast.error("Görev kabul işlemi yalnızca masaüstü uygulamasında yapılabilir.");
-            return;
-        }
-
         try {
             setSaving(true);
             await acceptTask(taskId, effectiveUid || "", effectiveEmail);
@@ -557,6 +552,28 @@ export default function Tasks() {
             if (effectiveUid) refreshTasks(effectiveUid);
         } catch (error) {
             toast.error("Görev kabul edilemedi.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleRejectInvitation = async (taskId: string) => {
+        const proceed = await confirm({
+            title: "Görevi Reddet",
+            message: "Bu görev paylaşım davetini reddetmek istediğinize emin misiniz?",
+            confirmText: "Evet, Reddet",
+            cancelText: "Vazgeç",
+            variant: "danger"
+        });
+        if (!proceed) return;
+
+        try {
+            setSaving(true);
+            await rejectTask(taskId, effectiveUid || "", effectiveEmail);
+            toast.success("Görev daveti reddedildi.");
+            if (effectiveUid) refreshTasks(effectiveUid);
+        } catch (error) {
+            toast.error("Görev daveti reddedilemedi.");
         } finally {
             setSaving(false);
         }
@@ -1754,18 +1771,20 @@ export default function Tasks() {
                                         <UserPlus size={10} /> Gönderen: {getSenderName(inv)}
                                     </p>
                                 </div>
-                                <button 
-                                    onClick={() => handleAcceptInvitation(inv.id)} 
-                                    className={cn(
-                                        "w-full rounded-xl h-10 font-bold text-[10px] uppercase tracking-widest shadow-lg transition-all active:scale-95",
-                                        isElectron 
-                                            ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200/50" 
-                                            : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
-                                    )}
-                                    title={!isElectron ? "Sadece Masaüstü Uygulamasında" : ""}
-                                >
-                                    {isElectron ? "Görevi Kabul Et ve Listeye Ekle" : "Kabul İçin Masaüstü Uygulamasını Açın"}
-                                </button>
+                                <div className="flex gap-2 w-full mt-2">
+                                    <button 
+                                        onClick={() => handleAcceptInvitation(inv.id)} 
+                                        className="flex-1 rounded-xl h-10 font-black text-[9px] bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-200/30 uppercase tracking-widest transition-all active:scale-95"
+                                    >
+                                        Kabul Et
+                                    </button>
+                                    <button 
+                                        onClick={() => handleRejectInvitation(inv.id)} 
+                                        className="flex-1 rounded-xl h-10 font-black text-[9px] bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-200/30 uppercase tracking-widest transition-all active:scale-95"
+                                    >
+                                        Reddet
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>

@@ -254,6 +254,40 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         };
     }, [wsConnected, connectionFailed, user?.uid, pollGlobalMessages]);
 
+    // Listen to new messages (both from WS and polled notifications fallback)
+    useEffect(() => {
+        const handleNewMessage = (e: any) => {
+            const data = e.detail;
+            if (!data || !data.room_id?.startsWith('dm_')) return;
+            
+            const msgRoomId = data.room_id;
+            const senderId = data.sender_id || data.author_id;
+            
+            if (senderId !== user?.uid) {
+                // Update unread count
+                setUnreadMessages(prev => ({
+                    ...prev,
+                    [msgRoomId]: (prev[msgRoomId] || 0) + 1
+                }));
+                
+                // Show toast & open chat window
+                const msgContent = data.content || data.text || '';
+                toast.success(`${data.sender_name || data.author_name || 'Bir Müfettiş'}: ${msgContent || 'Bir dosya gönderdi'}`, {
+                    icon: '💬',
+                    duration: 4000,
+                    position: 'top-center'
+                });
+                
+                openChat(msgRoomId, data.sender_name || data.author_name, 'dm', senderId);
+            }
+        };
+
+        window.addEventListener('mufyard:new_message', handleNewMessage as any);
+        return () => {
+            window.removeEventListener('mufyard:new_message', handleNewMessage as any);
+        };
+    }, [user?.uid, openChat]);
+
     // WebSocket Connection Logic
     useEffect(() => {
         if (!user?.uid) return;
@@ -282,22 +316,6 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                     data.content = msgContent;
                     data.text = msgContent;
                     window.dispatchEvent(new CustomEvent('mufyard:new_message', { detail: data }));
-
-                    const senderId = data.sender_id || data.author_id;
-                    if (senderId !== user?.uid) {
-                        setUnreadMessages(prev => ({
-                            ...prev,
-                            [msgRoomId]: (prev[msgRoomId] || 0) + 1
-                        }));
-
-                        toast.success(`${data.sender_name || data.author_name || 'Bir Müfettiş'}: ${msgContent || 'Bir dosya gönderdi'}`, {
-                            icon: '💬',
-                            duration: 4000,
-                            position: 'top-center'
-                        });
-
-                        openChat(msgRoomId, data.sender_name || data.author_name, 'dm', senderId);
-                    }
                     return;
                 }
 
@@ -438,6 +456,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             delete next[roomId];
             return next;
         });
+        window.dispatchEvent(new CustomEvent('mufyard:chat_read', { detail: { roomId } }));
     }, []);
 
     const sendMessage = useCallback((content: string, attachments: any[] = []): string => {
