@@ -195,12 +195,56 @@ class ContactService:
         if not doc.exists:
             return False
             
-        # Check ownership
-        if doc.to_dict().get('owner_id') != user_id:
-            raise PermissionError("Sadece kendi eklediğiniz kişileri silebilirsiniz.")
+        contact_data = doc.to_dict() or {}
+        owner_id = contact_data.get('owner_id')
+        
+        # Look up user email to support both UID and email based identities
+        user_email = None
+        profile_ref = db.collection('profiles').document(user_id)
+        profile_doc = await asyncio.to_thread(profile_ref.get)
+        if profile_doc.exists:
+            user_email = (profile_doc.to_dict().get('email') or "").strip().lower()
             
-        await asyncio.to_thread(doc_ref.delete)
-        return True
+        identity_keys = [v for v in [user_id, user_email] if v]
+        admin_id = "sefa.yaprakli@gsb.gov.tr"
+        
+        is_owner_or_admin = (
+            any(identity in [owner_id, admin_id, "admin"] for identity in identity_keys)
+        )
+            
+        # Check ownership
+        if is_owner_or_admin:
+            await asyncio.to_thread(doc_ref.delete)
+            return True
+        else:
+            # Collaborator case: remove from lists (leave contact)
+            pending = contact_data.get('pending_collaborators', []) or []
+            accepted = contact_data.get('accepted_collaborators', []) or []
+            assigned_to = contact_data.get('assigned_to', []) or []
+            shared_with = contact_data.get('shared_with', []) or []
+            
+            is_collaborator = (
+                any(ident in pending for ident in identity_keys) or
+                any(ident in accepted for ident in identity_keys) or
+                any(ident in assigned_to for ident in identity_keys) or
+                any(ident in shared_with for ident in identity_keys)
+            )
+            
+            if is_collaborator:
+                new_pending = [ident for ident in pending if ident not in identity_keys]
+                new_accepted = [ident for ident in accepted if ident not in identity_keys]
+                new_assigned = [ident for ident in assigned_to if ident not in identity_keys]
+                new_shared = [ident for ident in shared_with if ident not in identity_keys]
+                
+                await asyncio.to_thread(doc_ref.update, {
+                    'pending_collaborators': new_pending,
+                    'accepted_collaborators': new_accepted,
+                    'assigned_to': new_assigned,
+                    'shared_with': new_shared
+                })
+                return True
+            else:
+                raise PermissionError("Bu kişiyi silme veya rehberinizden kaldırma yetkiniz yok.")
 
     @staticmethod
     async def accept_contact(contact_id: str, user_id: Optional[str], user_email: Optional[str] = None) -> bool:
