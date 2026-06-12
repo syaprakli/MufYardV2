@@ -95,7 +95,7 @@ export default function ReportEditor() {
     ];
     const userEmail = (user?.email || "").toLowerCase().trim();
     const isFounder = founderEmails.includes(userEmail);
-    const isWizardAllowed = isAdmin && isFounder;
+    const isWizardAllowed = isAdmin; // Şimdilik sadece admin rolüne açık
     const { openChat } = useChat();
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
     const [isProofreadOpen, setIsProofreadOpen] = useState(false);
@@ -1486,7 +1486,7 @@ export default function ReportEditor() {
                         </Button>
                     </div>
 
-                    <div className={`${showMobileActions ? "flex animate-in slide-in-from-top-2 duration-200" : "hidden"} md:flex flex-col md:flex-row items-stretch md:items-center gap-2 md:flex-nowrap md:overflow-x-auto md:scrollbar-none w-full md:w-auto bg-slate-50 md:bg-transparent p-2.5 md:p-0 rounded-xl border border-slate-200 md:border-none mt-2 md:mt-0 max-w-full pb-1`}>
+                    <div className={`${showMobileActions ? "flex animate-in slide-in-from-top-2 duration-200" : "hidden"} md:flex flex-col md:flex-row items-stretch md:items-center gap-2 md:flex-wrap w-full md:w-auto bg-slate-50 md:bg-transparent p-2.5 md:p-0 rounded-xl border border-slate-200 md:border-none mt-2 md:mt-0 max-w-full`}>
                         {providerStatus === 'connected' && onlineUsers.length > 0 && (
                             <div className="flex -space-x-1.5 mr-2 mb-2 md:mb-0 justify-center md:justify-start flex-shrink-0">
                                 {onlineUsers.map((u, i) => (

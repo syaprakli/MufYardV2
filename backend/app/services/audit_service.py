@@ -149,25 +149,23 @@ class AuditService:
             if force_version is not True:
                 # blocking queries wrapped in thread
                 last_version_docs = await asyncio.to_thread(lambda: list(versions_ref.order_by('created_at', direction='DESCENDING').limit(1).get()))
-                if last_version_docs:
-                    last_v = last_version_docs[0].to_dict()
-                    last_time_raw = last_v.get('created_at')
-                    try:
-                        if isinstance(last_time_raw, str):
-                            # Remove optional trailing Z if present to parse with fromisoformat
-                            raw_str = last_time_raw.rstrip('Z')
-                            last_time = datetime.fromisoformat(raw_str)
-                        else:
-                            last_time = last_time_raw # Firestore Timestamp if exists
-                        time_diff = now - last_time
-                        new_content = update_data.get('report_content', '')
-                        last_content = last_v.get('report_content', '')
-                        char_diff = abs(len(new_content) - len(last_content))
-                        # Eger 1 saat gecmediyse VE karakter farki 1000'den az ise yeni surum olusturma
-                        if time_diff < timedelta(hours=1) and char_diff < 1000:
-                            should_create_version = False
-                    except Exception:
-                        pass
+                try:
+                    new_content = update_data.get('report_content', '')
+                    if last_version_docs:
+                        last_v = last_version_docs[0].to_dict()
+                        last_content = last_v.get('report_content', '') or ''
+                    else:
+                        # Eğer geçmişte hiç sürüm yoksa, değişimi mevcut rapor içeriğiyle karşılaştır
+                        last_content = current_data.get('report_content', '') or ''
+                    
+                    char_diff = abs(len(new_content) - len(last_content))
+                    
+                    # Zaman sınırı kaldırıldı. Sadece karakter değişimi/artışı 3000 veya daha fazla ise yeni sürüm kaydedilir.
+                    # 3000 karakterden az değişimlerde yeni sürüm oluşturulmaz, doğrudan mevcut raporun üzerine yazılır.
+                    if char_diff < 3000:
+                        should_create_version = False
+                except Exception:
+                    pass
             if should_create_version:
                 existing_versions = await asyncio.to_thread(lambda: list(versions_ref.get()))
                 v_num = len(existing_versions) + 1
