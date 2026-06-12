@@ -142,15 +142,58 @@ async def delete_audit(id: str, current_user: Dict[str, Any] = Depends(get_curre
     current = await AuditService.get_audit(id)
     if not current:
         raise HTTPException(status_code=404, detail="Denetim silinemedi veya bulunamadı.")
-    role = _resolve_audit_role(current, current_user.get("uid"), current_user.get("email"))
-    user_role = (current_user.get("role") or "user").strip().lower()
-    if role == "none" and user_role not in ["admin", "moderator"]:
-        raise HTTPException(status_code=403, detail="Bu denetimi silme yetkiniz yok.")
+    
+    uid = current_user.get("uid")
+    email = (current_user.get("email") or "").strip().lower()
+    identity_keys = [v for v in [uid, email] if v]
+    
+    owner_id = current.get("owner_id")
+    admin_id = "sefa.yaprakli@gsb.gov.tr"
+    
+    is_owner_or_admin = (
+        any(identity in [owner_id, admin_id, "admin"] for identity in identity_keys) or
+        (current_user.get("role") or "user").strip().lower() == "admin"
+    )
 
-    success = await AuditService.delete_audit(id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Denetim silinemedi veya bulunamadı.")
-    return {"status": "success", "message": "Denetim silindi"}
+    if is_owner_or_admin:
+        success = await AuditService.delete_audit(id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Denetim silinemedi veya bulunamadı.")
+        return {"status": "success", "message": "Denetim silindi"}
+    else:
+        import asyncio
+        from app.lib.firebase_admin import db
+        
+        assigned_to = current.get("assigned_to") or []
+        shared_with = current.get("shared_with") or []
+        pending_collaborators = current.get("pending_collaborators") or []
+        accepted_collaborators = current.get("accepted_collaborators") or []
+
+        is_collaborator = (
+            any(ident in assigned_to for ident in identity_keys) or
+            any(ident in shared_with for ident in identity_keys) or
+            any(ident in pending_collaborators for ident in identity_keys) or
+            any(ident in accepted_collaborators for ident in identity_keys)
+        )
+
+        if is_collaborator:
+            doc_ref = db.collection('audits').document(id)
+            
+            new_assigned = [ident for ident in assigned_to if ident not in identity_keys]
+            new_shared = [ident for ident in shared_with if ident not in identity_keys]
+            new_pending = [ident for ident in pending_collaborators if ident not in identity_keys]
+            new_accepted = [ident for ident in accepted_collaborators if ident not in identity_keys]
+            
+            await asyncio.to_thread(doc_ref.update, {
+                "assigned_to": new_assigned,
+                "shared_with": new_shared,
+                "pending_collaborators": new_pending,
+                "accepted_collaborators": new_accepted
+            })
+            return {"status": "success", "message": "Denetim paylaşımlarınızdan kaldırıldı."}
+        else:
+            raise HTTPException(status_code=403, detail="Bu denetimi silme veya terk etme yetkiniz yok.")
+
 
 @router.get("/{id}/versions")
 async def get_audit_versions(id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
