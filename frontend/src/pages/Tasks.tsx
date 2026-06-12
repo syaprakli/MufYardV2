@@ -545,6 +545,11 @@ export default function Tasks() {
     };
 
     const handleAcceptInvitation = async (taskId: string) => {
+        if (!isElectron) {
+            toast.error("Görev kabul işlemi yalnızca masaüstü uygulamasında yapılabilir.");
+            return;
+        }
+
         try {
             setSaving(true);
             await acceptTask(taskId, effectiveUid || "", effectiveEmail);
@@ -558,6 +563,11 @@ export default function Tasks() {
     };
 
     const handleRejectInvitation = async (taskId: string) => {
+        if (!isElectron) {
+            toast.error("Görev reddetme işlemi yalnızca masaüstü uygulamasında yapılabilir.");
+            return;
+        }
+
         const proceed = await confirm({
             title: "Görevi Reddet",
             message: "Bu görev paylaşım davetini reddetmek istediğinize emin misiniz?",
@@ -1771,20 +1781,29 @@ export default function Tasks() {
                                         <UserPlus size={10} /> Gönderen: {getSenderName(inv)}
                                     </p>
                                 </div>
-                                <div className="flex gap-2 w-full mt-2">
+                                {isElectron ? (
+                                    <div className="flex gap-2 w-full mt-2">
+                                        <button 
+                                            onClick={() => handleAcceptInvitation(inv.id)} 
+                                            className="flex-1 rounded-xl h-10 font-black text-[9px] bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-200/30 uppercase tracking-widest transition-all active:scale-95"
+                                        >
+                                            Kabul Et
+                                        </button>
+                                        <button 
+                                            onClick={() => handleRejectInvitation(inv.id)} 
+                                            className="flex-1 rounded-xl h-10 font-black text-[9px] bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-200/30 uppercase tracking-widest transition-all active:scale-95"
+                                        >
+                                            Reddet
+                                        </button>
+                                    </div>
+                                ) : (
                                     <button 
-                                        onClick={() => handleAcceptInvitation(inv.id)} 
-                                        className="flex-1 rounded-xl h-10 font-black text-[9px] bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-200/30 uppercase tracking-widest transition-all active:scale-95"
+                                        disabled
+                                        className="w-full rounded-xl h-10 font-bold text-[9px] bg-slate-200 text-slate-400 uppercase tracking-widest shadow-none cursor-not-allowed"
                                     >
-                                        Kabul Et
+                                        Kabul/Reddet İçin Masaüstü Uygulamasını Açın
                                     </button>
-                                    <button 
-                                        onClick={() => handleRejectInvitation(inv.id)} 
-                                        className="flex-1 rounded-xl h-10 font-black text-[9px] bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-200/30 uppercase tracking-widest transition-all active:scale-95"
-                                    >
-                                        Reddet
-                                    </button>
-                                </div>
+                                )}
                             </div>
                         ))}
                     </div>
