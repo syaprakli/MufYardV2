@@ -208,6 +208,12 @@ function createWindow() {
     // Menü çubuğunu gizle ama kısayolları (Ctrl+R, Ctrl+Shift+I) aktif bırak
     win.setMenuBarVisibility(false);
     
+    // Dış bağlantıları (ve window.open çağrılarını) varsayılan sistem tarayıcısında aç
+    win.webContents.setWindowOpenHandler(({ url }) => {
+        require('electron').shell.openExternal(url);
+        return { action: 'deny' };
+    });
+    
     if (app.isPackaged) {
         win.loadFile(path.join(__dirname, 'dist', 'index.html'));
         return;
