@@ -88,13 +88,13 @@ export default function ReportEditor() {
     const isAdmin = profile?.role === "admin";
     
     // Yalnızca admin olan ve aşağıdaki kurucu e-postalarına sahip olan kullanıcılar AI Sihirbazına erişebilir.
-    const founderEmails = [
-        "sefa.yaprakli@gsb.gov.tr",
-        "syaprakli@gmail.com",
-        "sefayaprakli@hotmail.com"
-    ];
-    const userEmail = (user?.email || "").toLowerCase().trim();
-    const isFounder = founderEmails.includes(userEmail);
+    // const founderEmails = [
+    //     "sefa.yaprakli@gsb.gov.tr",
+    //     "syaprakli@gmail.com",
+    //     "sefayaprakli@hotmail.com"
+    // ];
+    // const userEmail = (user?.email || "").toLowerCase().trim();
+    // const isFounder = founderEmails.includes(userEmail);
     const isWizardAllowed = isAdmin; // Şimdilik sadece admin rolüne açık
     const { openChat } = useChat();
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
