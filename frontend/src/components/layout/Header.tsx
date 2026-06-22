@@ -69,10 +69,20 @@ export function Header({ toggleSidebar }: HeaderProps) {
     useEffect(() => {
         if (user?.uid) {
             // Bekleyen istekleri çek ve periyodik olarak güncelle (30 saniye)
-            const updateRequests = () => fetchPendingRequests(user.uid, user.email || undefined).then(setPendingRequests);
+            const updateRequests = () => {
+                if (user?.uid) {
+                    fetchPendingRequests(user.uid, user.email || undefined).then(setPendingRequests);
+                }
+            };
             updateRequests();
+            
+            window.addEventListener('mufyard:refresh_pending_requests', updateRequests);
+            
             const interval = setInterval(updateRequests, 30000);
-            return () => clearInterval(interval);
+            return () => {
+                window.removeEventListener('mufyard:refresh_pending_requests', updateRequests);
+                clearInterval(interval);
+            };
         }
     }, [user]);
 

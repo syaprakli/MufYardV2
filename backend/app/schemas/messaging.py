@@ -4,7 +4,7 @@ from datetime import datetime
 
 class MessageBase(BaseModel):
     text: str = Field(..., example="Merhabalar, iyi çalışmalar.")
-    author_id: str = Field(..., example="mufettis-id")
+    author_id: Optional[str] = Field(None, example="mufettis-id")
     author_name: str = Field(..., example="Sefa YAPRAKLI")
     author_role: Optional[str] = Field("Müfettiş", example="Müfettiş")
 

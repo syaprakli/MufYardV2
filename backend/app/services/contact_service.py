@@ -155,6 +155,37 @@ class ContactService:
         new_doc = await asyncio.to_thread(doc_ref[1].get)
         new_contact = new_doc.to_dict()
         new_contact['id'] = doc_ref[1].id
+
+        # Send notifications
+        pending = contact_data.get('pending_collaborators', [])
+        if pending:
+            try:
+                from app.services.notification_service import NotificationService
+                from app.services.profile_service import ProfileService
+                
+                owner_profile = await ProfileService.get_profile(owner_id)
+                owner_display = owner_profile.get('full_name') if owner_profile else owner_id
+                
+                for collaborator_id in pending:
+                    try:
+                        target_uid = collaborator_id
+                        if "@" in collaborator_id:
+                            profiles_query = db.collection('profiles').where('email', '==', collaborator_id.lower().trim()).limit(1)
+                            profiles = await asyncio.to_thread(lambda: list(profiles_query.stream()))
+                            if profiles:
+                                target_uid = profiles[0].id
+                        
+                        await NotificationService.notify_contact_invitation(
+                            contact_id=new_contact['id'],
+                            contact_name=contact_data.get('name', 'Yeni Kişi'),
+                            owner_name=owner_display,
+                            collaborator_id=target_uid
+                        )
+                    except Exception as inner_err:
+                        print(f"[NOTIF] Create contact inner notify error: {inner_err}")
+            except Exception as outer_err:
+                print(f"[NOTIF] Create contact outer notify error: {outer_err}")
+
         return new_contact
 
     @staticmethod
@@ -163,6 +194,7 @@ class ContactService:
         doc = await asyncio.to_thread(doc_ref.get)
         if not doc.exists:
             return None
+        current_data = doc.to_dict() or {}
             
         update_data = {k: v for k, v in contact_update.dict().items() if v is not None}
         update_data['updated_at'] = datetime.utcnow()
@@ -172,6 +204,42 @@ class ContactService:
         updated_doc_res = await asyncio.to_thread(doc_ref.get)
         updated_doc = updated_doc_res.to_dict()
         updated_doc['id'] = contact_id
+
+        # Send notifications if pending_collaborators changed
+        if 'pending_collaborators' in update_data:
+            old_pending = current_data.get('pending_collaborators', [])
+            new_pending = update_data['pending_collaborators'] or []
+            added_collaborators = [c for c in new_pending if c not in old_pending]
+            
+            if added_collaborators:
+                try:
+                    from app.services.notification_service import NotificationService
+                    from app.services.profile_service import ProfileService
+                    
+                    owner_id = current_data.get('owner_id')
+                    owner_profile = await ProfileService.get_profile(owner_id)
+                    owner_display = owner_profile.get('full_name') if owner_profile else owner_id
+                    
+                    for collaborator_id in added_collaborators:
+                        try:
+                            target_uid = collaborator_id
+                            if "@" in collaborator_id:
+                                profiles_query = db.collection('profiles').where('email', '==', collaborator_id.lower().trim()).limit(1)
+                                profiles = await asyncio.to_thread(lambda: list(profiles_query.stream()))
+                                if profiles:
+                                    target_uid = profiles[0].id
+                            
+                            await NotificationService.notify_contact_invitation(
+                                contact_id=contact_id,
+                                contact_name=current_data.get('name', 'Yeni Kişi'),
+                                owner_name=owner_display,
+                                collaborator_id=target_uid
+                            )
+                        except Exception as inner_err:
+                            print(f"[NOTIF] Update contact inner notify error: {inner_err}")
+                except Exception as outer_err:
+                    print(f"[NOTIF] Update contact outer notify error: {outer_err}")
+
         return updated_doc
 
     @staticmethod

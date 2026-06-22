@@ -23,6 +23,8 @@ async def get_message_history(limit: int = 50, current_user: Dict[str, Any] = De
 @router.post("/messages", response_model=MessageResponse)
 async def save_global_message(message: MessageCreate, current_user: Dict[str, Any] = Depends(get_current_user)):
     try:
+        if not message.author_id:
+            message.author_id = current_user.get("uid")
         return await CollaborationService.save_message(message)
     except Exception:
         raise HTTPException(status_code=500, detail="Mesaj kaydedilirken bir hata oluştu.")

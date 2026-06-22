@@ -16,6 +16,7 @@ class ProfileBase(BaseModel):
     premium_until: Optional[str] = None
     notifications_enabled: bool = True
     trial_started: bool = False
+    intro_seen: bool = False
     role: str = Field(default="user", example="admin") # "admin", "moderator", "user"
     fcm_token: Optional[str] = None
     email_assignments: bool = True
@@ -48,6 +49,7 @@ class ProfileUpdate(BaseModel):
     premium_until: Optional[str] = None
     notifications_enabled: Optional[bool] = None
     trial_started: Optional[bool] = None
+    intro_seen: Optional[bool] = None
     role: Optional[str] = None
     fcm_token: Optional[str] = None
     email_assignments: Optional[bool] = None

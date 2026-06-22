@@ -81,15 +81,22 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
     }
   };
 
-  const markIntroSeen = () => {
+  const markIntroSeen = async () => {
     const uid = activeProfile?.uid || user?.uid;
     if (uid) {
       localStorage.setItem(`mufyard_intro_seen_${uid}`, 'true');
+      try {
+        await updateProfile(uid, { intro_seen: true });
+        const email = activeProfile?.email || user?.email || undefined;
+        await refreshProfile(uid, email);
+      } catch (err) {
+        console.error("Failed to update intro_seen in database:", err);
+      }
     }
   };
 
-  const handleFinishIntro = () => {
-    markIntroSeen();
+  const handleFinishIntro = async () => {
+    await markIntroSeen();
     onClose();
   };
 
@@ -106,16 +113,16 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
 
     // Admin veya zaten trial baslatmis kullanicida direkt kapat.
     if (isAdmin || isTrialStarted) {
-      handleFinishIntro();
+      await handleFinishIntro();
       return;
     }
 
     setLoading(true);
     try {
-      await updateProfile(uid, { trial_started: true });
+      await updateProfile(uid, { trial_started: true, intro_seen: true });
       await refreshProfile(uid, email);
       toast.success("Deneme sürümünüz başlatıldı.");
-      handleFinishIntro();
+      await handleFinishIntro();
     } catch (err) {
       console.error("Trial start backend error:", err);
       // Backend başarısız olsa bile kullanıcıyı kilitleme!
@@ -125,18 +132,18 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
         const cached = localStorage.getItem(storageKey);
         if (cached) {
           const parsed = JSON.parse(cached);
-          parsed.data = { ...parsed.data, trial_started: true };
+          parsed.data = { ...parsed.data, trial_started: true, intro_seen: true };
           localStorage.setItem(storageKey, JSON.stringify(parsed));
         } else {
           localStorage.setItem(storageKey, JSON.stringify({
-            data: { uid, email, trial_started: true },
+            data: { uid, email, trial_started: true, intro_seen: true },
             timestamp: Date.now()
           }));
         }
       } catch { /* localStorage hatası */ }
       
       toast.success("Deneme sürümünüz başlatıldı.");
-      handleFinishIntro();
+      await handleFinishIntro();
     } finally {
       setLoading(false);
     }
@@ -154,7 +161,7 @@ export const IntroPresentation: React.FC<{ onClose: () => void }> = ({ onClose }
       await handleStartTrialAndClose();
       return;
     }
-    handleFinishIntro();
+    await handleFinishIntro();
   };
 
   const slide = slides[currentSlide];

@@ -27,6 +27,7 @@ export interface Profile {
     birthday?: string;
     birthday_full?: string;
     trial_started?: boolean;
+    intro_seen?: boolean;
     premium_type?: string;
     premium_until?: string;
     report_prefix?: string;

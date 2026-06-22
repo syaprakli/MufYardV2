@@ -4,7 +4,7 @@ import { useConfirm } from "../lib/context/ConfirmContext";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Suspense, lazy, useState, useEffect, useMemo } from "react";
-import { createContact, shareContact, deleteContact, updateContact, acceptContact, type Contact } from "../lib/api/contacts";
+import { createContact, shareContact, deleteContact, updateContact, acceptContact, rejectContact, type Contact } from "../lib/api/contacts";
 import { MessageSquare } from "lucide-react";
 import { useChat } from "../lib/context/ChatContext";
 import { useAuth } from "../lib/hooks/useAuth";
@@ -129,6 +129,17 @@ export default function Contacts() {
             loadContacts();
         } catch (error) {
             toast.error("Kişi kabul edilemedi.");
+        }
+    };
+
+    const handleRejectInvitation = async (contactId: string) => {
+        if (!user?.uid) return;
+        try {
+            await rejectContact(contactId, user.uid, user.email || undefined);
+            toast.success("Paylaşım daveti reddedildi.");
+            loadContacts();
+        } catch (error) {
+            toast.error("Paylaşım daveti reddedilemedi.");
         }
     };
 
@@ -443,12 +454,20 @@ export default function Contacts() {
                                         {inv.title} - {inv.unit}
                                     </p>
                                 </div>
-                                <button 
-                                    onClick={() => handleAcceptInvitation(inv.id)} 
-                                    className="w-full bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl h-10 font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-200/50 transition-all active:scale-95"
-                                >
-                                    Kişiyi Kabul Et ve Kaydet
-                                </button>
+                                <div className="flex gap-2 w-full mt-4">
+                                    <button 
+                                        onClick={() => handleAcceptInvitation(inv.id)} 
+                                        className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl h-10 font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-200/50 transition-all active:scale-95 flex items-center justify-center gap-1"
+                                    >
+                                        Kabul Et
+                                    </button>
+                                    <button 
+                                        onClick={() => handleRejectInvitation(inv.id)} 
+                                        className="flex-1 bg-rose-500 hover:bg-rose-600 text-white rounded-xl h-10 font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-rose-200/50 transition-all active:scale-95 flex items-center justify-center gap-1"
+                                    >
+                                        Reddet
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>

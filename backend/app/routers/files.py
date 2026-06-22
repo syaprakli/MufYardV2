@@ -52,6 +52,12 @@ class ShareFileRequest(BaseModel):
     file_id: str
     recipient_id: str
 
+class TaskFolderMetadata(BaseModel):
+    rapor_turu: Optional[str] = None
+    rapor_kodu: Optional[str] = None
+    rapor_adi: Optional[str] = None
+    baslama_tarihi: Optional[str] = None
+
 @router.post("/upload", response_model=UploadResponse)
 @limiter.limit("5/minute")
 async def upload_file(
@@ -97,19 +103,45 @@ async def upload_file(
             base, ext = os.path.splitext(file.filename)
             file_path = os.path.join(target_dir, f"{base}_{int(datetime.now().timestamp())}{ext}")
 
-        def save_file(f, p):
-            with open(p, "wb") as buffer:
-                buffer.write(file_bytes)
-
-        await asyncio.to_thread(save_file, file, file_path)
-
         # Binary type detection (simplified)
-        mime_type = file.content_type
+        mime_type = file.content_type or "application/octet-stream"
         media_type = "file"
         if mime_type.startswith("image/"): media_type = "image"
         elif mime_type.startswith("video/"): media_type = "video"
         elif mime_type.startswith("audio/"): media_type = "audio"
         elif "pdf" in mime_type: media_type = "pdf"
+
+        if not IS_DESKTOP:
+            from app.lib.firebase_admin import bucket
+            timestamp = int(datetime.utcnow().timestamp())
+            base, ext = os.path.splitext(file.filename)
+            blob_path = f"uploads/{base}_{timestamp}{ext}"
+            
+            def _upload():
+                blob = bucket.blob(blob_path)
+                blob.upload_from_string(
+                    file_bytes,
+                    content_type=mime_type,
+                )
+                try:
+                    blob.make_public()
+                except Exception:
+                    pass
+                return blob.public_url
+                
+            public_url = await asyncio.to_thread(_upload)
+            return {
+                "url": public_url,
+                "name": file.filename,
+                "type": media_type,
+                "path": blob_path
+            }
+
+        def save_file(f, p):
+            with open(p, "wb") as buffer:
+                buffer.write(file_bytes)
+
+        await asyncio.to_thread(save_file, file, file_path)
 
         from app.config import DATA_DIR
         relative_path_from_data = os.path.relpath(file_path, DATA_DIR).replace("\\", "/")
@@ -355,18 +387,34 @@ async def open_folder(file_id: str, current_user: dict = Depends(get_current_use
 
 
 @router.post("/open-task-folder/{task_id}")
-async def open_task_folder(task_id: str, current_user: dict = Depends(get_current_user)):
+async def open_task_folder(
+    task_id: str,
+    metadata: Optional[TaskFolderMetadata] = None,
+    current_user: dict = Depends(get_current_user)
+):
     """
     Belirli bir göreve (Task) ait ana klasörü işletim sistemi gezgininde açar.
     """
     try:
-        from app.lib.firebase_admin import db
-        task_ref = db.collection('tasks').document(str(task_id))
-        task_doc = await asyncio.to_thread(task_ref.get)
-        if not task_doc.exists:
-            raise HTTPException(status_code=404, detail="Göreve ait klasör bilgisi bulunamadı.")
-            
-        task_data = task_doc.to_dict() or {}
+        task_data = {}
+        if metadata and (metadata.rapor_adi or metadata.rapor_kodu):
+            task_data = {
+                'baslama_tarihi': metadata.baslama_tarihi or datetime.utcnow().isoformat().split('T')[0],
+                'rapor_turu': metadata.rapor_turu or 'Diger',
+                'rapor_kodu': metadata.rapor_kodu or 'Kodsuz',
+                'rapor_adi': metadata.rapor_adi or 'Basliksiz',
+                'owner_id': current_user.get("uid"),
+                'assigned_to': [current_user.get("uid")],
+                'accepted_collaborators': [],
+                'shared_with': []
+            }
+        else:
+            from app.lib.firebase_admin import db
+            task_ref = db.collection('tasks').document(str(task_id))
+            task_doc = await asyncio.to_thread(task_ref.get)
+            if not task_doc.exists:
+                raise HTTPException(status_code=404, detail="Göreve ait klasör bilgisi bulunamadı.")
+            task_data = task_doc.to_dict() or {}
         
         # Calculate year, type, code, title
         start_date_str = task_data.get('baslama_tarihi')
@@ -452,18 +500,34 @@ async def open_task_folder(task_id: str, current_user: dict = Depends(get_curren
 
 
 @router.post("/create-task-folder/{task_id}")
-async def create_task_folder_endpoint(task_id: str, current_user: dict = Depends(get_current_user)):
+async def create_task_folder_endpoint(
+    task_id: str,
+    metadata: Optional[TaskFolderMetadata] = None,
+    current_user: dict = Depends(get_current_user)
+):
     """
     Belirli bir göreve (Task) ait klasör yapısını (kabul edildiğinde) işletim sisteminde oluşturur (açmaz).
     """
     try:
-        from app.lib.firebase_admin import db
-        task_ref = db.collection('tasks').document(str(task_id))
-        task_doc = await asyncio.to_thread(task_ref.get)
-        if not task_doc.exists:
-            raise HTTPException(status_code=404, detail="Göreve ait klasör bilgisi bulunamadı.")
-            
-        task_data = task_doc.to_dict() or {}
+        task_data = {}
+        if metadata and (metadata.rapor_adi or metadata.rapor_kodu):
+            task_data = {
+                'baslama_tarihi': metadata.baslama_tarihi or datetime.utcnow().isoformat().split('T')[0],
+                'rapor_turu': metadata.rapor_turu or 'Diger',
+                'rapor_kodu': metadata.rapor_kodu or 'Kodsuz',
+                'rapor_adi': metadata.rapor_adi or 'Basliksiz',
+                'owner_id': current_user.get("uid"),
+                'assigned_to': [current_user.get("uid")],
+                'accepted_collaborators': [],
+                'shared_with': []
+            }
+        else:
+            from app.lib.firebase_admin import db
+            task_ref = db.collection('tasks').document(str(task_id))
+            task_doc = await asyncio.to_thread(task_ref.get)
+            if not task_doc.exists:
+                raise HTTPException(status_code=404, detail="Göreve ait klasör bilgisi bulunamadı.")
+            task_data = task_doc.to_dict() or {}
         
         # Calculate year, type, code, title
         start_date_str = task_data.get('baslama_tarihi')

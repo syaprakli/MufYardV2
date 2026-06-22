@@ -551,11 +551,38 @@ Lütfen şunları analiz et:
     const filteredCurrentSummaryTasks = currentSummaryTasks.filter(matchesSummaryRole);
     const filteredArchivedSummaryTasks = archivedSummaryTasks.filter(matchesSummaryRole);
     const archivedPreviewTasks = filteredArchivedSummaryTasks.slice(0, 25);
+    const defaultPrefix = "S.Y.64";
+    const userEmail = user?.email?.toLowerCase();
+    const isSefa = userEmail === "sefa.yaprakli@gsb.gov.tr";
+    const hasDefaultPrefix = profile?.report_prefix === defaultPrefix || localStorage.getItem('raporKoduOnek') === defaultPrefix;
+    const shouldPromptPrefix = profile && !isSefa && hasDefaultPrefix;
 
     if (!user) return null;
 
     return (
         <div className="max-w-[1600px] mx-auto space-y-4 lg:space-y-8 animate-in fade-in duration-500 pb-12 pr-2 lg:pr-4 pl-2 lg:pl-2">
+            {shouldPromptPrefix && (
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm mb-6 animate-in slide-in-from-top-4 duration-500 font-inter">
+                    <div className="flex gap-4">
+                        <div className="p-3 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-2xl shrink-0">
+                            <AlertCircle size={24} />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-amber-900 dark:text-amber-200 text-sm">Rapor Kodu Ayarı Gerekli</h4>
+                            <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                                Şu anda varsayılan rapor kodu ön eki (<strong>S.Y.64</strong>) kullanılmaktadır. Raporlarınızın doğru kodlanması için lütfen ayarlardan kendi müfettiş ön ekinizi belirleyin.
+                            </p>
+                        </div>
+                    </div>
+                    <Button 
+                        onClick={() => navigate("/settings")} 
+                        className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl px-5 h-11 shrink-0 font-bold text-xs"
+                    >
+                        Ayarlara Git
+                    </Button>
+                </div>
+            )}
+
             {showIdentityModal && effectiveUid && (
                 <Suspense fallback={null}>
                     <IdentitySelectionModalLazy

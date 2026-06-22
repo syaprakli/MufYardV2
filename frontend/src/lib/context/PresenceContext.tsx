@@ -491,7 +491,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             };
             setMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
             
-            sendGlobalMessage(content, senderName).catch((err) => {
+            sendGlobalMessage(content, senderName, user?.uid || '').catch((err) => {
                 console.error("Failed to send global message via REST:", err);
                 toast.error("Mesaj gönderilemedi.");
             });

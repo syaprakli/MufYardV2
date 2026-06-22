@@ -59,6 +59,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                     
                     newNotifications.forEach((newNotif: any) => {
                         if (!newNotif.read) {
+                            if (['task_invite', 'note_invite', 'contact_invite'].includes(newNotif.type)) {
+                                window.dispatchEvent(new CustomEvent('mufyard:refresh_pending_requests'));
+                            }
+
                             if (newNotif.type === 'collaboration' && newNotif.chat_room_id) {
                                 const senderName = newNotif.title.replace('Yeni Mesaj: ', '');
                                 const senderId = newNotif.chat_room_id.replace('dm_', '').split('_').find((id: string) => id !== user.uid) || '';
@@ -192,6 +196,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                     seenNotifIdsRef.current.add(newNotif.id);
                     
                     setNotifications(prev => [newNotif, ...prev]);
+                    
+                    if (['task_invite', 'note_invite', 'contact_invite'].includes(newNotif.type)) {
+                        window.dispatchEvent(new CustomEvent('mufyard:refresh_pending_requests'));
+                    }
                     
                     if (newNotif.type === 'dm' && newNotif.chat_room_id) {
                         return;

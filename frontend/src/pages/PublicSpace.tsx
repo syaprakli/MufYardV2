@@ -76,7 +76,7 @@ import { Suspense, lazy, useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { 
-    User, MessageSquare, Search, Send,
+    User, MessageSquare, Search, Send, Pin,
     Loader2, Trash2,
     ChevronDown, ChevronUp,
     Plus, Eye, Edit3,
@@ -112,6 +112,7 @@ export interface Post {
     category?: string;
     shared_with?: string[];
     is_approved?: boolean;
+    is_pinned?: boolean;
     attachments?: Attachment[];
 }
 
@@ -639,6 +640,26 @@ export default function PublicSpace() {
         }
     };
 
+    const handleTogglePinPost = async (post: Post) => {
+        try {
+            const headers = await getAuthHeaders({ 'Content-Type': 'application/json' });
+            const res = await fetchWithTimeout(`${API_URL}/collaboration/posts/${post.id}`, {
+                method: 'PATCH',
+                headers,
+                body: JSON.stringify({ is_pinned: !post.is_pinned })
+            });
+            if (!res.ok) throw new Error("İşlem başarısız oldu.");
+            const updatedPost = await res.json();
+            setPosts(prev => prev.map(p => p.id === post.id ? { ...p, is_pinned: updatedPost.is_pinned } : p));
+            if (selectedPost?.id === post.id) {
+                setSelectedPost(prev => prev ? { ...prev, is_pinned: updatedPost.is_pinned } : null);
+            }
+            toast.success(updatedPost.is_pinned ? "Gönderi başa tutturuldu." : "Sabitleme kaldırıldı.");
+        } catch (err: any) {
+            toast.error(err.message || "Bir hata oluştu.");
+        }
+    };
+
     const handleAddCategory = async () => {
         if (!newCategoryName.trim()) return;
         setIsAddingCategory(true);
@@ -856,7 +877,13 @@ export default function PublicSpace() {
                                     </motion.div>
                                 ) : viewMode === 'Duyurular' ? (
                                     <motion.div key="duyurular" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-4xl mx-auto space-y-4">
-                                            {posts.filter(p => p.category?.toLowerCase() === 'duyurular').map(post => (
+                                            {posts.filter(p => p.category?.toLowerCase() === 'duyurular')
+                                                 .sort((a, b) => {
+                                                     if (a.is_pinned && !b.is_pinned) return -1;
+                                                     if (!a.is_pinned && b.is_pinned) return 1;
+                                                     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                                                 })
+                                                 .map(post => (
                                                 <TopicRow 
                                                     key={post.id} 
                                                     post={post} 
@@ -872,6 +899,8 @@ export default function PublicSpace() {
                                                     isAdmin={userRole === 'admin' || userRole === 'moderator'}
                                                     canDelete={userRole === 'admin' || userRole === 'moderator' || post.author_id === user?.uid}
                                                     canEdit={userRole === 'admin' || userRole === 'moderator' || post.author_id === user?.uid}
+                                                    onPin={() => handleTogglePinPost(post)}
+                                                    canPin={userRole === 'admin' || userRole === 'moderator'}
                                                 />
                                             ))}
                                     </motion.div>
@@ -979,6 +1008,8 @@ export default function PublicSpace() {
                                                     return cat !== 'sss' && (selectedCategory === 'Hepsi' || p.category === selectedCategory);
                                                 })
                                                 .sort((a, b) => {
+                                                    if (a.is_pinned && !b.is_pinned) return -1;
+                                                    if (!a.is_pinned && b.is_pinned) return 1;
                                                     if (sortBy === 'popular') return (b.likes_count || 0) - (a.likes_count || 0);
                                                     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
                                                 })
@@ -998,6 +1029,8 @@ export default function PublicSpace() {
                                                         isAdmin={userRole === 'admin' || userRole === 'moderator'}
                                                         canDelete={userRole === 'admin' || userRole === 'moderator' || post.author_id === user?.uid}
                                                         canEdit={userRole === 'admin' || userRole === 'moderator' || post.author_id === user?.uid}
+                                                        onPin={() => handleTogglePinPost(post)}
+                                                        canPin={userRole === 'admin' || userRole === 'moderator'}
                                                     />
                                                 ))}
                                         </div>
@@ -1267,7 +1300,7 @@ export default function PublicSpace() {
     );
 }
 
-function TopicRow({ post, onClick, onDelete, onEdit, onApprove, onReject, canDelete, canEdit, isAdmin }: any) {
+function TopicRow({ post, onClick, onDelete, onEdit, onApprove, onReject, canDelete, canEdit, isAdmin, onPin, canPin }: any) {
     const isMapPost = post.title?.includes("İnteraktif Denetim Haritası");
     return (
         <div onClick={onClick} className="group p-4 md:p-5 bg-card border border-border/60 rounded-3xl shadow-sm hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center gap-4 md:gap-6 relative overflow-hidden">
@@ -1277,6 +1310,11 @@ function TopicRow({ post, onClick, onDelete, onEdit, onApprove, onReject, canDel
             <div className="flex-1 space-y-1 text-center sm:text-left min-w-0">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-1 sm:mb-0">
                     <span className="inline-block self-center sm:self-start px-2.5 py-1 bg-muted/80 text-muted-foreground rounded-lg text-[9px] font-black capitalize tracking-widest w-fit">{post.category}</span>
+                    {post.is_pinned && (
+                        <span className="inline-flex items-center gap-1 self-center sm:self-start px-2.5 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg text-[9px] font-black uppercase tracking-widest w-fit">
+                            <Pin size={8} className="fill-current" /> Sabitlendi
+                        </span>
+                    )}
                     {isMapPost && (
                         <span className="inline-block self-center sm:self-start px-2.5 py-1 bg-violet-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest w-fit shadow-md">İNTERAKTİF HARİTA</span>
                     )}
@@ -1299,6 +1337,11 @@ function TopicRow({ post, onClick, onDelete, onEdit, onApprove, onReject, canDel
                     <p className="text-[9px] font-bold text-slate-400 capitalize tracking-widest">Beğeni</p>
                 </div>
                 <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all">
+                    {canPin && (
+                        <button onClick={(e) => { e.stopPropagation(); onPin(); }} className={cn("p-2.5 rounded-xl transition-all", post.is_pinned ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/20" : "text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-955/20")} title={post.is_pinned ? "Sabitlemeyi Kaldır" : "Başa Tuttur"}>
+                            <Pin size={18} className={post.is_pinned ? "fill-amber-500" : ""} />
+                        </button>
+                    )}
                     {isAdmin && post.is_approved === false && (
                         <>
                             <button onClick={(e) => { e.stopPropagation(); onApprove(); }} className="p-2.5 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-xl transition-all" title="Onayla">

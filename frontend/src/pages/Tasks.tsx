@@ -3,7 +3,7 @@ import { Suspense, lazy, useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History, ArrowUpDown, FolderOpen, WifiOff, MoreVertical
+    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History, ArrowUpDown, FolderOpen, WifiOff, MoreVertical, AlertCircle
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -556,7 +556,14 @@ export default function Tasks() {
             
             // local folder creation for electron desktop app
             try {
-                await createTaskFolder(taskId);
+                const invTask = invitations.find(t => t.id === taskId);
+                const metadata = invTask ? {
+                    rapor_turu: invTask.rapor_turu,
+                    rapor_kodu: invTask.rapor_kodu,
+                    rapor_adi: invTask.rapor_adi,
+                    baslama_tarihi: invTask.baslama_tarihi
+                } : undefined;
+                await createTaskFolder(taskId, metadata);
             } catch (folderError) {
                 console.error("Yerel klasör oluşturulamadı:", folderError);
             }
@@ -814,7 +821,12 @@ export default function Tasks() {
             return;
         }
         try {
-            await openTaskFolder(task.id);
+            await openTaskFolder(task.id, {
+                rapor_turu: task.rapor_turu,
+                rapor_kodu: task.rapor_kodu,
+                rapor_adi: task.rapor_adi,
+                baslama_tarihi: task.baslama_tarihi
+            });
             toast.success("Klasör açılıyor...");
         } catch (error) {
             toast.error("Klasör açılamadı.");
@@ -1434,8 +1446,35 @@ export default function Tasks() {
         toast.success(`${baseTasks.length} görev CSV olarak dışa aktarıldı.`);
     };
 
+    const defaultPrefix = "S.Y.64";
+    const userEmail = user?.email?.toLowerCase();
+    const isSefa = userEmail === "sefa.yaprakli@gsb.gov.tr";
+    const hasDefaultPrefix = profile?.report_prefix === defaultPrefix || cachedData.profile?.report_prefix === defaultPrefix || localStorage.getItem('raporKoduOnek') === defaultPrefix;
+    const shouldPromptPrefix = (profile || cachedData.profile) && !isSefa && hasDefaultPrefix;
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500 max-w-full overflow-x-hidden">
+            {shouldPromptPrefix && (
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm mb-6 animate-in slide-in-from-top-4 duration-500 font-inter">
+                    <div className="flex gap-4">
+                        <div className="p-3 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-2xl shrink-0">
+                            <AlertCircle size={24} />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-amber-900 dark:text-amber-200 text-sm">Rapor Kodu Ayarı Gerekli</h4>
+                            <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                                Şu anda varsayılan rapor kodu ön eki (<strong>S.Y.64</strong>) kullanılmaktadır. Raporlarınızın doğru kodlanması için lütfen ayarlardan kendi müfettiş ön ekinizi belirleyin.
+                            </p>
+                        </div>
+                    </div>
+                    <Button 
+                        onClick={() => navigate("/settings")} 
+                        className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl px-5 h-11 shrink-0 font-bold text-xs"
+                    >
+                        Ayarlara Git
+                    </Button>
+                </div>
+            )}
             {/* Global Search Button */}
             <div className="flex justify-end mb-2">
                 <button

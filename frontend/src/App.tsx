@@ -5,6 +5,7 @@ import { ConfirmProvider } from "./lib/context/ConfirmContext";
 import { NotificationProvider } from "./lib/context/NotificationContext";
 import { ThemeProvider } from "./lib/context/ThemeContext";
 import { PresenceProvider } from "./lib/context/PresenceContext";
+import { useGlobalData } from "./lib/context/GlobalDataContext";
 
 import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth";
 import { auth, isElectron } from "./lib/firebase";
@@ -88,22 +89,26 @@ function App() {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [showIntro, setShowIntro] = useState(false);
+  const { data } = useGlobalData();
+  const profile = data?.profile;
 
   useEffect(() => {
     // Sadece giriş yapmış kullanıcılar için intro göster
     // Eğer deneme süresi başlatılmadıysa (ve admin değilse) intro zorunlu olsun
     if (user) {
-      // Global data yüklendikten sonra kontrol et (MainLayout veya burası fark etmez ama App'te kalabilir)
-      const hasSeenIntro = localStorage.getItem(`mufyard_intro_seen_${user.uid}`);
-      
-      // NOT: Gerçek kontrolü IntroPresentation içinde yapıyoruz zaten, 
-      // burası sadece otomatik tetikleme için.
-      if (!hasSeenIntro) {
+      const hasSeenIntroLocal = localStorage.getItem(`mufyard_intro_seen_${user.uid}`) === "true";
+      const hasSeenIntroDB = profile?.intro_seen === true;
+      const isAdmin = profile?.role === "admin";
+      const isTrialStarted = profile?.trial_started === true;
+
+      const isAlreadySeen = hasSeenIntroLocal || hasSeenIntroDB || isAdmin || isTrialStarted;
+
+      if (!isAlreadySeen) {
         const timer = setTimeout(() => setShowIntro(true), 1500);
         return () => clearTimeout(timer);
       }
     }
-  }, [user]);
+  }, [user, profile]);
 
   const handleCloseIntro = () => {
     if (user) {

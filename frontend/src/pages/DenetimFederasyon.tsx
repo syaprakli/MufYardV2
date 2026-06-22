@@ -1605,8 +1605,8 @@ export default function DenetimFederasyon() {
         });
 
         return (
-            <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 overflow-hidden h-full">
-                <div className={`flex flex-col gap-4 overflow-hidden h-full ${activeQuestionForTenkit ? "xl:col-span-7" : "xl:col-span-12"}`}>
+            <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 xl:overflow-hidden h-auto xl:h-full">
+                <div className={`flex flex-col gap-4 xl:overflow-hidden h-auto xl:h-full ${activeQuestionForTenkit ? "xl:col-span-7" : "xl:col-span-12"}`}>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
                         <div className="flex-1 relative">
                             <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -1649,7 +1649,7 @@ export default function DenetimFederasyon() {
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                    <div className="flex-1 xl:overflow-y-auto space-y-4 pr-1 overflow-visible h-auto">
                         {filteredQuestions.length === 0 ? (
                             <div className="text-center py-12 border border-dashed border-slate-200 dark:border-slate-850 rounded-2xl bg-slate-50/20 dark:bg-slate-955/5">
                                 <AlertCircle size={20} className="mx-auto text-slate-400 mb-2" />
@@ -1732,7 +1732,7 @@ export default function DenetimFederasyon() {
                     </div>
                 </div>
                 {activeQuestionForTenkit && (
-                    <div className="xl:col-span-5 flex flex-col max-h-full overflow-hidden border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-950 p-4 relative">
+                    <div className="xl:col-span-5 flex flex-col xl:max-h-full xl:overflow-hidden h-auto border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-950 p-4 relative">
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1">
                                 <Bot size={12} className="text-blue-500 animate-pulse" />
@@ -2273,7 +2273,7 @@ export default function DenetimFederasyon() {
     return (
         <div className="flex flex-col gap-6 h-[calc(100vh-110px)] overflow-hidden animate-in fade-in duration-300">
             {/* Header / Back Navigation */}
-            <div className="flex items-center gap-4 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-shrink-0 justify-between shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-shrink-0 justify-between shadow-sm">
                 <div className="flex items-center gap-3.5">
                     <button
                         onClick={() => navigate("/denetim")}
@@ -2294,7 +2294,7 @@ export default function DenetimFederasyon() {
                 
                 <button
                     onClick={() => setShowTaskPicker(true)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-px active:translate-y-0 flex-shrink-0 group"
+                    className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-px active:translate-y-0 flex-shrink-0 group w-full sm:w-auto"
                 >
                     <Play size={11} className="group-hover:scale-110 transition-transform" />
                     <span>Denetimi Başlat</span>
@@ -2714,7 +2714,7 @@ export default function DenetimFederasyon() {
                                                 setPickerTaskForAudit(selectedTask);
                                                 setShowTaskPicker(true);
                                             }}
-                                            className="px-6 h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-blue-500/20"
+                                            className="px-6 h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 w-full sm:w-auto"
                                         >
                                             <Play size={14} className="fill-white" />
                                             <span>Denetimi Başlat</span>

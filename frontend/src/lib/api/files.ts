@@ -97,24 +97,26 @@ export const openFile = async (id: string): Promise<any> => {
     return response.json();
 };
 
-export const openTaskFolder = async (taskId: string): Promise<any> => {
+export const openTaskFolder = async (taskId: string, metadata?: any): Promise<any> => {
     const baseUrl = IS_ELECTRON ? LOCAL_API_URL : API_URL;
-    const headers = await getAuthHeaders();
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
     const response = await fetchWithTimeout(`${baseUrl}/files/open-task-folder/${taskId}`, {
         method: "POST",
-        headers
+        headers,
+        body: metadata ? JSON.stringify(metadata) : undefined
     });
     
     if (!response.ok) throw new Error("Görev klasörü açılamadı");
     return response.json();
 };
 
-export const createTaskFolder = async (taskId: string): Promise<any> => {
+export const createTaskFolder = async (taskId: string, metadata?: any): Promise<any> => {
     const baseUrl = IS_ELECTRON ? LOCAL_API_URL : API_URL;
-    const headers = await getAuthHeaders();
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
     const response = await fetchWithTimeout(`${baseUrl}/files/create-task-folder/${taskId}`, {
         method: "POST",
-        headers
+        headers,
+        body: metadata ? JSON.stringify(metadata) : undefined
     });
     
     if (!response.ok) throw new Error("Görev klasörü oluşturulamadı");

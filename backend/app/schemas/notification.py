@@ -8,6 +8,8 @@ class NotificationBase(BaseModel):
     message: str
     type: str = "task_invite" # "task_invite", "task_accepted", "general", "dm"
     task_id: Optional[str] = None
+    note_id: Optional[str] = None
+    contact_id: Optional[str] = None
     chat_room_id: Optional[str] = None
     read: bool = False
 

@@ -37,6 +37,25 @@ class NoteService:
         
         notes = list(unique_notes.values())
         
+        # Resolve owner names
+        def resolve_names():
+            for n in notes:
+                oid = n.get('owner_id')
+                if oid:
+                    try:
+                        prof_doc = db.collection('profiles').document(oid).get()
+                        if prof_doc.exists:
+                            n['owner_name'] = prof_doc.to_dict().get('full_name') or oid
+                        else:
+                            n['owner_name'] = oid
+                    except Exception:
+                        n['owner_name'] = oid
+                else:
+                    n['owner_name'] = 'Bilinmeyen'
+
+        if notes:
+            await asyncio.to_thread(resolve_names)
+
         # Sort in memory: Pinned first, then by created_at descending
         def sort_key(x):
             pinned = 1 if x.get('is_pinned', False) else 0
@@ -67,15 +86,47 @@ class NoteService:
         new_doc = await asyncio.to_thread(doc_ref[1].get)
         new_note = new_doc.to_dict()
         new_note['id'] = doc_ref[1].id
+
+        # Send notifications
+        pending = note_data.get('pending_collaborators', [])
+        if pending:
+            try:
+                from app.services.notification_service import NotificationService
+                from app.services.profile_service import ProfileService
+                
+                owner_profile = await ProfileService.get_profile(owner_id)
+                owner_display = owner_profile.get('full_name') if owner_profile else owner_id
+                
+                for collaborator_id in pending:
+                    try:
+                        target_uid = collaborator_id
+                        if "@" in collaborator_id:
+                            profiles_query = db.collection('profiles').where('email', '==', collaborator_id.lower().trim()).limit(1)
+                            profiles = await asyncio.to_thread(lambda: list(profiles_query.stream()))
+                            if profiles:
+                                target_uid = profiles[0].id
+                        
+                        await NotificationService.notify_note_invitation(
+                            note_id=new_note['id'],
+                            note_title=note_data.get('title', 'Yeni Not'),
+                            owner_name=owner_display,
+                            collaborator_id=target_uid
+                        )
+                    except Exception as inner_err:
+                        print(f"[NOTIF] Create note inner notify error: {inner_err}")
+            except Exception as outer_err:
+                print(f"[NOTIF] Create note outer notify error: {outer_err}")
+
         return new_note
 
 
     @staticmethod
     async def update_note(note_id: str, note_update: NoteUpdate) -> Optional[Dict[str, Any]]:
         doc_ref = db.collection('notes').document(note_id)
-        exists = await asyncio.to_thread(lambda: doc_ref.get().exists)
-        if not exists:
+        doc = await asyncio.to_thread(doc_ref.get)
+        if not doc.exists:
             return None
+        current_data = doc.to_dict() or {}
             
         update_data = {k: v for k, v in note_update.dict().items() if v is not None}
         await asyncio.to_thread(doc_ref.update, update_data)
@@ -83,6 +134,42 @@ class NoteService:
         updated_doc_res = await asyncio.to_thread(doc_ref.get)
         updated_doc = updated_doc_res.to_dict()
         updated_doc['id'] = note_id
+
+        # Send notifications if pending_collaborators changed
+        if 'pending_collaborators' in update_data:
+            old_pending = current_data.get('pending_collaborators', [])
+            new_pending = update_data['pending_collaborators'] or []
+            added_collaborators = [c for c in new_pending if c not in old_pending]
+            
+            if added_collaborators:
+                try:
+                    from app.services.notification_service import NotificationService
+                    from app.services.profile_service import ProfileService
+                    
+                    owner_id = current_data.get('owner_id')
+                    owner_profile = await ProfileService.get_profile(owner_id)
+                    owner_display = owner_profile.get('full_name') if owner_profile else owner_id
+                    
+                    for collaborator_id in added_collaborators:
+                        try:
+                            target_uid = collaborator_id
+                            if "@" in collaborator_id:
+                                profiles_query = db.collection('profiles').where('email', '==', collaborator_id.lower().trim()).limit(1)
+                                profiles = await asyncio.to_thread(lambda: list(profiles_query.stream()))
+                                if profiles:
+                                    target_uid = profiles[0].id
+                            
+                            await NotificationService.notify_note_invitation(
+                                note_id=note_id,
+                                note_title=current_data.get('title', 'Yeni Not'),
+                                owner_name=owner_display,
+                                collaborator_id=target_uid
+                            )
+                        except Exception as inner_err:
+                            print(f"[NOTIF] Update note inner notify error: {inner_err}")
+                except Exception as outer_err:
+                    print(f"[NOTIF] Update note outer notify error: {outer_err}")
+
         return updated_doc
 
     @staticmethod

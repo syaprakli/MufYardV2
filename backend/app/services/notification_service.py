@@ -182,3 +182,27 @@ class NotificationService:
             task_id=task_id
         )
         return await NotificationService.create_notification(notif)
+
+    @staticmethod
+    async def notify_note_invitation(note_id: str, note_title: str, owner_name: str, collaborator_id: str):
+        """Not daveti için bildirim oluşturur."""
+        notif = NotificationCreate(
+            user_id=collaborator_id,
+            title="Yeni Not Daveti",
+            message=f"{owner_name} sizinle '{note_title}' notunu paylaştı.",
+            type="note_invite",
+            note_id=note_id
+        )
+        return await NotificationService.create_notification(notif)
+
+    @staticmethod
+    async def notify_contact_invitation(contact_id: str, contact_name: str, owner_name: str, collaborator_id: str):
+        """Rehber daveti için bildirim oluşturur."""
+        notif = NotificationCreate(
+            user_id=collaborator_id,
+            title="Yeni Rehber Kaydı Paylaşımı",
+            message=f"{owner_name} sizinle '{contact_name}' kişi kaydını paylaştı.",
+            type="contact_invite",
+            contact_id=contact_id
+        )
+        return await NotificationService.create_notification(notif)

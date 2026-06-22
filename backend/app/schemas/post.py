@@ -13,6 +13,7 @@ class PostBase(BaseModel):
     shared_with: Optional[List[str]] = Field(default_factory=list, example=["user-id-1", "user-id-2"])
     attachments: Optional[List[dict]] = Field(default_factory=list, example=[{"url": "...", "type": "image", "name": "..."}])
     is_approved: bool = True
+    is_pinned: bool = False
     approved_by: Optional[str] = None
     approved_at: Optional[datetime] = None
 
@@ -24,6 +25,7 @@ class PostUpdate(BaseModel):
     content: Optional[str] = None
     category: Optional[str] = None
     is_approved: Optional[bool] = None
+    is_pinned: Optional[bool] = None
     approved_by: Optional[str] = None
     approved_at: Optional[datetime] = None
 

@@ -6,7 +6,7 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Suspense, lazy, useState, useEffect, useRef } from "react";
 import { cn } from "../lib/utils";
-import { fetchNotes, createNote, updateNote, deleteNote, acceptNote, type Note } from "../lib/api/notes";
+import { fetchNotes, createNote, updateNote, deleteNote, acceptNote, rejectNote, type Note } from "../lib/api/notes";
 import { useSearchParams } from "react-router-dom";
 
 const ShareModalLazy = lazy(() => import("../components/ShareModal"));
@@ -179,6 +179,17 @@ export default function Notes() {
         }
     };
 
+    const handleRejectInvitation = async (noteId: string) => {
+        if (!user?.uid) return;
+        try {
+            await rejectNote(noteId, user.uid, user.email || undefined);
+            toast.success("Not daveti reddedildi.");
+            loadNotes(user.uid);
+        } catch (error) {
+            toast.error("Not daveti reddedilemedi.");
+        }
+    };
+
     const handleShareUpdate = async (newSharedWith: string[]) => {
         if (!shareNote) return;
         try {
@@ -322,15 +333,23 @@ export default function Notes() {
                                     </div>
                                     <h4 className="font-bold text-foreground dark:text-slate-100 text-sm mb-1">{inv.title}</h4>
                                     <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-4 italic flex items-center gap-1">
-                                        <UserPlus size={10} /> Gönderen: {inv.owner_id}
+                                        <UserPlus size={10} /> Gönderen: {(inv as any).owner_name || inv.owner_id}
                                     </p>
                                 </div>
-                                <button 
-                                    onClick={() => handleAcceptInvitation(inv.id)} 
-                                    className="w-full bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-10 font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-amber-200/50 transition-all active:scale-95"
-                                >
-                                    Notu Kabul Et ve Listeye Ekle
-                                </button>
+                                <div className="flex gap-2 w-full mt-4">
+                                    <button 
+                                        onClick={() => handleAcceptInvitation(inv.id)} 
+                                        className="flex-1 bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-10 font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-amber-200/50 transition-all active:scale-95 flex items-center justify-center gap-1"
+                                    >
+                                        Kabul Et
+                                    </button>
+                                    <button 
+                                        onClick={() => handleRejectInvitation(inv.id)} 
+                                        className="flex-1 bg-rose-500 hover:bg-rose-600 text-white rounded-xl h-10 font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-rose-200/50 transition-all active:scale-95 flex items-center justify-center gap-1"
+                                    >
+                                        Reddet
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
