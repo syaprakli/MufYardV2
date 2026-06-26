@@ -1854,7 +1854,7 @@ export default function DenetimKyk() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-1">
+                            <div className="flex-1 flex flex-col gap-6 xl:overflow-y-auto pr-1">
                                 {/* Header */}
                                 <div className="flex flex-col border-b border-slate-100 dark:border-slate-800/50 pb-4 gap-4">
                                     <button
@@ -2023,7 +2023,7 @@ export default function DenetimKyk() {
                                         </Button>
                                     </div>
                                 ) : (
-                                    <div className="flex-1 flex flex-col overflow-y-auto">
+                                    <div className="flex-1 flex flex-col xl:overflow-y-auto">
                                         {activeDetailTab === "info" && renderInfoTab()}
                                         {activeDetailTab === "notes" && renderNotesTab()}
                                         {activeDetailTab === "photos" && renderPhotosTab()}
