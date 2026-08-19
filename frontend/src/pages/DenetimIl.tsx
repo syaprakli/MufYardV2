@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import {
     BookOpen, ClipboardCheck, Bot, Plus, Edit2, Trash2, Search,
     Tag, ChevronRight, X, Check, Loader2, Database, Sparkles, FileText,
-    ArrowRight, Info, AlertCircle, Save, ExternalLink, Play, ArrowLeft
+    ArrowRight, Info, AlertCircle, Save, ExternalLink, Play, ArrowLeft,
+    Copy, Printer, Download
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { API_URL } from "../lib/config";
@@ -15,6 +16,7 @@ import { useAuth } from "../lib/hooks/useAuth";
 import { useGlobalData } from "../lib/context/GlobalDataContext";
 import { createAudit, updateAudit, deleteAudit, fetchAuditById } from "../lib/api/audit";
 import { updateTask } from "../lib/api/tasks";
+import { generateEvrakTalebiDocx } from "../lib/api/files";
 
 interface KnowledgeItem {
     id: string;
@@ -32,6 +34,26 @@ import { AUDIT_TEMPLATES } from "../lib/auditTemplates";
 const PRESET_CATEGORIES = [
     "Yurt İşlemleri", "Spor Tesisi", "Federasyon", "Denetim Genel",
     "İdari İşlemler", "Mali İşlemler", "Teknik Kontrol", "Diğer"
+];
+
+const EVRAK_TALEP_MADDELERI = [
+    "{donem} tarihleri arasında klasör bazındaki işlem ve faaliyetlerin teftişe hazır halde bulundurulması.",
+    "Teşkilatımızın (İl Müdürlüğünün) mülkiyetinde bulunan yurt, spor tesisleri, arsalar ve diğer gayrimenkullerin listesi (Gerekli açıklama yapılan bu tesislerin adet, m2, mevki ve kapasitesi de belirtilmelidir).",
+    "Teşkilatımızca (İl Müdürlüğünce) intifa hakkı alınan ya da devredilen tesis ve arsaların ayrıntılı listesi (Gerekli açıklama yapılan bu tesislerin adet, m2, mevki ve kapasitesi de belirtilecek).",
+    "İl Müdürlüğünce {donem} tarihleri arasında kiraya verilen büfe, arsa, bina, lokal, otopark, vb. tesislerin listesi.",
+    "Kiraya verilen tesislere ait; kira, tahsis, reklam, ATM ve baz istasyonlarının dosyaları.",
+    "İl Müdürlüğünce {donem} tarihleri arasında kiralanan veya kirası halen ödenen yurt binalarının listesi.",
+    "İl Müdürlüğünce {donem} tarihleri arasında yapılan ihalelerin listelenmesi.",
+    "İl Müdürlüğünce {donem} tarihleri arasında yapılan doğrudan teminlerin listelenmesi.",
+    "{donem} tarihleri arasındaki; Mutemet makbuzları ve Mutemet Defteri, Avans Defteri, varsa bilet ve Bilet Defterinin hazır halde bulundurulması.",
+    "{donemMusabaka} tarihleri arasındaki müsabaka (Amatör futbol dahil) görev ücretleri evrakının ilgili klasörden çıkarılıp yıllık bazda sıralanarak hazır halde bulundurulması.",
+    "İl Müdürlüğü personelinin eş bilgisinin sistemden çekilerek, Sosyal Güvenlik İl Müdürlüğünden bir yazı ile çalışıp çalışmadıkları sorgusunun yapılması.",
+    "Sosyal Güvenlik İl Müdürlüğüne bir yazı yazılarak, il sicil sayılı dosyada işlem görmüş iş yerine ait {donem} tarihleri arasında tahakkuk edip ödenmeyen idari para cezası (İPC) borcunun bulunup bulunmadığı sorgusunun yapılması.",
+    "Belediye ve enerji dağıtımı yapan firmalara bir yazı yazılarak, {donem} tarihleri arasında tahakkuk edip ödenmeyen gecikme cezası/faizi borcunun bulunup bulunmadığı sorgusunun yapılması.",
+    "2016 yılından 2019 yılına kadar olan dönem için Esas Defter ve Emanet Fark; 2019 yılı ve sonrası için ise mizan, yevmiye ve yardımcı defterlerin dijital ortamdaki Excel dökümleri.",
+    "{yillar} yılları arasındaki aylık bazda hizmet binası, yurt binaları ve spor tesislerinin elektrik, su ve doğalgaz fatura dökümleri.",
+    "Özel barınma hizmeti veren yükseköğrenim yurtlarının denetimlerinin yapılıp yapılmadığı, yapıldıysa denetim formlarının/raporlarının ve dosyalarının hazır halde bulundurulması.",
+    "Denetim Dönemini kapsayan yıllara ({yillar}) ait ücret tahsis cetvellerinin hazır hale getirilmesi."
 ];
 
 const emptyForm = {
@@ -218,7 +240,8 @@ export default function DenetimIl() {
     const [tenkitResults, setTenkitResults] = useState<KnowledgeItem[]>([]);
 
     // 6. Detailed Tab States
-    const [activeDetailTab, setActiveDetailTab] = useState<"info" | "notes" | "photos" | "checklist" | "editor">("info");
+    const [customItemText, setCustomItemText] = useState("");
+    const [activeDetailTab, setActiveDetailTab] = useState<"info" | "notes" | "photos" | "checklist" | "editor" | "evrak_talebi">("info");
     const [localAuditData, setLocalAuditData] = useState<any>({
         info: {},
         generalNotes: "",
@@ -370,7 +393,8 @@ export default function DenetimIl() {
                 generalNotes: ad.generalNotes || "",
                 photos: ad.photos || [],
                 photo_descriptions: ad.photo_descriptions || {},
-                form: ad.form || {}
+                form: ad.form || {},
+                evrakTalep: ad.evrakTalep || null
             });
         } else {
             setReportContent("");
@@ -379,7 +403,8 @@ export default function DenetimIl() {
                 generalNotes: "",
                 photos: [],
                 photo_descriptions: {},
-                form: {}
+                form: {},
+                evrakTalep: null
             });
         }
         setReportEditing(false);
@@ -611,6 +636,549 @@ export default function DenetimIl() {
         
         toast.success(`"${item.topic}" müfettiş notuna ve rapora eklendi.`);
         setActiveQuestionForTenkit(null);
+    };
+
+    const renderEvrakTalebiTab = () => {
+        const evrakTalep = localAuditData.evrakTalep || {
+            olurTarihi: "",
+            olurSayisi: "",
+            gorevTarihi: "",
+            gorevSayisi: "",
+            mufettisAdi: profile?.full_name || "",
+            mufettisUnvani: "Bakanlık Müfettişi",
+            denetimDonemi: "01.03.2016 - 31.12.2025",
+            denetimYili: "2016-2025",
+            donemMusabaka: "01.01.2020 - 31.12.2025",
+            teslimSuresi: "7",
+            selectedItems: EVRAK_TALEP_MADDELERI.map((_, i) => i),
+            customText: "",
+            customItems: [] as string[]
+        };
+
+        const customItems = evrakTalep.customItems || [];
+        const combinedItems = [...EVRAK_TALEP_MADDELERI, ...customItems];
+
+        const updateEvrakTalepField = (key: string, value: any) => {
+            const updated = {
+                ...localAuditData,
+                evrakTalep: {
+                    ...evrakTalep,
+                    [key]: value
+                }
+            };
+            setLocalAuditData(updated);
+            handleSaveAuditData(updated);
+        };
+
+        const addCustomItem = (text: string) => {
+            if (!text.trim()) return;
+            const updatedCustomItems = [...customItems, text.trim()];
+            const newIndex = EVRAK_TALEP_MADDELERI.length + updatedCustomItems.length - 1;
+            const updatedSelectedItems = [...(evrakTalep.selectedItems || []), newIndex];
+            
+            const updated = {
+                ...localAuditData,
+                evrakTalep: {
+                    ...evrakTalep,
+                    customItems: updatedCustomItems,
+                    selectedItems: updatedSelectedItems
+                }
+            };
+            setLocalAuditData(updated);
+            handleSaveAuditData(updated);
+        };
+
+        const removeCustomItem = (customIndex: number) => {
+            const globalIndex = EVRAK_TALEP_MADDELERI.length + customIndex;
+            const updatedCustomItems = customItems.filter((_: any, i: number) => i !== customIndex);
+            
+            let updatedSelectedItems = (evrakTalep.selectedItems || [])
+                .filter((idx: number) => idx !== globalIndex)
+                .map((idx: number) => {
+                    if (idx > globalIndex) return idx - 1;
+                    return idx;
+                });
+
+            const updated = {
+                ...localAuditData,
+                evrakTalep: {
+                    ...evrakTalep,
+                    customItems: updatedCustomItems,
+                    selectedItems: updatedSelectedItems
+                }
+            };
+            setLocalAuditData(updated);
+            handleSaveAuditData(updated);
+        };
+
+        const toggleItem = (index: number) => {
+            let items = [...(evrakTalep.selectedItems || [])];
+            if (items.includes(index)) {
+                items = items.filter((i: number) => i !== index);
+            } else {
+                items.push(index);
+                items.sort((a, b) => a - b);
+            }
+            updateEvrakTalepField("selectedItems", items);
+        };
+
+        const selectAll = () => {
+            updateEvrakTalepField("selectedItems", combinedItems.map((_, i) => i));
+        };
+
+        const selectNone = () => {
+            updateEvrakTalepField("selectedItems", []);
+        };
+
+        // Live text formatting
+        const olurTarihiStr = evrakTalep.olurTarihi || ".......";
+        const olurSayisiStr = evrakTalep.olurSayisi || ".......";
+        const gorevTarihiStr = evrakTalep.gorevTarihi || ".......";
+        const gorevSayisiStr = evrakTalep.gorevSayisi || ".......";
+        const denetimDonemiStr = evrakTalep.denetimDonemi || "01.03.2016 - 31.12.2025";
+        const denetimYiliStr = evrakTalep.denetimYili || "2016-2025";
+        const donemMusabakaStr = evrakTalep.donemMusabaka || "01.01.2020 - 31.12.2025";
+        const teslimSuresiStr = evrakTalep.teslimSuresi || "7";
+        const recipientNameStr = "GENÇLİK VE SPOR İL MÜDÜRLÜĞÜNE";
+        const inspectorName = evrakTalep.mufettisAdi || ".......";
+        const inspectorTitle = evrakTalep.mufettisUnvani || "Bakanlık Müfettişi";
+
+        const getFormattedItem = (itemText: string) => {
+            return itemText
+                .replace(/\{donem\}/g, denetimDonemiStr)
+                .replace(/\{donemMusabaka\}/g, donemMusabakaStr)
+                .replace(/\{yillar\}/g, denetimYiliStr);
+        };
+
+        // Generate printable/copyable text
+        const getPlainText = () => {
+            let text = `T.C.\nGENÇLİK VE SPOR BAKANLIĞI\nBakanlık Müfettişliği\n\n`;
+            text += `Konu: Görev Emirleri\n\n`;
+            text += `${recipientNameStr}\n\n`;
+            text += `İlgi: a) Bakanlık Makamının ${olurTarihiStr} tarihli ve ${olurSayisiStr} sayılı Oluru.\n`;
+            text += `      b) Rehberlik ve Denetim Başkanlığının ${gorevTarihiStr} tarih ve ${gorevSayisiStr} sayılı Görev Emri.\n\n`;
+            text += `İlgi (a)'da kayıtlı Makam Oluru ve ilgi (b)'de kayıtlı Görev Emri uyarınca, İl Müdürlüğünün ${denetimDonemiStr} tarihleri arasındaki teftişi Müfettişliğimizce yapılacaktır. Aşağıda belirtilen tüm bilgi ve belgelerin tasniflenmiş onaylı suretlerinin denetime hazır hale getirilerek ${teslimSuresiStr} gün içinde Müfettişliğimize teslim edilmesini rica ederim.\n\n`;
+            text += `TALEP EDİLEN BİLGİ VE BELGELER:\n\n`;
+            
+            let count = 1;
+            combinedItems.forEach((item, index) => {
+                if (evrakTalep.selectedItems?.includes(index)) {
+                    text += `${count}. ${getFormattedItem(item)}\n`;
+                    count++;
+                }
+            });
+            
+            text += `\n\nMüfettişliğimize cevaben hazırlanacak tablo ve listeler İl Müdürlüğü onaylı olarak ibraz edilmelidir.\nBilgilerinizi ve gereğini rica ederim.\n\n`;
+            text += `${inspectorName}\n${inspectorTitle}`;
+            return text;
+        };
+
+        const handleCopyText = () => {
+            navigator.clipboard.writeText(getPlainText());
+            toast.success("Belge metni panoya kopyalandı!");
+        };
+
+        const handlePrint = () => {
+            const printWindow = window.open("", "_blank");
+            if (!printWindow) return;
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Evrak Talep Yazısı - ${selectedTask?.rapor_adi || ''}</title>
+                    <style>
+                        body {
+                            font-family: 'Times New Roman', Times, serif;
+                            line-height: 1.5;
+                            padding: 50px;
+                            color: #000;
+                            font-size: 14px;
+                        }
+                        .header {
+                            text-align: center;
+                            margin-bottom: 30px;
+                            font-weight: bold;
+                        }
+                        .subject {
+                            margin-bottom: 20px;
+                        }
+                        .recipient {
+                            font-weight: bold;
+                            margin-bottom: 20px;
+                            text-align: center;
+                        }
+                        .reference {
+                            margin-bottom: 20px;
+                            margin-left: 20px;
+                        }
+                        .content {
+                            text-align: justify;
+                            text-indent: 40px;
+                            margin-bottom: 20px;
+                        }
+                        .list-title {
+                            font-weight: bold;
+                            margin-bottom: 10px;
+                        }
+                        ol {
+                            margin-left: 20px;
+                            padding-left: 0;
+                            text-align: justify;
+                        }
+                        li {
+                            margin-bottom: 8px;
+                        }
+                        .footer-note {
+                            text-indent: 40px;
+                            margin-top: 20px;
+                            margin-bottom: 20px;
+                            text-align: justify;
+                        }
+                        .signature {
+                            float: right;
+                            text-align: center;
+                            margin-top: 40px;
+                            margin-right: 50px;
+                            font-weight: bold;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        T.C.<br />
+                        GENÇLİK VE SPOR BAKANLIĞI<br />
+                        Bakanlık Müfettişliği
+                    </div>
+                    
+                    <div class="subject">
+                        <strong>Konu:</strong> Görev Emirleri
+                    </div>
+                    
+                    <div class="recipient">
+                        ${recipientNameStr}
+                    </div>
+                    
+                    <div class="reference">
+                        <strong>İlgi:</strong><br />
+                        a) Bakanlık Makamının ${olurTarihiStr} tarihli ve ${olurSayisiStr} sayılı Oluru.<br />
+                        b) Rehberlik ve Denetim Başkanlığının ${gorevTarihiStr} tarih ve ${gorevSayisiStr} sayılı Görev Emri.
+                    </div>
+                    
+                    <div class="content">
+                        İlgi (a)'da kayıtlı Makam Oluru ve ilgi (b)'de kayıtlı Görev Emri uyarınca, İl Müdürlüğünün ${denetimDonemiStr} tarihleri arasındaki teftişi Müfettişliğimizce yapılacaktır. Aşağıda belirtilen tüm bilgi ve belgelerin tasniflenmiş onaylı suretlerinin denetime hazır hale getirilerek ${teslimSuresiStr} gün içinde Müfettişliğimize teslim edilmesini rica ederim.
+                    </div>
+                    
+                    <div class="list-title">TALEP EDİLEN BİLGİ VE BELGELER:</div>
+                    <ol>
+                        ${combinedItems.map((item, index) => {
+                            if (evrakTalep.selectedItems?.includes(index)) {
+                                return `<li>${getFormattedItem(item)}</li>`;
+                            }
+                            return "";
+                        }).join("")}
+                    </ol>
+                    
+                    <div class="footer-note">
+                        Müfettişliğimize cevaben hazırlanacak tablo ve listeler İl Müdürlüğü onaylı olarak ibraz edilmelidir.<br/>
+                        Bilgilerinizi ve gereğini rica ederim.
+                    </div>
+                    
+                    <div class="signature">
+                        ${inspectorName}<br />
+                        ${inspectorTitle}
+                    </div>
+                    
+                    <script>
+                        window.onload = function() {
+                            window.print();
+                        }
+                    </script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        };
+
+        const handleDownloadWord = async () => {
+            const loadingToast = toast.loading("Word Dosyası Hazırlanıyor...");
+            try {
+                const selectedItemsText: string[] = [];
+                combinedItems.forEach((item, index) => {
+                    if (evrakTalep.selectedItems?.includes(index)) {
+                        selectedItemsText.push(getFormattedItem(item));
+                    }
+                });
+                
+                await generateEvrakTalebiDocx({
+                    olurTarihi: olurTarihiStr,
+                    olurSayisi: olurSayisiStr,
+                    gorevTarihi: gorevTarihiStr,
+                    gorevSayisi: gorevSayisiStr,
+                    mufettisAdi: inspectorName,
+                    mufettisUnvani: inspectorTitle,
+                    denetimDonemi: denetimDonemiStr,
+                    denetimYili: denetimYiliStr,
+                    donemMusabaka: donemMusabakaStr,
+                    teslimSuresi: teslimSuresiStr,
+                    selectedItemsText: selectedItemsText,
+                    scope: "reports",
+                    path: ""
+                });
+                toast.success("Evrak talebi yazısı Word formatında oluşturuldu ve açıldı!", { id: loadingToast });
+            } catch (error: any) {
+                console.error("Word generation error:", error);
+                toast.error(error.message || "Word dosyası oluşturulurken hata oluştu", { id: loadingToast });
+            }
+        };
+
+        return (
+            <div className="flex flex-col gap-6">
+                {/* Toolbar */}
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/50 pb-4 flex-wrap gap-3">
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-black text-slate-850 dark:text-slate-200 uppercase tracking-wider">Evrak Talep Yazısı</h3>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="rounded-xl text-[10px] font-black h-9"
+                            onClick={handleCopyText}
+                        >
+                            <Copy size={12} className="mr-1.5" /> METNİ KOPYALA
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="rounded-xl text-[10px] font-black h-9"
+                            onClick={handlePrint}
+                        >
+                            <Printer size={12} className="mr-1.5" /> YAZDIR / PDF
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="rounded-xl text-[10px] font-black h-9"
+                            onClick={handleDownloadWord}
+                        >
+                            <Download size={12} className="mr-1.5" /> WORD İNDİR
+                        </Button>
+                        <Button
+                            size="sm"
+                            className="rounded-xl text-[10px] font-black h-9 shadow-md shadow-primary/25"
+                            onClick={() => handleSaveAuditData(localAuditData)}
+                            disabled={isSavingAuditData}
+                        >
+                            {isSavingAuditData ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Save size={12} className="mr-1.5" />}
+                            KAYDET
+                        </Button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                    {/* Form Controls */}
+                    <div className="xl:col-span-5 space-y-6">
+                        <div className="bg-slate-50 dark:bg-slate-955 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-850 dark:text-slate-200">Yazı Bilgileri</h4>
+                            <div className="h-px bg-slate-200 dark:bg-slate-800/60" />
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5 col-span-2">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Müfettiş Adı Soyadı</label>
+                                    <input
+                                        type="text"
+                                        value={evrakTalep.mufettisAdi || ""}
+                                        onChange={e => updateEvrakTalepField("mufettisAdi", e.target.value)}
+                                        placeholder="Örn: Sefa YAPRAKLI"
+                                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1.5 col-span-2">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Müfettiş Unvanı</label>
+                                    <input
+                                        type="text"
+                                        value={evrakTalep.mufettisUnvani || ""}
+                                        onChange={e => updateEvrakTalepField("mufettisUnvani", e.target.value)}
+                                        placeholder="Örn: Bakanlık Müfettişi..."
+                                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1.5 col-span-2">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Denetim Dönemi (Tarih Aralığı)</label>
+                                    <input
+                                        type="text"
+                                        value={evrakTalep.denetimDonemi || ""}
+                                        onChange={e => updateEvrakTalepField("denetimDonemi", e.target.value)}
+                                        placeholder="Örn: 01.03.2016 - 31.12.2025"
+                                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1.5 col-span-2">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Müsabaka Dönemi (M. 10)</label>
+                                    <input
+                                        type="text"
+                                        value={evrakTalep.donemMusabaka || ""}
+                                        onChange={e => updateEvrakTalepField("donemMusabaka", e.target.value)}
+                                        placeholder="Örn: 01.01.2020 - 31.12.2025"
+                                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Makam Oluru Tarih</label>
+                                    <input
+                                        type="text"
+                                        value={evrakTalep.olurTarihi || ""}
+                                        onChange={e => updateEvrakTalepField("olurTarihi", e.target.value)}
+                                        placeholder="Örn: 21.01.2025"
+                                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Makam Oluru Sayı</label>
+                                    <input
+                                        type="text"
+                                        value={evrakTalep.olurSayisi || ""}
+                                        onChange={e => updateEvrakTalepField("olurSayisi", e.target.value)}
+                                        placeholder="Örn: 41444738-660-26"
+                                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Görevlendirme Tarih</label>
+                                    <input
+                                        type="text"
+                                        value={evrakTalep.gorevTarihi || ""}
+                                        onChange={e => updateEvrakTalepField("gorevTarihi", e.target.value)}
+                                        placeholder="Örn: 24.01.2025"
+                                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Görevlendirme Sayı</label>
+                                    <input
+                                        type="text"
+                                        value={evrakTalep.gorevSayisi || ""}
+                                        onChange={e => updateEvrakTalepField("gorevSayisi", e.target.value)}
+                                        placeholder="Örn: E-41444738-662..."
+                                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Denetim Yılları</label>
+                                    <input
+                                        type="text"
+                                        value={evrakTalep.denetimYili || ""}
+                                        onChange={e => updateEvrakTalepField("denetimYili", e.target.value)}
+                                        placeholder="Örn: 2016-2025"
+                                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Teslim Süresi (Gün)</label>
+                                    <input
+                                        type="text"
+                                        value={evrakTalep.teslimSuresi || ""}
+                                        onChange={e => updateEvrakTalepField("teslimSuresi", e.target.value)}
+                                        placeholder="Örn: 7"
+                                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Checklist selection */}
+                        <div className="bg-slate-50 dark:bg-slate-955 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4 flex flex-col max-h-[400px]">
+                            <div className="flex justify-between items-center">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-850 dark:text-slate-200">Talep Edilen Evrak Listesi</h4>
+                                <div className="flex gap-2">
+                                    <button onClick={selectAll} className="text-[10px] font-bold text-blue-500 hover:underline">Tümünü Seç</button>
+                                    <span className="text-[10px] text-slate-350">|</span>
+                                    <button onClick={selectNone} className="text-[10px] font-bold text-blue-500 hover:underline">Temizle</button>
+                                </div>
+                            </div>
+                            <div className="h-px bg-slate-200 dark:bg-slate-800/60" />
+                            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                {combinedItems.map((item, index) => {
+                                    const isChecked = evrakTalep.selectedItems?.includes(index);
+                                    const isCustom = index >= EVRAK_TALEP_MADDELERI.length;
+                                    return (
+                                        <div
+                                            key={index}
+                                            className={`flex items-start justify-between gap-2.5 p-2 rounded-xl border text-left transition-all ${
+                                                isChecked
+                                                    ? "bg-blue-600/5 dark:bg-blue-955/10 border-blue-200 dark:border-blue-900/40"
+                                                    : "bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-850 opacity-60"
+                                            }`}
+                                        >
+                                            <div className="flex items-start gap-2.5 flex-1 cursor-pointer" onClick={() => toggleItem(index)}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() => {}}
+                                                    className="mt-0.5 pointer-events-none"
+                                                />
+                                                <span className="text-[11px] text-slate-800 dark:text-slate-200 font-bold leading-snug">
+                                                    {index + 1}. {getFormattedItem(item)}
+                                                </span>
+                                            </div>
+                                            {isCustom && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        removeCustomItem(index - EVRAK_TALEP_MADDELERI.length);
+                                                    }}
+                                                    className="p-1 text-red-500 hover:text-red-700 transition-colors shrink-0"
+                                                    title="Maddeyi Sil"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            {/* Add Custom Item Input */}
+                            <div className="flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-800/60 shrink-0">
+                                <input
+                                    type="text"
+                                    value={customItemText}
+                                    onChange={(e) => setCustomItemText(e.target.value)}
+                                    placeholder="Eklemek istediğiniz özel evrak maddesini yazın..."
+                                    className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            e.preventDefault();
+                                            addCustomItem(customItemText);
+                                            setCustomItemText("");
+                                        }
+                                    }}
+                                />
+                                <Button
+                                    size="sm"
+                                    onClick={() => {
+                                        addCustomItem(customItemText);
+                                        setCustomItemText("");
+                                    }}
+                                    className="rounded-lg text-[10px] font-black h-8 shrink-0 px-3 bg-blue-600 hover:bg-blue-700 text-white"
+                                >
+                                    EKLE
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Preview Area */}
+                    <div className="xl:col-span-7 bg-slate-50 dark:bg-slate-955 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-850 dark:text-slate-200">Resmi Yazı Önizleme</h4>
+                        <div className="h-px bg-slate-200 dark:bg-slate-800/60" />
+                        
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-850 text-slate-900 dark:text-slate-100 font-serif leading-relaxed text-xs shadow-sm whitespace-pre-wrap text-justify max-h-[700px] overflow-y-auto select-text">
+                            {getPlainText()}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     const renderInfoTab = () => {
@@ -1917,7 +2485,8 @@ export default function DenetimIl() {
                                             { id: "notes", label: "Notlar" },
                                             { id: "photos", label: "Fotoğraflar" },
                                             { id: "checklist", label: "Kontrol\nListesi" },
-                                            { id: "editor", label: "Rapor\nEditörü" }
+                                            { id: "editor", label: "Rapor\nEditörü" },
+                                            { id: "evrak_talebi", label: "Evrak\nTalebi" }
                                         ].map(tab => {
                                             const isActive = activeDetailTab === tab.id;
                                             return (
@@ -1965,6 +2534,7 @@ export default function DenetimIl() {
                                         {activeDetailTab === "notes" && renderNotesTab()}
                                         {activeDetailTab === "photos" && renderPhotosTab()}
                                         {activeDetailTab === "checklist" && renderChecklistTab()}
+                                        {activeDetailTab === "evrak_talebi" && renderEvrakTalebiTab()}
                                         {activeDetailTab === "editor" && (
                                             selectedReport.report_created === false ? (
                                                 <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center gap-3 min-h-[300px]">

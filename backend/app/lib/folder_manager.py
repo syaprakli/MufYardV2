@@ -7,6 +7,7 @@ settings = get_settings()
 
 # Root directory for reports
 BASE_REPORTS_DIR = settings.REPORTS_DIR
+BASE_OTHER_DIR = settings.OTHER_DIR
 
 # Dosya izinleri metadata dosyasının yolu
 PERMISSIONS_FILE = settings.PERMISSIONS_FILE
@@ -223,7 +224,7 @@ class FolderManager:
 
     @staticmethod
     def get_tree(start_path: str = BASE_REPORTS_DIR):
-        """Recursively scans the Raporlar directory and returns a tree structure."""
+        """Recursively scans the directory and returns a tree structure."""
         if not os.path.exists(start_path):
             os.makedirs(start_path, exist_ok=True)
             
@@ -235,40 +236,40 @@ class FolderManager:
                     try:
                         if entry.name.startswith("."):
                             continue
-
-                        item_id = os.path.relpath(entry.path, BASE_REPORTS_DIR).replace("\\", "/")
+ 
+                        item_id = os.path.relpath(entry.path, start_path).replace("\\", "/")
                         is_dir = entry.is_dir()
-
+ 
                         node = {
                             "id": item_id,
                             "name": entry.name,
                             "type": "folder" if is_dir else "file",
                             "parentId": parent_id
                         }
-
+ 
                         if not is_dir:
                             stats = entry.stat()
                             try:
                                 rel_path_from_data = os.path.relpath(entry.path, settings.DATA_DIR).replace("\\", "/")
                                 node["url"] = f"/{rel_path_from_data}"
                             except Exception:
-                                rel_path_from_reports = os.path.relpath(entry.path, BASE_REPORTS_DIR).replace("\\", "/")
-                                node["url"] = f"/Raporlar/{rel_path_from_reports}"
-
+                                rel_path_from_start = os.path.relpath(entry.path, start_path).replace("\\", "/")
+                                route_prefix = "Diğer İşlem ve Belgeler" if start_path == BASE_OTHER_DIR else "Raporlar"
+                                node["url"] = f"/{route_prefix}/{rel_path_from_start}"
+ 
                             node["size"] = FolderManager.format_size(stats.st_size)
                             node["date"] = datetime.fromtimestamp(stats.st_mtime).strftime("%d.%m.%Y %H:%M")
                             node["type"] = FolderManager.detect_file_type(entry.name)
-
+ 
                         items.append(node)
                         if is_dir:
                             items.extend(scan(entry.path, item_id))
                     except Exception:
-                        # Tek bir bozuk giriş yüzünden tüm klasör listesini düşürme.
                         continue
             except Exception:
                 pass
             return items
-
+ 
         return scan(start_path)
 
     # ... diğer yardımcılar ...

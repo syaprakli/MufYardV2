@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
     LayoutDashboard,
     FileText,
@@ -7,6 +7,7 @@ import {
     Users,
     CheckSquare,
     FolderTree,
+    FolderOpen,
     StickyNote,
     BookOpen,
     Settings,
@@ -38,6 +39,7 @@ const navItems: Array<{ icon: any; label: string; href: string }> = [
     { icon: FileText, label: "Raporlar", href: "/audit" },
     { icon: StickyNote, label: "Hızlı Notlar", href: "/notes" },
     { icon: FolderTree, label: "Dosyalar", href: "/files" },
+    { icon: FolderOpen, label: "Diğer İşlem ve Belgeler", href: "/files?scope=other" },
     { icon: BookOpen, label: "Mevzuat", href: "/legislation" },
     { icon: Calendar, label: "Takvim", href: "/calendar" },
     { icon: Users, label: "Rehber", href: "/contacts" },
@@ -56,6 +58,7 @@ const bottomNavItems = [
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
+    const location = useLocation();
     const { data: { profile } } = useGlobalData();
     const { unreadMessages } = usePresence();
     
@@ -84,6 +87,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         if (isAdmin) return true; // Admin sees everything
         if (!isModerator) return true; // Standard user sees everything by default
         
+        const basePath = href.split('?')[0];
+        
         const pathMapping: Record<string, string> = {
             "/": "dashboard",
             "/tasks": "tasks",
@@ -100,7 +105,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             "/feedback": "feedback"
         };
         
-        const modId = pathMapping[href];
+        const modId = pathMapping[basePath];
         if (modId) {
             return modPermissions.includes(modId);
         }
@@ -143,34 +148,51 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <nav className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-0.5">
                 {navItems.filter(item => {
                     // Dosyalar sayfası sadece Electron (Masaüstü Paket) sürümünde görünsün
-                    if (item.href === "/files" && !isElectron) return false;
+                    if (item.href.startsWith("/files") && !isElectron) return false;
                     return isVisible(item.href);
-                }).map((item) => (
-                    <NavLink
-                        key={item.href}
-                        to={item.href}
-                        onMouseEnter={() => prefetchNavRoute(item.href)}
-                        onFocus={() => prefetchNavRoute(item.href)}
-                        onTouchStart={() => prefetchNavRoute(item.href)}
-                        onClick={() => {
-                            if (window.innerWidth < 1280) onClose();
-                        }}
-                        className={({ isActive }) => cn(
-                            "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200",
-                            isActive
-                                ? "bg-primary-light text-white shadow-md shadow-black/5"
-                                : "text-secondary hover:bg-white/10 hover:text-white"
-                        )}
-                    >
-                        <item.icon size={18} />
-                        <span className="font-semibold text-sm flex-1">{item.label}</span>
-                        {item.href === "/messages" && totalUnread > 0 && (
-                            <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-bounce shadow-lg shadow-red-500/20">
-                                {totalUnread}
-                            </span>
-                        )}
-                    </NavLink>
-                ))}
+                }).map((item) => {
+                    const isLinkActive = (() => {
+                        const linkUrl = new URL(item.href, window.location.origin);
+                        const linkPath = linkUrl.pathname;
+                        const linkScope = linkUrl.searchParams.get("scope");
+                        
+                        const currentPath = location.pathname;
+                        const currentParams = new URLSearchParams(location.search);
+                        const currentScope = currentParams.get("scope");
+                        
+                        if (currentPath !== linkPath) return false;
+                        if (linkScope === "other" && currentScope !== "other") return false;
+                        if (linkScope !== "other" && currentScope === "other") return false;
+                        return true;
+                    })();
+
+                    return (
+                        <NavLink
+                            key={item.href}
+                            to={item.href}
+                            onMouseEnter={() => prefetchNavRoute(item.href)}
+                            onFocus={() => prefetchNavRoute(item.href)}
+                            onTouchStart={() => prefetchNavRoute(item.href)}
+                            onClick={() => {
+                                if (window.innerWidth < 1280) onClose();
+                            }}
+                            className={cn(
+                                "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200",
+                                isLinkActive
+                                    ? "bg-primary-light text-white shadow-md shadow-black/5"
+                                    : "text-secondary hover:bg-white/10 hover:text-white"
+                            )}
+                        >
+                            <item.icon size={18} />
+                            <span className="font-semibold text-sm flex-1">{item.label}</span>
+                            {item.href === "/messages" && totalUnread > 0 && (
+                                <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-bounce shadow-lg shadow-red-500/20">
+                                    {totalUnread}
+                                </span>
+                            )}
+                        </NavLink>
+                    );
+                })}
 
                 {/* Yakında gelecek özellikler */}
                 {comingSoonItems.map((item) => (

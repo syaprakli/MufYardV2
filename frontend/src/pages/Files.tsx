@@ -9,10 +9,11 @@ import { Card } from "../components/ui/Card";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { useState, useEffect, useMemo, useRef, type DragEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import * as XLSX from "xlsx";
-import { fetchFileTree, uploadFile, createFolder, deleteItem, openFolder, openFile, shareFileToUser, type FileItem } from "../lib/api/files";
+import { fetchFileTree, uploadFile, createFolder, deleteItem, openFolder, openFile, shareFileToUser, generateKapakDocx, generateDiziDocx, generateDegerlendirmeDocx, type FileItem } from "../lib/api/files";
 import { aiSearch } from "../lib/api/ai";
 import { cn } from "../lib/utils";
 import { isElectron } from "../lib/firebase";
@@ -24,8 +25,50 @@ import { sendDirectMessage } from "../lib/api/collaboration";
 
 export default function Files() {
     const confirm = useConfirm();
+    const [searchParams] = useSearchParams();
+    const scope = searchParams.get("scope");
 
+    // Template modalları
+    const [isDiziModalOpen, setIsDiziModalOpen] = useState(false);
+    const [isKapakModalOpen, setIsKapakModalOpen] = useState(false);
+    const [isFormModalOpen, setIsFormModalOpen] = useState(false);
 
+    // Dizi Pusulası verileri
+    const [diziItems, setDiziItems] = useState<Array<{
+        siraNo: string;
+        tarih: string;
+        sayi: string;
+        adet: string;
+        aciklama: string;
+    }>>([
+        { siraNo: "1", tarih: "", sayi: "", adet: "", aciklama: "" }
+    ]);
+    const [diziEvaluators, setDiziEvaluators] = useState<Array<{ name: string; title: string }>>([
+        { name: "", title: "" }
+    ]);
+    const [generatingDizi, setGeneratingDizi] = useState(false);
+
+    // Kapak verileri
+    const [kapakData, setKapakData] = useState({
+        arsivNo: "",
+        raporSayisi: "",
+        raporTuru: "Genel Teftiş Raporu",
+        tarih: "",
+        yer: "ANKARA",
+        onayTarihi: "",
+        onaySayisi: "",
+        gorevEmriTarihi: "",
+        gorevEmriSayisi: "",
+        sayfaAdedi: "",
+        ekAdedi: "",
+        ekSayfaAdedi: "",
+        ilgiliBirim: "",
+        konu: ""
+    });
+    const [kapakEvaluators, setKapakEvaluators] = useState<Array<{ name: string; title: string }>>([
+        { name: "", title: "" }
+    ]);
+    const [generatingKapak, setGeneratingKapak] = useState(false);
 
     const [items, setItems] = useState<FileItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -212,6 +255,40 @@ export default function Files() {
 
     useEffect(() => {
         loadData();
+    }, [scope]);
+
+    useEffect(() => {
+        const handleIframeMessage = async (event: MessageEvent) => {
+            if (event.data && event.data.type === "GENERATE_WORD_DEGERLENDIRME") {
+                const formData = event.data.data;
+                const loadingToast = toast.loading("Değerlendirme Formu Word belgesi oluşturuluyor...");
+                try {
+                    const data = {
+                        ...formData,
+                        scope: "other"
+                    };
+                    const result = await generateDegerlendirmeDocx(data);
+                    if (result.status === "success") {
+                        const fileUrl = "/Diğer İşlem ve Belgeler/" + result.filename;
+                        const resolvedUrl = resolveFileUrl(fileUrl);
+                        const link = document.createElement("a");
+                        link.href = resolvedUrl;
+                        link.download = result.filename;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        toast.success("Değerlendirme Formu Word belgesi başarıyla oluşturuldu ve indirildi.", { id: loadingToast });
+                    } else {
+                        toast.error("Dosya oluşturulamadı.", { id: loadingToast });
+                    }
+                } catch (error: any) {
+                    console.error(error);
+                    toast.error("Hata: " + error.message, { id: loadingToast });
+                }
+            }
+        };
+        window.addEventListener("message", handleIframeMessage);
+        return () => window.removeEventListener("message", handleIframeMessage);
     }, []);
 
     useEffect(() => {
@@ -250,7 +327,7 @@ export default function Files() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const data = await fetchFileTree();
+            const data = await fetchFileTree(undefined, scope || undefined);
             setItems(data);
         } catch (error) {
             console.error(error);
@@ -442,6 +519,763 @@ export default function Files() {
         if (item.type === 'text') return <FileText size={20} className="text-slate-500" />;
         return <FileIcon size={20} className="text-slate-400" />;
     };
+
+    // --- TEMPLATE DASHBOARD HANDLERS & MODALS ---
+    const handleAddDiziItem = () => {
+        setDiziItems([...diziItems, { siraNo: String(diziItems.length + 1), tarih: "", sayi: "", adet: "", aciklama: "" }]);
+    };
+
+    const handleRemoveDiziItem = (index: number) => {
+        const updated = diziItems.filter((_, i) => i !== index).map((item, idx) => ({ ...item, siraNo: String(idx + 1) }));
+        setDiziItems(updated);
+    };
+
+    const handleDiziItemChange = (index: number, field: string, value: string) => {
+        const updated = [...diziItems];
+        updated[index] = { ...updated[index], [field]: value };
+        setDiziItems(updated);
+    };
+
+    const handleAddDiziEvaluator = () => {
+        if (diziEvaluators.length >= 10) {
+            toast.error("En fazla 10 müfettiş eklenebilir");
+            return;
+        }
+        setDiziEvaluators([...diziEvaluators, { name: "", title: "" }]);
+    };
+
+    const handleRemoveDiziEvaluator = (index: number) => {
+        if (diziEvaluators.length <= 1) return;
+        setDiziEvaluators(diziEvaluators.filter((_, i) => i !== index));
+    };
+
+    const handleDiziEvaluatorChange = (index: number, field: string, value: string) => {
+        const updated = [...diziEvaluators];
+        updated[index] = { ...updated[index], [field]: value };
+        setDiziEvaluators(updated);
+    };
+
+    const handleGenerateDizi = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setGeneratingDizi(true);
+        const loadingToast = toast.loading("Dizi Pusulası oluşturuluyor...");
+        try {
+            const formattedItems = diziItems.map(item => ({
+                siraNo: item.siraNo,
+                tarih: item.tarih,
+                sayi: item.sayi,
+                adet: item.adet,
+                aciklama: item.aciklama
+            }));
+            const formattedEvaluators = diziEvaluators.filter(ev => ev.name.trim());
+            let sortedEvaluators = [...formattedEvaluators];
+            if (sortedEvaluators.length === 2) {
+                sortedEvaluators = [formattedEvaluators[1], formattedEvaluators[0]];
+            }
+            const data = {
+                items: formattedItems,
+                evaluators: sortedEvaluators,
+                scope: "other"
+            };
+            const result = await generateDiziDocx(data);
+            if (result.status === "success") {
+                const fileUrl = "/Diğer İşlem ve Belgeler/" + result.filename;
+                const resolvedUrl = resolveFileUrl(fileUrl);
+                const link = document.createElement("a");
+                link.href = resolvedUrl;
+                link.download = result.filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                toast.success("Dizi Pusulası başarıyla oluşturuldu ve indirildi.", { id: loadingToast });
+                setIsDiziModalOpen(false);
+            } else {
+                toast.error("Dosya oluşturulamadı.", { id: loadingToast });
+            }
+        } catch (error: any) {
+            console.error(error);
+            toast.error("Hata: " + error.message, { id: loadingToast });
+        } finally {
+            setGeneratingDizi(false);
+        }
+    };
+
+    const handleAddKapakEvaluator = () => {
+        if (kapakEvaluators.length >= 10) {
+            toast.error("En fazla 10 müfettiş eklenebilir");
+            return;
+        }
+        setKapakEvaluators([...kapakEvaluators, { name: "", title: "" }]);
+    };
+
+    const handleRemoveKapakEvaluator = (index: number) => {
+        if (kapakEvaluators.length <= 1) return;
+        setKapakEvaluators(kapakEvaluators.filter((_, i) => i !== index));
+    };
+
+    const handleKapakEvaluatorChange = (index: number, field: string, value: string) => {
+        const updated = [...kapakEvaluators];
+        updated[index] = { ...updated[index], [field]: value };
+        setKapakEvaluators(updated);
+    };
+
+    const handleKapakChange = (field: string, value: string) => {
+        setKapakData({ ...kapakData, [field]: value });
+    };
+
+    const handleGenerateKapak = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setGeneratingKapak(true);
+        const loadingToast = toast.loading("Rapor Kapağı oluşturuluyor...");
+        try {
+            const formattedEvaluators = kapakEvaluators.filter(ev => ev.name.trim());
+            let sortedEvaluators = [...formattedEvaluators];
+            if (sortedEvaluators.length === 2) {
+                sortedEvaluators = [formattedEvaluators[1], formattedEvaluators[0]];
+            }
+            const data = {
+                ...kapakData,
+                evaluators: sortedEvaluators,
+                scope: "other",
+                openAfterGenerate: false
+            };
+            const result = await generateKapakDocx(data);
+            if (result.status === "success") {
+                const fileUrl = "/Diğer İşlem ve Belgeler/" + result.filename;
+                const resolvedUrl = resolveFileUrl(fileUrl);
+                const link = document.createElement("a");
+                link.href = resolvedUrl;
+                link.download = result.filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                toast.success("Rapor kapağı başarıyla oluşturuldu ve indirildi.", { id: loadingToast });
+                setIsKapakModalOpen(false);
+            } else {
+                toast.error("Dosya oluşturulamadı.", { id: loadingToast });
+            }
+        } catch (error: any) {
+            console.error(error);
+            toast.error("Hata: " + error.message, { id: loadingToast });
+        } finally {
+            setGeneratingKapak(false);
+        }
+    };
+
+    const renderFormModal = () => {
+        if (!isFormModalOpen) return null;
+        return createPortal(
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 md:p-8 animate-in fade-in duration-300">
+                <div className="bg-card w-full h-full rounded-[32px] overflow-hidden shadow-2xl border border-white/20 dark:border-slate-800 flex flex-col">
+                    <div className="p-4 md:p-6 bg-indigo-600 text-white flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <Shield size={20} />
+                            <h3 className="text-lg font-black tracking-tight">Müfettiş Yardımcısı Değerlendirme Formu</h3>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => window.open("/mufettis_yardimcisi_degerlendirme_formu.html", "_blank")}
+                                className="rounded-xl bg-white/10 hover:bg-white/20 border-white/20 text-white font-bold"
+                            >
+                                <ExternalLink size={14} className="mr-2" /> Yeni Sekmede Aç
+                            </Button>
+                            <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                onClick={() => setIsFormModalOpen(false)} 
+                                className="rounded-xl text-white hover:bg-white/10 h-10 w-10"
+                            >
+                                <X size={20} />
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="flex-1 bg-slate-100 dark:bg-slate-955 relative">
+                        <iframe 
+                            src="/mufettis_yardimcisi_degerlendirme_formu.html" 
+                            className="w-full h-full border-none shadow-inner"
+                        />
+                    </div>
+                </div>
+            </div>,
+            document.body
+        );
+    };
+
+    const renderDiziModal = () => {
+        if (!isDiziModalOpen) return null;
+        return createPortal(
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+                <Card className="w-full max-w-4xl p-8 rounded-[32px] bg-card border-white/60 dark:border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar animate-in zoom-in-95 duration-300">
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-2xl">
+                                <ListIcon size={24} />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-slate-900 dark:text-slate-100">Dizi Pusulası Hazırlama</h3>
+                                <p className="text-xs text-slate-500 font-medium">Resmi dizi pusulası (.docx) oluşturmak için bilgileri girin.</p>
+                            </div>
+                        </div>
+                        <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            onClick={() => setIsDiziModalOpen(false)} 
+                            className="rounded-xl h-10 w-10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                        >
+                            <X size={20} />
+                        </Button>
+                    </div>
+
+                    <form onSubmit={handleGenerateDizi} className="space-y-8">
+                        {/* Tablo Bölümü */}
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-405 dark:text-slate-400">Ek ve Belgeler Listesi</h4>
+                                <Button 
+                                    type="button" 
+                                    onClick={handleAddDiziItem}
+                                    className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] tracking-widest px-4 py-2"
+                                >
+                                    <Plus size={14} className="mr-2" /> Satır Ekle
+                                </Button>
+                            </div>
+
+                            <div className="overflow-x-auto rounded-2xl border border-slate-100 dark:border-slate-800">
+                                <table className="min-w-full text-xs text-left border-collapse">
+                                    <thead className="bg-slate-50 dark:bg-slate-900/50 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                                        <tr>
+                                            <th className="px-4 py-3 w-16 text-center">Sıra No</th>
+                                            <th className="px-4 py-3 w-36">Tarih</th>
+                                            <th className="px-4 py-3 w-40">Belge Sayısı/No</th>
+                                            <th className="px-4 py-3 w-28 text-center">Sayfa Adedi</th>
+                                            <th className="px-4 py-3">Açıklama</th>
+                                            <th className="px-4 py-3 w-14 text-center">İşlem</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900/10">
+                                        {diziItems.map((item, index) => (
+                                            <tr key={index} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                                                <td className="px-4 py-2 font-bold text-center text-slate-500">
+                                                    {item.siraNo}
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <input 
+                                                        type="text" 
+                                                        value={item.tarih}
+                                                        onChange={(e) => handleDiziItemChange(index, "tarih", e.target.value)}
+                                                        placeholder="GG.AA.YYYY"
+                                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-bold"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <input 
+                                                        type="text" 
+                                                        value={item.sayi}
+                                                        onChange={(e) => handleDiziItemChange(index, "sayi", e.target.value)}
+                                                        placeholder="Sayı girin"
+                                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-bold"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <input 
+                                                        type="number" 
+                                                        value={item.adet}
+                                                        onChange={(e) => handleDiziItemChange(index, "adet", e.target.value)}
+                                                        placeholder="Adet"
+                                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-bold text-center"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2">
+                                                    <input 
+                                                        type="text" 
+                                                        value={item.aciklama}
+                                                        onChange={(e) => handleDiziItemChange(index, "aciklama", e.target.value)}
+                                                        placeholder="Belge konusu / açıklaması"
+                                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-bold"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2 text-center">
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => handleRemoveDiziItem(index)}
+                                                        disabled={diziItems.length <= 1}
+                                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 disabled:opacity-30 transition-all"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Müfettiş İmzaları */}
+                        <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">İmzalayacak Müfettişler</h4>
+                                <Button 
+                                    type="button" 
+                                    variant="outline"
+                                    onClick={handleAddDiziEvaluator}
+                                    disabled={diziEvaluators.length >= 10}
+                                    className="rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350 font-black text-[10px] tracking-widest px-4 py-2"
+                                >
+                                    <Plus size={14} className="mr-2" /> Müfettiş Ekle
+                                </Button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {diziEvaluators.map((ev, index) => (
+                                    <div key={index} className="p-4 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-slate-100 dark:border-slate-800/60 relative">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className="text-[10px] font-black uppercase text-slate-400">
+                                                {(() => {
+                                                    const total = diziEvaluators.length;
+                                                    if (total === 2) {
+                                                        return index === 0 ? "1. İmza Bloğu (Kıdemli)" : "2. İmza Bloğu (Kıdemsiz)";
+                                                    }
+                                                    if (total === 3) {
+                                                        if (index === 0) return "1. İmza Bloğu (En Kıdemli)";
+                                                        if (index === 1) return "2. İmza Bloğu (Kıdemli)";
+                                                        return "3. İmza Bloğu (En Kıdemsiz)";
+                                                    }
+                                                    return `${index + 1}. İmza Bloğu`;
+                                                })()}
+                                            </span>
+                                            {diziEvaluators.length > 1 && (
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => handleRemoveDiziEvaluator(index)}
+                                                    className="text-xs text-rose-500 hover:underline font-bold"
+                                                >
+                                                    Kaldır
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Adı Soyadı</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={ev.name}
+                                                    onChange={(e) => handleDiziEvaluatorChange(index, "name", e.target.value)}
+                                                    placeholder="Örn: Sefa YAPRAKLI"
+                                                    required
+                                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-bold"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Unvanı</label>
+                                                <select 
+                                                    value={ev.title}
+                                                    onChange={(e) => handleDiziEvaluatorChange(index, "title", e.target.value)}
+                                                    required
+                                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-bold"
+                                                >
+                                                    <option value="">Seçiniz...</option>
+                                                    <option value="Müfettiş">Müfettiş</option>
+                                                    <option value="Başmüfettiş">Başmüfettiş</option>
+                                                    <option value="Müfettiş Yardımcısı">Müfettiş Yardımcısı</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Submit Actions */}
+                        <div className="flex gap-4 pt-6 border-t border-slate-100 dark:border-slate-800 justify-end">
+                            <Button 
+                                type="button"
+                                variant="ghost" 
+                                onClick={() => setIsDiziModalOpen(false)}
+                                disabled={generatingDizi}
+                                className="h-14 px-8 rounded-2xl font-bold text-slate-500"
+                            >
+                                İptal
+                            </Button>
+                            <Button 
+                                type="submit"
+                                disabled={generatingDizi}
+                                className="h-14 px-8 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest shadow-xl shadow-emerald-600/10 hover:-translate-y-0.5 transition-all"
+                            >
+                                {generatingDizi ? <RefreshCw className="animate-spin mr-2" size={18} /> : <Download className="mr-2" size={18} />}
+                                Word Belgesi Oluştur ve İndir
+                            </Button>
+                        </div>
+                    </form>
+                </Card>
+            </div>,
+            document.body
+        );
+    };
+
+    const renderKapakModal = () => {
+        if (!isKapakModalOpen) return null;
+        return createPortal(
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+                <Card className="w-full max-w-4xl p-8 rounded-[32px] bg-card border-white/60 dark:border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar animate-in zoom-in-95 duration-300">
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-blue-500/10 text-blue-500 rounded-2xl">
+                                <FileText size={24} />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-slate-900 dark:text-slate-100">Teftiş Rapor Kapağı Hazırlama</h3>
+                                <p className="text-xs text-slate-500 font-medium">Resmi rapor kapak belgesini (.docx) oluşturmak için bilgileri girin.</p>
+                            </div>
+                        </div>
+                        <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            onClick={() => setIsKapakModalOpen(false)} 
+                            className="rounded-xl h-10 w-10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                        >
+                            <X size={20} />
+                        </Button>
+                    </div>
+
+                    <form onSubmit={handleGenerateKapak} className="space-y-6">
+                        {/* 1. Genel Bilgiler */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Rapor Sayısı</label>
+                                <input 
+                                    type="text" 
+                                    value={kapakData.raporSayisi}
+                                    onChange={(e) => handleKapakChange("raporSayisi", e.target.value)}
+                                    placeholder="Örn: 35/01"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Rapor Türü</label>
+                                <input 
+                                    type="text" 
+                                    value={kapakData.raporTuru}
+                                    onChange={(e) => handleKapakChange("raporTuru", e.target.value)}
+                                    placeholder="Örn: Genel Teftiş Raporu"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Tarih</label>
+                                <input 
+                                    type="text" 
+                                    value={kapakData.tarih}
+                                    onChange={(e) => handleKapakChange("tarih", e.target.value)}
+                                    placeholder="Örn: 12.08.2026"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold"
+                                />
+                            </div>
+                        </div>
+
+                        {/* 2. Onay & Görev Emri Bilgileri */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Bakanlık Onay Tarihi</label>
+                                <input 
+                                    type="text" 
+                                    value={kapakData.onayTarihi}
+                                    onChange={(e) => handleKapakChange("onayTarihi", e.target.value)}
+                                    placeholder="Örn: 15.02.2026"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Bakanlık Onay Sayısı</label>
+                                <input 
+                                    type="text" 
+                                    value={kapakData.onaySayisi}
+                                    onChange={(e) => handleKapakChange("onaySayisi", e.target.value)}
+                                    placeholder="Örn: 201"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Görev Emri Tarihi</label>
+                                <input 
+                                    type="text" 
+                                    value={kapakData.gorevEmriTarihi}
+                                    onChange={(e) => handleKapakChange("gorevEmriTarihi", e.target.value)}
+                                    placeholder="Örn: 18.02.2026"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Görev Emri Sayısı</label>
+                                <input 
+                                    type="text" 
+                                    value={kapakData.gorevEmriSayisi}
+                                    onChange={(e) => handleKapakChange("gorevEmriSayisi", e.target.value)}
+                                    placeholder="Örn: 1045"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold"
+                                />
+                            </div>
+                        </div>
+
+                        {/* 3. Sayfa & Birim & Konu */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Rapor Sayfa Adedi</label>
+                                <input 
+                                    type="text" 
+                                    value={kapakData.sayfaAdedi}
+                                    onChange={(e) => handleKapakChange("sayfaAdedi", e.target.value)}
+                                    placeholder="Örn: 120"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold text-center"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Ek Adedi</label>
+                                <input 
+                                    type="text" 
+                                    value={kapakData.ekAdedi}
+                                    onChange={(e) => handleKapakChange("ekAdedi", e.target.value)}
+                                    placeholder="Örn: 14"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold text-center"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Ek Toplam Sayfa Adedi</label>
+                                <input 
+                                    type="text" 
+                                    value={kapakData.ekSayfaAdedi}
+                                    onChange={(e) => handleKapakChange("ekSayfaAdedi", e.target.value)}
+                                    placeholder="Örn: 245"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold text-center"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Yer</label>
+                                <input 
+                                    type="text" 
+                                    value={kapakData.yer}
+                                    onChange={(e) => handleKapakChange("yer", e.target.value)}
+                                    placeholder="Örn: ANKARA"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold"
+                                />
+                            </div>
+                        </div>
+
+                        {/* 4. İlgili Birim ve Konu */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">İlgili Birim</label>
+                                <input 
+                                    type="text" 
+                                    value={kapakData.ilgiliBirim}
+                                    onChange={(e) => handleKapakChange("ilgiliBirim", e.target.value)}
+                                    placeholder="Örn: Destek Hizmetleri Dairesi Başkanlığı"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Konu</label>
+                                <input 
+                                    type="text" 
+                                    value={kapakData.konu}
+                                    onChange={(e) => handleKapakChange("konu", e.target.value)}
+                                    placeholder="Örn: Teftiş faaliyetleri ve idari incelemeler"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold"
+                                />
+                            </div>
+                        </div>
+
+                        {/* 5. Müfettiş İmzaları */}
+                        <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">İmzalayacak Müfettişler</h4>
+                                <Button 
+                                    type="button" 
+                                    variant="outline"
+                                    onClick={handleAddKapakEvaluator}
+                                    disabled={kapakEvaluators.length >= 10}
+                                    className="rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350 font-black text-[10px] tracking-widest px-4 py-2"
+                                >
+                                    <Plus size={14} className="mr-2" /> Müfettiş Ekle
+                                </Button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {kapakEvaluators.map((ev, index) => (
+                                    <div key={index} className="p-4 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-slate-100 dark:border-slate-800/60 relative">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className="text-[10px] font-black uppercase text-slate-400">
+                                                {(() => {
+                                                    const total = kapakEvaluators.length;
+                                                    if (total === 2) {
+                                                        return index === 0 ? "1. İmza Bloğu (Kıdemli)" : "2. İmza Bloğu (Kıdemsiz)";
+                                                    }
+                                                    if (total === 3) {
+                                                        if (index === 0) return "1. İmza Bloğu (En Kıdemli)";
+                                                        if (index === 1) return "2. İmza Bloğu (Kıdemli)";
+                                                        return "3. İmza Bloğu (En Kıdemsiz)";
+                                                    }
+                                                    return `${index + 1}. İmza Bloğu`;
+                                                })()}
+                                            </span>
+                                            {kapakEvaluators.length > 1 && (
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => handleRemoveKapakEvaluator(index)}
+                                                    className="text-xs text-rose-500 hover:underline font-bold"
+                                                >
+                                                    Kaldır
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Adı Soyadı</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={ev.name}
+                                                    onChange={(e) => handleKapakEvaluatorChange(index, "name", e.target.value)}
+                                                    placeholder="Örn: Sefa YAPRAKLI"
+                                                    required
+                                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Unvanı</label>
+                                                <select 
+                                                    value={ev.title}
+                                                    onChange={(e) => handleKapakEvaluatorChange(index, "title", e.target.value)}
+                                                    required
+                                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-blue-500 outline-none text-xs font-bold"
+                                                >
+                                                    <option value="">Seçiniz...</option>
+                                                    <option value="Müfettiş">Müfettiş</option>
+                                                    <option value="Başmüfettiş">Başmüfettiş</option>
+                                                    <option value="Müfettiş Yardımcısı">Müfettiş Yardımcısı</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Submit Actions */}
+                        <div className="flex gap-4 pt-6 border-t border-slate-100 dark:border-slate-800 justify-end">
+                            <Button 
+                                type="button"
+                                variant="ghost" 
+                                onClick={() => setIsKapakModalOpen(false)}
+                                disabled={generatingKapak}
+                                className="h-14 px-8 rounded-2xl font-bold text-slate-500"
+                            >
+                                İptal
+                            </Button>
+                            <Button 
+                                type="submit"
+                                disabled={generatingKapak}
+                                className="h-14 px-8 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest shadow-xl shadow-blue-600/10 hover:-translate-y-0.5 transition-all"
+                            >
+                                {generatingKapak ? <RefreshCw className="animate-spin mr-2" size={18} /> : <Download className="mr-2" size={18} />}
+                                Word Belgesi Oluştur ve İndir
+                            </Button>
+                        </div>
+                    </form>
+                </Card>
+            </div>,
+            document.body
+        );
+    };
+
+    const renderDashboard = () => {
+        return (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 font-outfit">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-card/40 dark:bg-slate-900/40 p-6 rounded-3xl border border-white/60 dark:border-slate-800 backdrop-blur-xl shadow-sm">
+                    <div>
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+                            <Shield size={10} className="text-primary/60" />
+                            <span>MufYard Platformu</span>
+                            <ChevronRight size={10} />
+                            <span className="text-primary opacity-80 uppercase tracking-widest">Diğer İşlem ve Belgeler</span>
+                        </div>
+                        <h1 className="text-4xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                            Diğer İşlem ve Belgeler
+                        </h1>
+                        <p className="text-slate-500 text-sm font-medium mt-1">Resmi teftiş ve diğer işlemleriniz için şablonları kullanın.</p>
+                    </div>
+                </div>
+
+                {/* Templates Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {/* Card 1: Müfettiş Yardımcısı Değerlendirme Formu */}
+                    <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-4 rounded-2xl bg-indigo-500/10 text-indigo-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
+                            <Shield size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Müfettiş Yardımcısı Değerlendirme Formu</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
+                            Müfettiş yardımcılarının teftiş ve soruşturma aşamalarındaki takım çalışması, motivasyon, mesleki gelişim gibi kriterler yönünden değerlendirildiği resmi formu interaktif düzenleyin ve yazdırın.
+                        </p>
+                        <Button 
+                            onClick={() => setIsFormModalOpen(true)}
+                            className="mt-6 w-full rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest py-3 animate-pulse hover:animate-none"
+                        >
+                            Uygulamayı Aç
+                        </Button>
+                    </Card>
+
+                    {/* Card 2: Dizi Pusulası Taslağı */}
+                    <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-4 rounded-2xl bg-emerald-500/10 text-emerald-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
+                            <ListIcon size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Dizi Pusulası Taslağı</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
+                            Teftiş raporu eklerinin listelendiği resmi Dizi Pusulası belgesini (.docx) hazırlayın. Eklerin sayısı, tarihleri ve açıklamalarını tablo halinde düzenleyerek çıktı alın.
+                        </p>
+                        <Button 
+                            onClick={() => setIsDiziModalOpen(true)}
+                            className="mt-6 w-full rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest py-3 animate-pulse hover:animate-none"
+                        >
+                            Uygulamayı Aç
+                        </Button>
+                    </Card>
+
+                    {/* Card 3: Teftiş Rapor Kapağı Taslağı */}
+                    <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-4 rounded-2xl bg-blue-500/10 text-blue-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
+                            <FileText size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Teftiş Rapor Kapağı Taslağı</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
+                            Bakanlık onayları, görev emirleri, sayfa adedi, ilgili birim, konu ve müfettiş imza bloklarını içeren resmi rapor kapak belgesini (.docx) hızlıca oluşturup indirin.
+                        </p>
+                        <Button 
+                            onClick={() => setIsKapakModalOpen(true)}
+                            className="mt-6 w-full rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest py-3 animate-pulse hover:animate-none"
+                        >
+                            Uygulamayı Aç
+                        </Button>
+                    </Card>
+                </div>
+
+                {/* Render Modals */}
+                {renderDiziModal()}
+                {renderKapakModal()}
+                {renderFormModal()}
+            </div>
+        );
+    };
+
+    if (scope === "other") {
+        return renderDashboard();
+    }
 
     return (
         <div 

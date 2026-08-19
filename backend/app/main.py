@@ -200,6 +200,7 @@ def mount_static_dir(path_name, route_path):
 
 mount_static_dir("uploads", "/uploads")
 mount_static_dir("Raporlar", "/Raporlar")
+mount_static_dir("Diğer İşlem ve Belgeler", "/Diğer İşlem ve Belgeler")
 mount_static_dir("Mevzuat", "/Mevzuat")
 
 # Middleware

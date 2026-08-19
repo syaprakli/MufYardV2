@@ -75,6 +75,10 @@ class Settings(BaseSettings):
         return os.path.join(DATA_DIR, "Raporlar")
     
     @property
+    def OTHER_DIR(self) -> str:
+        return os.path.join(DATA_DIR, "Diğer İşlem ve Belgeler")
+    
+    @property
     def MEVZUAT_DIR(self) -> str:
         return os.path.join(DATA_DIR, "Mevzuat")
 

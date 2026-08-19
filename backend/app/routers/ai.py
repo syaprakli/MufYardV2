@@ -40,9 +40,11 @@ async def ai_search(
     all_items = await asyncio.to_thread(FolderManager.get_tree)
     results = []
     user_id = current_user.get("uid")
+    is_admin = current_user.get("role") == "admin"
+    is_desktop = os.environ.get("MUFYARD_DESKTOP", "false").lower() == "true"
     for item in all_items:
         # Sadece okuma izni olanlar
-        if item["type"] == "folder" or FolderManager.check_permission(item["id"], user_id, "read"):
+        if is_admin or is_desktop or item["type"] == "folder" or FolderManager.check_permission(item["id"], user_id, "read"):
             # Basit string benzerliği (daha sonra embedding ile geliştirilebilir)
             score = difflib.SequenceMatcher(None, req.query.lower(), item["name"].lower()).ratio()
             if score > 0.3:

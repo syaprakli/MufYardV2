@@ -14,20 +14,24 @@ export interface FileItem {
     url?: string;
 }
 
-export const fetchFileTree = async (path?: string): Promise<FileItem[]> => {
+export const fetchFileTree = async (path?: string, scope?: string): Promise<FileItem[]> => {
     const headers = await getAuthHeaders();
-    const response = await fetchWithTimeout(`${CURRENT_FILES_API}/files/tree?path=${path || ""}`, { headers });
+    const url = new URL(`${CURRENT_FILES_API}/files/tree`);
+    if (path) url.searchParams.append("path", path);
+    if (scope) url.searchParams.append("scope", scope);
+    const response = await fetchWithTimeout(url.toString(), { headers });
     if (!response.ok) throw new Error("Dosya ağacı yüklenemedi");
     return response.json();
 };
 
-export const uploadFile = async (file: File, path?: string, uid?: string): Promise<any> => {
+export const uploadFile = async (file: File, path?: string, uid?: string, scope?: string): Promise<any> => {
     const formData = new FormData();
     formData.append("file", file);
     
     const url = new URL(`${CURRENT_FILES_API}/files/upload`);
     if (path) url.searchParams.append("path", path);
     if (uid) url.searchParams.append("uid", uid);
+    if (scope) url.searchParams.append("scope", scope);
     
     const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(url.toString(), {
@@ -40,9 +44,10 @@ export const uploadFile = async (file: File, path?: string, uid?: string): Promi
     return response.json();
 };
 
-export const createFolder = async (name: string, path: string, parentId?: string, uid?: string): Promise<any> => {
+export const createFolder = async (name: string, path: string, parentId?: string, uid?: string, scope?: string): Promise<any> => {
     const url = new URL(`${CURRENT_FILES_API}/files/create-folder`);
     if (uid) url.searchParams.append("uid", uid);
+    if (scope) url.searchParams.append("scope", scope);
     const headers = await getAuthHeaders({ "Content-Type": "application/json" });
 
     const response = await fetchWithTimeout(url.toString(), {
@@ -55,13 +60,14 @@ export const createFolder = async (name: string, path: string, parentId?: string
     return response.json();
 };
 
-export const deleteItem = async (id: string): Promise<any> => {
+export const deleteItem = async (id: string, scope?: string): Promise<any> => {
     // Slah'ları koruyarak diğer özel karakterleri encode et
     const safeId = id.split('/').map(part => encodeURIComponent(part)).join('/');
-    const url = `${CURRENT_FILES_API}/files/delete-item/${safeId}`;
+    const url = new URL(`${CURRENT_FILES_API}/files/delete-item/${safeId}`);
+    if (scope) url.searchParams.append("scope", scope);
     const headers = await getAuthHeaders();
     
-    const response = await fetchWithTimeout(url, {
+    const response = await fetchWithTimeout(url.toString(), {
         method: "DELETE",
         headers
     });
@@ -73,10 +79,12 @@ export const deleteItem = async (id: string): Promise<any> => {
     return response.json();
 };
 
-export const openFolder = async (id: string): Promise<any> => {
+export const openFolder = async (id: string, scope?: string): Promise<any> => {
     const safeId = id.split('/').map(part => encodeURIComponent(part)).join('/');
+    const url = new URL(`${CURRENT_FILES_API}/files/open-folder/${safeId}`);
+    if (scope) url.searchParams.append("scope", scope);
     const headers = await getAuthHeaders();
-    const response = await fetchWithTimeout(`${CURRENT_FILES_API}/files/open-folder/${safeId}`, {
+    const response = await fetchWithTimeout(url.toString(), {
         method: "POST",
         headers
     });
@@ -85,10 +93,12 @@ export const openFolder = async (id: string): Promise<any> => {
     return response.json();
 };
 
-export const openFile = async (id: string): Promise<any> => {
+export const openFile = async (id: string, scope?: string): Promise<any> => {
     const safeId = id.split('/').map(part => encodeURIComponent(part)).join('/');
+    const url = new URL(`${CURRENT_FILES_API}/files/open-file/${safeId}`);
+    if (scope) url.searchParams.append("scope", scope);
     const headers = await getAuthHeaders();
-    const response = await fetchWithTimeout(`${CURRENT_FILES_API}/files/open-file/${safeId}`, {
+    const response = await fetchWithTimeout(url.toString(), {
         method: "POST",
         headers
     });
@@ -123,14 +133,65 @@ export const createTaskFolder = async (taskId: string, metadata?: any): Promise<
     return response.json();
 };
 
-export const shareFileToUser = async (fileId: string, recipientId: string): Promise<any> => {
+export const shareFileToUser = async (fileId: string, recipientId: string, scope?: string): Promise<any> => {
+    const url = new URL(`${API_URL}/files/share-to-user`);
+    if (scope) url.searchParams.append("scope", scope);
     const headers = await getAuthHeaders({ "Content-Type": "application/json" });
-    const response = await fetchWithTimeout(`${API_URL}/files/share-to-user`, {
+    const response = await fetchWithTimeout(url.toString(), {
         method: "POST",
         headers,
         body: JSON.stringify({ file_id: fileId, recipient_id: recipientId })
     });
 
     if (!response.ok) throw new Error("Paylasilan dosya hazirlanamadi");
+    return response.json();
+};
+
+
+export const generateKapakDocx = async (data: any): Promise<any> => {
+    const url = `${CURRENT_FILES_API}/files/generate-docx-kapak`;
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
+    const response = await fetchWithTimeout(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error("Kapak Word belgesi oluşturulamadı.");
+    return response.json();
+};
+
+export const generateDiziDocx = async (data: any): Promise<any> => {
+    const url = `${CURRENT_FILES_API}/files/generate-docx-dizi`;
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
+    const response = await fetchWithTimeout(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error("Dizi Pusulası Word belgesi oluşturulamadı.");
+    return response.json();
+};
+
+export const generateEvrakTalebiDocx = async (data: any): Promise<any> => {
+    const url = `${CURRENT_FILES_API}/files/generate-docx-hazirlik`;
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
+    const response = await fetchWithTimeout(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error("Evrak Talebi Word belgesi oluşturulamadı.");
+    return response.json();
+};
+
+export const generateDegerlendirmeDocx = async (data: any): Promise<any> => {
+    const url = `${CURRENT_FILES_API}/files/generate-docx-degerlendirme`;
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
+    const response = await fetchWithTimeout(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error("Değerlendirme Formu Word belgesi oluşturulamadı.");
     return response.json();
 };
