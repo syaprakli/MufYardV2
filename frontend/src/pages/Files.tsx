@@ -2892,9 +2892,9 @@ const calculateYollukValues = () => {
                                             <svg className="w-3 h-3 text-slate-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
-                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-72 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-medium leading-relaxed rounded-lg px-3 py-2 shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                                            <div className="absolute bottom-full left-0 mb-1.5 w-72 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-medium leading-relaxed rounded-lg px-3 py-2 shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
                                                 Kamu görevlileri hakem kurulunun 29/05/2012 tarihli ve 2012/1 nolu kararı ile 1/7/2012 tarihinden geçerli olmak üzere, 375 sayılı KHK'nın 1. maddesinin (D) fıkrasında yer alan 12105 gösterge rakamı 13558 olarak uygulanır.
-                                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800 dark:border-t-slate-700" />
+                                                <div className="absolute top-full left-3 border-4 border-transparent border-t-slate-800 dark:border-t-slate-700" />
                                             </div>
                                         </div>
                                     </div>
