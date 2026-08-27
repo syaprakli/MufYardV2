@@ -2999,26 +2999,26 @@ const calculateYollukValues = () => {
                                 className="bg-white dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-inner flex-1 overflow-y-auto custom-scrollbar"
                             >
                                 {/* Invoice Header */}
-                                <div className="text-center border-b-2 border-slate-200 dark:border-slate-800 pb-4 mb-6">
-                                    <h2 className="text-sm font-black uppercase text-slate-900 dark:text-slate-100 tracking-wider">
+                                <div className="text-center border-b border-slate-200 dark:border-slate-800 pb-2 mb-3">
+                                    <h2 className="text-xs font-black uppercase text-slate-900 dark:text-slate-100 tracking-wider">
                                         T.C. GENÇLİK VE SPOR BAKANLIĞI
                                     </h2>
-                                    <p className="text-[10px] font-black tracking-widest text-indigo-600 dark:text-indigo-400 mt-1 uppercase">
+                                    <p className="text-[9px] font-black tracking-widest text-indigo-600 dark:text-indigo-400 mt-0.5 uppercase">
                                         Lojman Kira Bedeli Hesaplama Raporu
                                     </p>
                                 </div>
 
                                 {/* Summary Grid */}
-                                <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl text-xs font-bold border border-slate-100 dark:border-slate-800 mb-6">
-                                    <div className="space-y-1.5">
-                                        <div className="text-slate-500">Hesap Yılı: <span className="text-slate-800 dark:text-slate-200">{lojmanYear} Yılı</span></div>
-                                        <div className="text-slate-500">Lojman Alanı: <span className="text-slate-800 dark:text-slate-200">{lojmanM2} m²</span></div>
-                                        <div className="text-slate-500">Bulunduğu İl: <span className="text-slate-800 dark:text-slate-200">{lojmanCity}</span></div>
+                                <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 mb-4">
+                                    <div className="space-y-0.5">
+                                        <div className="text-[10px] font-bold text-slate-500">Hesap Yılı: <span className="text-slate-800 dark:text-slate-200">{lojmanYear} Yılı</span></div>
+                                        <div className="text-[10px] font-bold text-slate-500">Lojman Alanı: <span className="text-slate-800 dark:text-slate-200">{lojmanM2} m²</span></div>
+                                        <div className="text-[10px] font-bold text-slate-500">Bulunduğu İl: <span className="text-slate-800 dark:text-slate-200">{lojmanCity}</span></div>
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <div className="text-slate-500">Lojman Türü: <span className="text-slate-800 dark:text-slate-200 capitalize">{lojmanType === "kerpic" ? "Kerpiç" : lojmanType}</span></div>
-                                        <div className="text-slate-500">İndirim Oranı: <span className="text-slate-800 dark:text-slate-200">{(discountPct * 100)}%</span></div>
-                                        <div className="text-slate-500">Hesaplama Tarihi: <span className="text-slate-800 dark:text-slate-200">{new Date().toLocaleDateString("tr-TR")}</span></div>
+                                    <div className="space-y-0.5">
+                                        <div className="text-[10px] font-bold text-slate-500">Lojman Türü: <span className="text-slate-800 dark:text-slate-200 capitalize">{lojmanType === "kerpic" ? "Kerpiç" : lojmanType}</span></div>
+                                        <div className="text-[10px] font-bold text-slate-500">İndirim Oranı: <span className="text-slate-800 dark:text-slate-200">{(discountPct * 100)}%</span></div>
+                                        <div className="text-[10px] font-bold text-slate-500">Hesaplama Tarihi: <span className="text-slate-800 dark:text-slate-200">{new Date().toLocaleDateString("tr-TR")}</span></div>
                                     </div>
                                 </div>
 
