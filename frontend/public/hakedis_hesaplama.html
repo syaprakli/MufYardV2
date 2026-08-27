@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hakediş ve Kesinti Hesaplama Cetveli</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Outfit) -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS (XLSX) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 p-4 md:p-8 min-h-screen">
+    <div class="max-w-6xl mx-auto bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden font-outfit">
+        
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-indigo-600 to-indigo-800 p-6 md:p-8 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="p-3 bg-white/10 rounded-2xl">
+                    <i class="fa-solid fa-calculator text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-black tracking-tight">Hakediş & Kesinti Hesaplama Cetveli</h1>
+                    <p class="text-xs text-indigo-200 font-semibold mt-1">İmalat kalemleri girin, KDV ve yasal kesintileri (Stopaj, Damga Vergisi, Ceza) hesaplayın ve Excel formatında indirin.</p>
+                </div>
+            </div>
+            <button onclick="window.close()" class="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 self-start md:self-auto">
+                <i class="fa-solid fa-arrow-left"></i> Geri Dön
+            </button>
+        </div>
+
+        <div class="p-6 md:p-8 space-y-8">
+            <!-- Genel Bilgiler Bölümü -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+                <div>
+                    <label class="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">İşin / Projenin Adı</label>
+                    <input type="text" id="jobName" value="Bakım Onarım ve Tesisat Yapım İşi" class="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold focus:ring-1 focus:ring-indigo-500 outline-none" />
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Yüklenici / Müteahhit Adı</label>
+                    <input type="text" id="contractorName" value="Örnek Yapım Mühendislik Ltd. Şti." class="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold focus:ring-1 focus:ring-indigo-500 outline-none" />
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Hakediş / Rapor No</label>
+                    <input type="text" id="hakedisNo" value="1 Nolu Ara Hakediş" class="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold focus:ring-1 focus:ring-indigo-500 outline-none" />
+                </div>
+            </div>
+
+            <!-- Hakediş Kalemleri Tablosu -->
+            <div>
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-indigo-500"></i> Hakedişe Esas İmalat Kalemleri
+                    </h2>
+                    <button onclick="addRow()" class="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-black transition-all flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus"></i> Kalem Ekle
+                    </button>
+                </div>
+                <div class="overflow-x-auto border border-slate-100 rounded-2xl">
+                    <table class="w-full text-xs text-left border-collapse" id="itemsTable">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-100 text-slate-400 font-black uppercase tracking-wider text-[10px]">
+                                <th class="p-3 w-12 text-center">No</th>
+                                <th class="p-3">Poz No / İmalat Adı</th>
+                                <th class="p-3 w-24">Birim</th>
+                                <th class="p-3 w-28 text-right">Miktar</th>
+                                <th class="p-3 w-32 text-right">Sözleşme Birim Fiyatı (TL)</th>
+                                <th class="p-3 w-32 text-right">Toplam Tutar (TL)</th>
+                                <th class="p-3 w-16 text-center">İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody" class="divide-y divide-slate-100 font-medium">
+                            <!-- Rows will be injected here dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Kesintiler ve Vergi Ayarları Bölümü -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Kesintiler Paneli -->
+                <div class="space-y-4">
+                    <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-scissors text-rose-500"></i> Hakediş Kesintileri (Yasal ve Özel)
+                    </h2>
+                    <div class="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">Stopaj Vergisi Oranı (%)</label>
+                                <input type="number" id="stopajRate" value="5" min="0" step="0.5" onchange="calculate()" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold focus:ring-1 focus:ring-indigo-500 outline-none" />
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">Damga Vergisi (Binde Oran)</label>
+                                <input type="number" id="damgaRate" value="9.48" min="0" step="0.01" onchange="calculate()" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold focus:ring-1 focus:ring-indigo-500 outline-none" />
+                                <span class="text-[9px] text-slate-400 mt-1 block">Standart: Binde 9.48 (0.00948)</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">SGK Borç Kesintisi (TL)</label>
+                                <input type="number" id="sgkCut" value="0" min="0" step="100" onchange="calculate()" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold focus:ring-1 focus:ring-indigo-500 outline-none" />
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">Gecikme Cezası / Diğer (TL)</label>
+                                <input type="number" id="otherCut" value="0" min="0" step="100" onchange="calculate()" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold focus:ring-1 focus:ring-indigo-500 outline-none" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Özet Tablosu -->
+                <div class="space-y-4">
+                    <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-receipt text-indigo-500"></i> Hakediş Özeti
+                    </h2>
+                    <div class="bg-indigo-900 text-white p-6 rounded-2xl shadow-sm space-y-3.5">
+                        <div class="flex justify-between items-center text-xs font-semibold opacity-90">
+                            <span>Brüt Hakediş Toplamı (KDV Hariç)</span>
+                            <span class="font-mono text-sm font-bold" id="grossTotal">0,00 TL</span>
+                        </div>
+                        <div class="flex justify-between items-center text-xs font-semibold opacity-90">
+                            <span>KDV Tutarı (%20)</span>
+                            <span class="font-mono text-sm font-bold" id="kdvAmount">0,00 TL</span>
+                        </div>
+                        <div class="flex justify-between items-center border-b border-white/20 pb-3 text-xs font-bold">
+                            <span>Hakediş Toplam Tutar (KDV Dahil)</span>
+                            <span class="font-mono text-base" id="totalWithKdv">0,00 TL</span>
+                        </div>
+                        
+                        <!-- Deductions Breakdown in Summary -->
+                        <div class="space-y-1.5 pt-1 text-[11px] opacity-80 font-medium">
+                            <div class="flex justify-between">
+                                <span>- Stopaj Kesintisi:</span>
+                                <span class="font-mono" id="stopajVal">0,00 TL</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>- Damga Vergisi Kesintisi:</span>
+                                <span class="font-mono" id="damgaVal">0,00 TL</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>- SGK Borç Kesintisi:</span>
+                                <span class="font-mono" id="sgkVal">0,00 TL</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>- Ceza / Diğer Kesintiler:</span>
+                                <span class="font-mono" id="otherVal">0,00 TL</span>
+                            </div>
+                            <div class="flex justify-between font-bold border-t border-white/10 pt-1 text-xs">
+                                <span>Toplam Kesinti Tutarı:</span>
+                                <span class="font-mono" id="totalCuts">0,00 TL</span>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center border-t border-white/30 pt-4 mt-2">
+                            <div>
+                                <span class="text-xs font-black uppercase text-indigo-200 tracking-wider">NET ÖDENECEK TUTAR</span>
+                                <p class="text-[9px] text-indigo-300 leading-none mt-0.5">Kesintiler ve vergiler düşülmüş net hak.</p>
+                            </div>
+                            <span class="font-mono text-2xl font-black text-emerald-400" id="netPayable">0,00 TL</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rapor Butonları -->
+            <div class="flex flex-col sm:flex-row justify-end gap-3.5 border-t border-slate-100 pt-6">
+                <button onclick="handleExportExcel()" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-file-spreadsheet text-base"></i> Formüllü Excel Olarak İndir
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Sample Initial Data
+        let items = [
+            { id: 1, name: "YFK-101 Çimento Bazlı Sıva Yapılması", unit: "m²", qty: 250, price: 180 },
+            { id: 2, name: "YFK-102 Çatı Su Yalıtım İmalatı", unit: "m²", qty: 120, price: 420 },
+            { id: 3, name: "YFK-203 Tesisat Bakım ve Vana Değişimi", unit: "Adet", qty: 15, price: 950 }
+        ];
+
+        // Render Table Rows
+        function renderRows() {
+            const tbody = document.getElementById("tableBody");
+            tbody.innerHTML = "";
+
+            items.forEach((item, index) => {
+                const tr = document.createElement("tr");
+                tr.className = "hover:bg-slate-50/50 transition-colors";
+                tr.innerHTML = `
+                    <td class="p-3 text-center text-slate-400 font-mono font-bold">${index + 1}</td>
+                    <td class="p-3">
+                        <input type="text" value="${item.name}" onchange="updateItem(${item.id}, 'name', this.value)" class="w-full bg-transparent border-b border-transparent hover:border-slate-200 focus:border-indigo-500 focus:bg-white px-2 py-1 rounded outline-none font-bold text-slate-700" />
+                    </td>
+                    <td class="p-3">
+                        <input type="text" value="${item.unit}" onchange="updateItem(${item.id}, 'unit', this.value)" class="w-full bg-transparent border-b border-transparent hover:border-slate-200 focus:border-indigo-500 focus:bg-white px-2 py-1 rounded outline-none text-center" />
+                    </td>
+                    <td class="p-3 text-right">
+                        <input type="number" value="${item.qty}" min="0" step="any" onchange="updateItem(${item.id}, 'qty', parseFloat(this.value) || 0)" class="w-full bg-transparent border-b border-transparent hover:border-slate-200 focus:border-indigo-500 focus:bg-white px-2 py-1 rounded outline-none text-right font-mono font-bold text-slate-700" />
+                    </td>
+                    <td class="p-3 text-right">
+                        <input type="number" value="${item.price}" min="0" step="any" onchange="updateItem(${item.id}, 'price', parseFloat(this.value) || 0)" class="w-full bg-transparent border-b border-transparent hover:border-slate-200 focus:border-indigo-500 focus:bg-white px-2 py-1 rounded outline-none text-right font-mono font-bold text-slate-700" />
+                    </td>
+                    <td class="p-3 text-right font-mono font-black text-slate-900">${(item.qty * item.price).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</td>
+                    <td class="p-3 text-center">
+                        <button onclick="deleteRow(${item.id})" class="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Add Row
+        function addRow() {
+            const nextId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
+            items.push({ id: nextId, name: "Yeni İmalat Kalemi", unit: "m²", qty: 0, price: 0 });
+            renderRows();
+            calculate();
+        }
+
+        // Delete Row
+        function deleteRow(id) {
+            items = items.filter(item => item.id !== id);
+            renderRows();
+            calculate();
+        }
+
+        // Update Item Field
+        function updateItem(id, field, value) {
+            const item = items.find(i => i.id === id);
+            if (item) {
+                item[field] = value;
+                renderRows();
+                calculate();
+            }
+        }
+
+        // Calculate Totals
+        function calculate() {
+            let gross = 0;
+            items.forEach(item => {
+                gross += item.qty * item.price;
+            });
+
+            const kdvRate = 0.20;
+            const kdv = gross * kdvRate;
+            const totalWithKdv = gross + kdv;
+
+            const stopajRate = parseFloat(document.getElementById("stopajRate").value) || 0;
+            const damgaBinde = parseFloat(document.getElementById("damgaRate").value) || 0;
+            const sgk = parseFloat(document.getElementById("sgkCut").value) || 0;
+            const other = parseFloat(document.getElementById("otherCut").value) || 0;
+
+            const stopajVal = gross * (stopajRate / 100);
+            const damgaVal = gross * (damgaBinde / 1000);
+            const totalCuts = stopajVal + damgaVal + sgk + other;
+
+            const netPayable = totalWithKdv - totalCuts;
+
+            // Update UI
+            document.getElementById("grossTotal").innerText = gross.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
+            document.getElementById("kdvAmount").innerText = kdv.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
+            document.getElementById("totalWithKdv").innerText = totalWithKdv.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
+            
+            document.getElementById("stopajVal").innerText = stopajVal.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
+            document.getElementById("damgaVal").innerText = damgaVal.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
+            document.getElementById("sgkVal").innerText = sgk.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
+            document.getElementById("otherVal").innerText = other.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
+            document.getElementById("totalCuts").innerText = totalCuts.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
+            
+            document.getElementById("netPayable").innerText = netPayable.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
+        }
+
+        // Export To Excel with Formulas
+        function handleExportExcel() {
+            const jobName = document.getElementById("jobName").value;
+            const contractorName = document.getElementById("contractorName").value;
+            const hakedisNo = document.getElementById("hakedisNo").value;
+            const stopajRate = parseFloat(document.getElementById("stopajRate").value) || 0;
+            const damgaBinde = parseFloat(document.getElementById("damgaRate").value) || 0;
+            const sgk = parseFloat(document.getElementById("sgkCut").value) || 0;
+            const other = parseFloat(document.getElementById("otherCut").value) || 0;
+
+            // Sheet Data setup
+            let data = [];
+            data.push(["HAKEDİŞ VE KESİNTİ HESAP CETVELİ", "", "", "", "", "", ""]);
+            data.push(["", "", "", "", "", "", ""]);
+            data.push(["İşin Adı:", jobName, "", "", "", "", ""]);
+            data.push(["Yüklenici:", contractorName, "", "", "", "", ""]);
+            data.push(["Hakediş / Rapor No:", hakedisNo, "", "", "", "", ""]);
+            data.push(["", "", "", "", "", "", ""]);
+            data.push(["S.No", "Poz No / İmalat Adı", "Birim", "Miktar", "Birim Fiyat (TL)", "Toplam Tutar (TL)", "Formül"]);
+            
+            let rowOffset = 8; // items start here (Row 8 in Excel indices - 1-based)
+            items.forEach((item, idx) => {
+                let excelRow = rowOffset + idx;
+                data.push([
+                    idx + 1,
+                    item.name,
+                    item.unit,
+                    item.qty,
+                    item.price,
+                    { t: 'n', f: `D${excelRow}*E${excelRow}`, z: '#,##0.00' },
+                    `D${excelRow}*E${excelRow}`
+                ]);
+            });
+
+            let sumStart = rowOffset;
+            let sumEnd = rowOffset + items.length - 1;
+            let grossRow = sumEnd + 2;
+            let kdvRow = grossRow + 1;
+            let totalWithKdvRow = kdvRow + 1;
+            
+            let stopajRow = totalWithKdvRow + 1;
+            let damgaRow = stopajRow + 1;
+            let sgkRow = damgaRow + 1;
+            let otherRow = sgkRow + 1;
+            let totalCutsRow = otherRow + 1;
+            let netRow = totalCutsRow + 1;
+
+            data.push(["", "", "", "", "", "", ""]); // Spacer
+            data.push(["Brüt Hakediş Toplamı (KDV Hariç)", "", "", "", "", { t: 'n', f: `SUM(F${sumStart}:F${sumEnd})`, z: '#,##0.00' }, `SUM(F${sumStart}:F${sumEnd})`]);
+            data.push(["KDV Tutarı (%20)", "", "", "", "", { t: 'n', f: `F${grossRow}*0.20`, z: '#,##0.00' }, `F${grossRow}*0.20`]);
+            data.push(["Hakediş Toplam Tutar (KDV Dahil)", "", "", "", "", { t: 'n', f: `F${grossRow}+F${kdvRow}`, z: '#,##0.00' }, `F${grossRow}+F${kdvRow}`]);
+            
+            // Cuts
+            data.push([`Stopaj Kesintisi (%${stopajRate})`, "", "", "", "", { t: 'n', f: `F${grossRow}*(${stopajRate}/100)`, z: '#,##0.00' }, `F${grossRow}*(${stopajRate}/100)`]);
+            data.push([`Damga Vergisi Kesintisi (Binde ${damgaBinde})`, "", "", "", "", { t: 'n', f: `F${grossRow}*(${damgaBinde}/1000)`, z: '#,##0.00' }, `F${grossRow}*(${damgaBinde}/1000)`]);
+            data.push(["SGK Borç Kesintisi", "", "", "", "", sgk, "Tutar"]);
+            data.push(["Gecikme Cezası / Diğer", "", "", "", "", other, "Tutar"]);
+            data.push(["Toplam Kesinti Tutarı", "", "", "", "", { t: 'n', f: `SUM(F${stopajRow}:F${otherRow})`, z: '#,##0.00' }, `SUM(F${stopajRow}:F${otherRow})`]);
+            
+            // Net Payable
+            data.push(["NET ÖDENECEK TUTAR", "", "", "", "", { t: 'n', f: `F${totalWithKdvRow}-F${totalCutsRow}`, z: '#,##0.00' }, `F${totalWithKdvRow}-F${totalCutsRow}`]);
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(data);
+
+            // Style/Formatting options
+            ws['!cols'] = [
+                { wch: 6 },  // S.No
+                { wch: 45 }, // Poz Name
+                { wch: 10 }, // Unit
+                { wch: 12 }, // Qty
+                { wch: 18 }, // Price
+                { wch: 22 }, // Total
+                { wch: 20 }  // Formula text
+            ];
+
+            XLSX.utils.book_append_sheet(wb, ws, "Hakediş Hesap Cetveli");
+            XLSX.writeFile(wb, `${hakedisNo.replace(/\s+/g, "_")}_Hesap_Cetveli.xlsx`);
+        }
+
+        // Init
+        renderRows();
+        calculate();
+    </script>
+</body>
+</html>

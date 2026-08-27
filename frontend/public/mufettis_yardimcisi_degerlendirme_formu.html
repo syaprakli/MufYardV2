@@ -50,7 +50,7 @@
     .evaluator .field.signature { margin-top: 6mm; }
     #fullName, #title, #evaluatorName, #evaluatorTitle, #signature { text-align: center; text-align-last: center; }
     @media (max-width: 680px) { .page { width: 100%; min-height: auto; margin: 0; padding: 24px; box-shadow: none; } .doc-ref { margin-bottom: 18px; } .form-meta { grid-template-columns: 1fr; gap: 14px; margin-bottom: 24px; } .wide { max-width: none; } table { font-size: 9pt; } th { font-size: 8.5pt; } th:first-child { width: 49%; } th:not(:first-child) { width: 17%; } .evaluator { width: 58%; } }
-    @media print { @page { size: A4 portrait; margin: 0; } body { background: #fff; } .toolbar { display: none; } .page { width: 210mm; min-height: 297mm; margin: 0; padding: 18mm 25mm 20mm; box-shadow: none; } input, textarea { appearance: none; -webkit-appearance: none; } textarea { resize: none; } }
+    @media print { @page { size: A4 portrait; margin: 0; } body { background: #fff; } .toolbar, .no-print { display: none !important; } .page { width: 210mm; min-height: 297mm; margin: 0; padding: 18mm 25mm 20mm; box-shadow: none; } input, textarea { appearance: none; -webkit-appearance: none; } textarea { resize: none; } }
   </style>
 </head>
 <body>
@@ -317,5 +317,8 @@
     });
     loadDraft();
   </script>
+  <div style="text-align: center; font-size: 10px; font-family: 'Times New Roman', serif; color: #777; margin: 15px 0;" class="no-print">
+    Bu bir Sefa Yapraklı Projesidir.
+  </div>
 </body>
 </html>

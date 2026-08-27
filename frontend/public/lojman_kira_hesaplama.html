@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lojman Kira Bedeli Hesaplama Cetveli</title>
+    
+    <!-- React & ReactDOM (Production) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Babel for JSX Compilation in Browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- XLSX for Excel Export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <!-- Outfit Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+        }
+        /* Custom scrollbars */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Print styles */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #lojman-print-area, #lojman-print-area * {
+                visibility: visible;
+            }
+            #lojman-print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                border: none !important;
+                box-shadow: none !important;
+                background: white !important;
+                color: black !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 min-h-screen flex items-center justify-center p-4">
+
+    <!-- React App Root Container -->
+    <div id="root" class="w-full max-w-5xl"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // Constants - Coefficients
+        const LOJMAN_RATES = {
+            "2026": {
+                kerpic: 10.23,
+                kalorifersiz: 15.99,
+                kaloriferli: 20.97,
+                kapici: 2.46,
+                elektrik: 4.66,
+                su: 4.04,
+                elektrik_su: 8.68,
+                kuyu_su: 2.17,
+                yakit: 8.38,
+                ortak_alan: 0.98
+            },
+            "2025": {
+                kerpic: 8.15,
+                kalorifersiz: 12.74,
+                kaloriferli: 16.71,
+                kapici: 1.96,
+                elektrik: 3.71,
+                su: 3.22,
+                elektrik_su: 6.92,
+                kuyu_su: 1.73,
+                yakit: 6.68,
+                ortak_alan: 0.78
+            },
+            "2024": {
+                kerpic: 5.66,
+                kalorifersiz: 8.85,
+                kaloriferli: 11.61,
+                kapici: 1.36,
+                elektrik: 2.58,
+                su: 2.24,
+                elektrik_su: 4.81,
+                kuyu_su: 1.2,
+                yakit: 4.64,
+                ortak_alan: 0.54
+            },
+            "2023": {
+                kerpic: 4.53,
+                kalorifersiz: 7.08,
+                kaloriferli: 9.29,
+                kapici: 1.09,
+                elektrik: 2.06,
+                su: 1.79,
+                elektrik_su: 3.85,
+                kuyu_su: 0.96,
+                yakit: 3.71,
+                ortak_alan: 0.43
+            },
+            "2022": {
+                kerpic: 3.62,
+                kalorifersiz: 5.66,
+                kaloriferli: 7.43,
+                kapici: 0.87,
+                elektrik: 1.65,
+                su: 1.43,
+                elektrik_su: 3.08,
+                kuyu_su: 0.77,
+                yakit: 2.97,
+                ortak_alan: 0.34
+            },
+            "2021": {
+                kerpic: 3.07,
+                kalorifersiz: 4.8,
+                kaloriferli: 6.3,
+                kapici: 0.74,
+                elektrik: 1.4,
+                su: 1.21,
+                elektrik_su: 2.61,
+                kuyu_su: 0.65,
+                yakit: 2.52,
+                ortak_alan: 0.29
+            },
+            "2020": {
+                kerpic: 2.69,
+                kalorifersiz: 4.21,
+                kaloriferli: 5.53,
+                kapici: 0.65,
+                elektrik: 1.23,
+                su: 1.06,
+                elektrik_su: 2.29,
+                kuyu_su: 0.57,
+                yakit: 2.21,
+                ortak_alan: 0.25
+            },
+            "2019": {
+                kerpic: 2.36,
+                kalorifersiz: 3.69,
+                kaloriferli: 4.85,
+                kapici: 0.57,
+                elektrik: 1.08,
+                su: 0.93,
+                elektrik_su: 2.01,
+                kuyu_su: 0.5,
+                yakit: 1.94,
+                ortak_alan: 0.22
+            },
+            "2018": {
+                kerpic: 2.36,
+                kalorifersiz: 3.69,
+                kaloriferli: 4.85,
+                kapici: 0.57,
+                elektrik: 1.08,
+                su: 0.93,
+                elektrik_su: 2.01,
+                kuyu_su: 0.5,
+                yakit: 1.94,
+                ortak_alan: 0.22
+            },
+            "2017": {
+                kerpic: 1.82,
+                kalorifersiz: 2.84,
+                kaloriferli: 3.73,
+                kapici: 0.44,
+                elektrik: 0.83,
+                su: 0.72,
+                elektrik_su: 1.54,
+                kuyu_su: 0.39,
+                yakit: 1.49,
+                ortak_alan: 0.17
+            },
+            "2016": {
+                kerpic: 1.65,
+                kalorifersiz: 2.58,
+                kaloriferli: 3.39,
+                kapici: 0.4,
+                elektrik: 0.75,
+                su: 0.65,
+                elektrik_su: 1.4,
+                kuyu_su: 0.35,
+                yakit: 1.35,
+                ortak_alan: 0.15
+            },
+            "2015": {
+                kerpic: 1.49,
+                kalorifersiz: 2.32,
+                kaloriferli: 3.05,
+                kapici: 0.28,
+                elektrik: 0.62,
+                su: 0.62,
+                elektrik_su: 1.24,
+                kuyu_su: 0.31,
+                yakit: 1.24,
+                ortak_alan: 0.13
+            },
+            "2014": {
+                kerpic: 1.35,
+                kalorifersiz: 2.11,
+                kaloriferli: 2.77,
+                kapici: 0.25,
+                elektrik: 0.56,
+                su: 0.56,
+                elektrik_su: 1.13,
+                kuyu_su: 0.28,
+                yakit: 1.13,
+                ortak_alan: 0.12
+            },
+            "2013": {
+                kerpic: 1.3,
+                kalorifersiz: 2.03,
+                kaloriferli: 2.67,
+                kapici: 0.24,
+                elektrik: 0.54,
+                su: 0.54,
+                elektrik_su: 1.09,
+                kuyu_su: 0.27,
+                yakit: 1.09,
+                ortak_alan: 0.11
+            },
+            "2012": {
+                kerpic: 1.21,
+                kalorifersiz: 1.88,
+                kaloriferli: 2.48,
+                kapici: 0.22,
+                elektrik: 0.5,
+                su: 0.5,
+                elektrik_su: 1.01,
+                kuyu_su: 0.25,
+                yakit: 1.01,
+                ortak_alan: 0.1
+            },
+            "2011": {
+                kerpic: 1.1,
+                kalorifersiz: 1.71,
+                kaloriferli: 2.25,
+                kapici: 0.2,
+                elektrik: 0.45,
+                su: 0.45,
+                elektrik_su: 0.92,
+                kuyu_su: 0.23,
+                yakit: 0.92,
+                ortak_alan: 0.09
+            },
+            "2010": {
+                kerpic: 1.02,
+                kalorifersiz: 1.58,
+                kaloriferli: 2.08,
+                kapici: 0.19,
+                elektrik: 0.42,
+                su: 0.42,
+                elektrik_su: 0.85,
+                kuyu_su: 0.21,
+                yakit: 0.85,
+                ortak_alan: 0.08
+            }
+        };
+
+        const CITY_DISCOUNT_GROUPS = [
+            { name: "Ağrı", group: "ek1", discountRate: 0.50 },
+            { name: "Aksaray", group: "ek1", discountRate: 0.50 },
+            { name: "Ardahan", group: "ek1", discountRate: 0.50 },
+            { name: "Artvin", group: "ek1", discountRate: 0.50 },
+            { name: "Batman", group: "ek1", discountRate: 0.50 },
+            { name: "Bayburt", group: "ek1", discountRate: 0.50 },
+            { name: "Bingöl", group: "ek1", discountRate: 0.50 },
+            { name: "Bitlis", group: "ek1", discountRate: 0.50 },
+            { name: "Çanakkale (Bozcaada ve Gökçeada)", group: "ek1", discountRate: 0.50 },
+            { name: "Çankırı", group: "ek1", discountRate: 0.50 },
+            { name: "Erzincan", group: "ek1", discountRate: 0.50 },
+            { name: "Giresun", group: "ek1", discountRate: 0.50 },
+            { name: "Gümüşhane", group: "ek1", discountRate: 0.50 },
+            { name: "Hakkari", group: "ek1", discountRate: 0.50 },
+            { name: "Iğdır", group: "ek1", discountRate: 0.50 },
+            { name: "Kars", group: "ek1", discountRate: 0.50 },
+            { name: "Kırşehir", group: "ek1", discountRate: 0.50 },
+            { name: "Muş", group: "ek1", discountRate: 0.50 },
+            { name: "Siirt", group: "ek1", discountRate: 0.50 },
+            { name: "Sinop", group: "ek1", discountRate: 0.50 },
+            { name: "Şırnak", group: "ek1", discountRate: 0.50 },
+            { name: "Tunceli", group: "ek1", discountRate: 0.50 },
+            
+            { name: "Adıyaman", group: "ek2", discountRate: 0.45 },
+            { name: "Amasya", group: "ek2", discountRate: 0.45 },
+            { name: "Bartın", group: "ek2", discountRate: 0.45 },
+            { name: "Çorum", group: "ek2", discountRate: 0.45 },
+            { name: "Diyarbakır", group: "ek2", discountRate: 0.45 },
+            { name: "Elazığ", group: "ek2", discountRate: 0.45 },
+            { name: "Erzurum", group: "ek2", discountRate: 0.45 },
+            { name: "Kahramanmaraş", group: "ek2", discountRate: 0.45 },
+            { name: "Karabük", group: "ek2", discountRate: 0.45 },
+            { name: "Karaman", group: "ek2", discountRate: 0.45 },
+            { name: "Kastamonu", group: "ek2", discountRate: 0.45 },
+            { name: "Kırıkkale", group: "ek2", discountRate: 0.45 },
+            { name: "Malatya", group: "ek2", discountRate: 0.45 },
+            { name: "Mardin", group: "ek2", discountRate: 0.45 },
+            { name: "Nevşehir", group: "ek2", discountRate: 0.45 },
+            { name: "Niğde", group: "ek2", discountRate: 0.45 },
+            { name: "Ordu", group: "ek2", discountRate: 0.45 },
+            { name: "Rize", group: "ek2", discountRate: 0.45 },
+            { name: "Samsun", group: "ek2", discountRate: 0.45 },
+            { name: "Sivas", group: "ek2", discountRate: 0.45 },
+            { name: "Şanlıurfa", group: "ek2", discountRate: 0.45 },
+            { name: "Tokat", group: "ek2", discountRate: 0.45 },
+            { name: "Trabzon", group: "ek2", discountRate: 0.45 },
+            { name: "Van", group: "ek2", discountRate: 0.45 },
+            { name: "Yozgat", group: "ek2", discountRate: 0.45 },
+            { name: "Zonguldak", group: "ek2", discountRate: 0.45 },
+            
+            { name: "Adana", group: "ek3", discountRate: 0.30 },
+            { name: "Afyonkarahisar", group: "ek3", discountRate: 0.30 },
+            { name: "Ankara", group: "ek3", discountRate: 0.30 },
+            { name: "Antalya", group: "ek3", discountRate: 0.30 },
+            { name: "Aydın", group: "ek3", discountRate: 0.30 },
+            { name: "Balıkesir", group: "ek3", discountRate: 0.30 },
+            { name: "Bilecik", group: "ek3", discountRate: 0.30 },
+            { name: "Bolu", group: "ek3", discountRate: 0.30 },
+            { name: "Burdur", group: "ek3", discountRate: 0.30 },
+            { name: "Bursa", group: "ek3", discountRate: 0.30 },
+            { name: "Çanakkale (Merkez ve Diğer İlçeler)", group: "ek3", discountRate: 0.30 },
+            { name: "Denizli", group: "ek3", discountRate: 0.30 },
+            { name: "Düzce", group: "ek3", discountRate: 0.30 },
+            { name: "Edirne", group: "ek3", discountRate: 0.30 },
+            { name: "Eskişehir", group: "ek3", discountRate: 0.30 },
+            { name: "Gaziantep", group: "ek3", discountRate: 0.30 },
+            { name: "Hatay", group: "ek3", discountRate: 0.30 },
+            { name: "Isparta", group: "ek3", discountRate: 0.30 },
+            { name: "Mersin", group: "ek3", discountRate: 0.30 },
+            { name: "İstanbul", group: "ek3", discountRate: 0.30 },
+            { name: "İzmir", group: "ek3", discountRate: 0.30 },
+            { name: "Kayseri", group: "ek3", discountRate: 0.30 },
+            { name: "Kırklareli", group: "ek3", discountRate: 0.30 },
+            { name: "Kilis", group: "ek3", discountRate: 0.30 },
+            { name: "Kocaeli", group: "ek3", discountRate: 0.30 },
+            { name: "Konya", group: "ek3", discountRate: 0.30 },
+            { name: "Kütahya", group: "ek3", discountRate: 0.30 },
+            { name: "Manisa", group: "ek3", discountRate: 0.30 },
+            { name: "Muğla", group: "ek3", discountRate: 0.30 },
+            { name: "Sakarya", group: "ek3", discountRate: 0.30 },
+            { name: "Tekirdağ", group: "ek3", discountRate: 0.30 },
+            { name: "Uşak", group: "ek3", discountRate: 0.30 },
+            { name: "Yalova", group: "ek3", discountRate: 0.30 },
+            { name: "Osmaniye", group: "ek3", discountRate: 0.30 }
+        ];
+
+        function App() {
+            // States
+            const [lojmanYear, setLojmanYear] = useState("2026");
+            const [lojmanType, setLojmanType] = useState("kaloriferli");
+            const [lojmanM2, setLojmanM2] = useState(100);
+            const [lojmanCity, setLojmanCity] = useState("Ankara");
+            const [lojmanDiscountGroup, setLojmanDiscountGroup] = useState("ek3");
+            
+            // Checkbox options
+            const [hasKapici, setHasKapici] = useState(false);
+            const [hasElektrik, setHasElektrik] = useState(false);
+            const [hasSu, setHasSu] = useState(false);
+            const [hasElektrikSu, setHasElektrikSu] = useState(false);
+            const [hasKuyuSu, setHasKuyuSu] = useState(false);
+            const [hasYakit, setHasYakit] = useState(false);
+            const [hasOrtakAlan, setHasOrtakAlan] = useState(false);
+
+            // Popover & Modal states
+            const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
+            const [isCityListOpen, setIsCityListOpen] = useState(false);
+            const [citySearchQuery, setCitySearchQuery] = useState("");
+
+            // Sync discount group with selected city
+            useEffect(() => {
+                const match = CITY_DISCOUNT_GROUPS.find(c => c.name === lojmanCity);
+                if (match) {
+                    setLojmanDiscountGroup(match.group);
+                }
+            }, [lojmanCity]);
+
+            // Formats currency nicely (Thousands: ., Decimal: ,, Empty Kurus: hidden)
+            const formatLojmanCurrency = (val) => {
+                const fixedVal = val.toFixed(2);
+                if (fixedVal.endsWith(".00")) {
+                    const intPart = Math.round(val);
+                    return intPart.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                } else {
+                    const [intPart, decPart] = fixedVal.split(".");
+                    const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                    return `${formattedInt},${decPart}`;
+                }
+            };
+
+            // Calculations
+            const values = useMemo(() => {
+                const rates = LOJMAN_RATES[lojmanYear] || LOJMAN_RATES["2026"];
+                const baseRate = rates[lojmanType] || 0;
+
+                // Determine discount percentage
+                let discountPct = 0;
+                if (lojmanDiscountGroup === "ek1") discountPct = 0.50;
+                else if (lojmanDiscountGroup === "ek2") discountPct = 0.45;
+                else if (lojmanDiscountGroup === "ek3") discountPct = 0.30;
+                else if (lojmanDiscountGroup === "ek3_10k") discountPct = 0.40;
+                else if (lojmanDiscountGroup === "uzak") discountPct = 0.70;
+
+                const discountAmountRate = baseRate * discountPct;
+                const netBaseRate = baseRate - discountAmountRate;
+
+                // Additions
+                const kapiciRate = hasKapici ? (rates.kapici || 0) : 0;
+                const elektrikRate = hasElektrik ? (rates.elektrik || 0) : 0;
+                const suRate = hasSu ? (rates.su || 0) : 0;
+                const elektrikSuRate = hasElektrikSu ? (rates.elektrik_su || 0) : 0;
+                const kuyuSuRate = hasKuyuSu ? (rates.kuyu_su || 0) : 0;
+                const yakitRate = hasYakit ? (rates.yakit || 0) : 0;
+                const ortakAlanRate = hasOrtakAlan ? (rates.ortak_alan || 0) : 0;
+
+                const additionsRate = kapiciRate + elektrikRate + suRate + elektrikSuRate + kuyuSuRate + yakitRate + ortakAlanRate;
+                const finalRate = netBaseRate + additionsRate;
+
+                const monthlyRent = finalRate * lojmanM2;
+                const dailyRent = monthlyRent / 30;
+
+                return {
+                    baseRate,
+                    discountPct,
+                    discountAmountRate,
+                    netBaseRate,
+                    kapiciRate,
+                    elektrikRate,
+                    suRate,
+                    elektrikSuRate,
+                    kuyuSuRate,
+                    yakitRate,
+                    ortakAlanRate,
+                    additionsRate,
+                    finalRate,
+                    monthlyRent,
+                    dailyRent
+                };
+            }, [
+                lojmanYear, lojmanType, lojmanM2, lojmanDiscountGroup,
+                hasKapici, hasElektrik, hasSu, hasElektrikSu, hasKuyuSu, hasYakit, hasOrtakAlan
+            ]);
+
+            // City Lists & Search filter
+            const sortedCities = useMemo(() => {
+                return [...CITY_DISCOUNT_GROUPS].sort((a, b) => a.name.localeCompare(b.name, "tr"));
+            }, []);
+
+            const filteredCities = useMemo(() => {
+                return sortedCities.filter(c => 
+                    c.name.toLowerCase().includes(citySearchQuery.toLowerCase())
+                );
+            }, [sortedCities, citySearchQuery]);
+
+            // Handlers
+            const handlePrintLojman = () => {
+                window.print();
+            };
+
+            const handleExportLojmanExcel = () => {
+                const {
+                    baseRate,
+                    discountPct,
+                    discountAmountRate,
+                    netBaseRate,
+                    kapiciRate,
+                    elektrikRate,
+                    suRate,
+                    elektrikSuRate,
+                    kuyuSuRate,
+                    yakitRate,
+                    ortakAlanRate,
+                    additionsRate,
+                    finalRate,
+                    monthlyRent,
+                    dailyRent
+                } = values;
+
+                const wb = XLSX.utils.book_new();
+                const data = [
+                    ["LOJMAN KİRA HESAPLAMA RAPORU"],
+                    ["Tarih", new Date().toLocaleDateString("tr-TR")],
+                    [],
+                    ["Hesaplama Parametreleri", "Değer"],
+                    ["Hesaplama Yılı", lojmanYear],
+                    ["Lojman Türü", lojmanType === "kerpic" ? "Kerpiç, ahşap, bağdadi ve benzeri" : lojmanType === "kalorifersiz" ? "Kalorifersiz" : "Kaloriferli"],
+                    ["Lojman Metrekaresi", { t: "n", v: lojmanM2, z: "#,##0" }],
+                    ["Bulunduğu İl", lojmanCity],
+                    ["İndirim Grubu", lojmanDiscountGroup.toUpperCase()],
+                    ["İndirim Oranı", { t: "n", v: discountPct, z: "0%" }],
+                    [],
+                    ["Hesaplama Detayları", "Birim Değer (TL/m²)", "Aylık Tutar (TL)"],
+                    ["İndirimsiz Birim Kira", { t: "n", v: baseRate, z: "#,##0.00" }, { t: "n", f: "B$9*B14", z: "#,##0.00" }],
+                    ["İndirim Tutarı", { t: "n", f: "B14*B12", z: "#,##0.00" }, { t: "n", f: "B$9*B15", z: "#,##0.00" }],
+                    ["İndirimli Birim Kira", { t: "n", f: "B14-B15", z: "#,##0.00" }, { t: "n", f: "B$9*B16", z: "#,##0.00" }],
+                    [],
+                    ["İlave Gider Kalemleri", "Birim Değer (TL/m²)", "Aylık Tutar (TL)"],
+                    ["Kapıcı / Kaloriferci", { t: "n", v: kapiciRate, z: "#,##0.00" }, { t: "n", f: "B$9*B19", z: "#,##0.00" }],
+                    ["Elektrik (Sayaçsız)", { t: "n", v: elektrikRate, z: "#,##0.00" }, { t: "n", f: "B$9*B20", z: "#,##0.00" }],
+                    ["Su (Sayaçsız)", { t: "n", v: suRate, z: "#,##0.00" }, { t: "n", f: "B$9*B21", z: "#,##0.00" }],
+                    ["Elektrik + Su (Sayaçsız)", { t: "n", v: elektrikSuRate, z: "#,##0.00" }, { t: "n", f: "B$9*B22", z: "#,##0.00" }],
+                    ["Kuyu / Artezyen Suyu", { t: "n", v: kuyuSuRate, z: "#,##0.00" }, { t: "n", f: "B$9*B23", z: "#,##0.00" }],
+                    ["Kurumca Tedarik Edilen Yakıt", { t: "n", v: yakitRate, z: "#,##0.00" }, { t: "n", f: "B$9*B24", z: "#,##0.00" }],
+                    ["Ortak Alan Giderleri", { t: "n", v: ortakAlanRate, z: "#,##0.00" }, { t: "n", f: "B$9*B25", z: "#,##0.00" }],
+                    ["İlave Giderler Toplamı", { t: "n", f: "SUM(B19:B25)", z: "#,##0.00" }, { t: "n", f: "SUM(C19:C25)", z: "#,##0.00" }],
+                    [],
+                    ["TOPLAM SONUÇLAR", "Birim Değer (TL/m²)", "Aylık Tutar (TL)"],
+                    ["Nihai Birim Kira Bedeli", { t: "n", f: "B16+B26", z: "#,##0.00" }, { t: "n", f: "C16+C26", z: "#,##0.00" }],
+                    ["Aylık Toplam Lojman Kirası", "", { t: "n", f: "C29", z: "#,##0.00" }],
+                    ["Günlük Lojman Kirası (30 Gün)", "", { t: "n", f: "C30/30", z: "#,##0.00" }]
+                ];
+                const ws = XLSX.utils.aoa_to_sheet(data);
+                XLSX.utils.book_append_sheet(wb, ws, "Lojman Kira Raporu");
+                XLSX.writeFile(wb, `Lojman_Kira_Hesaplama_${lojmanYear}_${lojmanCity}.xlsx`);
+            };
+
+            const ek1Cities = sortedCities.filter(c => c.group === "ek1");
+            const ek2Cities = sortedCities.filter(c => c.group === "ek2");
+            const ek3Cities = sortedCities.filter(c => c.group === "ek3");
+
+            return (
+                <div class="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[32px] p-6 shadow-2xl flex flex-col max-h-[95vh] lg:max-h-[90vh] overflow-hidden no-print">
+                    
+                    {/* Header */}
+                    <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2.5 bg-indigo-500/10 text-indigo-500 rounded-xl">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-black text-slate-900 dark:text-slate-100 font-bold">Lojman Kira Bedeli Hesaplama</h3>
+                                <p class="text-[10px] text-slate-500 font-medium">Milli Emlak Genel Tebliğlerine göre lojman aylık net kirasını hesaplayın.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Main Split Grid */}
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 overflow-hidden">
+                        
+                        {/* Parameters Form - Left */}
+                        <div class="lg:col-span-5 space-y-4 overflow-y-auto pr-1 custom-scrollbar">
+                            <div class="bg-slate-50/50 dark:bg-slate-900/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 space-y-3">
+                                <h4 class="text-[10px] font-black uppercase tracking-wider text-slate-400">Temel Parametreler</h4>
+                                
+                                <div>
+                                    <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">Hesaplama Yılı</label>
+                                    <select 
+                                        value={lojmanYear} 
+                                        onChange={(e) => setLojmanYear(e.target.value)}
+                                        class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                    >
+                                        {Object.keys(LOJMAN_RATES).sort((a,b)=>b.localeCompare(a)).map(yr => (
+                                            <option key={yr} value={yr}>{yr} Yılı</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">Lojman Türü</label>
+                                    <select 
+                                        value={lojmanType} 
+                                        onChange={(e) => setLojmanType(e.target.value)}
+                                        class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                    >
+                                        <option value="kerpic">Kerpiç, ahşap, bağdadi ve benzeri</option>
+                                        <option value="kalorifersiz">Kalorifersiz konutlar</option>
+                                        <option value="kaloriferli">Kaloriferli konutlar</option>
+                                    </select>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">Lojman Alanı (m²)</label>
+                                        <input 
+                                            type="number" 
+                                            value={lojmanM2 || ""} 
+                                            min={1}
+                                            max={999}
+                                            onChange={(e) => setLojmanM2(Math.max(1, parseInt(e.target.value) || 0))}
+                                            class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                        />
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center justify-between mb-1">
+                                            <label class="text-[9px] font-black uppercase tracking-wide text-slate-400">Şehir Seçin</label>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setIsCityListOpen(true)}
+                                                class="text-[9px] text-indigo-650 hover:text-indigo-850 dark:text-indigo-400 dark:hover:text-indigo-300 font-extrabold uppercase tracking-wide border-b border-indigo-600/30 hover:border-indigo-600 transition-all"
+                                            >
+                                                İl Grupları
+                                            </button>
+                                        </div>
+                                        <div class="relative">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setIsCityDropdownOpen(!isCityDropdownOpen);
+                                                    setCitySearchQuery("");
+                                                }}
+                                                class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold text-left flex justify-between items-center text-slate-800 dark:text-slate-200"
+                                            >
+                                                <span>{lojmanCity || "Şehir Seçin"}</span>
+                                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </button>
+
+                                            {isCityDropdownOpen && (
+                                                <React.Fragment>
+                                                    <div class="fixed inset-0 z-[1000]" onClick={() => setIsCityDropdownOpen(false)} />
+                                                    <div class="absolute left-0 right-0 mt-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-[1001] max-h-48 flex flex-col overflow-hidden">
+                                                        <div class="p-1 border-b border-slate-100 dark:border-slate-900">
+                                                            <input 
+                                                                type="text"
+                                                                value={citySearchQuery}
+                                                                autoFocus
+                                                                onChange={(e) => setCitySearchQuery(e.target.value)}
+                                                                placeholder="Şehir Ara..." 
+                                                                class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 outline-none text-[11px] font-bold focus:ring-1 focus:ring-indigo-500 text-slate-805 dark:text-slate-200"
+                                                            />
+                                                        </div>
+                                                        <div class="overflow-y-auto pr-1 flex-1 custom-scrollbar">
+                                                            {filteredCities.length > 0 ? (
+                                                                filteredCities.map(c => (
+                                                                    <button
+                                                                        key={c.name}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setLojmanCity(c.name);
+                                                                            setIsCityDropdownOpen(false);
+                                                                        }}
+                                                                        class={`w-full text-left px-3 py-1.5 text-xs font-bold transition-all hover:bg-indigo-55 dark:hover:bg-slate-900 flex justify-between items-center ${c.name === lojmanCity ? 'bg-indigo-500/10 text-indigo-650 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}
+                                                                    >
+                                                                        <span>{c.name}</span>
+                                                                        {c.name === lojmanCity && (
+                                                                            <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                                                            </svg>
+                                                                        )}
+                                                                    </button>
+                                                                ))
+                                                            ) : (
+                                                                <div class="px-3 py-2 text-xs font-semibold text-slate-400 text-center">Eşleşme yok</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </React.Fragment>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">İndirim Grubu (Otomatik / Manuel)</label>
+                                    <select 
+                                        value={lojmanDiscountGroup} 
+                                        onChange={(e) => setLojmanDiscountGroup(e.target.value)}
+                                        class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold text-indigo-600 dark:text-indigo-400 font-extrabold"
+                                    >
+                                        <option value="indirimsiz">İndirimsiz (%0)</option>
+                                        <option value="ek1">EK 1 İlleri (%50 İndirim)</option>
+                                        <option value="ek2">EK 2 İlleri (%45 İndirim)</option>
+                                        <option value="ek3">EK 3 İlleri (%30 İndirim)</option>
+                                        <option value="ek3_10k">EK 3 Nüfusu 10 Bin Altı Yerler (%40 İndirim)</option>
+                                        <option value="uzak">Uzak, Kısıtlı İskan Yerleri (%70 İndirim)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-50/50 dark:bg-slate-900/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80">
+                                <h4 class="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">İlave Gider ve Eklentiler</h4>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
+                                    <label class="flex items-center gap-2.5 p-0.5 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasKapici} 
+                                            onChange={(e) => setHasKapici(e.target.checked)}
+                                            class="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+                                        />
+                                        <span class="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">Kapıcı/Kaloriferci Karşılanıyor</span>
+                                    </label>
+
+                                    <label class="flex items-center gap-2.5 p-0.5 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasElektrik} 
+                                            disabled={hasElektrikSu}
+                                            onChange={(e) => { setHasElektrik(e.target.checked); if (e.target.checked) setHasElektrikSu(false); }}
+                                            class="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900 disabled:opacity-50"
+                                        />
+                                        <span class="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">Elektrik Sayacı Ayrılmamış</span>
+                                    </label>
+
+                                    <label class="flex items-center gap-2.5 p-0.5 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasSu} 
+                                            disabled={hasElektrikSu}
+                                            onChange={(e) => { setHasSu(e.target.checked); if (e.target.checked) setHasElektrikSu(false); }}
+                                            class="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900 disabled:opacity-50"
+                                        />
+                                        <span class="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">Su Sayacı Ayrılmamış</span>
+                                    </label>
+
+                                    <label class="flex items-center gap-2.5 p-0.5 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasElektrikSu} 
+                                            onChange={(e) => { setHasElektrikSu(e.target.checked); if (e.target.checked) { setHasElektrik(false); setHasSu(false); } }}
+                                            class="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+                                        />
+                                        <span class="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">Elektrik ve Su Sayaçsız</span>
+                                    </label>
+
+                                    <label class="flex items-center gap-2.5 p-0.5 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasKuyuSu} 
+                                            class="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+                                            onChange={(e) => setHasKuyuSu(e.target.checked)}
+                                        />
+                                        <span class="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">Kuyu/Artezyen Suyu</span>
+                                    </label>
+
+                                    <label class="flex items-center gap-2.5 p-0.5 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasYakit} 
+                                            class="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+                                            onChange={(e) => setHasYakit(e.target.checked)}
+                                        />
+                                        <span class="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">Yakıt Kurumca Tedarik Ediliyor</span>
+                                    </label>
+
+                                    <label class="flex items-center gap-2.5 p-0.5 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all col-span-2">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasOrtakAlan} 
+                                            class="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+                                            onChange={(e) => setHasOrtakAlan(e.target.checked)}
+                                        />
+                                        <span class="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">Ortak Alan Giderleri Kurumca Karşılanıyor</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Calculation Invoice Sheet - Right */}
+                        <div class="lg:col-span-7 flex flex-col h-full justify-between overflow-hidden">
+                            <div 
+                                id="lojman-print-area"
+                                class="bg-white dark:bg-slate-950 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-inner overflow-y-auto custom-scrollbar flex-1 max-h-[50vh] lg:max-h-none"
+                            >
+                                {/* Invoice Header */}
+                                <div class="text-center border-b border-slate-250 dark:border-slate-800 pb-2 mb-3">
+                                    <h2 class="text-xs font-black uppercase text-slate-900 dark:text-slate-100 tracking-wider">
+                                        T.C. GENÇLİK VE SPOR BAKANLIĞI
+                                    </h2>
+                                    <p class="text-[9px] font-black tracking-widest text-indigo-600 dark:text-indigo-400 mt-0.5 uppercase">
+                                        Lojman Kira Bedeli Hesaplama Cetveli
+                                    </p>
+                                </div>
+
+                                {/* Summary Grid */}
+                                <div class="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl text-[11px] font-bold border border-slate-100 dark:border-slate-800/80 mb-3">
+                                    <div class="space-y-1">
+                                        <div class="text-slate-500">Hesap Yılı: <span class="text-slate-800 dark:text-slate-200">{lojmanYear} Yılı</span></div>
+                                        <div class="text-slate-500">Lojman Alanı: <span class="text-slate-800 dark:text-slate-200">{lojmanM2} m²</span></div>
+                                        <div class="text-slate-500">Bulunduğu İl: <span class="text-slate-800 dark:text-slate-200">{lojmanCity}</span></div>
+                                        <div class="text-slate-500">m² Birim Kirası: <span class="text-indigo-650 dark:text-indigo-400 font-extrabold">{formatLojmanCurrency(values.finalRate)} TL</span></div>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <div class="text-slate-500">Lojman Türü: <span class="text-slate-800 dark:text-slate-200 capitalize">{lojmanType === "kerpic" ? "Kerpiç" : lojmanType}</span></div>
+                                        <div class="text-slate-500">İndirim Oranı: <span class="text-slate-800 dark:text-slate-200">{(values.discountPct * 100)}%</span></div>
+                                        <div class="text-slate-500">Hesaplama Tarihi: <span class="text-slate-800 dark:text-slate-200">{new Date().toLocaleDateString("tr-TR")}</span></div>
+                                        <div class="text-slate-500">Aylık Toplam: <span class="text-indigo-650 dark:text-indigo-400 font-extrabold">{formatLojmanCurrency(values.monthlyRent)} TL</span></div>
+                                    </div>
+                                </div>
+
+                                {/* Calculation Details Table */}
+                                <div class="space-y-1.5">
+                                    <h4 class="text-[9px] font-black uppercase tracking-wider text-slate-400">Ücretlendirme Ayrıntıları</h4>
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full text-[11px] text-left">
+                                            <thead>
+                                                <tr class="border-b border-slate-200 dark:border-slate-800 text-[9px] text-slate-400 uppercase font-black">
+                                                    <th class="py-1">Ücret Kalemi</th>
+                                                    <th class="py-1 text-right">Birim (TL/m²)</th>
+                                                    <th class="py-1 text-right">Tutar (TL)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-300 font-bold">
+                                                <tr>
+                                                    <td class="py-1">İndirimsiz Metrekare Birim Kirası</td>
+                                                    <td class="py-1 text-right font-mono">{formatLojmanCurrency(values.baseRate)} TL</td>
+                                                    <td class="py-1 text-right font-mono">{formatLojmanCurrency(values.baseRate * lojmanM2)} TL</td>
+                                                </tr>
+                                                {values.discountPct > 0 && (
+                                                    <tr class="text-rose-550 dark:text-rose-400">
+                                                        <td class="py-1 font-black">Lojman İndirimi (-{(values.discountPct * 100)}%)</td>
+                                                        <td class="py-1 text-right font-mono">-{formatLojmanCurrency(values.discountAmountRate)} TL</td>
+                                                        <td class="py-1 text-right font-mono">-{formatLojmanCurrency(values.discountAmountRate * lojmanM2)} TL</td>
+                                                    </tr>
+                                                )}
+                                                <tr class="bg-slate-50/50 dark:bg-slate-900/30 text-indigo-650 dark:text-indigo-400 font-extrabold">
+                                                    <td class="py-1">İndirimli Metrekare Birim Kirası</td>
+                                                    <td class="py-1 text-right font-mono">{formatLojmanCurrency(values.netBaseRate)} TL</td>
+                                                    <td class="py-1 text-right font-mono">{formatLojmanCurrency(values.netBaseRate * lojmanM2)} TL</td>
+                                                </tr>
+
+                                                {/* Additions list */}
+                                                {values.kapiciRate > 0 && (
+                                                    <tr>
+                                                        <td class="py-1">İlave: Kapıcı / Kaloriferci Gideri</td>
+                                                        <td class="py-1 text-right font-mono">+{formatLojmanCurrency(values.kapiciRate)} TL</td>
+                                                        <td class="py-1 text-right font-mono">+{formatLojmanCurrency(values.kapiciRate * lojmanM2)} TL</td>
+                                                    </tr>
+                                                )}
+                                                {values.elektrikRate > 0 && (
+                                                    <tr>
+                                                        <td class="py-1">İlave: Elektrik Sayacı Ayrılmamış</td>
+                                                        <td class="py-1 text-right font-mono">+{formatLojmanCurrency(values.elektrikRate)} TL</td>
+                                                        <td class="py-1 text-right font-mono">+{formatLojmanCurrency(values.elektrikRate * lojmanM2)} TL</td>
+                                                    </tr>
+                                                )}
+                                                {values.suRate > 0 && (
+                                                    <tr>
+                                                        <td class="py-1">İlave: Su Sayacı Ayrılmamış</td>
+                                                        <td class="py-1 text-right font-mono">+{formatLojmanCurrency(values.suRate)} TL</td>
+                                                        <td class="py-1 text-right font-mono">+{formatLojmanCurrency(values.suRate * lojmanM2)} TL</td>
+                                                    </tr>
+                                                )}
+                                                {values.elektrikSuRate > 0 && (
+                                                    <tr>
+                                                        <td class="py-1">İlave: Elektrik + Su Sayaçsız</td>
+                                                        <td class="py-1 text-right font-mono">+{formatLojmanCurrency(values.elektrikSuRate)} TL</td>
+                                                        <td class="py-1 text-right font-mono">+{formatLojmanCurrency(values.elektrikSuRate * lojmanM2)} TL</td>
+                                                    </tr>
+                                                )}
+                                                {values.kuyuSuRate > 0 && (
+                                                    <tr>
+                                                        <td class="py-1">İlave: Şebeke Dışı Kuyu/Artezyen</td>
+                                                        <td class="py-1 text-right font-mono">+{formatLojmanCurrency(values.kuyuSuRate)} TL</td>
+                                                        <td class="py-1 text-right font-mono">+{formatLojmanCurrency(values.kuyuSuRate * lojmanM2)} TL</td>
+                                                    </tr>
+                                                )}
+                                                {values.yakitRate > 0 && (
+                                                    <tr>
+                                                        <td class="py-1">İlave: Tedarik Edilen Yakıt</td>
+                                                        <td class="py-1 text-right font-mono">+{formatLojmanCurrency(values.yakitRate)} TL</td>
+                                                        <td class="py-1 text-right font-mono">+{formatLojmanCurrency(values.yakitRate * lojmanM2)} TL</td>
+                                                    </tr>
+                                                )}
+                                                {values.ortakAlanRate > 0 && (
+                                                    <tr>
+                                                        <td class="py-1">İlave: Ortak Alan Giderleri</td>
+                                                        <td class="py-1 text-right font-mono">+{formatLojmanCurrency(values.ortakAlanRate)} TL</td>
+                                                        <td class="py-1 text-right font-mono">+{formatLojmanCurrency(values.ortakAlanRate * lojmanM2)} TL</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                {/* Total Calculation Summary Box */}
+                                <div class="mt-4 border-t border-dashed border-slate-200 dark:border-slate-800 pt-3">
+                                    <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+                                        <div>
+                                            <span class="text-[9px] font-black uppercase text-slate-400 block tracking-wider font-bold">Aylık Toplam Net Kira</span>
+                                            <span class="text-xl font-black text-indigo-650 dark:text-indigo-400 font-mono">
+                                                {formatLojmanCurrency(values.monthlyRent)} TL
+                                            </span>
+                                        </div>
+                                        <div class="text-right border-l border-slate-200 dark:border-slate-800 pl-4 text-indigo-650 dark:text-indigo-400">
+                                            <span class="text-[9px] font-black uppercase text-slate-400 block tracking-wider font-bold">Günlük Kira (30 Gün)</span>
+                                            <span class="text-base font-black font-mono">
+                                                {formatLojmanCurrency(values.dailyRent)} TL
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div class="flex gap-3 pt-3 mt-4 border-t border-slate-100 dark:border-slate-800 justify-end">
+                                <button 
+                                    type="button"
+                                    onClick={handlePrintLojman}
+                                    class="h-10 px-5 rounded-xl font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350 text-xs transition-all"
+                                >
+                                    Yazdır
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={handleExportLojmanExcel}
+                                    class="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-emerald-600/10 flex items-center transition-all"
+                                >
+                                    <svg class="w-3.5 h-3.5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    Excel İndir
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* City Groups List Modal Overlay */}
+                    {isCityListOpen && (
+                        <div class="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+                            <div class="w-full max-w-4xl p-6 md:p-8 rounded-[32px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+                                
+                                {/* Modal Header */}
+                                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
+                                    <div class="flex items-center gap-3">
+                                        <div class="p-3 bg-indigo-500/10 text-indigo-500 rounded-2xl">
+                                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h3 class="text-xl font-black text-slate-900 dark:text-slate-100 font-bold">Lojman İndirim Grupları ve İller Listesi</h3>
+                                            <p class="text-xs text-slate-500 font-medium font-bold">Milli Emlak Genel Tebliğlerine göre EK 1, EK 2 ve EK 3 gruplarındaki iller.</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => setIsCityListOpen(false)} 
+                                        class="rounded-xl h-10 w-10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                                    >
+                                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                {/* Columns content scrollable */}
+                                <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        
+                                        {/* EK 1 Column */}
+                                        <div class="bg-emerald-500/5 dark:bg-emerald-950/10 p-5 rounded-2xl border border-emerald-500/10 h-fit">
+                                            <div class="border-b border-emerald-500/20 pb-3 mb-3">
+                                                <span class="text-sm font-black text-emerald-600 dark:text-emerald-400 block uppercase font-bold">EK 1 İlleri (%50 İndirim)</span>
+                                                <span class="text-[10px] text-slate-400 font-bold dark:text-slate-400">Kalkınmada 1. derece öncelikli yöreler</span>
+                                            </div>
+                                            <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-bold text-slate-700 dark:text-slate-350">
+                                                {ek1Cities.map(c => (
+                                                    <button 
+                                                        key={c.name}
+                                                        type="button"
+                                                        onClick={() => { setLojmanCity(c.name); setIsCityListOpen(false); }}
+                                                        class="text-left py-1 hover:text-indigo-600 hover:underline transition-all"
+                                                    >
+                                                        • {c.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* EK 2 Column */}
+                                        <div class="bg-amber-500/5 dark:bg-amber-950/10 p-5 rounded-2xl border border-amber-500/10 h-fit">
+                                            <div class="border-b border-amber-500/20 pb-3 mb-3">
+                                                <span class="text-sm font-black text-amber-600 dark:text-amber-400 block uppercase font-bold">EK 2 İlleri (%45 İndirim)</span>
+                                                <span class="text-[10px] text-slate-400 font-bold dark:text-slate-400">Kalkınmada 2. derece öncelikli yöreler</span>
+                                            </div>
+                                            <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-bold text-slate-700 dark:text-slate-355">
+                                                {ek2Cities.map(c => (
+                                                    <button 
+                                                        key={c.name}
+                                                        type="button"
+                                                        onClick={() => { setLojmanCity(c.name); setIsCityListOpen(false); }}
+                                                        class="text-left py-1 hover:text-indigo-600 hover:underline transition-all"
+                                                    >
+                                                        • {c.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* EK 3 Column */}
+                                        <div class="bg-indigo-500/5 dark:bg-indigo-950/10 p-5 rounded-2xl border border-indigo-500/10 h-fit">
+                                            <div class="border-b border-indigo-500/20 pb-3 mb-3">
+                                                <span class="text-sm font-black text-indigo-600 dark:text-indigo-400 block uppercase font-bold">EK 3 İlleri (%30 İndirim)</span>
+                                                <span class="text-[10px] text-slate-400 font-bold dark:text-slate-400">Gelişmiş iller ve diğer merkezler</span>
+                                            </div>
+                                            <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-bold text-slate-700 dark:text-slate-350">
+                                                {ek3Cities.map(c => (
+                                                    <button 
+                                                        key={c.name}
+                                                        type="button"
+                                                        onClick={() => { setLojmanCity(c.name); setIsCityListOpen(false); }}
+                                                        class="text-left py-1 hover:text-indigo-650 hover:underline transition-all"
+                                                    >
+                                                        • {c.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Footer */}
+                                <div class="mt-6 border-t border-slate-100 dark:border-slate-800 pt-4 flex justify-between items-center text-xs text-slate-500 font-bold">
+                                    <span>İstediğiniz şehre tıklayarak doğrudan seçim yapabilirsiniz.</span>
+                                    <button 
+                                        onClick={() => setIsCityListOpen(false)}
+                                        class="h-10 px-5 rounded-xl font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 text-xs transition-all"
+                                    >
+                                        Kapat
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <div class="text-center text-[10px] text-slate-400 dark:text-slate-500 font-bold no-print pt-2 mt-4 border-t border-slate-100/50 dark:border-slate-800/50">
+                        Bu bir Sefa Yapraklı Projesidir.
+                    </div>
+                </div>
+            );
+        }
+
+        // Render React App
+        const rootElement = document.getElementById("root");
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(<App />);
+    </script>
+</body>
+</html>

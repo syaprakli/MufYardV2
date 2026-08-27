@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sürekli Görev Yolluğu Hesaplama Cetveli</title>
+    
+    <!-- React & ReactDOM (Production) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Babel for JSX Compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- XLSX for Excel Export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <!-- Outfit Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+        }
+        /* Custom scrollbars */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Print styles */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #yolluk-print-area, #yolluk-print-area * {
+                visibility: visible;
+            }
+            #yolluk-print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                border: none !important;
+                box-shadow: none !important;
+                background: white !important;
+                color: black !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-105 dark:bg-slate-950 min-h-screen flex items-center justify-center p-4">
+
+    <!-- React App Root Container -->
+    <div id="root" class="w-full max-w-5xl"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+
+        // Constants - H-Cetveli Gündelikleri
+        const YOLLUK_H_RATES = {
+            "2026": {
+                ek_8000_plus: 890,
+                ek_6400_8000: 880,
+                ek_3600_6400: 870,
+                der_1_4: 860,
+                der_5_15: 850
+            },
+            "2025": {
+                ek_8000_plus: 680,
+                ek_6400_8000: 650,
+                ek_3600_6400: 635,
+                der_1_4: 610,
+                der_5_15: 600
+            },
+            "2024": {
+                ek_8000_plus: 465,
+                ek_6400_8000: 435,
+                ek_3600_6400: 420,
+                der_1_4: 405,
+                der_5_15: 400
+            },
+            "2023": {
+                ek_8000_plus: 236,
+                ek_6400_8000: 220,
+                ek_3600_6400: 212,
+                der_1_4: 203,
+                der_5_15: 200
+            },
+            "2022": {
+                ek_8000_plus: 104,
+                ek_6400_8000: 97,
+                ek_3600_6400: 93,
+                der_1_4: 89,
+                der_5_15: 87
+            },
+            "2021": {
+                ek_8000_plus: 69.50,
+                ek_6400_8000: 64.50,
+                ek_3600_6400: 60.50,
+                der_1_4: 57.50,
+                der_5_15: 55.50
+            },
+            "2020": {
+                ek_8000_plus: 61.50,
+                ek_6400_8000: 57.50,
+                ek_3600_6400: 54.00,
+                der_1_4: 51.50,
+                der_5_15: 50.00
+            }
+        };
+
+        // Constants - Memur Aylık Katsayıları (375 sayılı KHK için)
+        const YOLLUK_COEFFICIENTS = {
+            "2026": {
+                jan_jun: 1.387871,
+                jul_dec: 1.575512
+            },
+            "2025": {
+                jan_jun: 1.012556,
+                jul_dec: 1.170211
+            },
+            "2024": {
+                jan_jun: 0.760871,
+                jul_dec: 0.907796
+            },
+            "2023": {
+                jan_jun: 0.433684,
+                jul_dec: 0.509796
+            },
+            "2022": {
+                jan_jun: 0.235445,
+                jul_dec: 0.333603
+            },
+            "2021": {
+                jan_jun: 0.165786,
+                jul_dec: 0.179797
+            },
+            "2020": {
+                jan_jun: 0.146061,
+                jul_dec: 0.154461
+            }
+        };
+
+        function App() {
+            // General state
+            const [yollukActiveTab, setYollukActiveTab] = useState("memur");
+            
+            // Active Memur yolluk states
+            const [yollukYear, setYollukYear] = useState("2026");
+            const [yollukGrade, setYollukGrade] = useState("der_5_15");
+            const [yollukCustomGundelik, setYollukCustomGundelik] = useState(850);
+            const [yollukDistance, setYollukDistance] = useState(100);
+            const [yollukMemurYolUcreti, setYollukMemurYolUcreti] = useState(150);
+            const [yollukTravelDays, setYollukTravelDays] = useState(1);
+            const [yollukFamily, setYollukFamily] = useState([]);
+
+            // Retired yolluk states
+            const [yollukEmekliYear, setYollukEmekliYear] = useState("2026");
+            const [yollukEmekliPeriod, setYollukEmekliPeriod] = useState("jan_jun");
+            const [yollukEmekliClass, setYollukEmekliClass] = useState("kadrolu");
+            const [yollukEmekliCustomIndicator, setYollukEmekliCustomIndicator] = useState(13558);
+            const [yollukEmekliUseCustomCoefficient, setYollukEmekliUseCustomCoefficient] = useState(false);
+            const [yollukEmekliCustomCoefficient, setYollukEmekliCustomCoefficient] = useState(1.387871);
+
+            // Online katsayı ve pratik bilgiler verisi
+            const [liveConfig, setLiveConfig] = useState(null);
+
+            useEffect(() => {
+                const fetchLiveConfig = async () => {
+                    try {
+                        const response = await fetch("https://raw.githubusercontent.com/syaprakli/MufYardV2/main/frontend/public/mufyard_rates.json");
+                        if (response.ok) {
+                            const data = await response.json();
+                            setLiveConfig(data);
+                            return;
+                        }
+                    } catch (e) {
+                        console.warn("GitHub live config fetch failed, falling back to local...", e);
+                    }
+
+                    try {
+                        const localResponse = await fetch("./mufyard_rates.json");
+                        if (localResponse.ok) {
+                            const data = await localResponse.json();
+                            setLiveConfig(data);
+                        }
+                    } catch (e) {
+                        console.error("Local config fetch failed", e);
+                    }
+                };
+
+                fetchLiveConfig();
+            }, []);
+
+            const activeYollukHRates = useMemo(() => {
+                return {
+                    ...YOLLUK_H_RATES,
+                    ...(liveConfig?.yollukRates || {})
+                };
+            }, [liveConfig]);
+
+            const activeYollukCoefficients = useMemo(() => {
+                return {
+                    ...YOLLUK_COEFFICIENTS,
+                    ...(liveConfig?.yollukCoefficients || {})
+                };
+            }, [liveConfig]);
+
+            // Currency formatting
+            const formatYollukCurrency = (val) => {
+                const fixedVal = val.toFixed(2);
+                if (fixedVal.endsWith(".00")) {
+                    const intPart = Math.round(val);
+                    return intPart.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                } else {
+                    const [intPart, decPart] = fixedVal.split(".");
+                    const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                    return `${formattedInt},${decPart}`;
+                }
+            };
+
+            // Calculations
+            const values = useMemo(() => {
+                const memurRates = activeYollukHRates[yollukYear] || activeYollukHRates["2026"];
+                const yevmiye = yollukGrade === "custom" 
+                    ? yollukCustomGundelik 
+                    : (memurRates[yollukGrade] || 850);
+                    
+                const memurSabit = yevmiye * 20;
+                const memurDegisken = yevmiye * yollukDistance * 0.05;
+                const memurYevmiyeTutar = yevmiye * yollukTravelDays;
+                const memurTotal = memurSabit + memurDegisken + yollukMemurYolUcreti + memurYevmiyeTutar;
+
+                const familyDetails = yollukFamily.map((f, index) => {
+                    const isEligibleForRelocation = index < 4;
+                    const relocationAllowance = isEligibleForRelocation ? yevmiye * 10 : 0;
+                    const dailyAllowance = yevmiye * yollukTravelDays;
+                    const total = f.yolUcreti + dailyAllowance + relocationAllowance;
+                    return {
+                        ...f,
+                        relocationAllowance,
+                        dailyAllowance,
+                        total
+                    };
+                });
+
+                const familyTotal = familyDetails.reduce((sum, item) => sum + item.total, 0);
+                const familyRelocationTotal = familyDetails.reduce((sum, item) => sum + item.relocationAllowance, 0);
+                const familyYolUcretiTotal = familyDetails.reduce((sum, item) => sum + item.yolUcreti, 0);
+                const familyDailyTotal = familyDetails.reduce((sum, item) => sum + item.dailyAllowance, 0);
+
+                const activeGrandTotal = memurTotal + familyTotal;
+
+                let emekliCoefficient = 1.387871;
+                if (yollukEmekliUseCustomCoefficient) {
+                    emekliCoefficient = yollukEmekliCustomCoefficient;
+                } else {
+                    const yrCoeffs = activeYollukCoefficients[yollukEmekliYear] || activeYollukCoefficients["2026"];
+                    emekliCoefficient = yrCoeffs[yollukEmekliPeriod] || 1.387871;
+                }
+
+                let emekliIndicator = 13558;
+                if (yollukEmekliClass === "isci") {
+                    emekliIndicator = 12105;
+                } else if (yollukEmekliClass === "custom") {
+                    emekliIndicator = yollukEmekliCustomIndicator;
+                }
+
+                const emekliGross = emekliIndicator * emekliCoefficient;
+                const emekliDamgaTax = emekliGross * 0.00759;
+                const emekliNet = emekliGross - emekliDamgaTax;
+
+                return {
+                    yevmiye,
+                    memurSabit,
+                    memurDegisken,
+                    memurYevmiyeTutar,
+                    memurTotal,
+                    familyDetails,
+                    familyTotal,
+                    familyRelocationTotal,
+                    familyYolUcretiTotal,
+                    familyDailyTotal,
+                    activeGrandTotal,
+                    emekliCoefficient,
+                    emekliIndicator,
+                    emekliGross,
+                    emekliDamgaTax,
+                    emekliNet
+                };
+            }, [
+                yollukYear, yollukGrade, yollukCustomGundelik, yollukDistance, yollukMemurYolUcreti, yollukTravelDays, yollukFamily,
+                yollukEmekliYear, yollukEmekliPeriod, yollukEmekliClass, yollukEmekliCustomIndicator,
+                yollukEmekliUseCustomCoefficient, yollukEmekliCustomCoefficient
+            ]);
+
+            // Handlers
+            const handlePrintYolluk = () => {
+                window.print();
+            };
+
+            const handleExportYollukExcel = () => {
+                const wb = XLSX.utils.book_new();
+                
+                if (yollukActiveTab === "memur") {
+                    const data = [
+                        ["SÜREKLİ GÖREV YOLLUĞU HESAPLAMA RAPORU (MEMUR)"],
+                        ["Tarih", new Date().toLocaleDateString("tr-TR")],
+                        [],
+                        ["Hesaplama Parametreleri", "Değer"],
+                        ["Hesaplama Yılı", yollukYear + " Yılı"],
+                        ["Kadro Derecesi / Unvanı", yollukGrade === "custom" ? "Özel Gündelik" : yollukGrade === "ek_8000_plus" ? "Ek Gösterge 8000+" : yollukGrade === "ek_6400_8000" ? "Ek Gösterge 6400-8000" : yollukGrade === "ek_3600_6400" ? "Ek Gösterge 3600-6400" : yollukGrade === "der_1_4" ? "Kadro Derecesi 1-4" : "Kadro Derecesi 5-15"],
+                        ["Harcırah Gündeliği (Yevmiye)", { t: "n", v: values.yevmiye, z: "#,##0.00" }],
+                        ["Harcırah Süresi (Yol Gün Sayısı)", { t: "n", v: yollukTravelDays, z: "#,##0" }],
+                        ["Mesafe (Km)", { t: "n", v: yollukDistance, z: "#,##0" }],
+                        ["Memur Yol Ücreti", { t: "n", v: yollukMemurYolUcreti, z: "#,##0.00" }],
+                        ["Aile Fertleri Sayısı", values.familyDetails.length],
+                        [],
+                        ["Memur Hesaplama Detayları", "Detay", "Tutar (TL)"],
+                        ["Sabit Unsur (Yevmiye x 20)", "Gündelik x 20", { t: "n", f: "B7*20", z: "#,##0.00" }],
+                        ["Değişken Unsur (Yevmiye x Km x %5)", "Gündelik x Km x 0.05", { t: "n", f: "B7*B9*0.05", z: "#,##0.00" }],
+                        ["Seyahat Harcırahı (Yevmiye x Gün)", "Gündelik x Gün", { t: "n", f: "B7*B8", z: "#,##0.00" }],
+                        ["Memur Yol Ücreti (Bilet)", "", { t: "n", f: "B10", z: "#,##0.00" }],
+                        ["Memur Toplam Yolluğu", "", { t: "n", f: "SUM(C14:C17)", z: "#,##0.00" }],
+                        []
+                    ];
+
+                    const N = values.familyDetails.length;
+                    if (N > 0) {
+                        data.push(["Aile Fertleri Yolluk Detayları", "Bilet Ücreti (TL)", "Harcırah (TL)", "Yer Değiştirme Masrafı (TL)", "Toplam (TL)"]);
+                        values.familyDetails.forEach((f, idx) => {
+                            const rIdx = 21 + idx; // 21-indexed start row
+                            data.push([
+                                `${idx + 1}. Aile Ferdi (${f.relation})`,
+                                { t: "n", v: f.yolUcreti, z: "#,##0.00" },
+                                { t: "n", f: `B$7*B$8`, z: "#,##0.00" },
+                                { t: "n", f: idx < 4 ? `B$7*10` : "0", z: "#,##0.00" },
+                                { t: "n", f: `SUM(B${rIdx}:D${rIdx})`, z: "#,##0.00" }
+                            ]);
+                        });
+                        data.push([]);
+                        data.push(["Aile Fertleri Toplamları", "", "", "", ""]);
+                        data.push(["Toplam Bilet Ücretleri", "", "", "", { t: "n", f: `SUM(B21:B${20+N})`, z: "#,##0.00" }]);
+                        data.push(["Toplam Seyahat Gündelikleri", "", "", "", { t: "n", f: `SUM(C21:C${20+N})`, z: "#,##0.00" }]);
+                        data.push(["Toplam Yer Değiştirme Masrafları (Max 40 Yevmiye)", "", "", "", { t: "n", f: `SUM(D21:D${20+N})`, z: "#,##0.00" }]);
+                        data.push(["Aile Fertleri Toplam Yolluğu", "", "", "", { t: "n", f: `SUM(E21:E${20+N})`, z: "#,##0.00" }]);
+                        data.push([]);
+                    }
+
+                    const summaryStartRow = N > 0 ? 21 + N + 7 : 20; // Correct row index for totals block
+                    data.push(["GENEL TOPLAM SONUÇLAR", "", ""]);
+                    data.push(["Memur Yolluğu Toplamı", "", { t: "n", f: "C18", z: "#,##0.00" }]);
+                    data.push(["Aile Fertleri Yolluğu Toplamı", "", N > 0 ? { t: "n", f: `E${20+N+6}`, z: "#,##0.00" } : { t: "n", v: 0, z: "#,##0.00" }]);
+                    data.push(["Net Ödenecek Toplam Yolluk (Vergisiz)", "", { t: "n", f: `C${summaryStartRow+1}+C${summaryStartRow+2}`, z: "#,##0.00" }]);
+
+                    const ws = XLSX.utils.aoa_to_sheet(data);
+                    XLSX.utils.book_append_sheet(wb, ws, "Memur Tayin Yolluğu");
+                    XLSX.writeFile(wb, `Memur_Sürekli_Görev_Yolluğu_${yollukYear}.xlsx`);
+                } else {
+                    const data = [
+                        ["EMEKLİLİK SÜREKLİ GÖREV YOLLUĞU (TAZMİNATI) RAPORU"],
+                        ["Tarih", new Date().toLocaleDateString("tr-TR")],
+                        [],
+                        ["Hesaplama Parametreleri", "Değer"],
+                        ["Hesaplama Yılı", yollukEmekliYear + " Yılı"],
+                        ["Katsayı Dönemi", yollukEmekliPeriod === "jan_jun" ? "Ocak - Haziran" : "Temmuz - Aralık"],
+                        ["Personel Sınıfı", yollukEmekliClass === "kadrolu" ? "Kadrolu / Sözleşmeli Memur" : yollukEmekliClass === "isci" ? "Kamu İşçisi" : "Özel Sınıf"],
+                        ["Gösterge Rakamı", { t: "n", v: values.emekliIndicator, z: "#,##0" }],
+                        ["Memur Maaş Katsayısı", { t: "n", v: values.emekliCoefficient, z: "0.000000" }],
+                        [],
+                        ["Hesaplama Kalemleri", "Tutar (TL)"],
+                        ["Brüt Emeklilik Yolluk Tutarı (Gösterge x Katsayı)", { t: "n", f: "B8*B9", z: "#,##0.00" }],
+                        ["Damga Vergisi Kesintisi (%0,759 / binde 7,59)", { t: "n", f: "B12*0.00759", z: "#,##0.00" }],
+                        ["Ödenecek Net Tutar", { t: "n", f: "B12-B13", z: "#,##0.00" }]
+                    ];
+
+                    const ws = XLSX.utils.aoa_to_sheet(data);
+                    XLSX.utils.book_append_sheet(wb, ws, "Emeklilik Yolluğu");
+                    XLSX.writeFile(wb, `Emeklilik_Yolluğu_Tazminatı_${yollukEmekliYear}.xlsx`);
+                }
+            };
+
+            const sortedRatesYears = Object.keys(activeYollukHRates).sort((a,b)=>b.localeCompare(a));
+            const sortedCoeffsYears = Object.keys(activeYollukCoefficients).sort((a,b)=>b.localeCompare(a));
+
+            return (
+                <div class="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[32px] p-6 shadow-2xl flex flex-col max-h-[95vh] lg:max-h-[90vh] overflow-hidden no-print">
+                    
+                    {/* Header */}
+                    <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2.5 bg-indigo-500/10 text-indigo-500 rounded-xl">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-black text-slate-900 dark:text-slate-100 font-bold">Sürekli Görev Yolluğu Hesaplama</h3>
+                                <p class="text-[10px] text-slate-500 font-medium">Tayin olan aktif memurlar ve emekliye ayrılan personelin sürekli görev yolluğu tutarlarını hesaplayın.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Tab Selection */}
+                    <div class="flex bg-slate-100/80 dark:bg-slate-900/80 p-1.5 rounded-2xl mb-4 gap-1">
+                        <button
+                            type="button"
+                            onClick={() => setYollukActiveTab("memur")}
+                            class={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${yollukActiveTab === "memur" ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-md" : "text-slate-500 hover:text-slate-700 dark:text-slate-400"}`}
+                        >
+                            Sürekli Görev Yolluğu (Tayin)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setYollukActiveTab("emekli")}
+                            class={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${yollukActiveTab === "emekli" ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-md" : "text-slate-500 hover:text-slate-700 dark:text-slate-400"}`}
+                        >
+                            Sürekli Görev Yolluğu (Emekli)
+                        </button>
+                    </div>
+
+                    {/* Main Split Grid */}
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 overflow-hidden flex-1">
+                        
+                        {/* LEFT: Parameters Form */}
+                        <div class="lg:col-span-5 space-y-4 overflow-y-auto pr-1 custom-scrollbar">
+                            {yollukActiveTab === "memur" ? (
+                                <div class="space-y-4">
+                                    <div class="bg-slate-50/50 dark:bg-slate-900/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 space-y-3">
+                                        <h4 class="text-[10px] font-black uppercase tracking-wider text-slate-400">Genel Bilgiler</h4>
+                                        
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">Hesaplama Yılı</label>
+                                                <select 
+                                                    value={yollukYear} 
+                                                    onChange={(e) => setYollukYear(e.target.value)}
+                                                    class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                                >
+                                                    {sortedRatesYears.map(yr => (
+                                                        <option key={yr} value={yr}>{yr} Yılı</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">Kadro Derecesi / Durumu</label>
+                                                <select 
+                                                    value={yollukGrade} 
+                                                    onChange={(e) => setYollukGrade(e.target.value)}
+                                                    class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                                >
+                                                    <option value="der_5_15">Aylık Derecesi 5 - 15 Olanlar</option>
+                                                    <option value="der_1_4">Aylık Derecesi 1 - 4 Olanlar</option>
+                                                    <option value="ek_3600_6400">Ek Göstergesi 3600 - 6400 Olanlar</option>
+                                                    <option value="ek_6400_8000">Ek Göstergesi 6400 - 8000 Olanlar</option>
+                                                    <option value="ek_8000_plus">Ek Göstergesi 8000 ve Üzeri Olanlar</option>
+                                                    <option value="custom">Özel Gündelik (El İle Gir)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div class="grid grid-cols-2 gap-3 mt-1.5">
+                                            <div>
+                                                <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">Harcırah Süresi (Yol Gün)</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={yollukTravelDays || ""} 
+                                                    min={1}
+                                                    onChange={(e) => setYollukTravelDays(Math.max(1, parseInt(e.target.value) || 1))}
+                                                    class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                                />
+                                            </div>
+                                            {yollukGrade === "custom" ? (
+                                                <div>
+                                                    <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">Harcırah Gündeliği (TL)</label>
+                                                    <input 
+                                                        type="number" 
+                                                        value={yollukCustomGundelik || ""} 
+                                                        min={0}
+                                                        onChange={(e) => setYollukCustomGundelik(Math.max(0, parseFloat(e.target.value) || 0))}
+                                                        class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                                    />
+                                                </div>
+                                            ) : null}
+                                        </div>
+
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">Mesafe (Km)</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={yollukDistance || ""} 
+                                                    min={0}
+                                                    onChange={(e) => setYollukDistance(Math.max(0, parseInt(e.target.value) || 0))}
+                                                    class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">Memur Bilet Ücreti (TL)</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={yollukMemurYolUcreti || ""} 
+                                                    min={0}
+                                                    onChange={(e) => setYollukMemurYolUcreti(Math.max(0, parseFloat(e.target.value) || 0))}
+                                                    class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                                />
+                                        </div>
+
+                                        <div class="mt-2 bg-indigo-50/30 dark:bg-indigo-950/10 p-2.5 rounded-xl border border-indigo-100/50 dark:border-indigo-950/30 text-[10px] space-y-1 text-slate-500 dark:text-slate-400">
+                                            <span class="font-bold text-indigo-650 dark:text-indigo-400 block mb-0.5">ℹ️ {yollukYear} Yılı Resmi H-Cetveli Gündelikleri:</span>
+                                            <div class="grid grid-cols-2 gap-x-2 gap-y-0.5 font-bold">
+                                                <div>• Der. 5-15: <span class="text-slate-700 dark:text-slate-200">{(activeYollukHRates[yollukYear] || activeYollukHRates["2026"]).der_5_15} TL</span></div>
+                                                <div>• Der. 1-4: <span class="text-slate-700 dark:text-slate-200">{(activeYollukHRates[yollukYear] || activeYollukHRates["2026"]).der_1_4} TL</span></div>
+                                                <div>• Ek Gös. 3600-6400: <span class="text-slate-700 dark:text-slate-200">{(activeYollukHRates[yollukYear] || activeYollukHRates["2026"]).ek_3600_6400} TL</span></div>
+                                                <div>• Ek Gös. 6400-8000: <span class="text-slate-700 dark:text-slate-200">{(activeYollukHRates[yollukYear] || activeYollukHRates["2026"]).ek_6400_8000} TL</span></div>
+                                                <div class="col-span-2">• Ek Gös. 8000+: <span class="text-slate-700 dark:text-slate-200">{(activeYollukHRates[yollukYear] || activeYollukHRates["2026"]).ek_8000_plus} TL</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Family list */}
+                                    <div class="bg-slate-50/50 dark:bg-slate-900/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 space-y-3">
+                                        <div class="flex justify-between items-center">
+                                            <h4 class="text-[10px] font-black uppercase tracking-wider text-slate-400">Bakmakla Yükümlü Aile Fertleri</h4>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setYollukFamily([
+                                                        ...yollukFamily,
+                                                        { id: Math.random().toString(), relation: "Çocuk", yolUcreti: 100 }
+                                                    ]);
+                                                }}
+                                                class="text-[9px] bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/30 dark:hover:bg-indigo-950/60 dark:text-indigo-400 px-2 py-1 rounded-lg font-black uppercase tracking-wide transition-all"
+                                            >
+                                                + Aile Ferdi Ekle
+                                            </button>
+                                        </div>
+
+                                        {yollukFamily.length > 0 ? (
+                                            <div class="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                                                <div class="flex gap-2 text-[9px] font-black uppercase tracking-wider text-slate-400 px-2 select-none">
+                                                    <span class="w-4"></span>
+                                                    <span class="flex-1">Aile Ferdi (Yakınlık)</span>
+                                                    <span class="w-20 text-center">Bilet Tutarı</span>
+                                                    <span class="w-6"></span>
+                                                </div>
+                                                {yollukFamily.map((f, idx) => (
+                                                    <div key={f.id} class="flex gap-2 items-center bg-white dark:bg-slate-900/85 p-2 rounded-xl border border-slate-200/50 dark:border-slate-850">
+                                                        <span class="text-[10px] font-bold text-slate-400 w-4">{idx + 1}.</span>
+                                                        <select
+                                                            value={f.relation}
+                                                            onChange={(e) => {
+                                                                const updated = [...yollukFamily];
+                                                                updated[idx].relation = e.target.value;
+                                                                setYollukFamily(updated);
+                                                            }}
+                                                            class="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-bold outline-none"
+                                                        >
+                                                            <option value="Eş">Çalışmayan Eş</option>
+                                                            <option value="Çocuk">Çocuk</option>
+                                                            <option value="Anne">Anne</option>
+                                                            <option value="Baba">Baba</option>
+                                                            <option value="Kardeş">Kardeş</option>
+                                                        </select>
+                                                        <div class="flex items-center gap-1">
+                                                            <input 
+                                                                type="number"
+                                                                placeholder="Bilet"
+                                                                value={f.yolUcreti || ""}
+                                                                min={0}
+                                                                onChange={(e) => {
+                                                                    const updated = [...yollukFamily];
+                                                                    updated[idx].yolUcreti = Math.max(0, parseFloat(e.target.value) || 0);
+                                                                    setYollukFamily(updated);
+                                                                }}
+                                                                class="w-16 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-bold text-right outline-none"
+                                                            />
+                                                            <span class="text-[10px] text-slate-400 font-bold">TL</span>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setYollukFamily(yollukFamily.filter(item => item.id !== f.id));
+                                                            }}
+                                                            class="p-1 text-slate-400 hover:text-red-505 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all"
+                                                        >
+                                                            <svg class="w-4 h-4 text-slate-400 hover:text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div class="text-center py-6 text-slate-400 text-xs font-semibold border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900/10">
+                                                Bakmakla yükümlü aile ferdi eklenmedi.
+                                            </div>
+                                        )}
+                                        {yollukFamily.length > 4 && (
+                                            <p class="text-[9px] font-bold text-amber-600 dark:text-amber-400 leading-normal">
+                                                ⚠️ Kanun gereği aile fertlerinin yer değiştirme masrafı toplamı memurun gündeliğinin 40 katını aşamaz. 4 kişiden fazla eklenen fertler için yer değiştirme masrafı 0 TL hesaplanacak, ancak yol ücreti ve seyahat gündeliği verilecektir.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            ) : (
+                                <div class="space-y-4 bg-slate-50/50 dark:bg-slate-900/20 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80">
+                                    <h4 class="text-[10px] font-black uppercase tracking-wider text-slate-400">Emeklilik Parametreleri</h4>
+                                    
+                                    <div>
+                                        <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">Hesaplama Yılı</label>
+                                        <select 
+                                            value={yollukEmekliYear} 
+                                            onChange={(e) => setYollukEmekliYear(e.target.value)}
+                                            class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                        >
+                                            {sortedCoeffsYears.map(yr => (
+                                                <option key={yr} value={yr}>{yr} Yılı</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">Katsayı Dönemi</label>
+                                        <select 
+                                            value={yollukEmekliPeriod} 
+                                            onChange={(e) => setYollukEmekliPeriod(e.target.value)}
+                                            class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                        >
+                                            <option value="jan_jun">1 Ocak - 30 Haziran Dönemi</option>
+                                            <option value="jul_dec">1 Temmuz - 31 Aralık Dönemi</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">Personel Sınıfı / Göstergesi</label>
+                                        <select 
+                                            value={yollukEmekliClass} 
+                                            onChange={(e) => setYollukEmekliClass(e.target.value)}
+                                            class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                        >
+                                            <option value="kadrolu">Kadrolu / Sözleşmeli Memurlar (13.558)*</option>
+                                            <option value="isci">Kamu İşçileri (12.105)</option>
+                                            <option value="custom">Özel Gösterge Gir (Manuel)</option>
+                                        </select>
+                                    </div>
+
+                                    {yollukEmekliClass === "custom" && (
+                                        <div>
+                                            <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">Gösterge Rakamı</label>
+                                            <input 
+                                                type="number" 
+                                                value={yollukEmekliCustomIndicator || ""} 
+                                                min={0}
+                                                onChange={(e) => setYollukEmekliCustomIndicator(Math.max(0, parseInt(e.target.value) || 0))}
+                                                class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                            />
+                                        </div>
+                                    )}
+
+                                    <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+                                        <label class="flex items-center gap-2 cursor-pointer">
+                                            <input 
+                                                type="checkbox"
+                                                checked={yollukEmekliUseCustomCoefficient}
+                                                onChange={(e) => {
+                                                    setYollukEmekliUseCustomCoefficient(e.target.checked);
+                                                    if (e.target.checked) {
+                                                        const defaultVal = activeYollukCoefficients[yollukEmekliYear]?.[yollukEmekliPeriod] || 1.387871;
+                                                        setYollukEmekliCustomCoefficient(defaultVal);
+                                                    }
+                                                }}
+                                                class="rounded text-indigo-650 focus:ring-indigo-500 h-3.5 w-3.5 bg-white border border-slate-350 dark:border-slate-700"
+                                            />
+                                            <span class="text-xs font-bold text-slate-700 dark:text-slate-350 select-none">Özel Maaş Katsayısı Gir</span>
+                                        </label>
+                                    </div>
+
+                                    {yollukEmekliUseCustomCoefficient && (
+                                        <div>
+                                            <label class="text-[9px] font-black uppercase tracking-wide text-slate-400 block mb-1">Memur Maaş Katsayısı</label>
+                                            <input 
+                                                type="number" 
+                                                value={yollukEmekliCustomCoefficient || ""} 
+                                                step={0.000001}
+                                                min={0}
+                                                onChange={(e) => setYollukEmekliCustomCoefficient(Math.max(0, parseFloat(e.target.value) || 0))}
+                                                class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                            />
+                                        </div>
+                                    )}
+
+                                    <div class="mt-3 bg-indigo-50/30 dark:bg-indigo-950/10 p-2.5 rounded-xl border border-indigo-100/50 dark:border-indigo-950/30 text-[10px] space-y-1 text-slate-500 dark:text-slate-400 font-bold">
+                                        <span class="font-bold text-indigo-650 dark:text-indigo-400 block mb-0.5">ℹ️ {yollukEmekliYear} Yılı {yollukEmekliPeriod === "jan_jun" ? "Ocak-Haziran" : "Temmuz-Aralık"} Katsayı Bilgileri:</span>
+                                        <div class="space-y-0.5">
+                                            <div>• Maaş Katsayısı: <span class="text-slate-700 dark:text-slate-200">{(activeYollukCoefficients[yollukEmekliYear]?.[yollukEmekliPeriod] || 1.387871).toFixed(6)}</span></div>
+                                            <div>• Kadrolu Memur (13.558 x Kat.): <span class="text-slate-700 dark:text-slate-200">{formatYollukCurrency(13558 * (activeYollukCoefficients[yollukEmekliYear]?.[yollukEmekliPeriod] || 1.387871))} TL</span></div>
+                                            <div>• Kamu İşçisi (12.105 x Kat.): <span class="text-slate-700 dark:text-slate-200">{formatYollukCurrency(12105 * (activeYollukCoefficients[yollukEmekliYear]?.[yollukEmekliPeriod] || 1.387871))} TL</span></div>
+                                        </div>
+                                    </div>
+                                    <p class="text-[9px] text-slate-400 dark:text-slate-505 leading-normal border-t border-slate-200/50 dark:border-slate-800/80 pt-2 select-none">
+                                        * Kamu görevlileri hakem kurulunun 29/05/2012 tarihli ve 2012/1 nolu kararı ile 1/7/2012 tarihinden geçerli olmak üzere, 375 sayılı Kanun Hükmünde Kararnamenin 1. maddesinin (D) fıkrasında yer alan 12105 gösterge rakamı 13558 olarak uygulanır hükmüne yer verilmiştir.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* RIGHT: Calculation Sheet */}
+                        <div class="lg:col-span-7 flex flex-col h-full justify-between overflow-hidden">
+                            <div 
+                                id="yolluk-print-area"
+                                class="bg-white dark:bg-slate-950 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-inner overflow-y-auto custom-scrollbar flex-1 max-h-[50vh] lg:max-h-none"
+                            >
+                                {yollukActiveTab === "memur" ? (
+                                    <div class="space-y-4">
+                                        {/* Cetvel Header */}
+                                        <div class="text-center border-b border-slate-200 dark:border-slate-800 pb-2 mb-3">
+                                            <h2 class="text-xs font-black uppercase text-slate-900 dark:text-slate-100 tracking-wider">
+                                                T.C. GENÇLİK VE SPOR BAKANLIĞI
+                                            </h2>
+                                            <p class="text-[9px] font-black tracking-widest text-indigo-600 dark:text-indigo-400 mt-0.5 uppercase">
+                                                Sürekli Görev Yolluğu Bildirim Cetveli
+                                            </p>
+                                        </div>
+
+                                        {/* Summary Grid */}
+                                        <div class="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl text-[11px] font-bold border border-slate-100 dark:border-slate-800/80 mb-3">
+                                            <div class="space-y-1">
+                                                <div class="text-slate-500">Hesap Yılı: <span class="text-slate-800 dark:text-slate-200">{yollukYear} Yılı</span></div>
+                                                <div class="text-slate-500">Mesafe (Km): <span class="text-slate-800 dark:text-slate-200">{yollukDistance} km</span></div>
+                                                <div class="text-slate-500">Gündelik (Yevmiye): <span class="text-indigo-650 dark:text-indigo-400 font-extrabold">{formatYollukCurrency(values.yevmiye)} TL</span></div>
+                                            </div>
+                                            <div class="space-y-1">
+                                                <div class="text-slate-500">Bilet Ücreti (Memur): <span class="text-slate-800 dark:text-slate-200">{formatYollukCurrency(yollukMemurYolUcreti)} TL</span></div>
+                                                <div class="text-slate-550">Aile Fertleri Sayısı: <span class="text-slate-800 dark:text-slate-200">{yollukFamily.length} Kişi</span></div>
+                                                <div class="text-slate-550">Ödenecek Toplam: <span class="text-indigo-650 dark:text-indigo-400 font-extrabold">{formatYollukCurrency(values.activeGrandTotal)} TL</span></div>
+                                            </div>
+                                        </div>
+
+                                        {/* Details Table */}
+                                        <div class="space-y-1.5">
+                                            <h4 class="text-[9px] font-black uppercase tracking-wider text-slate-400">Ücretlendirme Ayrıntıları</h4>
+                                            <div class="overflow-x-auto">
+                                                <table class="min-w-full text-[11px] text-left">
+                                                    <thead>
+                                                        <tr class="border-b border-slate-200 dark:border-slate-800 text-[9px] text-slate-400 uppercase font-black">
+                                                            <th class="py-1">Harcırah Kalemi</th>
+                                                            <th class="py-1 text-right">Açıklama / Formül</th>
+                                                            <th class="py-1 text-right">Tutar (TL)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-300 font-bold">
+                                                        {/* Memur's own calculation */}
+                                                        <tr>
+                                                            <td class="py-1">Memur Sabit Unsur (Yevmiye x 20)</td>
+                                                            <td class="py-1 text-right font-mono font-medium text-slate-400">{formatYollukCurrency(values.yevmiye)} x 20</td>
+                                                            <td class="py-1 text-right font-mono">{formatYollukCurrency(values.memurSabit)} TL</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="py-1">Memur Değişken Unsur (Km x %5 Yevmiye)</td>
+                                                            <td class="py-1 text-right font-mono font-medium text-slate-400">{yollukDistance} km x {formatYollukCurrency(values.yevmiye * 0.05)}</td>
+                                                            <td class="py-1 text-right font-mono">{formatYollukCurrency(values.memurDegisken)} TL</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="py-1">Memur Yol Harcırahı (Seyahat Günü)</td>
+                                                            <td class="py-1 text-right font-mono font-medium text-slate-400">{yollukTravelDays} Gün x {formatYollukCurrency(values.yevmiye)}</td>
+                                                            <td class="py-1 text-right font-mono">{formatYollukCurrency(values.memurYevmiyeTutar)} TL</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="py-1">Memur Bilet Ücreti</td>
+                                                            <td class="py-1 text-right font-mono font-medium text-slate-400">-</td>
+                                                            <td class="py-1 text-right font-mono">{formatYollukCurrency(yollukMemurYolUcreti)} TL</td>
+                                                        </tr>
+                                                        <tr class="bg-slate-50/50 dark:bg-slate-900/30 text-slate-900 dark:text-slate-200">
+                                                            <td class="py-1 font-extrabold">Memur Yolluğu Toplamı</td>
+                                                            <td class="py-1 text-right">-</td>
+                                                            <td class="py-1 text-right font-mono font-extrabold">{formatYollukCurrency(values.memurTotal)} TL</td>
+                                                        </tr>
+
+                                                        {/* Dependents list */}
+                                                        {values.familyDetails.length > 0 && (
+                                                            <React.Fragment>
+                                                                <tr class="border-t border-slate-200 dark:border-slate-800 bg-slate-100/30 dark:bg-slate-900/10">
+                                                                    <td colSpan={3} class="py-1.5 text-[9px] font-black uppercase tracking-wider text-slate-400">Bakmakla Yükümlü Aile Fertleri Yollukları</td>
+                                                                </tr>
+                                                                {values.familyDetails.map((f, idx) => (
+                                                                    <tr key={f.id} class="text-slate-600 dark:text-slate-400">
+                                                                        <td class="py-1 pl-2">• {idx + 1}. Aile Ferdi ({f.relation})</td>
+                                                                        <td class="py-1 text-right font-mono text-[10px]">
+                                                                            Bilet: {formatYollukCurrency(f.yolUcreti)} | 
+                                                                            Hrc: {formatYollukCurrency(f.dailyAllowance)} | 
+                                                                            Yer Değ: {formatYollukCurrency(f.relocationAllowance)}
+                                                                        </td>
+                                                                        <td class="py-1 text-right font-mono">{formatYollukCurrency(f.total)} TL</td>
+                                                                    </tr>
+                                                                ))}
+                                                                <tr class="bg-slate-50/50 dark:bg-slate-900/30 text-slate-900 dark:text-slate-200">
+                                                                    <td class="py-1 font-extrabold">Aile Fertleri Toplamı</td>
+                                                                    <td class="py-1 text-right text-[10px] text-slate-400">
+                                                                        Bl: {formatYollukCurrency(values.familyYolUcretiTotal)} | 
+                                                                        Hr: {formatYollukCurrency(values.familyDailyTotal)} | 
+                                                                        Y.D: {formatYollukCurrency(values.familyRelocationTotal)}
+                                                                    </td>
+                                                                    <td class="py-1 text-right font-mono font-extrabold">{formatYollukCurrency(values.familyTotal)} TL</td>
+                                                                </tr>
+                                                            </React.Fragment>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                        <p class="text-[9px] font-semibold text-slate-400 leading-normal border-t border-slate-100 dark:border-slate-900 pt-2">
+                                            ℹ️ Not: 2004/2 sayılı Damga Vergisi Kanunu Genel Sirküleri gereği, geçici ve sürekli görev yolluğu ödemelerinden Damga Vergisi ve Gelir Vergisi kesintisi yapılmaz. Tutarın tamamı memura ödenir.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div class="space-y-4">
+                                        {/* Cetvel Header */}
+                                        <div class="text-center border-b border-slate-200 dark:border-slate-800 pb-2 mb-3">
+                                            <h2 class="text-xs font-black uppercase text-slate-900 dark:text-slate-100 tracking-wider">
+                                                T.C. GENÇLİK VE SPOR BAKANLIĞI
+                                            </h2>
+                                            <p class="text-[9px] font-black tracking-widest text-indigo-650 dark:text-indigo-400 mt-0.5 uppercase">
+                                                Emeklilik Yolluğu (Tazminatı) Hesap Cetveli
+                                            </p>
+                                        </div>
+
+                                        {/* Summary Grid */}
+                                        <div class="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl text-[11px] font-bold border border-slate-100 dark:border-slate-800/80 mb-3">
+                                            <div class="space-y-1">
+                                                <div class="text-slate-550">Hesap Yılı: <span class="text-slate-800 dark:text-slate-200">{yollukEmekliYear} Yılı</span></div>
+                                                <div class="text-slate-550">Dönem: <span class="text-slate-800 dark:text-slate-200">{yollukEmekliPeriod === "jan_jun" ? "Ocak - Haziran" : "Temmuz - Aralık"}</span></div>
+                                                <div class="text-slate-550">Maaş Katsayısı: <span class="text-indigo-650 dark:text-indigo-400 font-extrabold">{values.emekliCoefficient.toFixed(6)}</span></div>
+                                            </div>
+                                            <div class="space-y-1">
+                                                <div class="text-slate-550">Personel Sınıfı: <span class="text-slate-800 dark:text-slate-200 capitalize">{yollukEmekliClass === "custom" ? "Özel" : yollukEmekliClass}</span></div>
+                                                <div class="text-slate-550">Gösterge Rakamı: <span class="text-slate-800 dark:text-slate-200">{values.emekliIndicator}</span></div>
+                                                <div class="text-slate-550">Brüt Tutar: <span class="text-indigo-650 dark:text-indigo-400 font-extrabold">{formatYollukCurrency(values.emekliGross)} TL</span></div>
+                                            </div>
+                                        </div>
+
+                                        {/* Details Table */}
+                                        <div class="space-y-1.5">
+                                            <h4 class="text-[9px] font-black uppercase tracking-wider text-slate-400">Hesaplama Kalemleri</h4>
+                                            <div class="overflow-x-auto">
+                                                <table class="min-w-full text-[11px] text-left">
+                                                    <thead>
+                                                        <tr class="border-b border-slate-200 dark:border-slate-800 text-[9px] text-slate-400 uppercase font-black">
+                                                            <th class="py-1">Hesap Kalemi</th>
+                                                            <th class="py-1 text-right">Formül / Oran</th>
+                                                            <th class="py-1 text-right">Tutar (TL)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-300 font-bold">
+                                                        <tr>
+                                                            <td class="py-1">Brüt Yolluk Tazminatı</td>
+                                                            <td class="py-1 text-right font-mono font-medium text-slate-400">{values.emekliIndicator} x {values.emekliCoefficient.toFixed(6)}</td>
+                                                            <td class="py-1 text-right font-mono">{formatYollukCurrency(values.emekliGross)} TL</td>
+                                                        </tr>
+                                                        <tr class="text-rose-550 dark:text-rose-400">
+                                                            <td class="py-1">Damga Vergisi Kesintisi</td>
+                                                            <td class="py-1 text-right font-mono font-medium text-slate-400">%0,759 (binde 7,59)</td>
+                                                            <td class="py-1 text-right font-mono">-{formatYollukCurrency(values.emekliDamgaTax)} TL</td>
+                                                        </tr>
+                                                        <tr class="bg-slate-50/50 dark:bg-slate-900/30 text-indigo-650 dark:text-indigo-400 font-extrabold">
+                                                            <td class="py-1">Net Ödenecek Emeklilik Yolluğu</td>
+                                                            <td class="py-1 text-right">-</td>
+                                                            <td class="py-1 text-right font-mono font-extrabold">{formatYollukCurrency(values.emekliNet)} TL</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <p class="text-[8px] font-semibold text-slate-400 dark:text-slate-500 leading-normal border-t border-slate-100 dark:border-slate-900 pt-2 whitespace-normal max-w-full">
+                                            * Kamu görevlileri hakem kurulunun 29/05/2012 tarihli ve 2012/1 nolu kararı ile 1/7/2012 tarihinden geçerli olmak üzere, 375 sayılı Kanun Hükmünde Kararnamenin 1. maddesinin (D) fıkrasında yer alan 12105 gösterge rakamı 13558 olarak uygulanır hükmüne yer verilmiştir.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Total Calculation Summary Box */}
+                                <div class="mt-4 border-t border-dashed border-slate-200 dark:border-slate-800 pt-3">
+                                    <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+                                        {yollukActiveTab === "memur" ? (
+                                            <React.Fragment>
+                                                <div>
+                                                    <span class="text-[9px] font-black uppercase text-slate-400 block tracking-wider font-bold">Net Ödenecek Toplam Yolluk</span>
+                                                    <span class="text-xl font-black text-indigo-650 dark:text-indigo-400 font-mono">
+                                                        {formatYollukCurrency(values.activeGrandTotal)} TL
+                                                    </span>
+                                                </div>
+                                                <div class="text-right border-l border-slate-200 dark:border-slate-800 pl-4 text-indigo-650 dark:text-indigo-400">
+                                                    <span class="text-[9px] font-black uppercase text-slate-400 block tracking-wider font-bold">Memur Sabit + Değişken</span>
+                                                    <span class="text-base font-black font-mono">
+                                                        {formatYollukCurrency(values.memurSabit + values.memurDegisken)} TL
+                                                    </span>
+                                                </div>
+                                            </React.Fragment>
+                                        ) : (
+                                            <React.Fragment>
+                                                <div>
+                                                    <span class="text-[9px] font-black uppercase text-slate-400 block tracking-wider font-bold">Net Ödenecek Yolluk (Kesintili)</span>
+                                                    <span class="text-xl font-black text-indigo-650 dark:text-indigo-400 font-mono">
+                                                        {formatYollukCurrency(values.emekliNet)} TL
+                                                    </span>
+                                                </div>
+                                                <div class="text-right border-l border-slate-200 dark:border-slate-800 pl-4 text-indigo-650 dark:text-indigo-400">
+                                                    <span class="text-[9px] font-black uppercase text-slate-400 block tracking-wider font-bold">Brüt Yolluk Tutarı</span>
+                                                    <span class="text-base font-black font-mono">
+                                                        {formatYollukCurrency(values.emekliGross)} TL
+                                                    </span>
+                                                </div>
+                                            </React.Fragment>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div class="flex gap-3 pt-3 mt-4 border-t border-slate-100 dark:border-slate-800 justify-end">
+                                <button 
+                                    type="button"
+                                    onClick={handlePrintYolluk}
+                                    class="h-10 px-5 rounded-xl font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350 text-xs transition-all"
+                                >
+                                    Yazdır
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={handleExportYollukExcel}
+                                    class="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-emerald-600/10 transition-all flex items-center"
+                                >
+                                    <svg class="w-3.5 h-3.5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    Excel İndir
+                                </button>
+                            </div>
+                            <div class="text-center text-[10px] text-slate-400 dark:text-slate-500 font-bold no-print pt-2 mt-4 border-t border-slate-100/50 dark:border-slate-800/50">
+                                Bu bir Sefa Yapraklı Projesidir.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render React App
+        const rootElement = document.getElementById("root");
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(<App />);
+    </script>
+</body>
+</html>

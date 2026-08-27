@@ -15,8 +15,26 @@ class LegislationCrawlerService:
         if "mevzuat.gov.tr" not in url:
             return None
 
+        # Clean and auto-complete the URL parameters
+        from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
         try:
-            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            parsed = urlparse(url)
+            qsl = parse_qsl(parsed.query)
+            params = {k: v for k, v in qsl}
+            
+            if "MevzuatNo" in params:
+                if not params.get("MevzuatTertip") or params.get("MevzuatTertip").strip() == "":
+                    params["MevzuatTertip"] = "5"
+                
+                clean_params = {k: v for k, v in params.items() if v and v.strip()}
+                new_query = urlencode(clean_params)
+                url = urlunparse(parsed._replace(query=new_query))
+                logger.info(f"Cleaned mevzuat.gov.tr URL: {url}")
+        except Exception as e:
+            logger.warning(f"Failed to clean URL: {e}")
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, verify=False) as client:
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",

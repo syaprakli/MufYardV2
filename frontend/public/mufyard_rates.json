@@ -1,0 +1,242 @@
+{
+  "lojmanRates": {
+    "2026": {
+      "kerpic": 9.47,
+      "kalorifersiz": 14.82,
+      "kaloriferli": 19.46,
+      "kapici": 2.46,
+      "elektrik": 4.90,
+      "su": 4.25,
+      "elektrik_su": 9.15,
+      "kuyu_su": 2.12,
+      "yakit": 11.23,
+      "ortak_alan": 0.98
+    },
+    "2025": {
+      "kerpic": 7.43,
+      "kalorifersiz": 11.62,
+      "kaloriferli": 15.26,
+      "kapici": 1.93,
+      "elektrik": 3.84,
+      "su": 3.33,
+      "elektrik_su": 7.17,
+      "kuyu_su": 1.66,
+      "yakit": 8.81,
+      "ortak_alan": 0.77
+    },
+    "2024": {
+      "kerpic": 5.15,
+      "kalorifersiz": 8.05,
+      "kaloriferli": 10.57,
+      "kapici": 1.34,
+      "elektrik": 2.66,
+      "su": 2.31,
+      "elektrik_su": 4.97,
+      "kuyu_su": 1.15,
+      "yakit": 6.10,
+      "ortak_alan": 0.53
+    },
+    "2023": {
+      "kerpic": 3.25,
+      "kalorifersiz": 5.08,
+      "kaloriferli": 6.67,
+      "kapici": 0.85,
+      "elektrik": 1.68,
+      "su": 1.46,
+      "elektrik_su": 3.14,
+      "kuyu_su": 0.73,
+      "yakit": 3.85,
+      "ortak_alan": 0.33
+    },
+    "2022": {
+      "kerpic": 2.05,
+      "kalorifersiz": 3.21,
+      "kaloriferli": 4.21,
+      "kapici": 0.54,
+      "elektrik": 1.06,
+      "su": 0.92,
+      "elektrik_su": 1.98,
+      "kuyu_su": 0.46,
+      "yakit": 2.43,
+      "ortak_alan": 0.21
+    },
+    "2021": {
+      "kerpic": 1.55,
+      "kalorifersiz": 2.42,
+      "kaloriferli": 3.18,
+      "kapici": 0.41,
+      "elektrik": 0.80,
+      "su": 0.70,
+      "elektrik_su": 1.50,
+      "kuyu_su": 0.35,
+      "yakit": 1.83,
+      "ortak_alan": 0.16
+    },
+    "2020": {
+      "kerpic": 1.35,
+      "kalorifersiz": 2.11,
+      "kaloriferli": 2.77,
+      "kapici": 0.36,
+      "elektrik": 0.70,
+      "su": 0.61,
+      "elektrik_su": 1.31,
+      "kuyu_su": 0.30,
+      "yakit": 1.60,
+      "ortak_alan": 0.14
+    }
+  },
+  "yollukRates": {
+    "2026": {
+      "ek_8000_plus": 890,
+      "ek_6400_8000": 880,
+      "ek_3600_6400": 870,
+      "der_1_4": 860,
+      "der_5_15": 850
+    },
+    "2025": {
+      "ek_8000_plus": 680,
+      "ek_6400_8000": 650,
+      "ek_3600_6400": 635,
+      "der_1_4": 610,
+      "der_5_15": 600
+    },
+    "2024": {
+      "ek_8000_plus": 465,
+      "ek_6400_8000": 435,
+      "ek_3600_6400": 420,
+      "der_1_4": 405,
+      "der_5_15": 400
+    },
+    "2023": {
+      "ek_8000_plus": 236,
+      "ek_6400_8000": 220,
+      "ek_3600_6400": 212,
+      "der_1_4": 203,
+      "der_5_15": 200
+    },
+    "2022": {
+      "ek_8000_plus": 104,
+      "ek_6400_8000": 97,
+      "ek_3600_6400": 93,
+      "der_1_4": 89,
+      "der_5_15": 87
+    },
+    "2021": {
+      "ek_8000_plus": 69.50,
+      "ek_6400_8000": 64.50,
+      "ek_3600_6400": 60.50,
+      "der_1_4": 57.50,
+      "der_5_15": 55.50
+    },
+    "2020": {
+      "ek_8000_plus": 61.50,
+      "ek_6400_8000": 57.50,
+      "ek_3600_6400": 54.00,
+      "der_1_4": 51.50,
+      "der_5_15": 50.00
+    }
+  },
+  "yollukCoefficients": {
+    "2026": {
+      "jan_jun": 1.387871,
+      "jul_dec": 1.575512
+    },
+    "2025": {
+      "jan_jun": 1.012556,
+      "jul_dec": 1.170211
+    },
+    "2024": {
+      "jan_jun": 0.760871,
+      "jul_dec": 0.907796
+    },
+    "2023": {
+      "jan_jun": 0.433684,
+      "jul_dec": 0.509796
+    },
+    "2022": {
+      "jan_jun": 0.235445,
+      "jul_dec": 0.333603
+    },
+    "2021": {
+      "jan_jun": 0.165786,
+      "jul_dec": 0.179797
+    },
+    "2020": {
+      "jan_jun": 0.146061,
+      "jul_dec": 0.154461
+    }
+  },
+  "pratikBilgiler": {
+    "damgaVergisi": [
+      { "name": "Sözleşme & Taahhütname", "rate": "Binde 9,48" },
+      { "name": "Kira Mukavelenamesi", "rate": "Binde 1,89" },
+      { "name": "KDV / Muhtasar Beyan. (2026)", "rate": "791,00 TL" },
+      { "name": "MUHSGK Beyan. (2026)", "rate": "939,70 TL" },
+      { "name": "Yıllık Gelir Beyan. (2026)", "rate": "1.189,50 TL" },
+      { "name": "Gelir Beyan. (2025 Eylül Sonrası)", "rate": "1.000,00 TL" },
+      { "name": "KDV/Muhtasar (2025 Eylül Sonrası)", "rate": "665,00 TL" },
+      { "name": "Damga Vergisi Üst Sınırı (2026)", "rate": "29.115.961,10 TL" }
+    ],
+    "kdvTevkifat": [
+      { "name": "Yapım İşleri & Mühendislik", "rate": "4/10" },
+      { "name": "Etüt, Danışmanlık & Denetim", "rate": "9/10" },
+      { "name": "Makine, Teçhizat & Taşıt Bakım", "rate": "7/10" },
+      { "name": "Yemek Servisi & Organizasyon", "rate": "5/10" },
+      { "name": "İşgücü Temin Hizmetleri", "rate": "9/10" },
+      { "name": "Temizlik, Çevre & Bahçe Bakım", "rate": "9/10" },
+      { "name": "Yapı Denetim Hizmetleri", "rate": "9/10" },
+      { "name": "Servis Taşımacılığı", "rate": "5/10" },
+      { "name": "Karayolu ile Yük Taşıma", "rate": "2/10" },
+      { "name": "Ticari Reklam Hizmetleri", "rate": "3/10" },
+      { "name": "Fason Tekstil & Konfeksiyon", "rate": "7/10" }
+    ],
+    "gecikmeZammi": [
+      { "term": "13.11.2025 - Günümüz", "rate": "%3,70", "active": true },
+      { "term": "21.05.2024 - 12.11.2025", "rate": "%4,50" },
+      { "term": "14.11.2023 - 20.05.2024", "rate": "%3,50" },
+      { "term": "21.07.2023 - 13.11.2023", "rate": "%2,50" }
+    ],
+    "dogrudanTemin": [
+      { "year": "2020", "metro": "97.008,00", "other": "32.316,00" },
+      { "year": "2021", "metro": "121.405,00", "other": "40.443,00" },
+      { "year": "2022", "metro": "218.395,00", "other": "72.752,00" },
+      { "year": "2023", "metro": "431.810,00", "other": "143.845,00" },
+      { "year": "2024", "metro": "622.756,00", "other": "207.453,00" },
+      { "year": "2025 *", "metro": "800.366,00", "other": "266.618,00", "active": true },
+      { "year": "2026 **", "metro": "1.021.827,00", "other": "340.391,00", "active": true }
+    ],
+    "dogrudanTeminNote": "* 01.02.2025 - 31.01.2026 dönemini kapsar.\n** 01.02.2026 - 31.01.2027 dönemini kapsar.",
+    "memurKatsayilari": [
+      { "p": "2020 Ocak - Haz", "v": "0,146061" },
+      { "p": "2020 Tem - Ara", "v": "0,154461" },
+      { "p": "2021 Ocak - Haz", "v": "0,165786" },
+      { "p": "2021 Tem - Ara", "v": "0,179797" },
+      { "p": "2022 Ocak - Haz", "v": "0,235445" },
+      { "p": "2022 Tem - Ara", "v": "0,333603" },
+      { "p": "2023 Ocak - Haz", "v": "0,433684" },
+      { "p": "2023 Tem - Ara", "v": "0,509796" },
+      { "p": "2024 Ocak - Haz", "v": "0,760871" },
+      { "p": "2024 Tem - Ara", "v": "0,907796" },
+      { "p": "2025 Ocak - Haz", "v": "1,012556" },
+      { "p": "2025 Tem - Ara", "v": "1,170211" },
+      { "p": "2026 Ocak - Haz", "v": "1,387871" },
+      { "p": "2026 Tem - Ara", "v": "1,575512" }
+    ],
+    "aileYardimi": [
+      { "p": "2020 Ocak - Haz", "e": "351,00 TL", "c": "77-130 TL" },
+      { "p": "2020 Tem - Ara", "e": "375,00 TL", "c": "77-130 TL" },
+      { "p": "2021 Ocak", "e": "403,00 TL", "c": "77-130 TL" },
+      { "p": "2021 Temmuz", "e": "436,00 TL", "c": "77-130 TL" },
+      { "p": "2022 İlk Yarı", "e": "521,00 TL", "c": "77-130 TL" },
+      { "p": "2022 Temmuz", "e": "730,00 TL", "c": "77-130 TL" },
+      { "p": "2023 Ocak - Haz", "e": "1.157,00 TL", "c": "216,84 TL" },
+      { "p": "2023 Tem - Ara", "e": "2.208,00 TL", "c": "254,90 TL" },
+      { "p": "2024 Ocak", "e": "3.111,00 TL", "c": "400,05 TL" },
+      { "p": "2024 Temmuz", "e": "3.897,00 TL", "c": "485,00 TL" },
+      { "p": "2025 Ocak", "e": "4.550,00 TL", "c": "506,28 TL" },
+      { "p": "2025 Temmuz", "e": "5.270,00 TL", "c": "585,11 TL" },
+      { "p": "2026 Ocak - Haz", "e": "3.154,63 TL", "c": "693,92 TL", "active": true },
+      { "p": "2026 Tem - Ara", "e": "3.581,45 TL", "c": "787,82 TL", "active": true }
+    ]
+  }
+}
