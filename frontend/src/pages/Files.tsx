@@ -2929,7 +2929,7 @@ const calculateYollukValues = () => {
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
                                             <div className="absolute bottom-full left-0 mb-1.5 w-72 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-medium leading-relaxed rounded-lg px-3 py-2 shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
-                                                Kamu görevlileri hakem kurulunun 29/05/2012 tarihli ve 2012/1 nolu kararı ile 1/7/2012 tarihinden geçerli olmak üzere, 375 sayılı KHK'nın 1. maddesinin (D) fıkrasında yer alan 12105 gösterge rakamı 13558 olarak uygulanır.
+                                                Milli Emlak Genel Tebliğlerine göre iller kira bedeli indirimi için gruplara ayrılmıştır: EK-1 İlleri %50, EK-2 İlleri %45, EK-3 İlleri %30, Nüfusu 10 binden az olan ilçeler ise %40 indirimli hesaplanır.
                                                 <div className="absolute top-full left-3 border-4 border-transparent border-t-slate-800 dark:border-t-slate-700" />
                                             </div>
                                         </div>
