@@ -43,6 +43,20 @@ export default function Files() {
         }
     };
 
+    // Turkish number format: 1.000 / 5,65 — no trailing ,00
+    const fmtTR = (val: number, decimals = 2): string => {
+        const fixedVal = val.toFixed(decimals);
+        const allZeros = /^0+$/.test(fixedVal.split(".")[1] ?? "");
+        if (allZeros) {
+            const intPart = Math.round(val === 0 ? 0 : Math.abs(val) < 1 ? val : val);
+            return Math.round(val).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        }
+        const [intPart, decPart] = fixedVal.split(".");
+        const trimmed = decPart.replace(/0+$/, "");
+        const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        return trimmed ? `${formattedInt},${trimmed}` : formattedInt;
+    };
+
     // Template modalları
     const [isDiziModalOpen, setIsDiziModalOpen] = useState(false);
     const [isKapakModalOpen, setIsKapakModalOpen] = useState(false);
@@ -3037,70 +3051,70 @@ const calculateYollukValues = () => {
                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-900 text-slate-700 dark:text-slate-300 font-bold">
                                                 <tr>
                                                     <td className="py-2">İndirimsiz Metrekare Birim Kirası</td>
-                                                    <td className="py-2 text-right font-mono">{baseRate.toFixed(4)} TL</td>
-                                                    <td className="py-2 text-right font-mono">{(baseRate * lojmanM2).toFixed(2)} TL</td>
+                                                    <td className="py-2 text-right font-mono">{fmtTR(baseRate, 4)} TL</td>
+                                                    <td className="py-2 text-right font-mono">{fmtTR(baseRate * lojmanM2)} TL</td>
                                                 </tr>
                                                 {discountPct > 0 && (
                                                     <tr className="text-rose-500">
                                                         <td className="py-2 font-black">Lojman İndirimi (-{(discountPct * 100)}%)</td>
-                                                        <td className="py-2 text-right font-mono">-{discountAmountRate.toFixed(4)} TL</td>
-                                                        <td className="py-2 text-right font-mono">-{ (discountAmountRate * lojmanM2).toFixed(2) } TL</td>
+                                                        <td className="py-2 text-right font-mono">-{fmtTR(discountAmountRate, 4)} TL</td>
+                                                        <td className="py-2 text-right font-mono">-{fmtTR(discountAmountRate * lojmanM2)} TL</td>
                                                     </tr>
                                                 )}
                                                 <tr className="bg-slate-50/50 dark:bg-slate-900/30 text-indigo-600 dark:text-indigo-400 font-extrabold">
                                                     <td className="py-2">İndirimli Metrekare Birim Kirası</td>
-                                                    <td className="py-2 text-right font-mono">{netBaseRate.toFixed(4)} TL</td>
-                                                    <td className="py-2 text-right font-mono">{(netBaseRate * lojmanM2).toFixed(2)} TL</td>
+                                                    <td className="py-2 text-right font-mono">{fmtTR(netBaseRate, 4)} TL</td>
+                                                    <td className="py-2 text-right font-mono">{fmtTR(netBaseRate * lojmanM2)} TL</td>
                                                 </tr>
 
                                                 {/* Additions list */}
                                                 {kapiciRate > 0 && (
                                                     <tr>
                                                         <td className="py-2">İlave: Kapıcı / Kaloriferci Gideri</td>
-                                                        <td className="py-2 text-right font-mono">+{kapiciRate.toFixed(4)} TL</td>
-                                                        <td className="py-2 text-right font-mono">+{(kapiciRate * lojmanM2).toFixed(2)} TL</td>
+                                                        <td className="py-2 text-right font-mono">+{fmtTR(kapiciRate, 4)} TL</td>
+                                                        <td className="py-2 text-right font-mono">+{fmtTR(kapiciRate * lojmanM2)} TL</td>
                                                     </tr>
                                                 )}
                                                 {elektrikRate > 0 && (
                                                     <tr>
                                                         <td className="py-2">İlave: Elektrik Sayacı Ayrılmamış</td>
-                                                        <td className="py-2 text-right font-mono">+{elektrikRate.toFixed(4)} TL</td>
-                                                        <td className="py-2 text-right font-mono">+{(elektrikRate * lojmanM2).toFixed(2)} TL</td>
+                                                        <td className="py-2 text-right font-mono">+{fmtTR(elektrikRate, 4)} TL</td>
+                                                        <td className="py-2 text-right font-mono">+{fmtTR(elektrikRate * lojmanM2)} TL</td>
                                                     </tr>
                                                 )}
                                                 {suRate > 0 && (
                                                     <tr>
                                                         <td className="py-2">İlave: Su Sayacı Ayrılmamış</td>
-                                                        <td className="py-2 text-right font-mono">+{suRate.toFixed(4)} TL</td>
-                                                        <td className="py-2 text-right font-mono">+{(suRate * lojmanM2).toFixed(2)} TL</td>
+                                                        <td className="py-2 text-right font-mono">+{fmtTR(suRate, 4)} TL</td>
+                                                        <td className="py-2 text-right font-mono">+{fmtTR(suRate * lojmanM2)} TL</td>
                                                     </tr>
                                                 )}
                                                 {elektrikSuRate > 0 && (
                                                     <tr>
                                                         <td className="py-2">İlave: Elektrik + Su Sayacı Ayrılmamış</td>
-                                                        <td className="py-2 text-right font-mono">+{elektrikSuRate.toFixed(4)} TL</td>
-                                                        <td className="py-2 text-right font-mono">+{(elektrikSuRate * lojmanM2).toFixed(2)} TL</td>
+                                                        <td className="py-2 text-right font-mono">+{fmtTR(elektrikSuRate, 4)} TL</td>
+                                                        <td className="py-2 text-right font-mono">+{fmtTR(elektrikSuRate * lojmanM2)} TL</td>
                                                     </tr>
                                                 )}
                                                 {kuyuSuRate > 0 && (
                                                     <tr>
                                                         <td className="py-2">İlave: Şebeke Dışı Kuyu / Artezyen Suyu</td>
-                                                        <td className="py-2 text-right font-mono">+{kuyuSuRate.toFixed(4)} TL</td>
-                                                        <td className="py-2 text-right font-mono">+{(kuyuSuRate * lojmanM2).toFixed(2)} TL</td>
+                                                        <td className="py-2 text-right font-mono">+{fmtTR(kuyuSuRate, 4)} TL</td>
+                                                        <td className="py-2 text-right font-mono">+{fmtTR(kuyuSuRate * lojmanM2)} TL</td>
                                                     </tr>
                                                 )}
                                                 {yakitRate > 0 && (
                                                     <tr>
                                                         <td className="py-2">İlave: Kurumca Tedarik Edilen Yakıt</td>
-                                                        <td className="py-2 text-right font-mono">+{yakitRate.toFixed(4)} TL</td>
-                                                        <td className="py-2 text-right font-mono">+{(yakitRate * lojmanM2).toFixed(2)} TL</td>
+                                                        <td className="py-2 text-right font-mono">+{fmtTR(yakitRate, 4)} TL</td>
+                                                        <td className="py-2 text-right font-mono">+{fmtTR(yakitRate * lojmanM2)} TL</td>
                                                     </tr>
                                                 )}
                                                 {ortakAlanRate > 0 && (
                                                     <tr>
                                                         <td className="py-2">İlave: Ortak Alan Giderleri</td>
-                                                        <td className="py-2 text-right font-mono">+{ortakAlanRate.toFixed(4)} TL</td>
-                                                        <td className="py-2 text-right font-mono">+{(ortakAlanRate * lojmanM2).toFixed(2)} TL</td>
+                                                        <td className="py-2 text-right font-mono">+{fmtTR(ortakAlanRate, 4)} TL</td>
+                                                        <td className="py-2 text-right font-mono">+{fmtTR(ortakAlanRate * lojmanM2)} TL</td>
                                                     </tr>
                                                 )}
                                             </tbody>
@@ -3114,13 +3128,13 @@ const calculateYollukValues = () => {
                                         <div>
                                             <span className="text-[10px] font-black uppercase text-slate-400 block tracking-wider font-bold">Aylık Toplam Net Kira</span>
                                             <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono">
-                                                {monthlyRent.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                                                {fmtTR(monthlyRent)} TL
                                             </span>
                                         </div>
                                         <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-6 text-indigo-600 dark:text-indigo-400">
                                             <span className="text-[10px] font-black uppercase text-slate-400 block tracking-wider font-bold">Günlük Kira (30 Gün)</span>
                                             <span className="text-lg font-black font-mono">
-                                                {dailyRent.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                                                {fmtTR(dailyRent)} TL
                                             </span>
                                         </div>
                                     </div>
