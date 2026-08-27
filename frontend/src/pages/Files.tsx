@@ -2883,24 +2883,32 @@ const calculateYollukValues = () => {
                                             )}
                                         </div>
                                     </div>
-                                    <p className="text-[9px] text-slate-400 dark:text-slate-500 leading-normal border-t border-slate-200/50 dark:border-slate-800/80 pt-2 select-none">
-                                        * Kamu görevlileri hakem kurulunun 29/05/2012 tarihli ve 2012/1 nolu kararı ile 1/7/2012 tarihinden geçerli olmak üzere, 375 sayılı Kanun Hükmünde Kararnamenin 1. maddesinin (D) fıkrasında yer alan 12105 gösterge rakamı 13558 olarak uygulanır hükmüne yer verilmiştir.
-                                    </p>
                                 </div>
 
                                 <div>
-                                    <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">İndirim Grubu</label>
+                                    <div className="flex items-center gap-1 mb-1">
+                                        <label className="text-[10px] font-black uppercase tracking-wide text-slate-400">İndirim Grubu</label>
+                                        <div className="relative group">
+                                            <svg className="w-3 h-3 text-slate-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-72 bg-slate-800 dark:bg-slate-700 text-white text-[10px] font-medium leading-relaxed rounded-lg px-3 py-2 shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                                                Kamu görevlileri hakem kurulunun 29/05/2012 tarihli ve 2012/1 nolu kararı ile 1/7/2012 tarihinden geçerli olmak üzere, 375 sayılı KHK'nın 1. maddesinin (D) fıkrasında yer alan 12105 gösterge rakamı 13558 olarak uygulanır.
+                                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800 dark:border-t-slate-700" />
+                                            </div>
+                                        </div>
+                                    </div>
                                     <select 
                                         value={lojmanDiscountGroup} 
                                         onChange={(e) => setLojmanDiscountGroup(e.target.value as any)}
-                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold text-indigo-600 dark:text-indigo-400"
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1 focus:ring-1 focus:ring-indigo-500 outline-none text-[11px] font-bold text-indigo-600 dark:text-indigo-400"
                                     >
                                         <option value="indirimsiz">İndirimsiz (%0)</option>
-                                        <option value="ek1">EK 1 İlleri (%50 İndirim)</option>
-                                        <option value="ek2">EK 2 İlleri (%45 İndirim)</option>
-                                        <option value="ek3">EK 3 İlleri (%30 İndirim)</option>
-                                        <option value="ek3_10k">EK 3 Nüfusu 10 Bin Altı (%40 İndirim)</option>
-                                        <option value="uzak">Uzak / Kısıtlı İskan (%70 İndirim)</option>
+                                        <option value="ek1">EK 1 — %50 İndirim</option>
+                                        <option value="ek2">EK 2 — %45 İndirim</option>
+                                        <option value="ek3">EK 3 — %30 İndirim</option>
+                                        <option value="ek3_10k">EK 3 Nüfus &lt;10K — %40 İndirim</option>
+                                        <option value="uzak">Uzak/Kısıtlı İskan — %70 İndirim</option>
                                     </select>
                                 </div>
                             </div>
