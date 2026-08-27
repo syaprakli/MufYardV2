@@ -679,6 +679,28 @@ const calculateYollukValues = () => {
     }, [scope]);
 
     useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                setIsLojmanModalOpen(false);
+                setIsYollukModalOpen(false);
+                setIsGorevModalOpen(false);
+                setIsIhaleModalOpen(false);
+                setIsHakedisModalOpen(false);
+                setIsIhale2ModalOpen(false);
+                setIsPratikModalOpen(false);
+                setIsFolderModalOpen(false);
+                setIsDiziModalOpen(false);
+                setIsKapakModalOpen(false);
+                setIsFormModalOpen(false);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, []);
+
+    useEffect(() => {
         const found = CITY_DISCOUNT_GROUPS.find(c => c.name === lojmanCity);
         if (found) {
             setLojmanDiscountGroup(found.group);
