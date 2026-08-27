@@ -2756,33 +2756,33 @@ const calculateYollukValues = () => {
 
         return createPortal(
             <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
-                <Card className="w-full max-w-5xl p-8 rounded-[32px] bg-card border-white/60 dark:border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar animate-in zoom-in-95 duration-300">
+                <Card className="w-full max-w-5xl p-5 rounded-[32px] bg-card border-white/60 dark:border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-300">
                     {/* Header */}
-                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-3 bg-indigo-500/10 text-indigo-500 rounded-2xl">
-                                <FileSpreadsheet size={24} />
+                            <div className="p-2 bg-indigo-500/10 text-indigo-500 rounded-xl">
+                                <FileSpreadsheet size={20} />
                             </div>
                             <div>
-                                <h3 className="text-xl font-black text-slate-900 dark:text-slate-100">Lojman Kira Bedeli Hesaplama</h3>
-                                <p className="text-xs text-slate-500 font-medium">Milli Emlak Genel Tebliğlerine göre lojman aylık net kirasını hesaplayın.</p>
+                                <h3 className="text-base font-black text-slate-900 dark:text-slate-100">Lojman Kira Bedeli Hesaplama</h3>
+                                <p className="text-[10px] text-slate-500 font-medium">Milli Emlak Genel Tebliğlerine göre lojman aylık net kirasını hesaplayın.</p>
                             </div>
                         </div>
                         <Button 
                             size="icon" 
                             variant="ghost" 
                             onClick={() => setIsLojmanModalOpen(false)} 
-                            className="rounded-xl h-10 w-10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            className="rounded-xl h-8 w-8 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                         >
-                            <X size={20} />
+                            <X size={16} />
                         </Button>
                     </div>
 
                     {/* Main Content Split Grid */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden flex-1">
                         {/* Parameters Form - Left */}
-                        <div className="lg:col-span-5 space-y-6">
-                            <div className="bg-slate-50/50 dark:bg-slate-900/20 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/80 space-y-4">
+                        <div className="lg:col-span-5 space-y-3 overflow-y-auto custom-scrollbar pr-1">
+                            <div className="bg-slate-50/50 dark:bg-slate-900/20 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/80 space-y-2.5">
                                 <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Temel Parametreler</h4>
                                 
                                 <div>
@@ -2790,7 +2790,7 @@ const calculateYollukValues = () => {
                                     <select 
                                         value={lojmanYear} 
                                         onChange={(e) => setLojmanYear(e.target.value)}
-                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
                                     >
                                         {Object.keys(LOJMAN_RATES).sort((a,b)=>b.localeCompare(a)).map(yr => (
                                             <option key={yr} value={yr}>{yr} Yılı</option>
@@ -2803,7 +2803,7 @@ const calculateYollukValues = () => {
                                     <select 
                                         value={lojmanType} 
                                         onChange={(e) => setLojmanType(e.target.value as any)}
-                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
                                     >
                                         <option value="kerpic">Kerpiç, ahşap, bağdadi ve benzeri</option>
                                         <option value="kalorifersiz">Kalorifersiz konutlar</option>
@@ -2811,16 +2811,16 @@ const calculateYollukValues = () => {
                                     </select>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Lojman Alanı (m²)</label>
+                                        <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Alan (m²)</label>
                                         <input 
                                             type="number" 
                                             value={lojmanM2 || ""} 
                                             min={1}
                                             max={999}
                                             onChange={(e) => setLojmanM2(Math.max(1, parseInt(e.target.value) || 0))}
-                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
                                         />
                                     </div>
                                     <div>
@@ -2889,104 +2889,106 @@ const calculateYollukValues = () => {
                                 </div>
 
                                 <div>
-                                    <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">İndirim Grubu (Otomatik / Manuel)</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">İndirim Grubu</label>
                                     <select 
                                         value={lojmanDiscountGroup} 
                                         onChange={(e) => setLojmanDiscountGroup(e.target.value as any)}
-                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold text-indigo-600 dark:text-indigo-400 font-extrabold"
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold text-indigo-600 dark:text-indigo-400"
                                     >
                                         <option value="indirimsiz">İndirimsiz (%0)</option>
                                         <option value="ek1">EK 1 İlleri (%50 İndirim)</option>
                                         <option value="ek2">EK 2 İlleri (%45 İndirim)</option>
                                         <option value="ek3">EK 3 İlleri (%30 İndirim)</option>
-                                        <option value="ek3_10k">EK 3 Nüfusu 10 Bin Altı Yerler (%40 İndirim)</option>
-                                        <option value="uzak">Uzak, Kısıtlı İskan Yerleri (%70 İndirim)</option>
+                                        <option value="ek3_10k">EK 3 Nüfusu 10 Bin Altı (%40 İndirim)</option>
+                                        <option value="uzak">Uzak / Kısıtlı İskan (%70 İndirim)</option>
                                     </select>
                                 </div>
                             </div>
 
-                            <div className="bg-slate-50/50 dark:bg-slate-900/20 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/80 space-y-3">
+                            <div className="bg-slate-50/50 dark:bg-slate-900/20 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/80">
                                 <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">İlave Gider ve Eklentiler</h4>
                                 
-                                <label className="flex items-center gap-3 p-1 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={hasKapici} 
-                                        onChange={(e) => setHasKapici(e.target.checked)}
-                                        className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
-                                    />
-                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Kapıcı / Kaloriferci Gideri Kurumca Karşılanıyor</span>
-                                </label>
+                                <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                                    <label className="flex items-center gap-2 p-1 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasKapici} 
+                                            onChange={(e) => setHasKapici(e.target.checked)}
+                                            className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 shrink-0 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+                                        />
+                                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">Kapıcı/Kaloriferci</span>
+                                    </label>
 
-                                <label className="flex items-center gap-3 p-1 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={hasElektrik} 
-                                        disabled={hasElektrikSu}
-                                        onChange={(e) => { setHasElektrik(e.target.checked); if (e.target.checked) setHasElektrikSu(false); }}
-                                        className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900 disabled:opacity-50"
-                                    />
-                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Elektrik Sayacı Ayrılmamış</span>
-                                </label>
+                                    <label className="flex items-center gap-2 p-1 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasElektrik} 
+                                            disabled={hasElektrikSu}
+                                            onChange={(e) => { setHasElektrik(e.target.checked); if (e.target.checked) setHasElektrikSu(false); }}
+                                            className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 shrink-0 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900 disabled:opacity-50"
+                                        />
+                                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">Elektrik Sayaçsız</span>
+                                    </label>
 
-                                <label className="flex items-center gap-3 p-1 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={hasSu} 
-                                        disabled={hasElektrikSu}
-                                        onChange={(e) => { setHasSu(e.target.checked); if (e.target.checked) setHasElektrikSu(false); }}
-                                        className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900 disabled:opacity-50"
-                                    />
-                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Su Sayacı Ayrılmamış</span>
-                                </label>
+                                    <label className="flex items-center gap-2 p-1 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasSu} 
+                                            disabled={hasElektrikSu}
+                                            onChange={(e) => { setHasSu(e.target.checked); if (e.target.checked) setHasElektrikSu(false); }}
+                                            className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 shrink-0 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900 disabled:opacity-50"
+                                        />
+                                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">Su Sayaçsız</span>
+                                    </label>
 
-                                <label className="flex items-center gap-3 p-1 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={hasElektrikSu} 
-                                        onChange={(e) => { setHasElektrikSu(e.target.checked); if (e.target.checked) { setHasElektrik(false); setHasSu(false); } }}
-                                        className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
-                                    />
-                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Elektrik ve Su Sayacının Her İkisi De Ayrılmamış</span>
-                                </label>
+                                    <label className="flex items-center gap-2 p-1 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasElektrikSu} 
+                                            onChange={(e) => { setHasElektrikSu(e.target.checked); if (e.target.checked) { setHasElektrik(false); setHasSu(false); } }}
+                                            className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 shrink-0 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+                                        />
+                                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">Elektrik+Su Sayaçsız</span>
+                                    </label>
 
-                                <label className="flex items-center gap-3 p-1 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={hasKuyuSu} 
-                                        className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
-                                        onChange={(e) => setHasKuyuSu(e.target.checked)}
-                                    />
-                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Su Şebeke Dışı Kuyu / Artezyenden Karşılanıyor</span>
-                                </label>
+                                    <label className="flex items-center gap-2 p-1 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasKuyuSu} 
+                                            className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 shrink-0 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+                                            onChange={(e) => setHasKuyuSu(e.target.checked)}
+                                        />
+                                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">Kuyu/Artezyen Suyu</span>
+                                    </label>
 
-                                <label className="flex items-center gap-3 p-1 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={hasYakit} 
-                                        className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
-                                        onChange={(e) => setHasYakit(e.target.checked)}
-                                    />
-                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Yakıtı Kurumca Tedarik Ediliyor</span>
-                                </label>
+                                    <label className="flex items-center gap-2 p-1 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasYakit} 
+                                            className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 shrink-0 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+                                            onChange={(e) => setHasYakit(e.target.checked)}
+                                        />
+                                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">Yakıt Kurumca Tedarik</span>
+                                    </label>
 
-                                <label className="flex items-center gap-3 p-1 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={hasOrtakAlan} 
-                                        className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
-                                        onChange={(e) => setHasOrtakAlan(e.target.checked)}
-                                    />
-                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Ortak Alan Giderleri Kurumca Karşılanıyor</span>
-                                </label>
+                                    <label className="flex items-center gap-2 p-1 hover:bg-slate-100/30 dark:hover:bg-slate-800/30 rounded-lg cursor-pointer transition-all col-span-2">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasOrtakAlan} 
+                                            className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 shrink-0 bg-white border border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+                                            onChange={(e) => setHasOrtakAlan(e.target.checked)}
+                                        />
+                                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight">Ortak Alan Giderleri Kurumca Karşılanıyor</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
 
                         {/* Calculation Invoice Sheet - Right */}
-                        <div className="lg:col-span-7 flex flex-col h-full justify-between">
+                        <div className="lg:col-span-7 flex flex-col overflow-hidden">
                             <div 
                                 id="lojman-print-area"
-                                className="bg-white dark:bg-slate-950 p-6 md:p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-inner flex-1"
+                                className="bg-white dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-inner flex-1 overflow-y-auto custom-scrollbar"
                             >
                                 {/* Invoice Header */}
                                 <div className="text-center border-b-2 border-slate-200 dark:border-slate-800 pb-4 mb-6">
