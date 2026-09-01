@@ -180,6 +180,7 @@ export default function DenetimIl() {
 
     const setSelectedTaskId = useCallback((id: string | null) => {
         setSelectedTaskIdState(id);
+        setActiveDetailTab("hub");
         if (id) {
             navigate(`/denetim/${activeTab}?task_id=${id}`, { replace: true });
         } else {

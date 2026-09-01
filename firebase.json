@@ -3,6 +3,7 @@
     "rules": "frontend/firestore.rules"
   },
   "hosting": {
+    "site": "mufyardv2",
     "public": "frontend/dist",
     "ignore": [
       "firebase.json",

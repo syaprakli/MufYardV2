@@ -7122,6 +7122,10 @@ const renderPratikModal = () => {
                 {renderHakedisModal()}
                 {renderDiziModal()}
                 {renderKapakModal()}
+                {renderTahsisModal()}
+                {renderStadyumModal()}
+                {renderMadde18Modal()}
+                {renderTarifeCetveliModal()}
             </>
         );
     }
