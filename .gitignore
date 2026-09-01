@@ -55,3 +55,6 @@ Thumbs.db
 backend/rehber.xlsx
 backend/import_mevzuat/
 Mevzuat/
+
+frontend/public/Harcýrah/*.pdf
+

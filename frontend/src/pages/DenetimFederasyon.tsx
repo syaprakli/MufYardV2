@@ -254,7 +254,7 @@ export default function DenetimFederasyon() {
     const [tenkitResults, setTenkitResults] = useState<KnowledgeItem[]>([]);
 
     // 6. Detailed Tab States
-    const [activeDetailTab, setActiveDetailTab] = useState<"dashboard" | "info" | "notes" | "photos" | "checklist" | "editor" | "evrak_talebi">("dashboard");
+    const [activeDetailTab, setActiveDetailTab] = useState<"hub" | "info" | "notes" | "photos" | "checklist" | "editor" | "dashboard" | "evrak_talebi">("hub");
     const [localAuditData, setLocalAuditData] = useState<any>({
         info: {},
         generalNotes: "",
@@ -382,10 +382,7 @@ export default function DenetimFederasyon() {
     }, [selectedTaskId, activeTab, cachedData?.tasks]);
 
     // Parent İl Denetimi (if selected is Kyk Yurt Denetimi)
-    const parentIlTask = useMemo(() => {
-        if (!selectedTask || activeTab !== "kyk" || !selectedTask.parent_task_id || !cachedData?.tasks) return null;
-        return cachedData.tasks.find(t => t.id === selectedTask.parent_task_id) || null;
-    }, [selectedTask, activeTab, cachedData?.tasks]);
+    // const parentIlTask = null;
 
     // Reset report states when report changes
     useEffect(() => {
@@ -1453,30 +1450,77 @@ export default function DenetimFederasyon() {
     };
 
     const renderNotesTab = () => {
+        const noteText = localAuditData.generalNotes || "";
+        const charCount = noteText.length;
+        const wordCount = noteText.trim() ? noteText.trim().split(/\s+/).length : 0;
+
+        const insertDateStamp = () => {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+            const stamp = `\n\n📌 [${dateStr}] - `;
+            const updated = (noteText ? noteText + stamp : `📌 [${dateStr}] - `);
+            setLocalAuditData((prev: any) => ({ ...prev, generalNotes: updated }));
+        };
+
         return (
-            <div className="space-y-5 bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 flex-1 flex flex-col min-h-[350px]">
-                <div>
-                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-850 dark:text-slate-200">
-                        Genel Müfettiş Notları
-                    </h4>
-                    <p className="text-[10px] text-slate-400 font-bold mt-0.5">Denetim esnasında alınan genel kararlar, tespitler ve notlar</p>
+            <div className="space-y-4 bg-white dark:bg-slate-900/60 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex-1 flex flex-col min-h-[550px] lg:min-h-[620px]">
+                {/* Header & Quick Tools */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800/60 pb-4">
+                    <div>
+                        <h4 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                            <FileText size={16} className="text-blue-600 dark:text-blue-400" />
+                            <span>Müfettiş Saha & Denetim Notları</span>
+                        </h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                            Saha incelemeleri, kurum yetkilileriyle görüşmeler ve tespit edilen hususları serbestçe not alabilirsiniz.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={insertDateStamp}
+                            className="rounded-xl h-9 px-3.5 text-xs font-bold text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-blue-50 hover:text-blue-600"
+                        >
+                            📅 Tarih / Saat Ekle
+                        </Button>
+                        <Button
+                            onClick={() => handleSaveAuditData(localAuditData)}
+                            disabled={isSavingAuditData}
+                            className="rounded-xl h-9 px-5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 flex items-center gap-1.5"
+                        >
+                            {isSavingAuditData ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                            <span>Notları Kaydet</span>
+                        </Button>
+                    </div>
                 </div>
-                <div className="h-px bg-slate-200 dark:bg-slate-800/60" />
-                <textarea
-                    value={localAuditData.generalNotes || ""}
-                    onChange={e => {
-                        const val = e.target.value;
-                        setLocalAuditData((prev: any) => ({ ...prev, generalNotes: val }));
-                    }}
-                    onBlur={() => handleSaveAuditData(localAuditData)}
-                    placeholder="Müfettiş notlarını buraya serbest biçimde yazabilirsiniz..."
-                    className="flex-1 w-full p-4 rounded-xl border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 dark:text-white resize-none leading-relaxed min-h-[200px]"
-                />
-                <div className="flex justify-end">
-                    <Button onClick={() => handleSaveAuditData(localAuditData)} disabled={isSavingAuditData} className="rounded-xl h-10 px-6 shadow-md shadow-primary/20">
-                        {isSavingAuditData ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
-                        Kaydet
-                    </Button>
+
+                {/* Big Spacious Textarea Canvas */}
+                <div className="flex-1 flex flex-col min-h-[420px] relative">
+                    <textarea
+                        value={noteText}
+                        onChange={e => {
+                            const val = e.target.value;
+                            setLocalAuditData((prev: any) => ({ ...prev, generalNotes: val }));
+                        }}
+                        onBlur={() => handleSaveAuditData(localAuditData)}
+                        placeholder="Müfettiş notlarınızı, saha tespitlerinizi ve önemli hususları buraya yazabilirsiniz..."
+                        className="flex-1 w-full p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 text-slate-850 dark:text-slate-100 resize-y leading-relaxed min-h-[420px] transition-all shadow-inner"
+                    />
+                </div>
+
+                {/* Footer Stats & Info */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/60 text-xs text-slate-400 font-semibold">
+                    <div className="flex items-center gap-3">
+                        <span>{wordCount} Kelime</span>
+                        <span>•</span>
+                        <span>{charCount} Karakter</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400">
+                        * Yazdığınız notlar otomatik olarak taslağa işlenir ve kaydedilir.
+                    </span>
                 </div>
             </div>
         );
@@ -2271,9 +2315,9 @@ export default function DenetimFederasyon() {
     const knowledgeCategories = [...new Set(knowledgeItems.map(i => i.category))].sort();
 
     return (
-        <div className="flex flex-col gap-6 h-[calc(100vh-110px)] overflow-hidden animate-in fade-in duration-300">
+        <div className="flex flex-col gap-6 h-[calc(100vh-110px)] flex flex-col gap-4 animate-in fade-in duration-300">
             {/* Header / Back Navigation */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-shrink-0 justify-between shadow-sm">
+            <div className={`flex flex-col sm:flex-row sm:items-center gap-4 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-shrink-0 justify-between shadow-sm ${activeDetailTab !== "hub" ? "hidden" : "flex"}`}>
                 <div className="flex items-center gap-3.5">
                     <button
                         onClick={() => navigate("/denetim")}
@@ -2450,7 +2494,7 @@ export default function DenetimFederasyon() {
                 // Standard Audit Category - Lists tasks and reports
                 <div className="flex-1 flex flex-col xl:flex-row gap-6 overflow-hidden">
                     {/* 2. Tasks list pane */}
-                    <div className={`w-full xl:w-80 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-col gap-3 flex-shrink-0 overflow-y-auto ${selectedTaskId ? "hidden xl:flex" : "flex"}`}>
+                    <div className={`w-full xl:w-80 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-col gap-3 flex-shrink-0 overflow-y-auto ${selectedTaskId ? (activeDetailTab !== "hub" ? "hidden" : "hidden xl:flex") : "flex"}`}>
                         <div className="px-1 py-1 border-b border-slate-100 dark:border-slate-850">
                             <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">{currentRaporTuru}</h3>
                             <p className="text-[10px] text-slate-400 font-bold">Aktif denetim görevleri listesi</p>
@@ -2551,285 +2595,392 @@ export default function DenetimFederasyon() {
                             </div>
                         ) : (
                             <div className="flex-1 flex flex-col gap-6 xl:overflow-y-auto pr-1">
-                                {/* Header */}
-                                <div className="flex flex-col border-b border-slate-100 dark:border-slate-800/50 pb-4 gap-4">
-                                    <button
-                                        onClick={() => {
-                                            setSelectedTaskId(null);
-                                            setSelectedAuditId(null);
-                                        }}
-                                        className="xl:hidden flex items-center gap-1.5 text-xs font-black text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors uppercase tracking-wider mb-2 self-start"
-                                    >
-                                        <ArrowLeft size={14} className="mr-1" />
-                                        <span>GÖREV LİSTESİNE DÖN</span>
-                                    </button>
-                                    <div className="flex flex-col md:flex-row justify-between gap-4 w-full">
-                                    <div>
-                                        <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 mb-1">
-                                            <span>{selectedTask.rapor_turu}</span>
+                                {activeDetailTab === "hub" ? (
+                                    /* ========================================================================= */
+                                    /* 1. HUB VIEW: TASK HEADER + KYK BANNER + 6 LARGE MODULE CARDS              */
+                                    /* ========================================================================= */
+                                    <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-1 animate-in fade-in duration-300">
+                                        {/* Task Header */}
+                                        <div className="flex flex-col border-b border-slate-100 dark:border-slate-800/50 pb-4 gap-4">
+                                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                                                <div className="space-y-1">
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                        {currentRaporTuru}
+                                                    </span>
+                                                    <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                                                        {selectedTask.rapor_adi}
+                                                    </h2>
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-3">
+                                                    {(cachedData?.audits || []).filter((a: any) => a.task_id === selectedTask.id).length > 1 && (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aktif Form:</span>
+                                                            <select
+                                                                value={selectedReport?.id || ""}
+                                                                onChange={e => setSelectedAuditId(e.target.value)}
+                                                                className="h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                            >
+                                                                {(cachedData?.audits || [])
+                                                                    .filter((a: any) => a.task_id === selectedTask.id)
+                                                                    .map((a: any) => (
+                                                                        <option key={a.id} value={a.id}>
+                                                                            {a.title} {a.report_created === false ? "(Taslak)" : "(Editörde)"}
+                                                                        </option>
+                                                                    ))}
+                                                            </select>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                                        <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-lg ${
+                                                            selectedTask.rapor_durumu === "Tamamlandı"
+                                                                ? "bg-green-500/10 text-green-500"
+                                                                : selectedTask.rapor_durumu === "Devam Ediyor"
+                                                                ? "bg-amber-500/10 text-amber-500"
+                                                                : "bg-slate-500/10 text-slate-400"
+                                                        }`}>
+                                                            Durum: {selectedTask.rapor_durumu}
+                                                        </span>
+                                                        {selectedReport && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-7 px-2.5 rounded-lg border-red-500/20 bg-red-500/5 hover:bg-red-600 hover:text-white text-red-600 dark:text-red-400 text-[10px] font-black flex items-center gap-1 transition-all"
+                                                                onClick={handleDeleteReport}
+                                                                disabled={isSavingAuditData}
+                                                            >
+                                                                <Trash2 size={12} />
+                                                                <span>DENETİMİ SİL / SIFIRLA</span>
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white leading-snug">{selectedTask.rapor_adi}</h2>
-                                        {(cachedData?.audits || []).filter((a: any) => a.task_id === selectedTask.id).length > 1 && (
-                                            <div className="mt-2 flex items-center gap-2">
-                                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aktif Form:</label>
-                                                <select
-                                                    value={selectedAuditId || ""}
-                                                    onChange={(e) => setSelectedAuditId(e.target.value)}
-                                                    className="text-xs font-bold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 outline-none text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-blue-500"
-                                                >
-                                                    {(cachedData?.audits || [])
-                                                        .filter((a: any) => a.task_id === selectedTask.id)
-                                                        .map((a: any) => (
-                                                            <option key={a.id} value={a.id}>
-                                                                {a.title} {a.report_created === false ? "(Taslak)" : "(Editörde)"}
-                                                            </option>
+
+                                        {/* Relationships (KYK Yurt <-> İl) */}
+                                        {activeTab === "il" && (
+                                            <div className="bg-blue-50/40 dark:bg-blue-950/10 border border-blue-100/50 dark:border-blue-900/20 rounded-xl p-4">
+                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-2">Bu İle Bağlı KYK Yurt Denetimleri</h4>
+                                                {childKykTasks.length === 0 ? (
+                                                    <p className="text-xs text-slate-400 font-medium">Bu il genel denetimine henüz bağlı bir KYK yurt denetimi atanmamış.</p>
+                                                ) : (
+                                                    <div className="flex flex-col gap-1.5">
+                                                        {childKykTasks.map(child => (
+                                                            <button
+                                                                key={child.id}
+                                                                onClick={() => {
+                                                                    setActiveTab("kyk");
+                                                                    setSelectedTaskId(child.id);
+                                                                }}
+                                                                className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-2.5 rounded-lg hover:border-blue-500 transition-colors text-left"
+                                                            >
+                                                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{child.rapor_adi}</span>
+                                                                <div className="flex items-center gap-2">
+                                                                    <ArrowRight size={12} className="text-blue-500" />
+                                                                </div>
+                                                            </button>
                                                         ))}
-                                                </select>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
-                                    </div>
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                        <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-lg ${
-                                            selectedTask.rapor_durumu === "Tamamlandı"
-                                                ? "bg-green-500/10 text-green-500"
-                                                : selectedTask.rapor_durumu === "Devam Ediyor"
-                                                ? "bg-amber-500/10 text-amber-500"
-                                                : "bg-slate-500/10 text-slate-400"
-                                        }`}>
-                                            Durum: {selectedTask.rapor_durumu}
-                                        </span>
-                                        {selectedReport && (
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-7 px-2.5 rounded-lg border-red-500/20 bg-red-500/5 hover:bg-red-600 hover:text-white text-red-600 dark:text-red-400 text-[10px] font-black flex items-center gap-1 transition-all"
-                                                onClick={handleDeleteReport}
-                                                disabled={isSavingAuditData}
-                                            >
-                                                <Trash2 size={12} />
-                                                <span>DENETİMİ SİL / SIFIRLA</span>
-                                            </Button>
-                                        )}
-                                    </div>
-                                    </div>
-                                </div>
 
-                                {/* Relationships (KYK Yurt <-> İl) */}
-                                {activeTab === "il" && (
-                                    <div className="bg-blue-50/40 dark:bg-blue-950/10 border border-blue-100/50 dark:border-blue-900/20 rounded-xl p-4">
-                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-2">Bu İle Bağlı KYK Yurt Denetimleri</h4>
-                                        {childKykTasks.length === 0 ? (
-                                            <p className="text-xs text-slate-400 font-medium">Bu il genel denetimine henüz bağlı bir KYK yurt denetimi atanmamış.</p>
-                                        ) : (
-                                            <div className="flex flex-col gap-1.5">
-                                                {childKykTasks.map(child => (
+                                        {/* 6 Large Module Cards Grid */}
+                                        {(() => {
+                                            const questions = AUDIT_TEMPLATES[taskTabId] || [];
+                                            const totalQuestions = questions.length;
+                                            const answeredQuestions = Object.keys(localAuditData.form || {}).filter(k => !!(localAuditData.form || {})[k]).length;
+                                            const percent = totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0;
+                                            const photoCount = (localAuditData.photos || []).length;
+                                            const hasNotes = !!localAuditData.generalNotes;
+                                            const isReportCreated = selectedReport && selectedReport.report_created !== false;
+
+                                            const cards = [
+                                                {
+                                                    id: "info",
+                                                    title: "Genel Bilgiler",
+                                                    subtitle: "İl Müdürlüğü kurumsal, tesis ve personel temel verileri",
+                                                    icon: Info,
+                                                    badge: localAuditData.info?.mudur_adi ? "Dolduruldu" : "Bekliyor",
+                                                    badgeColor: localAuditData.info?.mudur_adi ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700",
+                                                    highlight: false
+                                                },
+                                                {
+                                                    id: "notes",
+                                                    title: "Notlar & Tespitler",
+                                                    subtitle: "Müfettiş saha tespitleri ve serbest denetim notları",
+                                                    icon: FileText,
+                                                    badge: hasNotes ? "Notlar Mevcut" : "Boş",
+                                                    badgeColor: hasNotes ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700",
+                                                    highlight: false
+                                                },
+                                                {
+                                                    id: "photos",
+                                                    title: "Fotoğraflar",
+                                                    subtitle: "Saha inceleme fotoğrafları ve tespit görselleri",
+                                                    icon: Tag,
+                                                    badge: `${photoCount} Fotoğraf`,
+                                                    badgeColor: photoCount > 0 ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700",
+                                                    highlight: false
+                                                },
+                                                {
+                                                    id: "checklist",
+                                                    title: "Kontrol Listesi",
+                                                    subtitle: "Mevzuat ve fiziki denetim soru maddeleri uygunluk tespiti",
+                                                    icon: ClipboardCheck,
+                                                    badge: `${answeredQuestions}/${totalQuestions} Soru (%${percent})`,
+                                                    badgeColor: percent > 0 ? "bg-blue-500/10 text-blue-600 border-blue-500/20" : "bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700",
+                                                    progress: percent,
+                                                    highlight: true
+                                                },
+                                                {
+                                                    id: "editor",
+                                                    title: "Rapor Editörü",
+                                                    subtitle: "Bulguların rapora aktarımı ve resmi rapor metni",
+                                                    icon: Edit2,
+                                                    badge: isReportCreated ? "Rapor Hazır" : "Taslak",
+                                                    badgeColor: isReportCreated ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-amber-500/10 text-amber-600 border-amber-500/20",
+                                                    highlight: false
+                                                },
+                                                {
+                                                    id: "evrak_talebi",
+                                                    title: "Evrak Talebi",
+                                                    subtitle: "İl Müdürlüğünden istenecek resmi evrak talep yazısı",
+                                                    icon: BookOpen,
+                                                    badge: "Resmi Yazı",
+                                                    badgeColor: "bg-purple-500/10 text-purple-600 border-purple-500/20",
+                                                    highlight: false
+                                                }
+                                            ];
+
+                                            return (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                                    {cards.map(card => {
+                                                        const IconComp = card.icon;
+                                                        return (
+                                                            <div
+                                                                key={card.id}
+                                                                onClick={() => {
+                                                                    handleSaveAuditData(localAuditData);
+                                                                    setActiveDetailTab(card.id as any);
+                                                                }}
+                                                                className={`group cursor-pointer rounded-2xl p-6 border transition-all duration-200 flex flex-col justify-between gap-5 relative overflow-hidden ${
+                                                                    card.highlight
+                                                                        ? "bg-gradient-to-br from-blue-50/70 to-white dark:from-blue-950/20 dark:to-slate-900/60 border-blue-300 dark:border-blue-800 shadow-md shadow-blue-500/5 hover:border-blue-500 hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-0.5"
+                                                                        : "bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 shadow-sm hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md hover:-translate-y-0.5"
+                                                                }`}
+                                                            >
+                                                                <div>
+                                                                    <div className="flex items-start justify-between gap-2 mb-4">
+                                                                        <div className="w-12 h-12 rounded-2xl bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+                                                                            <IconComp size={22} />
+                                                                        </div>
+                                                                        <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${card.badgeColor}`}>
+                                                                            {card.badge}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    <h4 className="text-base font-black text-slate-900 dark:text-white tracking-tight mb-1.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                                                        {card.title}
+                                                                    </h4>
+                                                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
+                                                                        {card.subtitle}
+                                                                    </p>
+                                                                </div>
+
+                                                                {card.progress !== undefined && (
+                                                                    <div className="space-y-1.5 pt-1">
+                                                                        <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
+                                                                            <span>İlerleme</span>
+                                                                            <span className="text-blue-600 dark:text-blue-400">%{card.progress}</span>
+                                                                        </div>
+                                                                        <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                                            <div className="h-full bg-blue-600 rounded-full transition-all duration-300" style={{ width: `${card.progress}%` }} />
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+                                                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs font-black text-blue-600 dark:text-blue-400">
+                                                                    <span>{card.highlight ? "Tam Ekran Çalış →" : "Modülü Aç →"}</span>
+                                                                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                ) : (
+                                    /* ========================================================================= */
+                                    /* 2. TRUE FULLSCREEN FOCUS VIEW: ACTIVE MODULE IN 100% VIEWPORT HEIGHT/WIDTH */
+                                    /* ========================================================================= */
+                                    <div className="flex-1 flex flex-col min-h-0 overflow-hidden animate-in fade-in duration-200">
+                                        {/* Sleek Focus Navigation Bar */}
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 p-3.5 rounded-2xl mb-4 flex-shrink-0 shadow-sm">
+                                            <div className="flex items-center gap-3">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        handleSaveAuditData(localAuditData);
+                                                        setActiveDetailTab("hub");
+                                                    }}
+                                                    className="rounded-xl h-9 px-4 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-black text-xs flex items-center gap-2 shadow-sm"
+                                                >
+                                                    <ArrowLeft size={15} />
+                                                    <span>Kartlara Dön</span>
+                                                </Button>
+
+                                                <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block" />
+
+                                                <div className="flex items-center gap-2 text-xs font-black text-slate-850 dark:text-white">
+                                                    <span className="text-slate-400 font-bold hidden md:inline">{selectedTask.rapor_adi} &gt;</span>
+                                                    <span className="text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                                                        {activeDetailTab === "info" && "Genel Bilgiler"}
+                                                        {activeDetailTab === "notes" && "Notlar & Tespitler"}
+                                                        {activeDetailTab === "photos" && "Fotoğraflar"}
+                                                        {activeDetailTab === "checklist" && "Kontrol Listesi"}
+                                                        {activeDetailTab === "editor" && "Rapor Editörü"}
+                                                        {activeDetailTab === "evrak_talebi" && "Evrak Talebi"}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Quick Switcher Pills */}
+                                            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                                                {[
+                                                    { id: "info", label: "Genel Bilgi" },
+                                                    { id: "notes", label: "Notlar" },
+                                                    { id: "photos", label: "Fotoğraflar" },
+                                                    { id: "checklist", label: "Kontrol Listesi" },
+                                                    { id: "editor", label: "Rapor" }
+                                                ].map(tab => (
                                                     <button
-                                                        key={child.id}
+                                                        key={tab.id}
                                                         onClick={() => {
-                                                            setActiveTab("kyk");
-                                                            setSelectedTaskId(child.id);
+                                                            handleSaveAuditData(localAuditData);
+                                                            setActiveDetailTab(tab.id as any);
                                                         }}
-                                                        className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-2.5 rounded-lg hover:border-blue-500 transition-colors text-left"
+                                                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
+                                                            activeDetailTab === tab.id
+                                                                ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20"
+                                                                : "text-slate-500 hover:bg-slate-200/60 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400"
+                                                        }`}
                                                     >
-                                                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{child.rapor_adi}</span>
-                                                        <div className="flex items-center gap-2">
-
-                                                            <ArrowRight size={12} className="text-blue-500" />
-                                                        </div>
+                                                        {tab.label}
                                                     </button>
                                                 ))}
                                             </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {activeTab === "kyk" && (
-                                    <div className="bg-blue-50/40 dark:bg-blue-950/10 border border-blue-100/50 dark:border-blue-900/20 rounded-xl p-4">
-                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-2">Bağlı Olduğu İl Genel Denetimi</h4>
-                                        {!selectedTask.parent_task_id ? (
-                                            <p className="text-xs text-slate-400 font-medium">
-                                                Bu yurt denetimi herhangi bir İl Genel Denetimi ile ilişkilendirilmemiş. Görevler sayfasından ilişki ekleyebilirsiniz.
-                                            </p>
-                                        ) : parentIlTask ? (
-                                            <button
-                                                onClick={() => {
-                                                    setActiveTab("il");
-                                                    setSelectedTaskId(parentIlTask.id);
-                                                }}
-                                                className="flex items-center justify-between w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-2.5 rounded-lg hover:border-blue-500 transition-colors text-left"
-                                            >
-                                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{parentIlTask.rapor_adi}</span>
-                                                <div className="flex items-center gap-2">
-
-                                                    <ArrowRight size={12} className="text-blue-500" />
-                                                </div>
-                                            </button>
-                                        ) : (
-                                            <p className="text-xs text-slate-400 font-medium">Bağlı görev bulunamadı.</p>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Report Tabs and Content */}
-                                {selectedReport && activeDetailTab !== "dashboard" && activeDetailTab !== "evrak_talebi" && (
-                                    <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 bg-slate-100 dark:bg-slate-955 border border-slate-250 dark:border-slate-900 rounded-xl p-1 flex-shrink-0 mb-4">
-                                        {[
-                                            { id: "info", label: "Genel\nBilgiler" },
-                                            { id: "notes", label: "Notlar" },
-                                            { id: "photos", label: "Fotoğraflar" },
-                                            { id: "checklist", label: "Kontrol\nListesi" },
-                                            { id: "editor", label: "Rapor\nEditörü" }
-                                        ].map(tab => {
-                                            const isActive = activeDetailTab === tab.id;
-                                            return (
-                                                <button
-                                                    key={tab.id}
-                                                    onClick={() => {
-                                                        handleSaveAuditData(localAuditData);
-                                                        setActiveDetailTab(tab.id as any);
-                                                    }}
-                                                    className={`flex-1 text-center py-2 px-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 whitespace-pre-line leading-tight min-h-[38px] flex items-center justify-center ${
-                                                        isActive
-                                                            ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200 dark:border-slate-850"
-                                                            : "text-slate-400 dark:text-slate-500 hover:bg-slate-250 dark:hover:bg-slate-900/50 hover:text-slate-800 dark:hover:text-slate-200"
-                                                    }`}
-                                                >
-                                                    {tab.label}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-
-                                {!selectedReport ? (
-                                    <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center gap-4 min-h-[300px]">
-                                        <AlertCircle size={28} className="text-blue-500 animate-bounce" />
-                                        <div className="space-y-1">
-                                            <h4 className="font-bold text-sm text-slate-850 dark:text-slate-250">Henüz Rapor Oluşturulmamış</h4>
-                                            <p className="text-xs text-slate-400 max-w-sm mx-auto">Bu görev için denetim formunu ve rapor dosyasını şimdi başlatabilirsiniz.</p>
                                         </div>
-                                        <Button
-                                            onClick={() => {
-                                                setPrepAuditName(`${selectedTask.rapor_adi} Denetim Formu`);
-                                                setPickerTaskForAudit(selectedTask);
-                                                setShowTaskPicker(true);
-                                            }}
-                                            className="px-6 h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 w-full sm:w-auto"
-                                        >
-                                            <Play size={14} className="fill-white" />
-                                            <span>Denetimi Başlat</span>
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <div className="flex-1 flex flex-col xl:overflow-y-auto">
-                                        {activeDetailTab === "dashboard" && renderDashboardTab()}
-                                        {activeDetailTab === "evrak_talebi" && renderEvrakTalebiTab()}
 
-                                        {activeDetailTab !== "dashboard" && activeDetailTab !== "evrak_talebi" && (
-                                            <>
-                                                {activeDetailTab === "info" && renderInfoTab()}
-                                                {activeDetailTab === "notes" && renderNotesTab()}
-                                                {activeDetailTab === "photos" && renderPhotosTab()}
-                                                {activeDetailTab === "checklist" && renderChecklistTab()}
-                                                {activeDetailTab === "editor" && (
-                                                    selectedReport.report_created === false ? (
-                                                        <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center gap-3 min-h-[300px]">
-                                                            <FileText size={32} className="text-slate-350 dark:text-slate-650" />
-                                                            <div>
-                                                                <h4 className="font-bold text-sm text-slate-850 dark:text-slate-250">Henüz Rapor Oluşturulmamış</h4>
-                                                                <p className="text-xs text-slate-400 mt-1">Bu denetime ait resmi rapor belgesi henüz oluşturulmamıştır.</p>
-                                                                <p className="text-xs text-slate-400">Bulguları rapora aktararak rapor belgesini başlatabilirsiniz.</p>
-                                                            </div>
-                                                            <Button
-                                                                onClick={handleSendToEditorClick}
-                                                                className="mt-2 rounded-xl h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
-                                                            >
-                                                                Rapor Oluştur ve Bulguları Aktar
-                                                            </Button>
+                                        {/* Module Contents (100% Height & Width) */}
+                                        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto pr-1">
+                                            {activeDetailTab === "info" && renderInfoTab()}
+                                            {activeDetailTab === "notes" && renderNotesTab()}
+                                            {activeDetailTab === "photos" && renderPhotosTab()}
+                                            {activeDetailTab === "checklist" && renderChecklistTab()}
+                                            {activeDetailTab === "dashboard" && renderDashboardTab()}
+                                            {activeDetailTab === "evrak_talebi" && renderEvrakTalebiTab()}
+                                            
+                                            {activeDetailTab === "editor" && (
+                                                selectedReport.report_created === false ? (
+                                                    <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center gap-3 min-h-[300px]">
+                                                        <FileText size={32} className="text-slate-350 dark:text-slate-650" />
+                                                        <div>
+                                                            <h4 className="font-bold text-sm text-slate-850 dark:text-slate-250">Henüz Rapor Oluşturulmamış</h4>
+                                                            <p className="text-xs text-slate-400 mt-1">Bu denetime ait resmi rapor belgesi henüz oluşturulmamıştır.</p>
+                                                            <p className="text-xs text-slate-400">Bulguları rapora aktararak rapor belgesini başlatabilirsiniz.</p>
                                                         </div>
-                                                    ) : (
-                                                        <div className="flex-1 flex flex-col gap-4">
-                                                            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/30 pb-2">
-                                                                <h3 className="text-xs font-black uppercase tracking-[0.15em] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                                                                    <FileText size={14} className="text-blue-500" />
-                                                                    <span>Denetim Raporu İçeriği</span>
-                                                                </h3>
-                                                                <div className="flex items-center gap-1.5">
+                                                        <Button
+                                                            onClick={handleSendToEditorClick}
+                                                            className="mt-2 rounded-xl h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+                                                        >
+                                                            Rapor Oluştur ve Bulguları Aktar
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex-1 flex flex-col gap-4">
+                                                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/30 pb-2">
+                                                            <h3 className="text-xs font-black uppercase tracking-[0.15em] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                                                <FileText size={14} className="text-blue-500" />
+                                                                <span>Denetim Raporu İçeriği</span>
+                                                            </h3>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="rounded-lg text-[10px] h-8"
+                                                                    onClick={() => navigate(`/audit/${selectedReport.id}/report`)}
+                                                                >
+                                                                    <ExternalLink size={12} className="mr-1" /> Editörde Aç
+                                                                </Button>
+                                                                {reportEditing ? (
+                                                                    <div className="flex items-center gap-1">
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="rounded-lg text-[10px] h-8 text-slate-400"
+                                                                            onClick={() => {
+                                                                                setReportContent(selectedReport.report_content || "");
+                                                                                setReportEditing(false);
+                                                                            }}
+                                                                        >
+                                                                            İptal
+                                                                        </Button>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            className="rounded-lg text-[10px] h-8"
+                                                                            onClick={handleSaveReport}
+                                                                            disabled={reportSaving}
+                                                                        >
+                                                                            {reportSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} className="mr-1" />}
+                                                                            Kaydet
+                                                                        </Button>
+                                                                    </div>
+                                                                ) : (
                                                                     <Button
                                                                         variant="outline"
                                                                         size="sm"
                                                                         className="rounded-lg text-[10px] h-8"
-                                                                        onClick={() => navigate(`/audit/${selectedReport.id}/report`)}
+                                                                        onClick={() => setReportEditing(true)}
                                                                     >
-                                                                        <ExternalLink size={12} className="mr-1" /> Editörde Aç
+                                                                        Manuel Düzenle
                                                                     </Button>
-                                                                    {reportEditing ? (
-                                                                        <div className="flex items-center gap-1">
-                                                                            <Button
-                                                                                variant="outline"
-                                                                                size="sm"
-                                                                                className="rounded-lg text-[10px] h-8 text-slate-400"
-                                                                                onClick={() => {
-                                                                                    setReportContent(selectedReport.report_content || "");
-                                                                                    setReportEditing(false);
-                                                                                }}
-                                                                            >
-                                                                                İptal
-                                                                            </Button>
-                                                                            <Button
-                                                                                size="sm"
-                                                                                className="rounded-lg text-[10px] h-8"
-                                                                                onClick={handleSaveReport}
-                                                                                disabled={reportSaving}
-                                                                            >
-                                                                                {reportSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} className="mr-1" />}
-                                                                                Kaydet
-                                                                            </Button>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            className="rounded-lg text-[10px] h-8"
-                                                                            onClick={() => setReportEditing(true)}
-                                                                        >
-                                                                            Manuel Düzenle
-                                                                        </Button>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 min-h-[300px]">
-                                                                {/* Left: Editor Area */}
-                                                                <div className="xl:col-span-7 flex flex-col gap-2">
-                                                                    {reportEditing ? (
-                                                                        <textarea
-                                                                            value={reportContent}
-                                                                            onChange={e => setReportContent(e.target.value)}
-                                                                            className="flex-1 w-full p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-955/20 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed resize-none h-[350px] lg:h-full"
-                                                                            placeholder="Rapor içeriğini HTML formatında yazın..."
-                                                                        />
-                                                                    ) : (
-                                                                        <div 
-                                                                            className="flex-1 p-4 rounded-xl border border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-955/5 text-xs text-slate-800 dark:text-slate-255 leading-relaxed overflow-y-auto select-text prose prose-sm dark:prose-invert max-w-none h-[350px] lg:h-full"
-                                                                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(reportContent || "<p class='text-slate-400 italic'>Rapor içeriği boş.</p>") }}
-                                                                        />
-                                                                    )}
-                                                                    <p className="text-[10px] text-slate-400 font-bold">
-                                                                        * Rapor içeriği HTML formatındadır. TinyMCE zengin metin düzenleyiciyle düzenlemek için sağ üstteki "Editörde Aç" butonunu kullanın.
-                                                                    </p>
-                                                                </div>
-
-                                                                {/* Right: AI Tenkit Bankası Panel */}
-                                                                <div className="xl:col-span-5 max-h-[500px]">
-                                                                    {renderTenkitBank("editor")}
-                                                                </div>
+                                                                )}
                                                             </div>
                                                         </div>
-                                                    )
-                                                )}
-                                            </>
-                                        )}
+
+                                                        <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 min-h-[300px]">
+                                                            {/* Left: Editor Area */}
+                                                            <div className="xl:col-span-7 flex flex-col gap-2">
+                                                                {reportEditing ? (
+                                                                    <textarea
+                                                                        value={reportContent}
+                                                                        onChange={e => setReportContent(e.target.value)}
+                                                                        className="flex-1 w-full p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-955/20 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed resize-none h-[350px] lg:h-full"
+                                                                        placeholder="Rapor içeriğini HTML formatında yazın..."
+                                                                    />
+                                                                ) : (
+                                                                    <div 
+                                                                        className="flex-1 p-4 rounded-xl border border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-955/5 text-xs text-slate-800 dark:text-slate-255 leading-relaxed overflow-y-auto select-text prose prose-sm dark:prose-invert max-w-none h-[350px] lg:h-full"
+                                                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(reportContent || "<p class='text-slate-400 italic'>Rapor içeriği boş.</p>") }}
+                                                                    />
+                                                                )}
+                                                                <p className="text-[10px] text-slate-400 font-bold">
+                                                                    * Rapor içeriği HTML formatındadır. TinyMCE zengin metin düzenleyiciyle düzenlemek için sağ üstteki "Editörde Aç" butonunu kullanın.
+                                                                </p>
+                                                            </div>
+
+                                                            {/* Right: AI Tenkit Bankası Panel */}
+                                                            <div className="xl:col-span-5 max-h-[500px]">
+                                                                {renderTenkitBank("editor")}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>

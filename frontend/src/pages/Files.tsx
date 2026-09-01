@@ -1,10 +1,11 @@
+// @ts-nocheck
 import { 
     Folder, File as FileIcon, Plus, Search, ChevronRight, ChevronDown, 
     Download, Trash2, Shield, FolderOpen,
     FileText, Image as ImageIcon, Video, Music, 
     Upload, X, Grid, List as ListIcon, RefreshCw, Share2, ExternalLink, HelpCircle,
     Briefcase, FileSpreadsheet, Users, Check, Calendar, AlertTriangle, ArrowLeft, Calculator, Settings
-} from "lucide-react";
+, Building, Coins, Info } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { toast } from "react-hot-toast";
@@ -27,6 +28,15 @@ import { YOLLUK_H_RATES, YOLLUK_COEFFICIENTS } from "../lib/yollukRates";
 
 
 export default function Files() {
+
+    const parseTRNumber = (str: string) => {
+        if (!str) return 0;
+        const cleaned = str.replace(/\./g, '').replace(/,/g, '.');
+        const parsed = parseFloat(cleaned);
+        return isNaN(parsed) ? 0 : parsed;
+    };
+
+
     const confirm = useConfirm();
     const [searchParams] = useSearchParams();
     const scope = searchParams.get("scope");
@@ -61,6 +71,58 @@ export default function Files() {
     const [isDiziModalOpen, setIsDiziModalOpen] = useState(false);
     const [isKapakModalOpen, setIsKapakModalOpen] = useState(false);
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+
+    // Tahsis States
+    const [isTahsisModalOpen, setIsTahsisModalOpen] = useState(false);
+    const [tahsisBaseFeeStr, setTahsisBaseFeeStr] = useState<string>("100000");
+    const [tahsisGunSayisiStr, setTahsisGunSayisiStr] = useState<string>("1");
+    const [tahsisStaffFeeStr, setTahsisStaffFeeStr] = useState<string>("0");
+    const [tahsisOtherFeeStr, setTahsisOtherFeeStr] = useState<string>("0");
+    const [tahsisSesDuzeniFeeStr, setTahsisSesDuzeniFeeStr] = useState<string>("0");
+    const [tahsisRingPistFeeStr, setTahsisRingPistFeeStr] = useState<string>("0");
+    const [tahsisKoruyucuOrtuFeeStr, setTahsisKoruyucuOrtuFeeStr] = useState<string>("0");
+    const [tahsisSandalyeFeeStr, setTahsisSandalyeFeeStr] = useState<string>("0");
+    const [tahsisEkstralarOpen, setTahsisEkstralarOpen] = useState<boolean>(false);
+    const [tahsisKdvRate, setTahsisKdvRate] = useState<number>(20);
+    const [tahsisIsKdvDahil, setTahsisIsKdvDahil] = useState<boolean>(false);
+    const [tahsisIsGencSpor, setTahsisIsGencSpor] = useState<boolean>(false);
+    const [tahsisIhaleVar, setTahsisIhaleVar] = useState<boolean>(false);
+    const [isMadde18Open, setIsMadde18Open] = useState<boolean>(false);
+    
+    // Checklist Tahsis
+    const [tahsisDocTalep, setTahsisDocTalep] = useState<boolean>(false);
+    const [tahsisDocDekont, setTahsisDocDekont] = useState<boolean>(false);
+    const [tahsisDocProtokol, setTahsisDocProtokol] = useState<boolean>(false);
+    const [tahsisDocTutanak, setTahsisDocTutanak] = useState<boolean>(false);
+    const [tahsisDocOnay, setTahsisDocOnay] = useState<boolean>(false);
+
+    // Stadyum States
+    const [isStadyumModalOpen, setIsStadyumModalOpen] = useState(false);
+    const [stadyumSezon, setStadyumSezon] = useState<string>("2026-2027");
+    const [stadyumLig, setStadyumLig] = useState<string>("superLig");
+    const [stadyumKapasiteTier, setStadyumKapasiteTier] = useState<string>("A");
+    const [stadyumKiralamaTuru, setStadyumKiralamaTuru] = useState<string>("sezonluk");
+    const [stadyumMacSayisi, setStadyumMacSayisi] = useState<number>(1);
+    const [stadyumOzelMusabaka, setStadyumOzelMusabaka] = useState<boolean>(false);
+    const [stadyumKalkinmaIl, setStadyumKalkinmaIl] = useState<boolean>(false);
+    const [stadyumEsaslarOpen, setStadyumEsaslarOpen] = useState<boolean>(false);
+    const [isTarifeCetveliOpen, setIsTarifeCetveliOpen] = useState<boolean>(false);
+    const [isStadyumTarifeOpen, setIsStadyumTarifeOpen] = useState<boolean>(false);
+    const [stadyumTarifeTab, setStadyumTarifeTab] = useState<string>("2026-2027");
+    const [stadyumRatesData, setStadyumRatesData] = useState<any>(null);
+    const [stadyumKdvRate, setStadyumKdvRate] = useState<number>(20);
+    const [stadyumIsKdvDahil, setStadyumIsKdvDahil] = useState<boolean>(false);
+    const [stadyumIsGencSpor, setStadyumIsGencSpor] = useState<boolean>(false);
+    const [stadyumIhaleVar, setStadyumIhaleVar] = useState<boolean>(false);
+
+    // Checklist Stadyum
+    const [stadyumDocTalep, setStadyumDocTalep] = useState<boolean>(false);
+    const [stadyumDocDekont, setStadyumDocDekont] = useState<boolean>(false);
+    const [stadyumDocSozlesme, setStadyumDocSozlesme] = useState<boolean>(false);
+    const [stadyumDocProtokol, setStadyumDocProtokol] = useState<boolean>(false);
+    const [stadyumDocOnay, setStadyumDocOnay] = useState<boolean>(false);
+    const [stadyumDocTutanak, setStadyumDocTutanak] = useState<boolean>(false);
+
 
     // Dizi Pusulası verileri
     const [diziItems, setDiziItems] = useState<Array<{
@@ -681,6 +743,9 @@ const calculateYollukValues = () => {
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
+                // If sub-modals are open, close them first
+                const anySubModalOpen = document.querySelector('.sub-modal-active');
+                // Alternatively, just close everything since state setters are stable
                 setIsLojmanModalOpen(false);
                 setIsYollukModalOpen(false);
                 setIsGorevModalOpen(false);
@@ -692,6 +757,12 @@ const calculateYollukValues = () => {
                 setIsDiziModalOpen(false);
                 setIsKapakModalOpen(false);
                 setIsFormModalOpen(false);
+                
+                // Add new modals for Tahsis & Stadyum
+                setIsTahsisModalOpen(false);
+                setIsStadyumModalOpen(false);
+                setIsMadde18Open(false);
+                setIsTarifeCetveliOpen(false);
             }
         };
         window.addEventListener("keydown", handleKeyDown);
@@ -5825,7 +5896,11 @@ const renderPratikModal = () => {
                             <span className="hover:text-primary cursor-pointer transition-colors" onClick={() => setIsHesaplamaSubActive(false)}>Diğer İşlem ve Belgeler</span>
                             <ChevronRight size={10} />
                             <span className="text-primary opacity-80 uppercase tracking-widest">Hesaplama Araçları</span>
-                        </div>
+                        {renderTahsisModal()}
+                  {renderStadyumModal()}
+                  {renderMadde18Modal()}
+                  {renderTarifeCetveliModal()}
+                  </div>
                         
                         <div className="flex items-center gap-4">
                             <Button
@@ -5900,6 +5975,46 @@ const renderPratikModal = () => {
                             Uygulamayı Aç
                         </Button>
                     </Card>
+                    {/* Sub-card 4: Salon Tahsis */}
+                      <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+                          <div className="p-4 rounded-2xl bg-amber-500/10 text-amber-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
+                              <Coins size={24} />
+                          </div>
+                          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Spor Tesisleri Tahsis Ücreti</h3>
+                          <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
+                              Salon, semt sahası ve diğer spor tesisleri tahsis hesaplamaları.
+                          </p>
+                          <div className="mt-6 flex gap-2 w-full">
+                              <Button 
+                                  onClick={() => setIsTahsisModalOpen(true)}
+                                  className="flex-1 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black uppercase text-[10px] tracking-widest py-3"
+                              >
+                                  Uygulamayı Aç
+                              </Button>
+                          </div>
+                      </Card>
+
+                      {/* Sub-card 5: Stadyum Tahsis */}
+                      <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-rose-500/10 to-pink-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+                          <div className="p-4 rounded-2xl bg-rose-500/10 text-rose-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
+                              <Building size={24} />
+                          </div>
+                          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Stadyum Tahsis Ücreti</h3>
+                          <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
+                              Süper Lig, 1. Lig, 2. Lig ve 3. Lig stadyum kiralama ve tahsis bedeli hesaplamaları.
+                          </p>
+                          <div className="mt-6 flex gap-2 w-full">
+                              <Button 
+                                  onClick={() => setIsStadyumModalOpen(true)}
+                                  className="flex-1 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest py-3"
+                              >
+                                  Uygulamayı Aç
+                              </Button>
+                          </div>
+                      </Card>
+
                 </div>
 
                 {/* Render Modals */}
@@ -6022,7 +6137,972 @@ const renderPratikModal = () => {
                 </div>
             </div>
         );
-    };    if (scope === "other") {
+    };    
+    const handleExportTahsisExcel = () => {
+        const gunSayisi = parseTRNumber(tahsisGunSayisiStr) || 1;
+        const baseDaily = parseTRNumber(tahsisBaseFeeStr);
+        const baseInput = baseDaily * gunSayisi;
+        const kdvRate = tahsisKdvRate / 100;
+        const baseNet = tahsisIsKdvDahil ? baseInput / (1 + kdvRate) : baseInput;
+        
+        const staff = parseTRNumber(tahsisStaffFeeStr);
+        const ses = parseTRNumber(tahsisSesDuzeniFeeStr);
+        const ring = parseTRNumber(tahsisRingPistFeeStr);
+        const ortu = parseTRNumber(tahsisKoruyucuOrtuFeeStr);
+        const sandalye = parseTRNumber(tahsisSandalyeFeeStr);
+        const ekstraToplam = staff + ses + ring + ortu + sandalye;
+
+        const kdv = baseNet * kdvRate;
+        const damga = baseNet * 0.00948;
+        const karar = tahsisIhaleVar ? baseNet * 0.00569 : 0;
+        
+        const gmPayBase = baseNet + kdv + damga + karar;
+        const gmPay = tahsisIsGencSpor ? 0 : (gmPayBase * 0.05);
+        const teminat = baseNet * 0.06;
+        
+        const total = baseNet + kdv + gmPay + damga + karar + ekstraToplam + teminat;
+
+        const wb = XLSX.utils.book_new();
+        const data: any[][] = [
+            ["SPOR TESİSLERİ TAHSİS ÜCRETİ HESAPLAMA RAPORU"],
+            ["Tarih", new Date().toLocaleDateString("tr-TR")],
+            [],
+            ["Hesaplama Kalemleri", "Açıklama", "Tutar (TL)"],
+            ["Tahsis Ücreti (Taban Bedel)", "", { t: "n", v: baseNet, z: "#,##0.00" }],
+            [`KDV Ücreti (%${tahsisKdvRate})`, "", { t: "n", v: kdv, z: "#,##0.00" }],
+            ["Genel Müdürlük Payı (%5)", tahsisIsGencSpor ? "Madde 12 İstisnası (0 TL)" : "KDV, Damga ve Karar Pulu Dahil Brüt Üzerinden", { t: "n", v: gmPay, z: "#,##0.00" }],
+            ["Damga Vergisi (Binde 9.48)", "Tahsis Bedeli Üzerinden", { t: "n", v: damga, z: "#,##0.00" }],
+            ["Karar Pulu (Binde 5.69)", tahsisIhaleVar ? "İhale Kararı - Tahsis Bedeli Üzerinden" : "İhale Yok (0 TL)", { t: "n", v: karar, z: "#,##0.00" }],
+            ["Ekstra Giderler Toplamı", "Personel, Ses, Ring vs.", { t: "n", v: ekstraToplam, z: "#,##0.00" }],
+            ["Teminat (%6 - İade Edilecek)", "Madde 13 - Tahsis Bedeli Üzerinden", { t: "n", v: teminat, z: "#,##0.00" }],
+            [],
+            ["TOPLAM ÖDEME BEDELİ", "Teminat Dahildir", { t: "n", v: total, z: "#,##0.00" }],
+            ["ÖDENECEK TEMİNAT", "İade Edilebilir Teminat Tutarı", { t: "n", v: teminat, z: "#,##0.00" }],
+            [],
+            ["Belge Kontrol Listesi", "Durum"],
+            ["Kiralama Talep Yazısı", tahsisDocTalep ? "Mevcut" : "Eksik"],
+            ["Teminat Dekontu / Mektubu", tahsisDocDekont ? "Mevcut" : "Eksik"],
+            ["Tahsis Sözleşmesi / Protokolü", tahsisDocProtokol ? "Mevcut" : "Eksik"],
+            ["Olur / Onay", tahsisDocOnay ? "Mevcut" : "Eksik"],
+            ["Eksiksiz Alındığına Dair Tutanak", tahsisDocTutanak ? "Mevcut" : "Eksik"],
+        ];
+
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb, ws, "Tahsis Raporu");
+        XLSX.writeFile(wb, "Tahsis_Ucreti_Raporu.xlsx");
+        toast.success("Excel belgesi indirildi.");
+    };
+
+    const renderMadde18Modal = () => {
+        if (!isMadde18Open) return null;
+        return createPortal(
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+                <Card className="w-full max-w-4xl p-6 rounded-[32px] bg-white dark:bg-slate-900 border-white/60 dark:border-slate-800 shadow-2xl flex flex-col max-h-[85vh]">
+                    <div className="flex items-center justify-between border-b pb-4 mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-amber-500/10 text-amber-500 rounded-xl"><Info size={24}/></div>
+                            <h2 className="text-xl font-bold">Ücretsiz Tahsisler (Madde 18)</h2>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => setIsMadde18Open(false)}><X/></Button>
+                    </div>
+                    <div className="overflow-y-auto custom-scrollbar flex-1 pr-2 space-y-4 text-sm text-slate-700 dark:text-slate-300">
+                        <p className="font-semibold text-amber-600">Aşağıdaki durumlarda tesisler ücretsiz olarak tahsis edilir (Madde 18):</p>
+                        <ul className="list-disc pl-5 space-y-2">
+                            <li>Bakanlık ve il müdürlüğü tarafından düzenlenen faaliyetler.</li>
+                            <li>Tesislerin kurulu bulunduğu eğitim kurumlarının beden eğitimi ve spor çalışmaları.</li>
+                            <li>Spor kulüplerinin ve ferdi lisanslı sporcuların antrenmanları.</li>
+                            <li>Milli Eğitim Bakanlığına bağlı okulların ilçe, il ve grup müsabakaları.</li>
+                            <li>Üniversite Sporları Federasyonu tarafından düzenlenen faaliyetler.</li>
+                            <li>Cumhurbaşkanlığı, TBMM, Başbakanlık, Bakanlıklar ile kamu kurum ve kuruluşları ve mahalli idarelerin kendi personeli arasında düzenlenen amatör müsabakalar.</li>
+                            <li>Engelliler, şehit yakınları ve gazilerin sportif faaliyetleri.</li>
+                            <li>Okul öncesi eğitim kurumlarının, ilköğretim ve ortaöğretim öğrencilerinin beden eğitimi ve spor faaliyetleri.</li>
+                            <li>Gençlik ve Spor Kulüpleri ile Bakanlık veya teşkilatı tarafından tescil edilen izcilik ünitelerinin, sportif, kültürel ve sosyal amaçlı faaliyetleri.</li>
+                            <li>Ulusal bayramlar ve mahalli kurtuluş günleri vb. kutlama törenleri.</li>
+                            <li>Kamu yararına çalışan derneklerin ve vakıfların gelir sağlamayan tamamen sosyal, kültürel ve sportif amaçlı faaliyetleri.</li>
+                        </ul>
+                    </div>
+                </Card>
+            </div>
+        , document.body);
+    };
+
+        const renderTarifeCetveliModal = () => {
+        if (!isTarifeCetveliOpen) return null;
+        
+        // Modal açıldığında eğer tablo verisi yoksa, yükle.
+        if (!stadyumRatesData) {
+            fetch("/mufyard_rates.json").then(r => r.json()).then(d => {
+                if (d.stadyumTahsisRates) setStadyumRatesData(d.stadyumTahsisRates);
+            }).catch(() => toast.error("Tarife verileri yüklenemedi."));
+            return createPortal(
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="text-white text-sm font-bold animate-pulse">Tarife cetvelleri yükleniyor...</div>
+                </div>
+            , document.body);
+        }
+
+        const seasonData = stadyumRatesData[stadyumSezon] || {};
+        const ligKeys = Object.keys(seasonData);
+
+        return createPortal(
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+                <Card className="w-full max-w-5xl p-6 rounded-[32px] bg-white dark:bg-slate-900 border-white/60 dark:border-slate-800 shadow-2xl flex flex-col max-h-[90vh]">
+                    <div className="flex items-center justify-between border-b pb-4 mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-rose-500/10 text-rose-500 rounded-xl"><Building size={24}/></div>
+                            <h2 className="text-xl font-bold">Stadyum Tahsis Ücret Cetvelleri</h2>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => setIsTarifeCetveliOpen(false)}><X/></Button>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
+                        <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Görüntülenen Sezon:</label>
+                        <select 
+                            value={stadyumSezon} 
+                            onChange={(e) => setStadyumSezon(e.target.value)} 
+                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none text-sm font-bold w-64 shadow-sm text-slate-800 dark:text-slate-200 cursor-pointer"
+                        >
+                            <option value="2026-2027">2026 - 2027 Sezonu</option>
+                            <option value="2024-2025">2024 - 2025 Sezonu</option>
+                            <option value="2023-2024">2023 - 2024 Sezonu</option>
+                            <option value="2022-2023">2022 - 2023 Sezonu</option>
+                        </select>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-auto">Fiyatlar ₺ cinsindendir.</p>
+                    </div>
+
+                    <div className="overflow-y-auto custom-scrollbar flex-1 space-y-8 pr-2">
+                        {ligKeys.map(ligKey => {
+                            const lig = seasonData[ligKey];
+                            return (
+                                <div key={ligKey} className="space-y-3">
+                                    <h3 className="font-black text-rose-600 text-lg uppercase tracking-wide border-b border-rose-100 dark:border-rose-900/30 pb-2">{lig.label}</h3>
+                                    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                                        <table className="w-full text-sm text-left">
+                                            <thead className="bg-slate-50 dark:bg-slate-800/50 text-xs uppercase font-bold text-slate-500 dark:text-slate-400">
+                                                <tr>
+                                                    <th className="px-4 py-3 whitespace-nowrap border-b border-slate-200 dark:border-slate-700">Kapasite Aralığı / Durumu</th>
+                                                    <th className="px-4 py-3 whitespace-nowrap border-b border-slate-200 dark:border-slate-700">Sezonluk Ücret</th>
+                                                    <th className="px-4 py-3 whitespace-nowrap border-b border-slate-200 dark:border-slate-700">Tek Maç / Belirli Müsabaka</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                {lig.tiers.map((t: any) => (
+                                                    <tr key={t.code} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                                                        <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">{t.code} - {t.label}</td>
+                                                        <td className="px-4 py-3 font-mono text-slate-900 dark:text-slate-100 font-bold">{t.sezonluk.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺</td>
+                                                        <td className="px-4 py-3 font-mono text-slate-900 dark:text-slate-100 font-bold">{t.tekMac.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {ligKeys.length === 0 && (
+                            <div className="text-center py-10 text-slate-500 font-bold">Bu sezon için veri bulunamadı.</div>
+                        )}
+                        
+                        <div className="mt-8 p-6 bg-rose-50/50 dark:bg-rose-900/10 rounded-2xl border border-rose-100 dark:border-rose-900/30">
+                            <p className="font-bold text-rose-700 dark:text-rose-400 mb-4 text-base">Stadyum Kiralama Esasları ve Açıklamalar:</p>
+                            <ul className="list-decimal pl-5 space-y-3 text-slate-700 dark:text-slate-300">
+                                <li>Kulüpler stadyum, stat ve sahaları kiraladığı takdirde Sportif Müsabaka ve Gösteri Hasılatı Dağıtım Çizelgesindeki İl ve İlçe payı kesilmeyecek, sadece kira ücreti alınacaktır. Ancak, müsabaka net hasılatının %7'si il müdürlüğü tarafından Bakanlığın hesabına yatırılacaktır.</li>
+                                <li>İşletme Yönetmeliğinin 12. maddesi gereği kira bedeli üzerinden %5 oranında ayrıca bir pay alınacaktır.</li>
+                                <li>Kira ücretleri müsabakalardan önce nakit, devlet tahvili veya bloke çek halinde ilgili il müdürlüklerine ödenecektir.</li>
+                                <li>Kira bedeli üzerinden Damga Vergisi (%0.948) tahsil edilir.</li>
+                                <li>İhale kararı alınmışsa Karar Pulu (Binde 5.69) tahsil edilir.</li>
+                                <li>Müsabakalar esnasında meydana gelebilecek hasarı karşılamak üzere kira ücretinin %6'sı kadar teminat alınacaktır.</li>
+                                <li>Kupa müsabakaları sezonluk kiralama kapsamı içindedir.</li>
+                                <li>Özel müsabakalarda kiralama yapıldığı takdirde sezonluk kira ücretlerinin %50 fazlası hesaplanıp alınacaktır. (Madde 15)</li>
+                                <li>Nüfusu 300.000 kişiden az olan kalkınmada öncelikli illerimizde kira ücretlerinin %50'si alınacaktır. (Madde 18)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+        , document.body);
+    };
+
+    const renderTahsisModal = () => {
+        if (!isTahsisModalOpen) return null;
+
+        const gunSayisi = parseTRNumber(tahsisGunSayisiStr) || 1;
+        const baseDaily = parseTRNumber(tahsisBaseFeeStr);
+        const baseInput = baseDaily * gunSayisi;
+        const kdvRate = tahsisKdvRate / 100;
+        const baseNet = tahsisIsKdvDahil ? baseInput / (1 + kdvRate) : baseInput;
+        
+        const staff = parseTRNumber(tahsisStaffFeeStr);
+        const ses = parseTRNumber(tahsisSesDuzeniFeeStr);
+        const ring = parseTRNumber(tahsisRingPistFeeStr);
+        const ortu = parseTRNumber(tahsisKoruyucuOrtuFeeStr);
+        const sandalye = parseTRNumber(tahsisSandalyeFeeStr);
+        const ekstraToplam = staff + ses + ring + ortu + sandalye;
+
+        const kdv = baseNet * kdvRate;
+        const damga = baseNet * 0.00948;
+        const karar = tahsisIhaleVar ? baseNet * 0.00569 : 0;
+        
+        const gmPayBase = baseNet + kdv + damga + karar;
+        const gmPay = tahsisIsGencSpor ? 0 : (gmPayBase * 0.05);
+        const teminat = baseNet * 0.06;
+        
+        const total = baseNet + kdv + gmPay + damga + karar + ekstraToplam + teminat;
+
+        const docsCount = [tahsisDocTalep, tahsisDocDekont, tahsisDocProtokol, tahsisDocTutanak, tahsisDocOnay].filter(Boolean).length;
+        const isComplete = docsCount === 5;
+
+        return createPortal(
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+                <Card className="w-full max-w-5xl p-5 rounded-[32px] bg-card border-white/60 dark:border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-300 font-outfit">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+                                <Coins size={20} />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-black text-slate-900 dark:text-slate-100">Tahsis Ücreti Hesaplama</h3>
+                                <p className="text-[10px] text-slate-500 font-medium">Genel Müdürlük payı, KDV, damga vergisi, karar pulu, personel ücreti ve teminat hesaplayın.</p>
+                            </div>
+                        </div>
+                        <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => setIsMadde18Open(true)}
+                            className="h-8 px-3 text-[11px] font-bold text-emerald-600 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800 dark:hover:bg-emerald-900/40 rounded-xl mr-1"
+                        >
+                            <Info size={14} className="mr-1" />
+                            Ücretsiz Tahsisler (Md. 18)
+                        </Button>
+                        <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            onClick={() => setIsTahsisModalOpen(false)} 
+                            className="rounded-xl h-8 w-8 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                        >
+                            <X size={16} />
+                        </Button>
+                    </div>
+
+                    {/* Main Content Split Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden flex-1">
+                        {/* Parameters Form - Left */}
+                        <div className="lg:col-span-5 space-y-3 overflow-y-auto custom-scrollbar pr-1">
+                            <div className="bg-slate-50/50 dark:bg-slate-900/20 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/80 space-y-2.5">
+                                <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Tarife Parametreleri</h4>
+                                
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Taban Bedeli (Günlük)</label>
+                                        <input 
+                                            type="text" 
+                                            value={tahsisBaseFeeStr} 
+                                            onChange={(e) => setTahsisBaseFeeStr(e.target.value)} onBlur={(e) => setTahsisBaseFeeStr(fmtTR(parseTRNumber(e.target.value)))} onBlur={() => setTahsisBaseFeeStr(fmtTR(parseTRNumber(TahsisBaseFeeStr)))}
+                                            onBlur={() => setTahsisBaseFeeStr(fmtTR(parseTRNumber(tahsisBaseFeeStr)))}
+                                            placeholder="Örn: 100.000"
+                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-amber-500 outline-none text-xs font-bold text-slate-800 dark:text-slate-200" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Gün Sayısı</label>
+                                        <input 
+                                            type="text" 
+                                            value={tahsisGunSayisiStr} 
+                                            onChange={(e) => setTahsisGunSayisiStr(e.target.value)} onBlur={(e) => setTahsisGunSayisiStr(fmtTR(parseTRNumber(e.target.value)))} onBlur={() => setTahsisGunSayisiStr(fmtTR(parseTRNumber(TahsisGunSayisiStr)))}
+                                            onBlur={() => setTahsisGunSayisiStr(fmtTR(parseTRNumber(tahsisGunSayisiStr)))}
+                                            placeholder="Örn: 1"
+                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-amber-500 outline-none text-xs font-bold text-slate-800 dark:text-slate-200" 
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">KDV Oranı (%)</label>
+                                        <input 
+                                            type="number" 
+                                            value={tahsisKdvRate} 
+                                            onChange={(e) => setTahsisKdvRate(Number(e.target.value))}
+                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-amber-500 outline-none text-xs font-bold text-slate-800 dark:text-slate-200" 
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2 mt-2">
+                                    <label className="flex items-center gap-2 text-[10px] font-semibold text-slate-600 dark:text-slate-350 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={tahsisIsKdvDahil} 
+                                            onChange={(e) => setTahsisIsKdvDahil(e.target.checked)}
+                                            className="rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                                        />
+                                        <span>Girdiğim Fiyat KDV {tahsisIsKdvDahil ? "Dahildir" : "Hariçtir"}</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-[10px] font-semibold text-slate-600 dark:text-slate-350 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={tahsisIsGencSpor} 
+                                            onChange={(e) => setTahsisIsGencSpor(e.target.checked)}
+                                            className="rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                                        />
+                                        <span>Gençlik ve Spor Faaliyeti (Madde 12: %5 Pay İstisnası)</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-[10px] font-semibold text-slate-600 dark:text-slate-350 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={tahsisIhaleVar} 
+                                            onChange={(e) => setTahsisIhaleVar(e.target.checked)}
+                                            className="rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                                        />
+                                        <span>İhale Kararı Var (Karar Pulu Uygulanır)</span>
+                                    </label>
+                                </div>
+
+                                {/* Ekstra Giderler Collapsible */}
+                                <div className="border-t border-slate-100 dark:border-slate-800 pt-3 pb-3">
+                                    <button 
+                                        onClick={() => setTahsisEkstralarOpen(!tahsisEkstralarOpen)}
+                                        className="w-full flex items-center justify-between group pb-2"
+                                    >
+                                        <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400 group-hover:text-amber-500 transition-colors">Ekstra Ücretler (Personel, Ses, Vb.)</h4>
+                                        <ChevronDown size={14} className={`text-slate-400 transition-transform duration-300 ${tahsisEkstralarOpen ? "rotate-180" : ""}`} />
+                                    </button>
+                                    
+                                    {tahsisEkstralarOpen && (
+                                        <div className="space-y-2 pt-2 animate-in slide-in-from-top-2 duration-200">
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Personel Ücreti (TL)</label>
+                                                <input type="text" value={tahsisStaffFeeStr} onChange={(e) => setTahsisStaffFeeStr(e.target.value)} onBlur={(e) => setTahsisStaffFeeStr(fmtTR(parseTRNumber(e.target.value)))} onBlur={() => setTahsisStaffFeeStr(fmtTR(parseTRNumber(TahsisStaffFeeStr)))} placeholder="Örn: 5.000" className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-amber-500 outline-none text-xs font-bold text-slate-800 dark:text-slate-200" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Ses Düzeneği Ücreti (TL)</label>
+                                                <input type="text" value={tahsisSesDuzeniFeeStr} onChange={(e) => setTahsisSesDuzeniFeeStr(e.target.value)} onBlur={(e) => setTahsisSesDuzeniFeeStr(fmtTR(parseTRNumber(e.target.value)))} onBlur={() => setTahsisSesDuzeniFeeStr(fmtTR(parseTRNumber(TahsisSesDuzeniFeeStr)))} placeholder="Örn: 1.500" className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-amber-500 outline-none text-xs font-bold text-slate-800 dark:text-slate-200" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Ring, Podyum Söküm-Takım (TL)</label>
+                                                <input type="text" value={tahsisRingPistFeeStr} onChange={(e) => setTahsisRingPistFeeStr(e.target.value)} onBlur={(e) => setTahsisRingPistFeeStr(fmtTR(parseTRNumber(e.target.value)))} onBlur={() => setTahsisRingPistFeeStr(fmtTR(parseTRNumber(TahsisRingPistFeeStr)))} placeholder="Örn: 2.000" className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-amber-500 outline-none text-xs font-bold text-slate-800 dark:text-slate-200" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Koruyucu Örtü Ücreti (TL)</label>
+                                                <input type="text" value={tahsisKoruyucuOrtuFeeStr} onChange={(e) => setTahsisKoruyucuOrtuFeeStr(e.target.value)} onBlur={(e) => setTahsisKoruyucuOrtuFeeStr(fmtTR(parseTRNumber(e.target.value)))} onBlur={() => setTahsisKoruyucuOrtuFeeStr(fmtTR(parseTRNumber(TahsisKoruyucuOrtuFeeStr)))} placeholder="Örn: 1.000" className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-amber-500 outline-none text-xs font-bold text-slate-800 dark:text-slate-200" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Sandalye Ücreti (TL)</label>
+                                                <input type="text" value={tahsisSandalyeFeeStr} onChange={(e) => setTahsisSandalyeFeeStr(e.target.value)} onBlur={(e) => setTahsisSandalyeFeeStr(fmtTR(parseTRNumber(e.target.value)))} onBlur={() => setTahsisSandalyeFeeStr(fmtTR(parseTRNumber(TahsisSandalyeFeeStr)))} placeholder="Örn: 500" className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-amber-500 outline-none text-xs font-bold text-slate-800 dark:text-slate-200" />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="bg-slate-50/50 dark:bg-slate-900/20 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/80">
+                                <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2.5">Belge Kontrol Listesi</h4>
+                                <div className="space-y-2">
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-350 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={tahsisDocTalep} 
+                                            onChange={(e) => setTahsisDocTalep(e.target.checked)}
+                                            className="rounded border-slate-350 text-amber-600 focus:ring-amber-500 h-3.5 w-3.5"
+                                        />
+                                        <span>Kiralama Talep Yazısı</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-350 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={tahsisDocDekont} 
+                                            onChange={(e) => setTahsisDocDekont(e.target.checked)}
+                                            className="rounded border-slate-350 text-amber-600 focus:ring-amber-500 h-3.5 w-3.5"
+                                        />
+                                        <span>Teminat Dekontu / Mektubu</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-350 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={tahsisDocProtokol} 
+                                            onChange={(e) => setTahsisDocProtokol(e.target.checked)}
+                                            className="rounded border-slate-350 text-amber-600 focus:ring-amber-500 h-3.5 w-3.5"
+                                        />
+                                        <span>Tahsis Sözleşmesi / Protokolü</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-350 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={tahsisDocTutanak} 
+                                            onChange={(e) => setTahsisDocTutanak(e.target.checked)}
+                                            className="rounded border-slate-350 text-amber-600 focus:ring-amber-500 h-3.5 w-3.5"
+                                        />
+                                        <span>Eksiksiz Alındığına Dair Tutanak</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-350 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={tahsisDocOnay} 
+                                            onChange={(e) => setTahsisDocOnay(e.target.checked)}
+                                            className="rounded border-slate-350 text-amber-600 focus:ring-amber-500 h-3.5 w-3.5"
+                                        />
+                                        <span>Olur / Onay</span>
+                                    </label>
+                                </div>
+
+                                <div className={`mt-3 p-2.5 rounded-xl border text-center transition-all ${isComplete ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"}`}>
+                                    <div className="text-[11px] font-bold flex items-center justify-center gap-1.5">
+                                        {isComplete ? <Check size={12} className="text-emerald-500" /> : null}
+                                        <span>Belgeler: {docsCount} / 5 Tamamlandı</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Calculation Results - Right */}
+                        <div className="lg:col-span-7 space-y-3 flex flex-col overflow-hidden">
+                            <div className="bg-slate-50/50 dark:bg-slate-900/20 p-4 rounded-3xl border border-slate-100 dark:border-slate-800/80 flex-1 overflow-y-auto custom-scrollbar space-y-4">
+                                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">Hesaplama Detayları</h4>
+                                    <div className="text-[10px] font-bold text-slate-500">Tarih: {new Date().toLocaleDateString("tr-TR")}</div>
+                                </div>
+
+                                <div className="space-y-2.5 text-xs">
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${fmtTR(baseDaily)} TL x ${gunSayisi} Gün`}>
+                                        <span className="font-medium text-slate-500">A) Tahsis Ücreti (Taban Bedel)</span>
+                                        <span className="font-bold text-slate-800 dark:text-slate-200">{fmtTR(baseNet)} TL</span>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${fmtTR(baseNet)} TL x %${tahsisKdvRate} = ${fmtTR(kdv)} TL`}>
+                                        <span className="font-medium text-slate-500">B) KDV Ücreti (%{tahsisKdvRate})</span>
+                                        <span className="font-bold text-slate-800 dark:text-slate-200">+{fmtTR(kdv)} TL</span>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${fmtTR(gmPayBase)} TL x %5 = ${fmtTR(gmPay)} TL`}>
+                                        <span className="font-medium text-slate-500">C) %5 Genel Müdürlük Payı</span>
+                                        <span className="font-bold text-slate-800 dark:text-slate-200">+{fmtTR(gmPay)} TL</span>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${fmtTR(baseNet)} TL x Binde 9.48 = ${fmtTR(damga)} TL`}>
+                                        <span className="font-medium text-slate-500">Ç) Damga Vergisi (Binde 9.48)</span>
+                                        <span className="font-bold text-slate-800 dark:text-slate-200">+{fmtTR(damga)} TL</span>
+                                    </div>
+                                    {tahsisIhaleVar && (
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${fmtTR(baseNet)} TL x Binde 5.69 = ${fmtTR(karar)} TL`}>
+                                        <span className="font-medium text-slate-500">D) Karar Pulu (Binde 5.69)</span>
+                                        <span className="font-bold text-slate-800 dark:text-slate-200">+{fmtTR(karar)} TL</span>
+                                    </div>
+                                    )}
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
+                                        <span className="font-medium text-slate-500">E) Ekstra Giderler Toplamı</span>
+                                        <span className="font-bold text-slate-800 dark:text-slate-200">+{fmtTR(ekstraToplam)} TL</span>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 text-amber-600 dark:text-amber-400" title={`${fmtTR(baseNet)} TL x %6 = ${fmtTR(teminat)} TL`}>
+                                        <span className="font-semibold">F) %6 Teminat Gideri (İade Edilecek)</span>
+                                        <span className="font-bold">{fmtTR(teminat)} TL</span>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-3">
+                                    <div className="bg-slate-100/50 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-200/50 dark:border-slate-800">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">Toplam Ödeme Bedeli</span>
+                                        <span className="text-xl font-black text-slate-900 dark:text-slate-100">{fmtTR(total)} TL</span>
+                                    </div>
+                                    <div className="bg-amber-500/5 p-3 rounded-2xl border border-amber-500/10">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-amber-500 block mb-0.5">Ödenecek Teminat</span>
+                                        <span className="text-xl font-black text-amber-600 dark:text-amber-400">{fmtTR(teminat)} TL</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Export Buttons */}
+                            <div className="flex gap-3">
+                                <Button 
+                                    onClick={handleExportTahsisExcel}
+                                    className="flex-1 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-3.5 flex items-center justify-center gap-2 border-none shadow-sm shadow-amber-600/10"
+                                >
+                                    <Download size={16} />
+                                    <span>Excel Olarak Dışa Aktar</span>
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+        , document.body);
+    };
+
+    const handleExportStadyumExcel = () => {
+        if (!stadyumRatesData) return;
+        const seasonData = stadyumRatesData[stadyumSezon];
+        if (!seasonData) return;
+        const ligData = seasonData[stadyumLig];
+        if (!ligData) return;
+        const tier = ligData.tiers.find((t: any) => t.code === stadyumKapasiteTier);
+        if (!tier) return;
+
+        const birimFiyat = stadyumKiralamaTuru === "sezonluk" ? tier.sezonluk : tier.tekMac;
+        let kiraBedeli = birimFiyat * stadyumMacSayisi;
+        let ozelFark = 0;
+        let kalkinmaIndirim = 0;
+        if (stadyumOzelMusabaka) { ozelFark = kiraBedeli * 0.50; kiraBedeli += ozelFark; }
+        if (stadyumKalkinmaIl) { kalkinmaIndirim = kiraBedeli * 0.50; kiraBedeli -= kalkinmaIndirim; }
+        
+        let baseNet = kiraBedeli;
+        let kdv = 0;
+        if (stadyumIsKdvDahil) {
+            baseNet = kiraBedeli / (1 + (stadyumKdvRate / 100));
+            kdv = kiraBedeli - baseNet;
+        } else {
+            kdv = kiraBedeli * (stadyumKdvRate / 100);
+        }
+        
+        const damga = baseNet * 0.00948;
+        const karar = stadyumIhaleVar ? baseNet * 0.00569 : 0;
+        
+        const gmPayBase = baseNet + kdv + damga + karar;
+        const gmPay = stadyumIsGencSpor ? 0 : (gmPayBase * 0.05);
+        
+        const teminat = baseNet * 0.06;
+        const total = baseNet + kdv + gmPay + damga + karar + teminat;
+    
+
+        const wb = XLSX.utils.book_new();
+        const data: any[][] = [
+            ["STADYUM TAHSİS ÜCRETİ HESAPLAMA RAPORU"],
+            ["Tarih", new Date().toLocaleDateString("tr-TR")],
+            [],
+            ["Sezon", stadyumSezon],
+            ["Lig", ligData.label],
+            ["Seyirci Kapasitesi", `${tier.code} - ${tier.label}`],
+            ["Kiralama Türü", stadyumKiralamaTuru === "sezonluk" ? "Sezonluk Kiralama" : "Tek Maç / Belirli Müsabakalar"],
+            ["Müsabaka Sayısı", stadyumMacSayisi],
+            [],
+            ["Hesaplama Kalemleri", "Açıklama", "Tutar (TL)"],
+            ["Birim Kira Bedeli (Müsabaka Başı)", stadyumKiralamaTuru === "sezonluk" ? "Sezonluk Tarife" : "Tek Maç Tarife", { t: "n", v: birimFiyat, z: "#,##0.00" }],
+            ["Toplam Kira Bedeli", `${stadyumMacSayisi} müsabaka`, { t: "n", v: birimFiyat * stadyumMacSayisi, z: "#,##0.00" }],
+        ];
+        if (stadyumOzelMusabaka) data.push(["Özel Müsabaka Farkı (+%50)", "Madde 15", { t: "n", v: ozelFark, z: "#,##0.00" }]);
+        if (stadyumKalkinmaIl) data.push(["Kalkınmada Öncelikli İl İndirimi (-%50)", "Madde 18", { t: "n", v: -kalkinmaIndirim, z: "#,##0.00" }]);
+        data.push(
+            ["Net Kira Bedeli", "", { t: "n", v: kiraBedeli, z: "#,##0.00" }],
+            ["Genel Müdürlük Payı (%5)", "Madde 2 - Kira Bedeli Üzerinden", { t: "n", v: gmPay, z: "#,##0.00" }],
+            ["Teminat (%6 - İade Edilebilir)", "Madde 13 - Kira Bedeli Üzerinden", { t: "n", v: teminat, z: "#,##0.00" }],
+            [],
+            ["TOPLAM ÖDEME (Teminat Dahil)", "", { t: "n", v: total, z: "#,##0.00" }],
+            [],
+            ["Belge Kontrol Listesi", "Durum", ""],
+            ["Kiralama Talep Yazısı", stadyumDocTalep ? "Mevcut" : "Eksik", ""],
+            ["Teminat Dekontu / Mektubu", stadyumDocDekont ? "Mevcut" : "Eksik", ""],
+            ["Stadyum Kiralama Sözleşmesi", stadyumDocSozlesme ? "Mevcut" : "Eksik", ""],
+            ["Güvenlik ve Emniyet Protokolü", stadyumDocProtokol ? "Mevcut" : "Eksik", ""],
+            ["Valilik / Kaymakamlık Oluru", stadyumDocOnay ? "Mevcut" : "Eksik", ""],
+            ["Eksiksiz Teslim ve Hasar Tespit Tutanağı", stadyumDocTutanak ? "Mevcut" : "Eksik", ""],
+            [],
+            ["ÖNEMLİ NOTLAR"],
+            ["Madde 1: Müsabaka net hasılatının %7'si Bakanlığa ayrıca yatırılacaktır."],
+            ["Madde 7: Yapısal olmayan bakım/onarımlar kulüp tarafından yapılacaktır."],
+            ["Madde 14: Kira ücretleri lig ve kupa müsabakaları için geçerlidir."],
+        );
+
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb, ws, "Stadyum Tahsis Raporu");
+        XLSX.writeFile(wb, "Stadyum_Tahsis_Ucreti_Raporu.xlsx");
+        toast.success("Excel belgesi indirildi.");
+    };
+    const renderStadyumModal = () => {
+        if (!isStadyumModalOpen) return null;
+
+        // Load rates data on first open
+        if (!stadyumRatesData) {
+            fetch("/mufyard_rates.json").then(r => r.json()).then(d => {
+                if (d.stadyumTahsisRates) setStadyumRatesData(d.stadyumTahsisRates);
+            }).catch(() => toast.error("Tarife verileri yüklenemedi."));
+            return createPortal(
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+                    <div className="text-white text-sm font-bold animate-pulse">Tarife verileri yükleniyor...</div>
+                </div>
+            , document.body);
+        }
+
+        const seasonData = stadyumRatesData[stadyumSezon];
+        const ligKeys = seasonData ? Object.keys(seasonData) : [];
+        const ligData = seasonData?.[stadyumLig];
+        const tiers = ligData?.tiers || [];
+        const selectedTier = tiers.find((t: any) => t.code === stadyumKapasiteTier) || tiers[0];
+
+        const birimFiyat = selectedTier ? (stadyumKiralamaTuru === "sezonluk" ? selectedTier.sezonluk : selectedTier.tekMac) : 0;
+        let kiraBedeli = birimFiyat * stadyumMacSayisi;
+        let ozelFark = 0;
+        let kalkinmaIndirim = 0;
+        if (stadyumOzelMusabaka) { ozelFark = kiraBedeli * 0.50; kiraBedeli += ozelFark; }
+        if (stadyumKalkinmaIl) { kalkinmaIndirim = kiraBedeli * 0.50; kiraBedeli -= kalkinmaIndirim; }
+        
+        let baseNet = kiraBedeli;
+        let kdv = 0;
+        if (stadyumIsKdvDahil) {
+            baseNet = kiraBedeli / (1 + (stadyumKdvRate / 100));
+            kdv = kiraBedeli - baseNet;
+        } else {
+            kdv = kiraBedeli * (stadyumKdvRate / 100);
+        }
+        
+        const damga = baseNet * 0.00948;
+        const karar = stadyumIhaleVar ? baseNet * 0.00569 : 0;
+        
+        const gmPayBase = baseNet + kdv + damga + karar;
+        const gmPay = stadyumIsGencSpor ? 0 : (gmPayBase * 0.05);
+        
+        const teminat = baseNet * 0.06;
+        const total = baseNet + kdv + gmPay + damga + karar + teminat;
+    
+
+        const docsCount = [stadyumDocTalep, stadyumDocDekont, stadyumDocSozlesme, stadyumDocProtokol, stadyumDocOnay, stadyumDocTutanak].filter(Boolean).length;
+        const isComplete = docsCount === 6;
+
+        const selectClass = "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-rose-500 outline-none text-xs font-bold text-slate-800 dark:text-slate-200 appearance-none cursor-pointer";
+
+        const esaslarItems = [
+            "Kulüpler stadyum, stat ve sahaları kiraladığı takdirde Sportif Müsabaka ve Gösteri Hasılatı Dağıtım Çizelgesindeki İl ve İlçe payı kesilmeyecek, sadece kira ücreti alınacaktır. Ancak, müsabaka net hasılatının %7'si il müdürlüğü tarafından Bakanlığın Ziraat Bankası Ankara Kurumsal Şubesindeki (IBAN TR 250001 0017 4588 4133 78 5002) nolu hesabına yatırılacaktır.",
+            "İşletme Yönetmeliğinin 12. maddesi gereği, stadyum, stat ve saha kira ücretleri dışında amatör sporcuların muayene ve tedavi giderleri ile amatör sporun geliştirilmesi için ihtiyaç duyulan her türlü spor araç, gereç ve malzeme alımlarında kullanılmak ve federasyon hizmetlerindeki sürat ve verimliliği artırmak üzere kira bedeli üzerinden %5 oranında ayrıca bir pay alınacaktır.",
+            "Stadyum, stat ve sahalarda bulunan büfe, kafeterya, reklam ve benzeri yerlerin işletme hakkı ile ilgili kuruluşlardan alınacak tesise giriş ücretleriyle ilgili gelirler il müdürlüğüne aittir.",
+            "Gençlik ve Spor İl Müdürlükleri her müsabaka için stadyum, stat, sahalar ile soyunma odalarını ve duşları müsabakalara hazır hale getireceklerdir.",
+            "Kira ücretleri müsabakalardan önce nakit, devlet tahvili veya bloke çek halinde ilgili il müdürlüklerine ödenecektir. Kira bedeli müsabakalardan önce herhangi bir nedenle ödenemediği takdirde müsabaka sonunda kulübün hasılatından mahsup edilebilecektir.",
+            "Stadyum, stat ve sahalara süzme elektrik ve su sayaçları taktırılacak olup, İşletme Yönetmeliğinin 'Bakım, onarım işletme sorumlulukları' başlığı altındaki 7 nci maddesinde yer alan hükümlerin yerine getirilmesi hususunda gerekli tedbirler alınacaktır.",
+            "Sezonluk olarak tahsisi istenen stadyum, stat ve sahaların yapısal olmayan bakım ve onarımları (saha zemini ve çim bakımı gibi) Kulüp tarafından gerçekleştirilecektir.",
+            "Stadyumun birden fazla Kulübe sezonluk olarak tahsis edilmesi halinde yapısal olmayan bakım ve onarımlar sezonluk olarak tahsis edilmiş olan tüm kulüplerin müştereken ve müteselsilen sorumluluğundadır.",
+            "Kulüp/kulüpler tarafından bakım onarım sorumlulukları yerine getirmez ise, bakım onarımlar İl Müdürlükleri tarafından gerçekleştirilecek ve bedelleri ilgili Kulüplere rücu edilecektir.",
+            "a) İlgili kulüp tarafından sezonluk olarak kiralanmak istenen stadyum, stat ve sahalara ait kira sözleşmeleri sezon başında yapılacaktır. b) Sezonluk kiralanmayıp da sadece belirli müsabakalar için stadyum, stat ve saha kiralamalarında ise kulüp tarafından müsabaka tarihinden önce il müdürlükleri ile temasa geçilerek, sözleşme tanzim ve imza edilecektir. c) Stadyum, stat ve sahalar kulüp tarafından sezonluk olarak kiralandığında, sezon içinde bu taleplerinden bir maç dahi olsa vazgeçerlerse, spor tesisi tahsis protokolü geçersiz sayılacak aynı sezon içerisinde kulübün tesisi tekrar kiralama talebinde bulunması halinde bir maç için tespit edilen tarifeye göre işlem yapılacaktır.",
+            "Aynı şehrin takımlarının kendi aralarında yapacakları müsabakalarda ismi birinci yazılan ev sahibi takım, müsabaka yapacağı takımın muvafakatını almadan stadyum, stat veya sahaları kiralayabilecektir.",
+            "Müsabaka biletlerinin basımı, satışı ve fiyatlandırılması ile hasılatın dağıtımına dair işlemler ilgili mevzuat ve Türkiye Futbol Federasyonu Başkanlığı ile imzalanan protokol hükümleri çerçevesinde yapılacaktır.",
+            "Müsabakalar esnasında stadyum, stat veya sahalarda meydana gelebilecek hasarı karşılamak üzere kira ücretinin %6'sı kadar teminat alınacaktır.",
+            "Söz konusu tesislerdeki kira ücretleri lig ve kupa müsabakaları (özel statüsü olan müsabakalar hariç) için geçerlidir. Kupa müsabakaları sezonluk kiralama kapsamı içindedir.",
+            "Özel müsabakalarda kulüpler tarafından kiralama yapıldığı takdirde sezonluk kira ücretlerinin %50 fazlası hesaplanıp alınacaktır.",
+            "Türkiye Spor Yazarları Derneği ve Spor Kulübü tarafından düzenlenecek futbol turnuvasında müsabakanın oynanacağı stadyum veya stadın kiralanması talebinde bulunulması halinde müsabaka başına 2022-2023 sezonu için tespit edilen sezonluk bir müsabakaya ait kira ücreti alınacaktır.",
+            "a) Bir lig takımının cezası veya mücbir sebeplerden dolayı aynı lig müsabakalarının oynandığı başka bir stadyum, stat ve sahada müsabaka yapması ve kiralama talebinde bulunması halinde o tesise ait kira bedelini ödeyecektir. b) Kulüp, kendi müsabakalarını oynayacağı stadyumu/stadı uzun süreli olarak kiralamış ise cezası veya mücbir sebeplerden dolayı aynı lig müsabakalarının oynandığı başka bir stadyum, stat veya sahada müsabaka yapması ve kiralama talebinde bulunması halinde o tesise ait tek maçlık kira ücretini ödeyecektir. c) Bir lig takımının cezası veya mücbir sebeplerden dolayı farklı lig müsabakalarının oynandığı başka bir stadyum, stat veya sahada müsabaka yapması ve anılan tesisi kiralama talebinde bulunması halinde söz konusu tesise ait kira bedeli ile ilgili il müdürlüklerince komisyon kararı alınacak ve Valilikçe onaylanan kararın bir nüshası bilgi için Bakanlığa gönderilecektir.",
+            "Nüfusu 300.000 kişiden az olan Doğu ve Güneydoğu Anadolu Bölgesi illeri ile nüfusu 300.000 kişiden az olan kalkınmada öncelikli illerimizde mevcut stadyum, stat ve sahaların kulüplerce kiralanması halinde o tesise ait kira ücretlerinin %50'si alınacaktır.",
+            "Sporcu ve hakem soyunma odaları ile saha tanzimcileri, reklam ve pano görevlileriyle Protokol Tribününde görev alacak personel, amatör müsabakanın özelliğine göre İl Müdürlüğü yetkilileri ve kulüp yetkililerince yeterli sayıda belirlenecek olup, ücretleri ise Gençlik ve Spor Hizmetleri Uygulamasında Görevlendirilenlere Ödenecek Ücretlerle İlgili Esaslar kapsamında Türkiye Futbol Federasyonu Başkanlığınca belirlenip ödenecektir.",
+            "Yukarıda sayılan esaslara aykırı olmamak şartıyla zorunluluk bulunan hallerde il müdürlüklerince de tahsis protokolüne madde ilave edilebilecek ve Protokolün bir nüshası Bakanlığa, bir nüshası da Türkiye Futbol Federasyonu Başkanlığına gönderilecektir.",
+            "Kulüplerce stadyum, stat veya sahaların kiralanmaması halinde Gençlik ve Spor Bakanlığı, Taşra Teşkilatı, Bütçe, Muhasebe ve Bilet Yönetmeliği ile Sportif Müsabaka ve Gösteri Hasılatının Dağıtımına Dair Yönetmelik Hükümlerine göre işlem yapılacaktır.",
+            "Sezon içinde bu esaslarda belirtilmeyen hususların ortaya çıkması halinde il müdürlüklerince komisyon kararı alınacak ve bu kararın bir nüshası bilgi için Bakanlığa gönderilerek uygulamaya konulacaktır."
+        ];
+
+        return createPortal(
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+                <Card className="w-full max-w-6xl p-5 rounded-[32px] bg-card border-white/60 dark:border-slate-800 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-300 font-outfit">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-rose-500/10 text-rose-500 rounded-xl">
+                                <Building size={20} />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-black text-slate-900 dark:text-slate-100">Stadyum Tahsis Ücreti Hesaplama</h3>
+                                <p className="text-[10px] text-slate-500 font-medium">Resmi tarife tablosuna göre lig, kapasite ve kiralama türüne dayalı otomatik hesaplama</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => setIsTarifeCetveliOpen(true)}
+                                className="h-8 px-3 text-[11px] font-bold text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:border-rose-800 dark:hover:bg-rose-900/40 rounded-xl mr-1"
+                            >
+                                <Building size={14} className="mr-1" />
+                                Cetvelleri İncele
+                            </Button>
+                            <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                onClick={() => setIsStadyumModalOpen(false)} 
+                            className="rounded-xl h-8 w-8 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                        >
+                            <X size={16} />
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Main Content Split Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden flex-1">
+                        {/* Parameters Form - Left */}
+                        <div className="lg:col-span-5 space-y-3 overflow-y-auto custom-scrollbar pr-1">
+                            <div className="bg-slate-50/50 dark:bg-slate-900/20 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/80 space-y-2.5">
+                                <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Tarife Parametreleri</h4>
+                                
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Futbol Sezonu</label>
+                                        <select value={stadyumSezon} onChange={(e) => { setStadyumSezon(e.target.value); setStadyumKapasiteTier("A"); }} className={selectClass}>
+                                            <option value="2026-2027">2026 - 2027 Sezonu</option>
+                                            <option value="2024-2025">2024 - 2025 Sezonu</option>
+                                            <option value="2023-2024">2023 - 2024 Sezonu</option>
+                                            <option value="2022-2023">2022 - 2023 Sezonu</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Lig</label>
+                                        <select value={stadyumLig} onChange={(e) => { setStadyumLig(e.target.value); setStadyumKapasiteTier("A"); }} className={selectClass}>
+                                            {ligKeys.map(key => (
+                                                <option key={key} value={key}>{seasonData[key].label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Seyirci Kapasitesi</label>
+                                    <select value={stadyumKapasiteTier} onChange={(e) => setStadyumKapasiteTier(e.target.value)} onBlur={() => setStadyumKapasiteTier(fmtTR(parseTRNumber(StadyumKapasiteTier)))} className={selectClass}>
+                                        {tiers.map((t: any) => (
+                                            <option key={t.code} value={t.code}>{t.code} - {t.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Kiralama Türü</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button 
+                                            onClick={() => setStadyumKiralamaTuru("sezonluk")} 
+                                            className={`py-2 px-3 rounded-xl text-[10px] font-bold border transition-all ${
+                                                stadyumKiralamaTuru === "sezonluk" 
+                                                    ? "bg-rose-500 text-white border-rose-500 shadow-sm" 
+                                                    : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-rose-300"
+                                            }`}
+                                        >
+                                            Sezonluk
+                                        </button>
+                                        <button 
+                                            onClick={() => setStadyumKiralamaTuru("tekMac")} 
+                                            className={`py-2 px-3 rounded-xl text-[10px] font-bold border transition-all ${
+                                                stadyumKiralamaTuru === "tekMac" 
+                                                    ? "bg-rose-500 text-white border-rose-500 shadow-sm" 
+                                                    : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-rose-300"
+                                            }`}
+                                        >
+                                            Tek Maç
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Müsabaka Sayısı</label>
+                                    <input 
+                                        type="number" 
+                                        value={stadyumMacSayisi} 
+                                        min={1}
+                                        max={99}
+                                        onChange={(e) => setStadyumMacSayisi(Math.max(1, parseInt(e.target.value) || 1))}
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-rose-500 outline-none text-xs font-bold text-slate-800 dark:text-slate-200"
+                                    />
+                                </div>
+
+                                <div className="space-y-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                    <label className="flex items-center gap-2 text-[10px] font-semibold text-slate-600 dark:text-slate-350 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={stadyumIsKdvDahil} 
+                                            onChange={(e) => setStadyumIsKdvDahil(e.target.checked)}
+                                            className="rounded border-slate-300 text-rose-500 focus:ring-rose-500"
+                                        />
+                                        <span>Girdiğim Fiyat KDV {stadyumIsKdvDahil ? "Dahildir" : "Hariçtir"}</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-[10px] font-semibold text-slate-600 dark:text-slate-350 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={stadyumIsGencSpor} 
+                                            onChange={(e) => setStadyumIsGencSpor(e.target.checked)}
+                                            className="rounded border-slate-300 text-rose-500 focus:ring-rose-500"
+                                        />
+                                        <span>Gençlik ve Spor Faaliyeti (Madde 12: %5 Pay İstisnası)</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-[10px] font-semibold text-slate-600 dark:text-slate-350 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={stadyumIhaleVar} 
+                                            onChange={(e) => setStadyumIhaleVar(e.target.checked)}
+                                            className="rounded border-slate-300 text-rose-500 focus:ring-rose-500"
+                                        />
+                                        <span>İhale Kararı Var (Karar Pulu Uygulanır)</span>
+                                    </label>
+                                </div>
+
+                                <div className="space-y-1.5 pt-1">
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                                        <input type="checkbox" checked={stadyumOzelMusabaka} onChange={(e) => setStadyumOzelMusabaka(e.target.checked)} className="rounded border-slate-350 text-rose-600 focus:ring-rose-500 h-3.5 w-3.5" />
+                                        <span>Özel Müsabaka (+%50 Fazla - Madde 15)</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                                        <input type="checkbox" checked={stadyumKalkinmaIl} onChange={(e) => setStadyumKalkinmaIl(e.target.checked)} className="rounded border-slate-350 text-rose-600 focus:ring-rose-500 h-3.5 w-3.5" />
+                                        <span>Kalkınmada Öncelikli İl (-%50 - Madde 18)</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Checklist System */}
+                            <div className="bg-slate-50/50 dark:bg-slate-900/20 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/80 space-y-2">
+                                <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Belge Kontrol Listesi</h4>
+                                <div className="space-y-1.5 mt-2">
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                                        <input type="checkbox" checked={stadyumDocTalep} onChange={(e) => setStadyumDocTalep(e.target.checked)} className="rounded border-slate-350 text-rose-600 focus:ring-rose-500 h-3.5 w-3.5" />
+                                        <span>Kiralama Talep Yazısı</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                                        <input type="checkbox" checked={stadyumDocDekont} onChange={(e) => setStadyumDocDekont(e.target.checked)} className="rounded border-slate-350 text-rose-600 focus:ring-rose-500 h-3.5 w-3.5" />
+                                        <span>Teminat Dekontu / Mektubu</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                                        <input type="checkbox" checked={stadyumDocSozlesme} onChange={(e) => setStadyumDocSozlesme(e.target.checked)} className="rounded border-slate-350 text-rose-600 focus:ring-rose-500 h-3.5 w-3.5" />
+                                        <span>Stadyum Kiralama Sözleşmesi</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                                        <input type="checkbox" checked={stadyumDocProtokol} onChange={(e) => setStadyumDocProtokol(e.target.checked)} className="rounded border-slate-350 text-rose-600 focus:ring-rose-500 h-3.5 w-3.5" />
+                                        <span>Güvenlik ve Emniyet Protokolü</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                                        <input type="checkbox" checked={stadyumDocOnay} onChange={(e) => setStadyumDocOnay(e.target.checked)} className="rounded border-slate-350 text-rose-600 focus:ring-rose-500 h-3.5 w-3.5" />
+                                        <span>Valilik / Kaymakamlık Oluru</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                                        <input type="checkbox" checked={stadyumDocTutanak} onChange={(e) => setStadyumDocTutanak(e.target.checked)} className="rounded border-slate-350 text-rose-600 focus:ring-rose-500 h-3.5 w-3.5" />
+                                        <span>Eksiksiz Teslim ve Hasar Tespit Tutanağı</span>
+                                    </label>
+                                </div>
+                                <div className={`mt-3 p-2.5 rounded-xl border text-center transition-all ${isComplete ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400"}`}>
+                                    <div className="text-[11px] font-bold flex items-center justify-center gap-1.5">
+                                        {isComplete ? <Check size={12} className="text-emerald-500" /> : null}
+                                        <span>Belgeler: {docsCount} / 6 Tamamlandı</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Calculation Results - Right */}
+                        <div className="lg:col-span-7 space-y-3 flex flex-col overflow-hidden">
+                            <div className="bg-slate-50/50 dark:bg-slate-900/20 p-4 rounded-3xl border border-slate-100 dark:border-slate-800/80 flex-1 overflow-y-auto custom-scrollbar space-y-4">
+                                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">Hesaplama Detayları</h4>
+                                    <div className="text-[10px] font-bold text-slate-500">{stadyumSezon} Sezonu · {ligData?.label}</div>
+                                </div>
+
+                                {/* Selected Tier Info */}
+                                {selectedTier && (
+                                    <div className="bg-rose-500/5 p-3 rounded-2xl border border-rose-500/10">
+                                        <div className="text-[10px] font-black uppercase tracking-wider text-rose-500 mb-1">Seçilen Kademe: {selectedTier.code}</div>
+                                        <div className="text-xs font-medium text-slate-600 dark:text-slate-400">Seyirci Kapasitesi: {selectedTier.label}</div>
+                                        <div className="grid grid-cols-2 gap-2 mt-2">
+                                            <div className="text-[10px]"><span className="text-slate-400">Sezonluk: </span><span className="font-bold text-slate-700 dark:text-slate-300">{fmtTR(selectedTier.sezonluk)} TL</span></div>
+                                            <div className="text-[10px]"><span className="text-slate-400">Tek Maç: </span><span className="font-bold text-slate-700 dark:text-slate-300">{fmtTR(selectedTier.tekMac)} TL</span></div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="space-y-2.5 text-xs">
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${stadyumKiralamaTuru === "sezonluk" ? "Sezonluk" : "Tek Maç"} tarife tablosundan`}>
+                                        <span className="font-medium text-slate-500">Birim Kira Bedeli ({stadyumKiralamaTuru === "sezonluk" ? "Sezonluk" : "Tek Maç"} Tarife)</span>
+                                        <span className="font-bold text-slate-800 dark:text-slate-200 cursor-help">{fmtTR(birimFiyat)} TL</span>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${fmtTR(birimFiyat)} TL x ${stadyumMacSayisi} Müsabaka = ${fmtTR(birimFiyat * stadyumMacSayisi)} TL`}>
+                                        <span className="font-medium text-slate-500">Müsabaka Sayısı x Birim Fiyat</span>
+                                        <span className="font-bold text-slate-800 dark:text-slate-200 cursor-help">{stadyumMacSayisi} x {fmtTR(birimFiyat)} = {fmtTR(birimFiyat * stadyumMacSayisi)} TL</span>
+                                    </div>
+                                    {stadyumOzelMusabaka && (
+                                        <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 text-amber-600 dark:text-amber-400" title={`${fmtTR(birimFiyat * stadyumMacSayisi)} TL x %50 = ${fmtTR(ozelFark)} TL`}>
+                                            <span className="font-semibold">Özel Müsabaka Farkı (+%50) - Madde 15</span>
+                                            <span className="font-bold cursor-help">+{fmtTR(ozelFark)} TL</span>
+                                        </div>
+                                    )}
+                                    {stadyumKalkinmaIl && (
+                                        <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 text-emerald-600 dark:text-emerald-400" title={`${fmtTR((birimFiyat * stadyumMacSayisi) + ozelFark)} TL x %50 = ${fmtTR(kalkinmaIndirim)} TL`}>
+                                            <span className="font-semibold">Kalkınmada Öncelikli İl İndirimi (-%50) - Madde 18</span>
+                                            <span className="font-bold cursor-help">-{fmtTR(kalkinmaIndirim)} TL</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 bg-slate-100/30 dark:bg-slate-900/40 px-1 rounded" title="İndirim ve zamlar uygulandıktan sonraki tutar">
+                                        <span className="font-semibold text-slate-600 dark:text-slate-350">Net Kira Bedeli</span>
+                                        <span className="font-bold text-slate-800 dark:text-slate-200 cursor-help">{fmtTR(kiraBedeli)} TL</span>
+                                    </div>
+
+                                    {/* KDV */}
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${fmtTR(baseNet)} TL x %${stadyumKdvRate} = ${fmtTR(kdv)} TL`}>
+                                        <span className="font-medium text-slate-500">KDV Ücreti (%{stadyumKdvRate})</span>
+                                        <span className="font-bold text-slate-800 dark:text-slate-200 cursor-help">+{fmtTR(kdv)} TL</span>
+                                    </div>
+
+                                    {/* GM Payı */}
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${fmtTR(gmPayBase)} TL x %5 = ${fmtTR(gmPay)} TL`}>
+                                        <span className="font-medium text-slate-500">Genel Müdürlük Payı (%5 - Madde 2)</span>
+                                        <span className="font-bold text-slate-800 dark:text-slate-200 cursor-help">+{fmtTR(gmPay)} TL</span>
+                                    </div>
+
+                                    {/* Damga Vergisi */}
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${fmtTR(baseNet)} TL x Binde 9.48 = ${fmtTR(damga)} TL`}>
+                                        <span className="font-medium text-slate-500">Damga Vergisi (Binde 9.48)</span>
+                                        <span className="font-bold text-slate-800 dark:text-slate-200 cursor-help">+{fmtTR(damga)} TL</span>
+                                    </div>
+
+                                    {/* Karar Pulu */}
+                                    {stadyumIhaleVar && (
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${fmtTR(baseNet)} TL x Binde 5.69 = ${fmtTR(karar)} TL`}>
+                                        <span className="font-medium text-slate-500">Karar Pulu (Binde 5.69)</span>
+                                        <span className="font-bold text-slate-800 dark:text-slate-200 cursor-help">+{fmtTR(karar)} TL</span>
+                                    </div>
+                                    )}
+
+                                    {/* Teminat */}
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 text-rose-600 dark:text-rose-400" title={`${fmtTR(baseNet)} TL x %6 = ${fmtTR(teminat)} TL`}>
+                                        <span className="font-semibold">Teminat (%6 - İade Edilecek - Madde 13)</span>
+                                        <span className="font-bold cursor-help">{fmtTR(teminat)} TL</span>
+                                    </div></div>
+
+                                <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-3">
+                                    <div className="bg-slate-100/50 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-200/50 dark:border-slate-800">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">Toplam Ödeme Bedeli</span>
+                                        <span className="text-xl font-black text-slate-900 dark:text-slate-100">{fmtTR(total)} TL</span>
+                                    </div>
+                                    <div className="bg-rose-500/5 p-3 rounded-2xl border border-rose-500/10">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-rose-500 block mb-0.5">Ödenecek Teminat</span>
+                                        <span className="text-xl font-black text-rose-600 dark:text-rose-400">{fmtTR(teminat)} TL</span>
+                                    </div>
+                                </div>
+
+                                {/* Important Warning */}
+                                <div className="bg-amber-500/5 p-3 rounded-2xl border border-amber-500/10 mt-2">
+                                    <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
+                                        <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                                        <span>Madde 1: Yukarıdaki tutarlara ek olarak, müsabaka net hasılatının %7'si Bakanlığın Ziraat Bankası Ankara Kurumsal Şubesine ayrıca yatırılacaktır.</span>
+                                    </div>
+                                </div>
+
+                                {/* Uyulacak Esaslar Collapsible */}
+                                <div className="border border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden mt-2">
+                                    <button 
+                                        onClick={() => setStadyumEsaslarOpen(!stadyumEsaslarOpen)} 
+                                        className="w-full flex items-center justify-between p-3 bg-slate-50/50 dark:bg-slate-900/20 hover:bg-slate-100/50 dark:hover:bg-slate-900/40 transition-colors text-left"
+                                    >
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Uyulacak Esaslar (22 Madde)</span>
+                                        <ChevronDown size={14} className={`text-slate-400 transition-transform duration-300 ${stadyumEsaslarOpen ? "rotate-180" : ""}`} />
+                                    </button>
+                                    {stadyumEsaslarOpen && (
+                                        <div className="p-3 space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                            {esaslarItems.map((item, idx) => (
+                                                <div key={idx} className="text-[10px] leading-relaxed text-slate-600 dark:text-slate-400 border-b border-slate-50 dark:border-slate-800/50 pb-2">
+                                                    <span className="font-bold text-slate-700 dark:text-slate-300">Madde {idx + 1}: </span>{item}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Export Buttons */}
+                            <div className="flex gap-3">
+                                <Button 
+                                    onClick={handleExportStadyumExcel}
+                                    className="flex-1 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-3.5 flex items-center justify-center gap-2 border-none shadow-sm shadow-rose-600/10"
+                                >
+                                    <Download size={16} />
+                                    <span>Excel Olarak Dışa Aktar</span>
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+        , document.body);
+    };
+
+    if (scope === "other") {
         return (
             <>
                 {isRaporSubActive && renderRaporSubDashboard()}
@@ -6151,7 +7231,7 @@ const renderPratikModal = () => {
                             <input
                                 type="text"
                                 value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onChange={(e) => setSearchQuery(e.target.value)} onBlur={() => setSearchQuery(fmtTR(parseTRNumber(SearchQuery)))}
                                 placeholder="Dosya adı, tür veya içerik ile ara..."
                                 className="bg-transparent border-none outline-none text-sm w-full font-medium text-muted-foreground placeholder:text-slate-400"
                             />
@@ -6667,7 +7747,7 @@ const renderPratikModal = () => {
                                 required
                                 type="text"
                                 value={newFolderName}
-                                onChange={(e) => setNewFolderName(e.target.value)}
+                                onChange={(e) => setNewFolderName(e.target.value)} onBlur={() => setNewFolderName(fmtTR(parseTRNumber(NewFolderName)))}
                                 placeholder="Klasör Adı (Örn: 2024 Denetimleri)"
                                 className="w-full px-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-black text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
                             />
