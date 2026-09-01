@@ -147,8 +147,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
             <nav className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-0.5">
                 {navItems.filter(item => {
-                    // Dosyalar sayfası sadece Electron (Masaüstü Paket) sürümünde görünsün
-                    if (item.href.startsWith("/files") && !isElectron) return false;
+                    // Local PC files explorer only in Electron, but Diğer İşlem ve Belgeler (/files?scope=other) is visible on Web as well!
+                    if (item.href === "/files" && !isElectron) return false;
                     return isVisible(item.href);
                 }).map((item) => {
                     const isLinkActive = (() => {
