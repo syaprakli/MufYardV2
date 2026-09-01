@@ -1514,7 +1514,7 @@ export default function DenetimFederasyon() {
 
                 {/* Footer Stats & Info */}
                 <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/60 text-xs text-slate-400 font-semibold">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between sm:justify-start gap-2.5 w-full sm:w-auto">
                         <span>{wordCount} Kelime</span>
                         <span>•</span>
                         <span>{charCount} Karakter</span>
@@ -2849,7 +2849,7 @@ export default function DenetimFederasyon() {
                                             </div>
 
                                             {/* Quick Switcher Pills */}
-                                            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                                            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto shrink-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                                                 {[
                                                     { id: "info", label: "Genel Bilgi" },
                                                     { id: "notes", label: "Notlar" },
