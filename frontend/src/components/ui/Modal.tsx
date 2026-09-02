@@ -50,7 +50,7 @@ export function Modal({
             }}
         >
             <div 
-                className={`bg-card rounded-2xl shadow-2xl w-full flex flex-col max-h-[90vh] ${sizes[size]} border border-border overflow-hidden`}
+                className={`bg-card rounded-2xl shadow-2xl w-[calc(100vw-16px)] sm:w-full flex flex-col max-h-[90dvh] ${sizes[size]} border border-border overflow-hidden`}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-muted/50 shrink-0">

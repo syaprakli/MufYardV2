@@ -299,7 +299,7 @@ function AuditListItem({
             ))}
           </select>
 
-          <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
             <div className="flex items-center gap-1 shrink-0">
               <Button
                 variant="ghost"

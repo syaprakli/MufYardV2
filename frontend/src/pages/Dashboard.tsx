@@ -895,7 +895,7 @@ Lütfen şunları analiz et:
                                 className="flex items-center justify-center sm:justify-start gap-2 bg-slate-50 dark:bg-slate-950/50 px-3 py-2 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-primary/20 hover:bg-slate-100 dark:hover:bg-slate-900 transition-all group h-full overflow-hidden"
                             >
                                 <link.icon size={16} style={{ color: link.color }} className="shrink-0" />
-                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 group-hover:text-primary transition-colors truncate hidden sm:block">{link.name}</span>
+                                <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 group-hover:text-primary transition-colors truncate">{link.name}</span>
                             </a>
                         ))}
                     </div>

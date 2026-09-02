@@ -33,7 +33,7 @@ export function MainLayout() {
             
             {/* The main content area */}
             <main className={cn(
-                "flex-1 flex flex-col min-w-0 relative h-full transition-all duration-300",
+                "flex-1 flex flex-col min-w-0 relative h-full transition-all duration-300 overflow-x-hidden",
                 !isFullScreen ? "pt-16 xl:ml-64 ml-0" : "pt-0 ml-0"
             )}>
                 {!isFullScreen && <Header toggleSidebar={toggleSidebar} />}
@@ -42,8 +42,8 @@ export function MainLayout() {
                 <div 
                     id="main-scroll-container"
                     className={cn(
-                    "flex-1 overflow-y-auto relative bg-slate-50 dark:bg-slate-950 scrollbar-none transition-colors duration-300",
-                    !isFullScreen ? "px-4 xl:px-8 py-6 xl:py-8 pb-24 xl:pb-8" : "p-0"
+                    "flex-1 overflow-y-auto overflow-x-hidden relative bg-slate-50 dark:bg-slate-950 scrollbar-none transition-colors duration-300",
+                    !isFullScreen ? "px-2 sm:px-4 xl:px-8 py-4 xl:py-8 pb-24 xl:pb-8" : "p-0"
                 )}>
                     <Outlet />
                 </div>
