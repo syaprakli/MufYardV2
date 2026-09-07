@@ -5,7 +5,7 @@ import {
     BookOpen, ClipboardCheck, Bot, Plus, Edit2, Trash2, Search,
     Tag, ChevronRight, X, Check, Loader2, Database, Sparkles, FileText,
     ArrowRight, Info, AlertCircle, Save, ExternalLink, Play, ArrowLeft,
-    Copy, Printer, Download, Table, Dumbbell, Building2
+    Copy, Printer, Download, Table, Building2
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { API_URL, LOCAL_API_URL, IS_ELECTRON } from "../lib/config";
@@ -18,7 +18,6 @@ import { createAudit, updateAudit, deleteAudit, fetchAuditById } from "../lib/ap
 import { updateTask } from "../lib/api/tasks";
 import { generateEvrakTalebiDocx } from "../lib/api/files";
 import { DenetimOzetTablolar } from "../components/audit/DenetimOzetTablolar";
-import { OzelBedenEgitimiDenetim } from "../components/audit/OzelBedenEgitimiDenetim";
 import { IlTesisleriDenetim, getSafeImageUrl } from "../components/audit/IlTesisleriDenetim";
 
 
@@ -1303,19 +1302,6 @@ export default function DenetimIl() {
     const renderOzetTablolarTab = () => {
         return (
             <DenetimOzetTablolar
-                localAuditData={localAuditData}
-                setLocalAuditData={setLocalAuditData}
-                onSave={handleSaveAuditData}
-                isSaving={isSavingAuditData}
-                selectedReport={selectedReport}
-                profile={profile}
-            />
-        );
-    };
-
-    const renderOzelBedenEgitimiTab = () => {
-        return (
-            <OzelBedenEgitimiDenetim
                 localAuditData={localAuditData}
                 setLocalAuditData={setLocalAuditData}
                 onSave={handleSaveAuditData}
@@ -2807,15 +2793,6 @@ export default function DenetimIl() {
                                                     highlight: false
                                                 },
                                                 {
-                                                    id: "ozel_beden_egitimi",
-                                                    title: "Özel Beden Eğitimi Tesisleri",
-                                                    subtitle: "Gerçek ve tüzel kişi spor tesisleri açılış evrakı, komisyon, fiziki şartlar ve vize denetimi",
-                                                    icon: Dumbbell,
-                                                    badge: localAuditData?.ozelBedenEgitimi?.tesisAdi ? "Dolduruldu" : "Denetime Hazır",
-                                                    badgeColor: localAuditData?.ozelBedenEgitimi?.tesisAdi ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-teal-500/10 text-teal-600 border-teal-500/20",
-                                                    highlight: false
-                                                },
-                                                {
                                                     id: "evrak_talebi",
                                                     title: "Evrak Talebi",
                                                     subtitle: "İl Müdürlüğünden istenecek resmi evrak talep yazısı",
@@ -2935,7 +2912,6 @@ export default function DenetimIl() {
                                                     { id: "tesisler", label: "Tesisler" },
                                                     { id: "checklist", label: "Kontrol Listesi" },
                                                     { id: "ozet_tablolar", label: "İstenecek Tablolar" },
-                                                    { id: "ozel_beden_egitimi", label: "Özel Spor Tesisleri" },
                                                     { id: "editor", label: "Rapor" },
                                                     { id: "evrak_talebi", label: "Evrak" }
                                                 ].map(tab => (
@@ -2965,7 +2941,6 @@ export default function DenetimIl() {
                                             {activeDetailTab === "tesisler" && renderTesislerTab()}
                                             {activeDetailTab === "checklist" && renderChecklistTab()}
                                             {activeDetailTab === "ozet_tablolar" && renderOzetTablolarTab()}
-                                            {activeDetailTab === "ozel_beden_egitimi" && renderOzelBedenEgitimiTab()}
                                             {activeDetailTab === "evrak_talebi" && renderEvrakTalebiTab()}
                                             {activeDetailTab === "editor" && (
                                                 selectedReport.report_created === false ? (

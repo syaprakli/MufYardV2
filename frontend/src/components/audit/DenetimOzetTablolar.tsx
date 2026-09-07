@@ -858,62 +858,63 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                 }
             `}</style>
             {/* ÜST ARAÇ ÇUBUĞU */}
-            <div className="sticky top-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-3 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 print:hidden">
-                <div className="flex items-center gap-2.5 sm:gap-3">
-                    <div className="p-2 sm:p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800 shrink-0">
-                        <Table size={18} className="sm:w-5 sm:h-5" />
+            <div className="sticky top-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-2.5 sm:p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-3 print:hidden">
+                {/* SOL SÜTUN: Başlık + Küçültülmüş İl ve Dönem Alanları */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 shrink-0">
+                    <div className="flex items-center gap-2 sm:gap-2.5">
+                        <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800 shrink-0">
+                            <Table size={18} className="sm:w-5 sm:h-5" />
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="text-xs sm:text-sm font-bold text-slate-850 dark:text-slate-100 flex flex-wrap items-center gap-1.5 leading-snug">
+                                <span>İstenecek Tablo ve Özet Bilgiler</span>
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 whitespace-nowrap">
+                                    16 Konu / 19 Tablo
+                                </span>
+                            </h3>
+                            <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                {ilAdi ? `${ilAdi} GSİM` : "İl Müdürlüğü"} Teftişi Bilgi & İstatistik Tabloları
+                            </p>
+                        </div>
                     </div>
-                    <div className="min-w-0">
-                        <h3 className="text-xs sm:text-sm font-bold text-slate-850 dark:text-slate-100 flex flex-wrap items-center gap-1.5 sm:gap-2 leading-snug">
-                            <span>İstenecek Tablo ve Özet Bilgiler</span>
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 whitespace-nowrap">
-                                16 Konu / 19 Tablo
-                            </span>
-                        </h3>
-                        <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate">
-                            {ilAdi ? `${ilAdi} Gençlik ve Spor İl Müdürlüğü` : "İl Müdürlüğü"} Teftişi Bilgi & İstatistik Tabloları
-                        </p>
-                    </div>
-                </div>
 
-                <div className="flex flex-col lg:flex-row flex-wrap items-stretch lg:items-center gap-2.5 w-full md:w-auto">
-                    {/* Meta Giriş Alanları: İl ve Dönem (Büyütülmüş, Düzenli & Mobil Uyumlu) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full lg:w-auto">
-                        {/* İl Seçici / Girişi */}
-                        <div className="flex items-center gap-2 h-9 sm:h-10 bg-slate-50 dark:bg-slate-800/90 px-3 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-sm w-full">
-                            <MapPin size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
-                            <span className="text-xs font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">İl:</span>
+                    {/* Küçültülmüş İl & Dönem Buton/Girişleri (En Sol Sütunda) */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* Küçük İl Girişi */}
+                        <div className="flex items-center gap-1 h-7 bg-slate-50 dark:bg-slate-800/90 px-2 rounded-lg border border-slate-200/90 dark:border-slate-700 shadow-xs">
+                            <MapPin size={12} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                            <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">İl:</span>
                             <input
                                 type="text"
                                 value={ilAdi}
                                 onChange={(e) => setIlAdi(e.target.value.toUpperCase())}
                                 onBlur={() => handleSave()}
-                                placeholder="ÖRN: VAN"
-                                className="h-7 sm:h-8 flex-1 min-w-0 sm:w-36 px-2 text-xs sm:text-sm font-black uppercase bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-300 rounded-lg border border-slate-200 dark:border-slate-700 shadow-inner text-center tracking-wide outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
+                                placeholder="İL"
+                                className="h-5 w-20 px-1 text-xs font-black uppercase bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-300 rounded border border-slate-200 dark:border-slate-700 shadow-inner text-center tracking-wide outline-none focus:ring-1 focus:ring-blue-500/40"
                                 title="Denetlenen il adı (Word ve tablo başlığında yer alır)"
                             />
                         </div>
 
-                        {/* Yıl Seçici */}
-                        <div className="flex items-center gap-2 h-9 sm:h-10 bg-slate-50 dark:bg-slate-800/90 px-3 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-sm w-full">
-                            <Calendar size={16} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-                            <span className="text-xs font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">Dönem:</span>
-                            <div className="flex items-center gap-1 flex-1 justify-center sm:justify-start">
+                        {/* Küçük Dönem Girişi */}
+                        <div className="flex items-center gap-1 h-7 bg-slate-50 dark:bg-slate-800/90 px-2 rounded-lg border border-slate-200/90 dark:border-slate-700 shadow-xs">
+                            <Calendar size={12} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                            <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">Dönem:</span>
+                            <div className="flex items-center gap-0.5">
                                 <input
                                     type="number"
                                     value={startYear}
                                     onChange={(e) => setStartYear(parseInt(e.target.value) || defaultStartYear)}
-                                    className="h-7 sm:h-8 w-18 sm:w-20 px-1 text-xs sm:text-sm font-black text-center bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg border border-slate-200 dark:border-slate-700 shadow-inner outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="h-5 w-13 sm:w-14 px-0.5 text-xs font-black text-center bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded border border-slate-200 dark:border-slate-700 shadow-inner outline-none focus:ring-1 focus:ring-indigo-500/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     min={2000}
                                     max={2040}
                                     title="Başlangıç Yılı"
                                 />
-                                <span className="font-black text-slate-400 text-xs px-0.5">-</span>
+                                <span className="font-bold text-slate-400 text-xs px-0.5">-</span>
                                 <input
                                     type="number"
                                     value={endYear}
                                     onChange={(e) => setEndYear(parseInt(e.target.value) || defaultEndYear)}
-                                    className="h-7 sm:h-8 w-18 sm:w-20 px-1 text-xs sm:text-sm font-black text-center bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg border border-slate-200 dark:border-slate-700 shadow-inner outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="h-5 w-13 sm:w-14 px-0.5 text-xs font-black text-center bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded border border-slate-200 dark:border-slate-700 shadow-inner outline-none focus:ring-1 focus:ring-indigo-500/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     min={2000}
                                     max={2040}
                                     title="Bitiş Yılı"
@@ -921,7 +922,10 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                             </div>
                         </div>
                     </div>
+                </div>
 
+                {/* SAĞ SÜTUN: Eylem Butonları */}
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                     {/* Gizli Excel File Input */}
                     <input
                         type="file"
@@ -931,11 +935,9 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                         className="hidden"
                     />
 
-                    {/* Butonlar Grubu: Mobilde dengeli sarılan ve tam oturan yapı */}
-                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                        {/* İndirme Açılır Menüsü */}
-                        <div className="relative">
-                            <Button
+                    {/* İndirme Açılır Menüsü */}
+                    <div className="relative">
+                        <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => setDownloadMenuOpen(prev => !prev)}
@@ -1106,7 +1108,6 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                         </Button>
                     </div>
                 </div>
-            </div>
 
             {/* SEKSİYON HIZLI GEÇİŞ BUTONLARI (GRUPLU KATEGORİLER) */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 print:hidden scroll-smooth touch-pan-x [&::-webkit-scrollbar]:hidden">

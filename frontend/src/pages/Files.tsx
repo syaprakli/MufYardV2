@@ -5,7 +5,7 @@ import {
     FileText, Image as ImageIcon, Video, Music, 
     Upload, X, Grid, List as ListIcon, RefreshCw, Share2, ExternalLink, HelpCircle,
     Briefcase, FileSpreadsheet, Users, Check, Calendar, AlertTriangle, ArrowLeft, Calculator, Settings
-, Building, Coins, Info } from "lucide-react";
+, Building, Coins, Info, Dumbbell } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { toast } from "react-hot-toast";
@@ -25,6 +25,7 @@ import { fetchAllProfiles, type Profile } from "../lib/api/profiles";
 import { sendDirectMessage } from "../lib/api/collaboration";
 import { LOJMAN_RATES, CITY_DISCOUNT_GROUPS } from "../lib/lojmanRates";
 import { YOLLUK_H_RATES, YOLLUK_COEFFICIENTS } from "../lib/yollukRates";
+import { OzelBedenEgitimiDenetim } from "../components/audit/OzelBedenEgitimiDenetim";
 
 
 export default function Files() {
@@ -177,6 +178,37 @@ export default function Files() {
     const [sharingFile, setSharingFile] = useState<FileItem | null>(null);
     const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
     const [sharingLoading, setSharingLoading] = useState(false);
+
+    // Özel Beden Eğitimi ve Spor Tesisleri Denetim states
+    const [isOzelBedenEgitimiModalOpen, setIsOzelBedenEgitimiModalOpen] = useState(false);
+    const [ozelBedenAuditData, setOzelBedenAuditData] = useState<any>(() => {
+        try {
+            const saved = localStorage.getItem("mufyard_ozel_beden_egitimi_data");
+            return saved ? JSON.parse(saved) : {};
+        } catch {
+            return {};
+        }
+    });
+
+    useEffect(() => {
+        if (ozelBedenAuditData && Object.keys(ozelBedenAuditData).length > 0) {
+            try {
+                localStorage.setItem("mufyard_ozel_beden_egitimi_data", JSON.stringify(ozelBedenAuditData));
+            } catch (e) {
+                console.error("Failed to auto-save ozelBedenAuditData", e);
+            }
+        }
+    }, [ozelBedenAuditData]);
+
+    const handleSaveOzelBedenData = (data: any) => {
+        setOzelBedenAuditData(data);
+        try {
+            localStorage.setItem("mufyard_ozel_beden_egitimi_data", JSON.stringify(data));
+            toast.success("Özel beden eğitimi tesisleri denetim formu kaydedildi.");
+        } catch (e) {
+            console.error("Save error:", e);
+        }
+    };
 
     // Lojman Kira Hesaplama states
     const [isLojmanModalOpen, setIsLojmanModalOpen] = useState(false);
@@ -2837,7 +2869,44 @@ const calculateYollukValues = () => {
         toast.success("Excel belgesi indirildi.");
     };
 
+    const renderOzelBedenEgitimiModal = () => {
+        if (!isOzelBedenEgitimiModalOpen) return null;
 
+        return createPortal(
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300 font-sans">
+                <Card className="w-full max-w-7xl h-[94vh] p-3 sm:p-5 rounded-[28px] bg-white dark:bg-slate-900 border border-white/60 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5 mb-2.5 shrink-0">
+                        <div className="flex items-center gap-2.5">
+                            <div className="p-2 bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-xl">
+                                <Dumbbell size={20} />
+                            </div>
+                            <div>
+                                <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100">Özel Spor Tesisleri Denetimi</h3>
+                                <p className="text-[10px] sm:text-xs text-slate-500 font-medium">Açılış evrakı, komisyon kararları, fiziki şartlar, antrenör personeli ve denetim formu</p>
+                            </div>
+                        </div>
+                        <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            onClick={() => setIsOzelBedenEgitimiModalOpen(false)} 
+                            className="rounded-xl h-8 w-8 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                        >
+                            <X size={16} />
+                        </Button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto min-h-0 pr-1">
+                        <OzelBedenEgitimiDenetim
+                            localAuditData={ozelBedenAuditData}
+                            setLocalAuditData={setOzelBedenAuditData}
+                            onSave={handleSaveOzelBedenData}
+                            profile={profile}
+                        />
+                    </div>
+                </Card>
+            </div>,
+            document.body
+        );
+    };
 
     const renderLojmanModal = () => {
         if (!isLojmanModalOpen) return null;
@@ -6015,6 +6084,26 @@ const renderPratikModal = () => {
                           </div>
                       </Card>
 
+                      {/* Sub-card 6: Özel Beden Eğitimi Tesisleri Denetimi */}
+                      <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-teal-500/10 to-cyan-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+                          <div className="p-4 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
+                              <Dumbbell size={24} />
+                          </div>
+                          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Özel Spor Tesisleri Denetimi</h3>
+                          <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
+                              Gerçek ve tüzel kişi özel beden eğitimi ve spor tesisleri açılış evrakı, komisyon kararları, fiziki şartlar ve denetim formu.
+                          </p>
+                          <div className="mt-6 flex gap-2 w-full">
+                              <Button 
+                                  onClick={() => setIsOzelBedenEgitimiModalOpen(true)}
+                                  className="flex-1 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-black uppercase text-[10px] tracking-widest py-3 animate-pulse hover:animate-none"
+                              >
+                                  Uygulamayı Aç
+                              </Button>
+                          </div>
+                      </Card>
+
                 </div>
 
                 {/* Render Modals */}
@@ -6026,6 +6115,7 @@ const renderPratikModal = () => {
                 {renderCityListModal()}
                 {renderYollukModal()}
                 {renderGorevModal()}
+                {renderOzelBedenEgitimiModal()}
             </div>
         );
     };
@@ -7126,6 +7216,7 @@ const renderPratikModal = () => {
                 {renderStadyumModal()}
                 {renderMadde18Modal()}
                 {renderTarifeCetveliModal()}
+                {renderOzelBedenEgitimiModal()}
             </>
         );
     }
