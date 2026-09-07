@@ -858,67 +858,61 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                 }
             `}</style>
             {/* ÜST ARAÇ ÇUBUĞU */}
-            <div className="sticky top-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-2.5 sm:p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-3 print:hidden">
-                {/* SOL SÜTUN: Başlık + Küçültülmüş İl ve Dönem Alanları */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 shrink-0">
-                    <div className="flex items-center gap-2 sm:gap-2.5">
-                        <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800 shrink-0">
-                            <Table size={18} className="sm:w-5 sm:h-5" />
-                        </div>
-                        <div className="min-w-0">
-                            <h3 className="text-xs sm:text-sm font-bold text-slate-850 dark:text-slate-100 flex flex-wrap items-center gap-1.5 leading-snug">
-                                <span>İstenecek Tablo ve Özet Bilgiler</span>
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 whitespace-nowrap">
-                                    16 Konu / 19 Tablo
-                                </span>
-                            </h3>
-                            <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                                {ilAdi ? `${ilAdi} GSİM` : "İl Müdürlüğü"} Teftişi Bilgi & İstatistik Tabloları
-                            </p>
-                        </div>
+            <div className="sticky top-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-3 print:hidden">
+                {/* SOL SÜTUN: Başlık ve Doğrudan Altında İl / Dönem Seçicileri */}
+                <div className="flex items-center gap-2.5 shrink-0">
+                    <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800 shrink-0">
+                        <Table size={18} />
                     </div>
-
-                    {/* Küçültülmüş İl & Dönem Buton/Girişleri (En Sol Sütunda) */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                        {/* Küçük İl Girişi */}
-                        <div className="flex items-center gap-1 h-7 bg-slate-50 dark:bg-slate-800/90 px-2 rounded-lg border border-slate-200/90 dark:border-slate-700 shadow-xs">
-                            <MapPin size={12} className="text-blue-600 dark:text-blue-400 shrink-0" />
-                            <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">İl:</span>
-                            <input
-                                type="text"
-                                value={ilAdi}
-                                onChange={(e) => setIlAdi(e.target.value.toUpperCase())}
-                                onBlur={() => handleSave()}
-                                placeholder="İL"
-                                className="h-5 w-20 px-1 text-xs font-black uppercase bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-300 rounded border border-slate-200 dark:border-slate-700 shadow-inner text-center tracking-wide outline-none focus:ring-1 focus:ring-blue-500/40"
-                                title="Denetlenen il adı (Word ve tablo başlığında yer alır)"
-                            />
+                    <div className="min-w-0 flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <h3 className="text-xs sm:text-sm font-bold text-slate-850 dark:text-slate-100 leading-none">
+                                İstenecek Tablo ve Özet Bilgiler
+                            </h3>
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                                16 Konu / 19 Tablo
+                            </span>
                         </div>
 
-                        {/* Küçük Dönem Girişi */}
-                        <div className="flex items-center gap-1 h-7 bg-slate-50 dark:bg-slate-800/90 px-2 rounded-lg border border-slate-200/90 dark:border-slate-700 shadow-xs">
-                            <Calendar size={12} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-                            <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">Dönem:</span>
-                            <div className="flex items-center gap-0.5">
+                        {/* İl & Dönem Girişleri - Başlığın altında, en solda tek sıra */}
+                        <div className="flex items-center gap-2 text-xs">
+                            {/* İl Alanı */}
+                            <div className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 px-1.5 py-0.5 rounded-md border border-slate-200/80 dark:border-slate-700">
+                                <MapPin size={10} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                                <span className="text-[9px] font-bold uppercase text-slate-400">İl:</span>
                                 <input
-                                    type="number"
-                                    value={startYear}
-                                    onChange={(e) => setStartYear(parseInt(e.target.value) || defaultStartYear)}
-                                    className="h-5 w-13 sm:w-14 px-0.5 text-xs font-black text-center bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded border border-slate-200 dark:border-slate-700 shadow-inner outline-none focus:ring-1 focus:ring-indigo-500/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                    min={2000}
-                                    max={2040}
-                                    title="Başlangıç Yılı"
+                                    type="text"
+                                    value={ilAdi}
+                                    onChange={(e) => setIlAdi(e.target.value.toUpperCase())}
+                                    onBlur={() => handleSave()}
+                                    placeholder="İL"
+                                    className="w-14 text-[10px] font-black uppercase text-blue-700 dark:text-blue-300 bg-transparent text-center outline-none"
                                 />
-                                <span className="font-bold text-slate-400 text-xs px-0.5">-</span>
-                                <input
-                                    type="number"
-                                    value={endYear}
-                                    onChange={(e) => setEndYear(parseInt(e.target.value) || defaultEndYear)}
-                                    className="h-5 w-13 sm:w-14 px-0.5 text-xs font-black text-center bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded border border-slate-200 dark:border-slate-700 shadow-inner outline-none focus:ring-1 focus:ring-indigo-500/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                    min={2000}
-                                    max={2040}
-                                    title="Bitiş Yılı"
-                                />
+                            </div>
+
+                            {/* Dönem Alanı */}
+                            <div className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 px-1.5 py-0.5 rounded-md border border-slate-200/80 dark:border-slate-700">
+                                <Calendar size={10} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                <span className="text-[9px] font-bold uppercase text-slate-400">Dönem:</span>
+                                <div className="flex items-center gap-0.5">
+                                    <input
+                                        type="number"
+                                        value={startYear}
+                                        onChange={(e) => setStartYear(parseInt(e.target.value) || defaultStartYear)}
+                                        className="w-10 text-[10px] font-black text-center text-slate-800 dark:text-slate-100 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        min={2000}
+                                        max={2040}
+                                    />
+                                    <span className="text-slate-400 font-bold text-[9px]">-</span>
+                                    <input
+                                        type="number"
+                                        value={endYear}
+                                        onChange={(e) => setEndYear(parseInt(e.target.value) || defaultEndYear)}
+                                        className="w-10 text-[10px] font-black text-center text-slate-800 dark:text-slate-100 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        min={2000}
+                                        max={2040}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -938,16 +932,16 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                     {/* İndirme Açılır Menüsü */}
                     <div className="relative">
                         <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setDownloadMenuOpen(prev => !prev)}
-                                className="rounded-xl h-8 sm:h-9 text-[11px] sm:text-xs font-bold border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 shadow-sm px-2.5 sm:px-3 justify-center gap-1.5"
-                                title="Excel ve Word formatında boş şablon veya dolu rapor indirme seçenekleri"
-                            >
-                                <Download size={14} className="shrink-0 text-blue-600 dark:text-blue-400" />
-                                <span>İndir / Şablonlar</span>
-                                <ChevronDown size={13} className={`shrink-0 transition-transform duration-200 ${downloadMenuOpen ? "rotate-180" : ""}`} />
-                            </Button>
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setDownloadMenuOpen(prev => !prev)}
+                            className="rounded-xl h-8 text-[11px] font-bold border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 shadow-sm px-2.5 justify-center gap-1"
+                            title="Excel ve Word formatında boş şablon veya dolu rapor indirme seçenekleri"
+                        >
+                            <Download size={13} className="shrink-0 text-blue-600 dark:text-blue-400" />
+                            <span>İndir / Şablonlar</span>
+                            <ChevronDown size={12} className={`shrink-0 transition-transform duration-200 ${downloadMenuOpen ? "rotate-180" : ""}`} />
+                        </Button>
 
                             {downloadMenuOpen && (
                                 <>
@@ -1028,10 +1022,10 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                             size="sm"
                             onClick={handleExcelUploadClick}
                             disabled={isImportingExcel || isSaving}
-                            className="rounded-xl h-8 sm:h-9 text-[11px] sm:text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20 px-2.5 sm:px-3 justify-center gap-1.5"
+                            className="rounded-xl h-8 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20 px-2.5 justify-center gap-1"
                             title="İl Müdürlüğünün doldurduğu Excel dosyasını seçip doğrudan sisteme aktarır ve kalıcı olarak kaydeder"
                         >
-                            {isImportingExcel ? <Loader2 size={13} className="animate-spin shrink-0" /> : <Upload size={13} className="shrink-0" />}
+                            {isImportingExcel ? <Loader2 size={12} className="animate-spin shrink-0" /> : <Upload size={12} className="shrink-0" />}
                             <span>Excel Yükle</span>
                         </Button>
 
@@ -1040,10 +1034,10 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                             size="sm"
                             variant="outline"
                             onClick={() => window.open('/mufettis_ozet_tablolar.html', '_blank')}
-                            className="rounded-xl h-8 sm:h-9 text-[11px] sm:text-xs font-semibold border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 px-2.5 sm:px-3 justify-center gap-1.5"
+                            className="rounded-xl h-8 text-[11px] font-semibold border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 px-2 justify-center gap-1"
                             title="Bağımsız interaktif HTML formunu yeni pencerede/sekmede açar"
                         >
-                            <ExternalLink size={13} className="shrink-0" />
+                            <ExternalLink size={12} className="shrink-0" />
                             <span>HTML Aç</span>
                         </Button>
 
@@ -1052,9 +1046,9 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                             size="sm"
                             variant="outline"
                             onClick={handlePrint}
-                            className="rounded-xl h-8 sm:h-9 text-[11px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 px-2.5 sm:px-3 justify-center gap-1.5"
+                            className="rounded-xl h-8 text-[11px] font-semibold text-slate-600 dark:text-slate-400 px-2 justify-center gap-1"
                         >
-                            <Printer size={13} className="shrink-0" />
+                            <Printer size={12} className="shrink-0" />
                             <span>Yazdır</span>
                         </Button>
 
@@ -1063,22 +1057,22 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                             size="sm"
                             variant="outline"
                             onClick={() => setViewMode(prev => prev === "auto" ? "card" : prev === "card" ? "table" : "auto")}
-                            className="rounded-xl h-8 sm:h-9 text-[11px] sm:text-xs font-bold border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 px-2.5 sm:px-3 justify-center gap-1.5"
+                            className="rounded-xl h-8 text-[11px] font-bold border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 px-2 justify-center gap-1"
                             title="Görünüm: Otomatik (Mobilde Kart) / Zorunlu Tablo / Zorunlu Kartlar"
                         >
                             {viewMode === "card" ? (
                                 <>
-                                    <LayoutGrid size={13} className="text-blue-600 shrink-0" />
+                                    <LayoutGrid size={12} className="text-blue-600 shrink-0" />
                                     <span>Kartlar</span>
                                 </>
                             ) : viewMode === "table" ? (
                                 <>
-                                    <Table size={13} className="text-indigo-600 shrink-0" />
+                                    <Table size={12} className="text-indigo-600 shrink-0" />
                                     <span>Tablo</span>
                                 </>
                             ) : (
                                 <>
-                                    <LayoutGrid size={13} className="text-slate-500 shrink-0" />
+                                    <LayoutGrid size={12} className="text-slate-500 shrink-0" />
                                     <span>Görünüm: Oto</span>
                                 </>
                             )}
@@ -1089,9 +1083,9 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                             size="sm"
                             onClick={handleSave}
                             disabled={isSaving}
-                            className="rounded-xl h-8 sm:h-9 text-[11px] sm:text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 px-3 sm:px-4 justify-center gap-1.5"
+                            className="rounded-xl h-8 text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 px-3 justify-center gap-1"
                         >
-                            {isSaving ? <Loader2 size={13} className="animate-spin shrink-0" /> : <Save size={13} className="shrink-0" />}
+                            {isSaving ? <Loader2 size={12} className="animate-spin shrink-0" /> : <Save size={12} className="shrink-0" />}
                             <span>Kaydet</span>
                         </Button>
 
@@ -1100,10 +1094,10 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                             size="sm"
                             variant="outline"
                             onClick={() => setShowResetModal(true)}
-                            className="rounded-xl h-8 sm:h-9 text-[11px] sm:text-xs font-bold border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 px-2.5 sm:px-3 justify-center gap-1.5"
+                            className="rounded-xl h-8 text-[11px] font-bold border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 px-2 justify-center gap-1"
                             title="Tüm tablo verilerini sıfırlar"
                         >
-                            <RotateCcw size={13} className="shrink-0" />
+                            <RotateCcw size={12} className="shrink-0" />
                             <span>Sıfırla</span>
                         </Button>
                     </div>

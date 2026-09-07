@@ -2885,21 +2885,10 @@ export default function DenetimIl() {
                                                     <span>Kartlara Dön</span>
                                                 </Button>
 
-                                                <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block" />
+                                                <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 hidden 2xl:block" />
 
-                                                <div className="flex items-center gap-1.5 sm:gap-2 text-xs font-black text-slate-850 dark:text-white min-w-0 truncate">
-                                                    <span className="text-slate-400 font-bold hidden xl:inline truncate max-w-[200px]">{selectedTask.rapor_adi} &gt;</span>
-                                                    <span className="text-blue-600 dark:text-blue-400 uppercase tracking-wide truncate">
-                                                        {activeDetailTab === "info" && "Genel Bilgiler"}
-                                                        {activeDetailTab === "notes" && "Notlar & Tespitler"}
-                                                        {activeDetailTab === "photos" && "Fotoğraflar"}
-                                                        {activeDetailTab === "tesisler" && "Tesisler"}
-                                                        {activeDetailTab === "checklist" && "Kontrol Listesi"}
-                                                        {activeDetailTab === "ozet_tablolar" && "İstenecek Tablolar"}
-                                                        {activeDetailTab === "ozel_beden_egitimi" && "Özel Spor Tesisleri"}
-                                                        {activeDetailTab === "editor" && "Rapor Editörü"}
-                                                        {activeDetailTab === "evrak_talebi" && "Evrak Talebi"}
-                                                    </span>
+                                                <div className="hidden 2xl:flex items-center gap-1.5 text-xs font-bold text-slate-400 min-w-0 truncate">
+                                                    <span className="truncate max-w-[220px]">{selectedTask.rapor_adi}</span>
                                                 </div>
                                             </div>
 
