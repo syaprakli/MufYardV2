@@ -1,11 +1,6 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
     Table,
-    MapPin,
-    Calendar,
-    FileSpreadsheet,
-    Upload,
-    Download,
     ExternalLink,
     Printer,
     Save,
@@ -15,7 +10,6 @@ import {
     XCircle,
     MinusCircle,
     Search,
-    FileText,
     Building2,
     Award,
     ShieldAlert,
@@ -26,7 +20,6 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { toast } from "react-hot-toast";
-import * as XLSX from "xlsx";
 import { useConfirm } from "../../lib/context/ConfirmContext";
 
 // ---------------------------------------------------------------------------
@@ -243,47 +236,21 @@ export const OzelBedenEgitimiDenetim: React.FC<OzelBedenEgitimiDenetimProps> = (
     setLocalAuditData,
     onSave,
     isSaving = false,
-    selectedReport,
-    profile
+    selectedReport
 }) => {
     const confirm = useConfirm();
-    const excelFileInputRef = useRef<HTMLInputElement>(null);
 
-    // Meta State: İl ve Dönem
-    const [ilAdi, setIlAdi] = useState<string>(() => {
-        return (
-            localAuditData?.ozelBedenEgitimi?.il ||
-            selectedReport?.il ||
-            localAuditData?.info?.il ||
-            "VAN"
-        ).toUpperCase();
-    });
+    // Meta: İl ve Dönem (Mevcut veriden okunur)
+    const ilAdi = (
+        localAuditData?.ozelBedenEgitimi?.il ||
+        selectedReport?.il ||
+        localAuditData?.info?.il ||
+        "VAN"
+    ).toUpperCase();
 
     const defaultYear = new Date().getFullYear();
-    const [startYear, setStartYear] = useState<number>(() => {
-        return localAuditData?.ozelBedenEgitimi?.startYear || (defaultYear - 1);
-    });
-    const [endYear, setEndYear] = useState<number>(() => {
-        return localAuditData?.ozelBedenEgitimi?.endYear || defaultYear;
-    });
-
-    // Loading & UI States
-    const [isExportingExcel, setIsExportingExcel] = useState(false);
-    const [isImportingExcel, setIsImportingExcel] = useState(false);
-    const [isExportingWord, setIsExportingWord] = useState(false);
-    const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
-    const downloadMenuRef = useRef<HTMLDivElement>(null);
-
-    // Dışarı tıklayınca indirme menüsünü kapat
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (downloadMenuRef.current && !downloadMenuRef.current.contains(event.target as Node)) {
-                setIsDownloadMenuOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+    const startYear = localAuditData?.ozelBedenEgitimi?.startYear || (defaultYear - 1);
+    const endYear = localAuditData?.ozelBedenEgitimi?.endYear || defaultYear;
 
     // Sekmeler ve Arama
     const [activeSection, setActiveSection] = useState<string>("all");
@@ -430,405 +397,6 @@ export const OzelBedenEgitimiDenetim: React.FC<OzelBedenEgitimiDenetimProps> = (
         return { totalItems, varCount, yokCount, muafCount, uyumYuzdesi };
     }, [activeFacility, evrakList]);
 
-    // ---------------------------------------------------------------------------
-    // EXCEL DIŞA AKTAR / İÇE AKTAR
-    // ---------------------------------------------------------------------------
-
-    const handleDownloadExcel = (isBlank: boolean) => {
-        try {
-            setIsExportingExcel(true);
-            const wb = XLSX.utils.book_new();
-            const fac = isBlank ? createDefaultFacility("Özel Beden Eğitimi ve Spor Tesisi") : activeFacility;
-            const currentEvraklar = fac.tur === "gercek" ? GERCEK_KISI_EVRAKLARI : TUZEL_KISI_EVRAKLARI;
-
-            // Sheet 1: Künye
-            const sheetKunyeData = [
-                ["T.C. GENÇLİK VE SPOR BAKANLIĞI"],
-                [`${ilAdi || "İL"} GENÇLİK VE SPOR İL MÜDÜRLÜĞÜ TEFTİŞİ`],
-                ["ÖZEL BEDEN EĞİTİMİ VE SPOR TESİSLERİ DENETİM ÇİZELGESİ"],
-                [],
-                ["TESİS BİLGİSİ / ALAN", "DEĞER"],
-                ["İl", ilAdi],
-                ["Denetim Dönemi", `${startYear} - ${endYear}`],
-                ["Tesis Adı", fac.tesisAdi],
-                ["Tesis Statüsü", fac.tur === "gercek" ? "Gerçek Kişi" : "Tüzel Kişi"],
-                ["İşletici / Sorumlu", fac.isleticiSahip],
-                ["T.C. / Vergi No", fac.tcVkn],
-                ["Faaliyet Branşları", fac.branslar],
-                ["İlçe ve Adres", fac.adres],
-                ["Açılış Tarihi", fac.acilisTarihi],
-                ["Son Vize Tarihi", fac.sonVizeTarihi],
-                ["Genel Uyum Skoru", isBlank ? "" : `%${stats.uyumYuzdesi}`],
-                ["Müfettiş Kararı", isBlank ? "" : fac.genelSonuc.toUpperCase()]
-            ];
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetKunyeData), "Tesis_Kunyesi");
-
-            const addSectionSheet = (title: string, sheetName: string, items: CheckItem[], secKey: "evraklar" | "fizikiSartlar" | "antrenorPersonel" | "saglikSporcu") => {
-                const rows: any[][] = [
-                    [title],
-                    ["No", "Mevzuat Maddesi / İstenen Belge", "Yönetmelik Dayanağı", "Durum (VAR / YOK / MUAF)", "Müfettiş Tespit Notu"]
-                ];
-                items.forEach(it => {
-                    const cur = isBlank ? { status: "", note: "" } : (fac[secKey]?.[it.id] || { status: "", note: "" });
-                    const st = cur.status === "var" ? "VAR" : cur.status === "yok" ? "YOK" : cur.status === "muaf" ? "MUAF" : "";
-                    rows.push([it.no, it.madde, it.mevzuatRef || "", st, cur.note || ""]);
-                });
-                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), sheetName);
-            };
-
-            addSectionSheet("1. AÇILIŞ VE RUHSAT EVRAKLARI", "1_Acilis_Evrak", currentEvraklar, "evraklar");
-
-            // 2. Komisyon
-            const komRows: any[][] = [
-                ["2. AÇILIŞ İZNİ KOMİSYONU VE HARÇ KONTROLÜ"],
-                ["Kriter / Görevli", "Durum / Bilgi", "Ek Açıklama"],
-                ["Vali Onayı", isBlank ? "" : (fac.komisyon.valiOnayi === "var" ? "VAR" : "YOK"), ""],
-                ["Komisyon Karar Tarihi / No", isBlank ? "" : `${fac.komisyon.komisyonKararTarihi} - ${fac.komisyon.komisyonKararNo}`, ""],
-                ["Komisyon Başkanı (İl Müdürü)", isBlank ? "" : fac.komisyon.ilMudurBaskan, ""],
-                ["Spor Faaliyetleri Şb. Md.", isBlank ? "" : fac.komisyon.sporSbMd, ""],
-                ["Tesisler Şb. Md.", isBlank ? "" : fac.komisyon.tesislerSbMd, ""],
-                ["Federasyon Temsilcisi", isBlank ? "" : fac.komisyon.fedTemsilcisi, ""],
-                ["İl Sağlık Müd. Temsilcisi", isBlank ? "" : fac.komisyon.saglikTemsilcisi, ""],
-                ["Tescil Harcı Tahsilatı", isBlank ? "" : (fac.komisyon.tescilUcretiTahsilat === "var" ? "TAHSİL EDİLDİ" : "EDİLMEDİ"), isBlank ? "" : fac.komisyon.tescilUcretiTutar],
-                ["Genel Müdürlük Payı (%50)", isBlank ? "" : (fac.komisyon.genelMudurPayiYatırıldı === "var" ? "YATIRILDI" : "YATIRILMADI"), ""],
-                ["İl Müdürlüğü Payı (%50)", isBlank ? "" : (fac.komisyon.ilMudurPayiYatırıldı === "var" ? "YATIRILDI" : "YATIRILMADI"), ""]
-            ];
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(komRows), "2_Komisyon_Harc");
-
-            addSectionSheet("3. FİZİKİ VE TEKNİK ŞARTLAR (Md. 8-9)", "3_Fiziki_Sartlar", FIZIKI_SARTLAR_LISTESI, "fizikiSartlar");
-            addSectionSheet("4. ANTRENÖR VE PERSONEL ŞARTLARI (Md. 22-23)", "4_Antrenor_Personel", ANTRENOR_PERSONEL_LISTESI, "antrenorPersonel");
-            addSectionSheet("5. SAĞLIK VE SPORCU KAYITLARI (Md. 16, 24, 25)", "5_Saglik_Sporcu", SAGLIK_SPORCU_LISTESI, "saglikSporcu");
-
-            const fname = isBlank
-                ? `Ozel_Beden_Egitimi_Bos_Denetim_Sablonu.xlsx`
-                : `Ozel_Beden_Egitimi_Denetim_${(fac.tesisAdi || "Tesis").replace(/\s+/g, '_')}.xlsx`;
-            XLSX.writeFile(wb, fname);
-            toast.success(isBlank ? "Boş Excel şablonu indirildi." : "Excel denetim raporu indirildi.");
-        } catch (e: any) {
-            toast.error("Excel oluşturulurken hata: " + e.message);
-        } finally {
-            setIsExportingExcel(false);
-        }
-    };
-
-    const handleExcelUploadClick = () => {
-        if (excelFileInputRef.current) {
-            excelFileInputRef.current.value = "";
-            excelFileInputRef.current.click();
-        }
-    };
-
-    const handleExcelFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setIsImportingExcel(true);
-        try {
-            const data = await file.arrayBuffer();
-            const wb = XLSX.read(data, { type: "array" });
-
-            updateActiveFacility(prev => {
-                const updated = { ...prev };
-
-                const parseSheetIntoMap = (sheetName: string, targetMap: Record<string, FacilityAuditItem>, list: CheckItem[]) => {
-                    const ws = wb.Sheets[sheetName];
-                    if (!ws) return;
-                    const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
-                    rows.forEach(row => {
-                        if (!row || row.length < 4) return;
-                        const noCol = String(row[0] || "").trim();
-                        const textCol = String(row[1] || "").trim();
-                        const statusCol = String(row[3] || "").toUpperCase().trim();
-                        const noteCol = String(row[4] || "").trim();
-
-                        const matchedItem = list.find(it =>
-                            (noCol && it.no.replace(/[^0-9]/g, "") === noCol.replace(/[^0-9]/g, "")) ||
-                            (textCol && it.madde.toLowerCase().includes(textCol.substring(0, 15).toLowerCase()))
-                        );
-
-                        if (matchedItem) {
-                            let st: ItemStatus = "";
-                            if (statusCol.includes("VAR") || statusCol.includes("UYGUN") || statusCol === "EVET") st = "var";
-                            else if (statusCol.includes("YOK") || statusCol.includes("DEĞİL") || statusCol === "HAYIR") st = "yok";
-                            else if (statusCol.includes("MUAF")) st = "muaf";
-
-                            targetMap[matchedItem.id] = {
-                                status: st,
-                                note: noteCol || targetMap[matchedItem.id]?.note || ""
-                            };
-                        }
-                    });
-                };
-
-                const currentEvrakList = prev.tur === "gercek" ? GERCEK_KISI_EVRAKLARI : TUZEL_KISI_EVRAKLARI;
-                const newEvrak = { ...(prev.evraklar || {}) };
-                const newFiziki = { ...(prev.fizikiSartlar || {}) };
-                const newAntrenor = { ...(prev.antrenorPersonel || {}) };
-                const newSaglik = { ...(prev.saglikSporcu || {}) };
-
-                parseSheetIntoMap("1_Acilis_Evrak", newEvrak, currentEvrakList);
-                parseSheetIntoMap("3_Fiziki_Sartlar", newFiziki, FIZIKI_SARTLAR_LISTESI);
-                parseSheetIntoMap("4_Antrenor_Personel", newAntrenor, ANTRENOR_PERSONEL_LISTESI);
-                parseSheetIntoMap("5_Saglik_Sporcu", newSaglik, SAGLIK_SPORCU_LISTESI);
-
-                updated.evraklar = newEvrak;
-                updated.fizikiSartlar = newFiziki;
-                updated.antrenorPersonel = newAntrenor;
-                updated.saglikSporcu = newSaglik;
-
-                return updated;
-            });
-
-            toast.success("Excel dosyasındaki denetim verileri sisteme başarıyla aktarıldı.");
-        } catch (e: any) {
-            toast.error("Excel yüklenirken hata oluştu: " + e.message);
-        } finally {
-            setIsImportingExcel(false);
-            if (excelFileInputRef.current) excelFileInputRef.current.value = "";
-        }
-    };
-
-    // ---------------------------------------------------------------------------
-    // WORD (.DOC) DIŞA AKTAR
-    // ---------------------------------------------------------------------------
-
-    const handleDownloadWord = (isBlank: boolean) => {
-        setIsExportingWord(true);
-        try {
-            const fac = isBlank ? createDefaultFacility("Özel Beden Eğitimi ve Spor Tesisi") : activeFacility;
-            const currentEvrakList = fac.tur === "gercek" ? GERCEK_KISI_EVRAKLARI : TUZEL_KISI_EVRAKLARI;
-
-            const renderWordTableRows = (items: CheckItem[], secKey: "evraklar" | "fizikiSartlar" | "antrenorPersonel" | "saglikSporcu") => {
-                return items.map(it => {
-                    const cur = isBlank ? { status: "", note: "" } : (fac[secKey]?.[it.id] || { status: "", note: "" });
-                    const stBadge = cur.status === "var"
-                        ? `<span class="badge-var">UYGUN</span>`
-                        : cur.status === "yok"
-                        ? `<span class="badge-yok">EKSİK</span>`
-                        : cur.status === "muaf"
-                        ? `<span class="badge-muaf">MUAF</span>`
-                        : isBlank ? `[ ] Uygun &nbsp; [ ] Eksik &nbsp; [ ] Muaf` : `-`;
-                    return `
-                        <tr>
-                            <td class="center bold">${it.no}</td>
-                            <td>${it.madde}</td>
-                            <td class="center">${it.mevzuatRef || "-"}</td>
-                            <td class="center">${stBadge}</td>
-                            <td>${cur.note || (isBlank ? "" : "-")}</td>
-                        </tr>
-                    `;
-                }).join("");
-            };
-
-            const html = `
-            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-            <head>
-            <meta charset='utf-8'>
-            <title>Özel Beden Eğitimi ve Spor Tesisleri Denetim Tutanağı</title>
-            <style>
-                body { font-family: 'Calibri', 'Times New Roman', Arial, sans-serif; font-size: 10.5pt; color: #000; }
-                h1 { text-align: center; font-size: 14pt; font-weight: bold; margin: 0; text-transform: uppercase; }
-                h2 { text-align: center; font-size: 11pt; font-weight: bold; margin: 3pt 0 14pt 0; }
-                h3 { font-size: 11pt; font-weight: bold; margin: 12pt 0 4pt 0; color: #1e3a8a; border-bottom: 1.5pt solid #cbd5e1; padding-bottom: 2pt; }
-                table { width: 100%; border-collapse: collapse; margin-bottom: 12pt; }
-                th, td { border: 1pt solid #475569; padding: 4.5pt 6pt; font-size: 9pt; vertical-align: top; }
-                th { background-color: #f1f5f9; font-weight: bold; text-align: left; }
-                .center { text-align: center; }
-                .bold { font-weight: bold; }
-                .badge-var { color: #047857; font-weight: bold; }
-                .badge-yok { color: #b91c1c; font-weight: bold; }
-                .badge-muaf { color: #475569; font-weight: bold; }
-                .meta-table td { border: 1pt solid #94a3b8; padding: 4pt 6pt; }
-                .meta-table th { background-color: #f8fafc; font-weight: bold; width: 22%; }
-                .sig-box { margin-top: 24pt; width: 100%; }
-                .sig-col { width: 50%; text-align: center; font-size: 9.5pt; }
-            </style>
-            </head>
-            <body>
-                <h1>T.C. GENÇLİK VE SPOR BAKANLIĞI</h1>
-                <h2>REHBERLİK VE DENETİM BAŞKANLIĞI / ${ilAdi || "GENÇLİK VE SPOR İL MÜDÜRLÜĞÜ"} TEFTİŞİ<br/>ÖZEL BEDEN EĞİTİMİ VE SPOR TESİSLERİ DENETİM ÇİZELGESİ</h2>
-                
-                <table class="meta-table">
-                    <tr>
-                        <th>Tesis Adı:</th>
-                        <td class="bold">${fac.tesisAdi || "-"}</td>
-                        <th>Tesis Statüsü:</th>
-                        <td>${fac.tur === "gercek" ? "Gerçek Kişi Tesisi" : "Tüzel Kişi (Şirket / Kulüp)"}</td>
-                    </tr>
-                    <tr>
-                        <th>İşletici / Sorumlu:</th>
-                        <td>${fac.isleticiSahip || "-"}</td>
-                        <th>T.C. / Vergi No:</th>
-                        <td>${fac.tcVkn || "-"}</td>
-                    </tr>
-                    <tr>
-                        <th>Faaliyet Branşları:</th>
-                        <td>${fac.branslar || "-"}</td>
-                        <th>İlçe ve Adres:</th>
-                        <td>${fac.adres || "-"}</td>
-                    </tr>
-                    <tr>
-                        <th>Açılış Tarihi:</th>
-                        <td>${fac.acilisTarihi || "-"}</td>
-                        <th>Son Vize Tarihi:</th>
-                        <td>${fac.sonVizeTarihi || "-"}</td>
-                    </tr>
-                    <tr>
-                        <th>Denetim Dönemi:</th>
-                        <td>${startYear} - ${endYear}</td>
-                        <th>Genel Uyum Oranı:</th>
-                        <td class="bold">${isBlank ? "-" : `%${stats.uyumYuzdesi} (${fac.genelSonuc.toUpperCase()})`}</td>
-                    </tr>
-                </table>
-
-                <h3>1. AÇILIŞ VE İZİN EVRAK KONTROLÜ (${fac.tur === "gercek" ? "Gerçek Kişi" : "Tüzel Kişi"})</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 32px;" class="center">No</th>
-                            <th>Mevzuat Maddesi / İstenen Belge</th>
-                            <th style="width: 85px;" class="center">Dayanak</th>
-                            <th style="width: 80px;" class="center">Durum</th>
-                            <th style="width: 140px;">Müfettiş Tespit Notu</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${renderWordTableRows(currentEvrakList, "evraklar")}
-                    </tbody>
-                </table>
-
-                <h3>2. AÇILIŞ İZNİ KOMİSYONU VE HARÇ KONTROLÜ</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 40%;">Kriter / İnceleme Konusu</th>
-                            <th style="width: 30%;">Durum / İlgili Kişi</th>
-                            <th style="width: 30%;">Tespit Notu</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td>Vali Onayı Bulunuyor mu?</td><td class="bold">${isBlank ? "[ ] Var  [ ] Yok" : (fac.komisyon.valiOnayi === "var" ? "VAR" : "YOK")}</td><td>-</td></tr>
-                        <tr><td>Komisyon Karar Tarihi ve Sayısı</td><td>${isBlank ? "..... / ..... / 20..  - Sayı: ....." : `${fac.komisyon.komisyonKararTarihi || "-"} / ${fac.komisyon.komisyonKararNo || "-"}`}</td><td>-</td></tr>
-                        <tr><td>Komisyon Başkanı (İl Müdürü)</td><td>${isBlank ? "........................................" : fac.komisyon.ilMudurBaskan || "-"}</td><td>-</td></tr>
-                        <tr><td>Spor Faaliyetleri Şube Müdürü</td><td>${isBlank ? "........................................" : fac.komisyon.sporSbMd || "-"}</td><td>-</td></tr>
-                        <tr><td>Tesisler Şube Müdürü</td><td>${isBlank ? "........................................" : fac.komisyon.tesislerSbMd || "-"}</td><td>-</td></tr>
-                        <tr><td>Federasyon İl Temsilcisi</td><td>${isBlank ? "........................................" : fac.komisyon.fedTemsilcisi || "-"}</td><td>-</td></tr>
-                        <tr><td>İl Sağlık Müdürlüğü Temsilcisi</td><td>${isBlank ? "........................................" : fac.komisyon.saglikTemsilcisi || "-"}</td><td>-</td></tr>
-                        <tr><td>Tescil Ücreti / Harcı Tahsilatı</td><td class="bold">${isBlank ? "[ ] Tahsil Edildi  [ ] Edilmedi" : (fac.komisyon.tescilUcretiTahsilat === "var" ? "TAHSİL EDİLDİ" : "EDİLMEDİ")}</td><td>${fac.komisyon.tescilUcretiTutar ? `${fac.komisyon.tescilUcretiTutar} TL` : "-"}</td></tr>
-                        <tr><td>Genel Müdürlük Payı (%50) Yatırıldı mı?</td><td>${isBlank ? "[ ] Evet  [ ] Hayır" : (fac.komisyon.genelMudurPayiYatırıldı === "var" ? "YATIRILDI" : "YATIRILMADI")}</td><td>-</td></tr>
-                        <tr><td>İl Müdürlüğü Payı (%50) Yatırıldı mı?</td><td>${isBlank ? "[ ] Evet  [ ] Hayır" : (fac.komisyon.ilMudurPayiYatırıldı === "var" ? "YATIRILDI" : "YATIRILMADI")}</td><td>-</td></tr>
-                    </tbody>
-                </table>
-
-                <h3>3. FİZİKİ VE TEKNİK ŞARTLAR (Md. 8 - 9)</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 32px;" class="center">No</th>
-                            <th>Fiziki ve Teknik Standart</th>
-                            <th style="width: 85px;" class="center">Dayanak</th>
-                            <th style="width: 80px;" class="center">Durum</th>
-                            <th style="width: 140px;">Müfettiş Tespit Notu</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${renderWordTableRows(FIZIKI_SARTLAR_LISTESI, "fizikiSartlar")}
-                    </tbody>
-                </table>
-
-                <h3>4. ANTRENÖR VE PERSONEL ŞARTLARI (Md. 22 - 23)</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 32px;" class="center">No</th>
-                            <th>Antrenör & Ücret Kriteri</th>
-                            <th style="width: 85px;" class="center">Dayanak</th>
-                            <th style="width: 80px;" class="center">Durum</th>
-                            <th style="width: 140px;">Müfettiş Tespit Notu</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${renderWordTableRows(ANTRENOR_PERSONEL_LISTESI, "antrenorPersonel")}
-                    </tbody>
-                </table>
-
-                <h3>5. SAĞLIK, İLKYARDIM VE SPORCU KAYITLARI (Md. 16, 24, 25)</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 32px;" class="center">No</th>
-                            <th>Sağlık & Sporcu Kayıt Kriteri</th>
-                            <th style="width: 85px;" class="center">Dayanak</th>
-                            <th style="width: 80px;" class="center">Durum</th>
-                            <th style="width: 140px;">Müfettiş Tespit Notu</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${renderWordTableRows(SAGLIK_SPORCU_LISTESI, "saglikSporcu")}
-                    </tbody>
-                </table>
-
-                <h3>6. YILLIK VİZE, İPC VE NİHAİ KANAAT (Md. 13, 26)</h3>
-                <table>
-                    <tr>
-                        <th style="width: 35%;">Yıllık Vize Yapıldı mı?</th>
-                        <td>${isBlank ? "[ ] Evet  [ ] Hayır" : (fac.vizeYaptirim.yillikVizeYapildiMi === "var" ? "VİZELİ" : "VİZESİZ")}</td>
-                        <th style="width: 20%;">Vize Tarihi:</th>
-                        <td>${fac.vizeYaptirim.vizeOnayTarihi || "-"}</td>
-                    </tr>
-                    <tr>
-                        <th>Önceki Denetimde İPC Durumu:</th>
-                        <td colspan="3">${fac.vizeYaptirim.oncekiIpcDurumu || "-"}</td>
-                    </tr>
-                    <tr>
-                        <th>Eksiklik Giderme İçin Verilen Süre:</th>
-                        <td colspan="3">${fac.vizeYaptirim.verilenSureVarMi || "-"}</td>
-                    </tr>
-                    <tr>
-                        <th>Tespit Edilen Aykırılıklar:</th>
-                        <td colspan="3">${fac.vizeYaptirim.tespitAykiriliklar || "-"}</td>
-                    </tr>
-                    <tr>
-                        <th>Nihai Müfettiş Kararı & Kanaati:</th>
-                        <td colspan="3" class="bold" style="min-height: 40pt;">${fac.vizeYaptirim.sonucKarari || (isBlank ? "" : "Mevzuata uygun faaliyet göstermektedir.")}</td>
-                    </tr>
-                </table>
-
-                <table class="sig-box" style="border: none;">
-                    <tr style="border: none;">
-                        <td class="sig-col" style="border: none;">
-                            <strong>Tesis Yetkilisi / İşletici</strong><br/>
-                            ${fac.isleticiSahip || "Ad Soyad"}<br/>
-                            İmza / Kaşe
-                        </td>
-                        <td class="sig-col" style="border: none;">
-                            <strong>Denetimi Yapan Bakanlık Müfettişi</strong><br/>
-                            ${profile?.full_name || "Bakanlık Müfettişi"}<br/>
-                            İmza
-                        </td>
-                    </tr>
-                </table>
-            </body>
-            </html>
-            `;
-
-            const blob = new Blob(['\ufeff', html], { type: 'application/msword;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = isBlank
-                ? `Ozel_Beden_Egitimi_Bos_Denetim_Sablonu.doc`
-                : `Ozel_Beden_Egitimi_Denetim_Raporu_${(fac.tesisAdi || "Tesis").replace(/\s+/g, '_')}.doc`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            toast.success(isBlank ? "Boş Word şablonu indirildi." : "Word denetim raporu indirildi.");
-        } catch (e: any) {
-            toast.error("Word belgesi oluşturulurken hata: " + e.message);
-        } finally {
-            setIsExportingWord(false);
-        }
-    };
 
     // ---------------------------------------------------------------------------
     // YAZDIRMA VE SIFIRLAMA
@@ -1221,230 +789,59 @@ export const OzelBedenEgitimiDenetim: React.FC<OzelBedenEgitimiDenetimProps> = (
                             </span>
                         </h3>
                         <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate">
-                            {ilAdi ? `${ilAdi} Gençlik ve Spor İl Müdürlüğü` : "İl Müdürlüğü"} Teftişi Bilgi & Denetim Çizelgesi
+                            Özel Beden Eğitimi ve Spor Tesisleri Mevzuat & Denetim Formu
                         </p>
                     </div>
                 </div>
 
-                {/* Sağ Araçlar: İl, Dönem ve Aksiyon Butonları */}
-                <div className="flex flex-col lg:flex-row flex-wrap items-stretch lg:items-center gap-2.5 w-full lg:w-auto">
-                    {/* Meta Alanlar: İl & Yıl (Büyütülmüş & Düzenlenmiş & Mobilde Tam Uyumlu) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-nowrap items-center gap-2 w-full lg:w-auto">
-                        {/* İl Seçici */}
-                        <div className="flex items-center gap-2 h-9 sm:h-10 bg-slate-50 dark:bg-slate-800/90 px-3 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-sm min-w-0">
-                            <MapPin size={15} className="text-blue-600 dark:text-blue-400 shrink-0" />
-                            <span className="text-xs font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider shrink-0">İl:</span>
-                            <input
-                                type="text"
-                                value={ilAdi}
-                                onChange={(e) => setIlAdi(e.target.value.toUpperCase())}
-                                onBlur={handleSave}
-                                placeholder="ÖRN: VAN"
-                                className="h-7 sm:h-8 w-full sm:w-36 px-2 text-xs sm:text-sm font-black uppercase bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-300 rounded-lg border border-slate-200 dark:border-slate-700 shadow-inner text-center tracking-wide outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all min-w-0"
-                                title="Denetlenen il adı"
-                            />
-                        </div>
+                {/* Sağ Araçlar: Aksiyon Butonları */}
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
+                    {/* HTML Aç */}
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => window.open('/ozel_beden_egitimi_tesisleri_denetimi.html', '_blank')}
+                        className="rounded-xl h-8 text-[11px] font-semibold border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 px-2.5 justify-center gap-1"
+                        title="Bağımsız interaktif HTML formunu yeni sekmede açar"
+                    >
+                        <ExternalLink size={12} className="shrink-0" />
+                        <span>HTML Aç</span>
+                    </Button>
 
-                        {/* Dönem Yıl Seçici */}
-                        <div className="flex items-center gap-2 h-9 sm:h-10 bg-slate-50 dark:bg-slate-800/90 px-3 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-sm min-w-0">
-                            <Calendar size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-                            <span className="text-xs font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider shrink-0">Dönem:</span>
-                            <div className="flex items-center gap-1 flex-1 sm:flex-initial">
-                                <input
-                                    type="number"
-                                    value={startYear}
-                                    onChange={(e) => setStartYear(parseInt(e.target.value) || 2024)}
-                                    className="h-7 sm:h-8 w-full sm:w-20 px-1 text-xs sm:text-sm font-black text-center bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg border border-slate-200 dark:border-slate-700 shadow-inner outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
-                                    min={2000}
-                                    max={2040}
-                                    title="Başlangıç Yılı"
-                                />
-                                <span className="font-black text-slate-400 text-xs px-0.5 shrink-0">-</span>
-                                <input
-                                    type="number"
-                                    value={endYear}
-                                    onChange={(e) => setEndYear(parseInt(e.target.value) || 2025)}
-                                    className="h-7 sm:h-8 w-full sm:w-20 px-1 text-xs sm:text-sm font-black text-center bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg border border-slate-200 dark:border-slate-700 shadow-inner outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
-                                    min={2000}
-                                    max={2040}
-                                    title="Bitiş Yılı"
-                                />
-                            </div>
-                        </div>
-                    </div>
+                    {/* Yazdır */}
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handlePrint}
+                        className="rounded-xl h-8 text-[11px] font-semibold text-slate-600 dark:text-slate-400 px-2.5 justify-center gap-1"
+                    >
+                        <Printer size={12} className="shrink-0" />
+                        <span>Yazdır</span>
+                    </Button>
 
-                    {/* Gizli Excel Input */}
-                    <input
-                        type="file"
-                        ref={excelFileInputRef}
-                        onChange={handleExcelFileSelected}
-                        accept=".xlsx, .xls"
-                        className="hidden"
-                    />
+                    {/* Kaydet */}
+                    <Button
+                        size="sm"
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="rounded-xl h-8 text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 px-3 justify-center gap-1"
+                    >
+                        {isSaving ? <Loader2 size={12} className="animate-spin shrink-0" /> : <Save size={12} className="shrink-0" />}
+                        <span>Kaydet</span>
+                    </Button>
 
-                    {/* Aksiyon Butonları Grubu */}
-                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2 w-full lg:w-auto">
-                        {/* 1. TEK İNDİR BUTONU (Tıklanınca 4 Seçenek Açılır) */}
-                        <div className="relative w-full sm:w-auto" ref={downloadMenuRef}>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setIsDownloadMenuOpen(prev => !prev)}
-                                className={`w-full sm:w-auto rounded-xl h-8 sm:h-9 text-[11px] sm:text-xs font-bold border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 shadow-sm px-2.5 sm:px-3 flex items-center justify-between sm:justify-start gap-1.5 ${isDownloadMenuOpen ? "bg-blue-50 dark:bg-blue-950/60 ring-2 ring-blue-500/20" : ""}`}
-                                title="Excel ve Word şablonlarını indirme seçenekleri"
-                            >
-                                <div className="flex items-center gap-1.5 truncate">
-                                    {isExportingExcel || isExportingWord ? (
-                                        <Loader2 size={13} className="animate-spin mr-1 shrink-0" />
-                                    ) : (
-                                        <Download size={13} className="text-blue-600 dark:text-blue-400 shrink-0" />
-                                    )}
-                                    <span className="truncate">İndir / Şablon</span>
-                                </div>
-                                <ChevronDown size={12} className={`transition-transform duration-200 shrink-0 ${isDownloadMenuOpen ? "rotate-180" : ""}`} />
-                            </Button>
-
-                            {isDownloadMenuOpen && (
-                                <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-1.5 w-64 max-w-[calc(100vw-2.5rem)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                                    <div className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                        Excel Formatı (.xlsx)
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            handleDownloadExcel(true);
-                                            setIsDownloadMenuOpen(false);
-                                        }}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 transition-colors text-left group"
-                                    >
-                                        <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                            <FileSpreadsheet size={15} />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="font-bold text-xs text-slate-850 dark:text-white">Boş Excel Şablonu</div>
-                                            <div className="text-[10px] text-slate-400">Kuruma gönderilecek boş .xlsx</div>
-                                        </div>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            handleDownloadExcel(false);
-                                            setIsDownloadMenuOpen(false);
-                                        }}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 transition-colors text-left group"
-                                    >
-                                        <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                            <FileSpreadsheet size={15} />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="font-bold text-xs text-slate-850 dark:text-white">Excel Denetim Çizelgesi</div>
-                                            <div className="text-[10px] text-slate-400">Mevcut verilerle dolu .xlsx</div>
-                                        </div>
-                                    </button>
-
-                                    <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
-
-                                    <div className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                        Word Formatı (.doc / .docx)
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            handleDownloadWord(false);
-                                            setIsDownloadMenuOpen(false);
-                                        }}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-700 transition-colors text-left group"
-                                    >
-                                        <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                            <FileText size={15} />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="font-bold text-xs text-slate-850 dark:text-white">Word Denetim Raporu</div>
-                                            <div className="text-[10px] text-slate-400">Çift imzalı resmi teftiş tutanağı</div>
-                                        </div>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            handleDownloadWord(true);
-                                            setIsDownloadMenuOpen(false);
-                                        }}
-                                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-700 transition-colors text-left group"
-                                    >
-                                        <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                            <FileText size={15} />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="font-bold text-xs text-slate-850 dark:text-white">Boş Word Tutanağı</div>
-                                            <div className="text-[10px] text-slate-400">Yerinde teftiş için boş şablon</div>
-                                        </div>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Excel Yükle */}
-                        <Button
-                            size="sm"
-                            onClick={handleExcelUploadClick}
-                            disabled={isImportingExcel || isSaving}
-                            className="w-full sm:w-auto rounded-xl h-8 sm:h-9 text-[11px] sm:text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20 px-2.5 sm:px-3 justify-center"
-                            title="Doldurulan Excel dosyasını seçip sisteme aktarır"
-                        >
-                            {isImportingExcel ? (
-                                <Loader2 size={13} className="animate-spin mr-1 sm:mr-1.5 shrink-0" />
-                            ) : (
-                                <Upload size={13} className="mr-1 sm:mr-1.5 shrink-0" />
-                            )}
-                            <span className="truncate">Excel Yükle</span>
-                        </Button>
-
-                        {/* HTML Aç */}
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => window.open('/ozel_beden_egitimi_tesisleri_denetimi.html', '_blank')}
-                            className="w-full sm:w-auto rounded-xl h-8 sm:h-9 text-[11px] sm:text-xs font-semibold border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 px-2 sm:px-3 justify-center"
-                            title="Bağımsız interaktif HTML formunu yeni sekmede açar"
-                        >
-                            <ExternalLink size={13} className="mr-1 sm:mr-1.5 shrink-0" />
-                            <span className="truncate">HTML Aç</span>
-                        </Button>
-
-                        {/* Yazdır */}
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handlePrint}
-                            className="w-full sm:w-auto rounded-xl h-8 sm:h-9 text-[11px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 px-2 sm:px-3 justify-center"
-                        >
-                            <Printer size={13} className="mr-1 sm:mr-1.5 shrink-0" />
-                            <span className="truncate">Yazdır</span>
-                        </Button>
-
-                        {/* Kaydet & Sıfırla Grubu (Mobilde tam genişlikte birlikte durur) */}
-                        <div className="col-span-2 sm:col-span-1 flex items-center gap-1.5 w-full sm:w-auto">
-                            <Button
-                                size="sm"
-                                onClick={handleSave}
-                                disabled={isSaving}
-                                className="flex-1 sm:flex-initial rounded-xl h-8 sm:h-9 text-[11px] sm:text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 px-3 justify-center"
-                            >
-                                {isSaving ? <Loader2 size={13} className="animate-spin mr-1.5 shrink-0" /> : <Save size={13} className="mr-1.5 shrink-0" />}
-                                <span>Kaydet</span>
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={handleResetAudit}
-                                disabled={isSaving}
-                                className="rounded-xl h-8 sm:h-9 text-[11px] sm:text-xs font-bold border-rose-300 dark:border-rose-900 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 px-2.5 justify-center shrink-0"
-                                title="Formdaki tüm verileri sıfırlar"
-                            >
-                                <RotateCcw size={13} className="shrink-0" />
-                            </Button>
-                        </div>
-                    </div>
+                    {/* Sıfırla */}
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleResetAudit}
+                        disabled={isSaving}
+                        className="rounded-xl h-8 text-[11px] font-bold border-rose-300 dark:border-rose-900 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 px-2.5 justify-center shrink-0 gap-1"
+                        title="Formdaki tüm verileri sıfırlar"
+                    >
+                        <RotateCcw size={12} className="shrink-0" />
+                        <span>Sıfırla</span>
+                    </Button>
                 </div>
             </div>
 
