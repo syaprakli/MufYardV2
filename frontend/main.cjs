@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification: NativeNotification, Menu, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification: NativeNotification, Menu, dialog, shell } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -154,7 +154,7 @@ async function startBackend() {
         // Use venv python if available, fallback to system python
         const venvPython = path.join(backendPath, '.venv', 'Scripts', 'python.exe');
         const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python';
-        const args = ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8000'];
+        const args = ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8000', '--reload'];
         
         console.log(`[DEV] Backend başlatılıyor: ${pythonCmd} ${args.join(' ')}`);
         console.log(`[DEV] CWD: ${backendPath}`);
@@ -340,5 +340,77 @@ ipcMain.handle('download-file-with-dialog', async (_event, { url, fileName }) =>
             ok: false,
             error: err && err.message ? err.message : 'Dosya kaydedilemedi.'
         };
+    }
+});
+
+ipcMain.handle('open-folder', async (_event, folderPath) => {
+    try {
+        let fullPath = folderPath || '';
+        if (!fullPath || !path.isAbsolute(fullPath)) {
+            fullPath = path.join(os.homedir(), 'Documents', 'MufYARD', fullPath || 'Mevzuat');
+        }
+        if (!fs.existsSync(fullPath)) {
+            fs.mkdirSync(fullPath, { recursive: true });
+        }
+        console.log('[ELECTRON] open-folder resolving path:', fullPath);
+        const err = await shell.openPath(fullPath);
+        if (err) {
+            console.error('[ELECTRON] openPath hatasi:', err);
+            return { ok: false, error: err };
+        }
+        return { ok: true, path: fullPath };
+    } catch (e) {
+        console.error('[ELECTRON] open-folder hatasi:', e);
+        return { ok: false, error: e.message };
+    }
+});
+
+ipcMain.handle('show-item-in-folder', async (_event, filePath) => {
+    try {
+        console.log('[ELECTRON] show-item-in-folder requested:', filePath);
+        const isWebUrl = typeof filePath === 'string' && (filePath.startsWith('http://') || filePath.startsWith('https://'));
+        if (!filePath || isWebUrl) {
+            const defaultDir = path.join(os.homedir(), 'Documents', 'MufYARD', 'Mevzuat');
+            if (!fs.existsSync(defaultDir)) fs.mkdirSync(defaultDir, { recursive: true });
+            await shell.openPath(defaultDir);
+            return { ok: true, type: 'folder', path: defaultDir, message: isWebUrl ? "Bu mevzuat web üzerinden eklenmiş; genel mevzuat klasörü açıldı." : undefined };
+        }
+
+        let fullPath = filePath;
+        if (!path.isAbsolute(fullPath)) {
+            let clean = filePath.replace(/^[/\\]+/, '').replace(/^Mevzuat[/\\]+/i, '');
+            const cand = path.join(os.homedir(), 'Documents', 'MufYARD', 'Mevzuat', clean);
+            if (fs.existsSync(cand)) {
+                fullPath = cand;
+            } else {
+                const cand2 = path.join(os.homedir(), 'Documents', 'MufYARD', filePath);
+                if (fs.existsSync(cand2)) {
+                    fullPath = cand2;
+                } else {
+                    fullPath = cand;
+                }
+            }
+        }
+
+        console.log('[ELECTRON] Resolved item path:', fullPath, 'Exists:', fs.existsSync(fullPath));
+
+        if (fs.existsSync(fullPath)) {
+            const stat = fs.statSync(fullPath);
+            if (stat.isDirectory()) {
+                await shell.openPath(fullPath);
+                return { ok: true, type: 'folder', path: fullPath };
+            } else {
+                shell.showItemInFolder(fullPath);
+                return { ok: true, type: 'file', path: fullPath };
+            }
+        } else {
+            const parentDir = path.dirname(fullPath);
+            if (!fs.existsSync(parentDir)) fs.mkdirSync(parentDir, { recursive: true });
+            await shell.openPath(parentDir);
+            return { ok: true, type: 'folder', path: parentDir, message: "Dosya yerel klasörde bulunamadı, ilgili klasör açıldı." };
+        }
+    } catch (e) {
+        console.error('[ELECTRON] show-item-in-folder hatasi:', e);
+        return { ok: false, error: e.message };
     }
 });

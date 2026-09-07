@@ -9,6 +9,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     downloadFile: (url, fileName) => {
         return ipcRenderer.invoke('download-file-with-dialog', { url, fileName });
     },
+    openFolder: (folderPath) => {
+        return ipcRenderer.invoke('open-folder', folderPath);
+    },
+    showItemInFolder: (filePath) => {
+        return ipcRenderer.invoke('show-item-in-folder', filePath);
+    },
     // Platform bilgisi
     platform: process.platform,
     isElectron: true,

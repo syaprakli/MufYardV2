@@ -1,0 +1,2444 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Müfettiş Özet Bilgiler ve Tablolar Formu</title>
+    <style>
+        :root {
+            --primary: #1e40af;
+            --primary-dark: #1e3a8a;
+            --primary-light: #dbeafe;
+            --success: #059669;
+            --danger: #dc2626;
+            --warning: #d97706;
+            --gray-50: #f8fafc;
+            --gray-100: #f1f5f9;
+            --gray-200: #e2e8f0;
+            --gray-300: #cbd5e1;
+            --gray-400: #94a3b8;
+            --gray-500: #64748b;
+            --gray-600: #475569;
+            --gray-700: #334155;
+            --gray-800: #1e293b;
+            --gray-900: #0f172a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f1f5f9;
+            color: var(--gray-800);
+            line-height: 1.4;
+            padding-bottom: 60px;
+        }
+
+        /* STICKY TOP TOOLBAR */
+        .toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--gray-300);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+            padding: 12px 24px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .toolbar-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toolbar-title h1 {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge {
+            background: var(--primary-light);
+            color: var(--primary);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            border: 1px solid #bfdbfe;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--gray-100);
+            padding: 4px 8px;
+            border-radius: 8px;
+            border: 1px solid var(--gray-300);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .input-group input {
+            border: 1px solid var(--gray-300);
+            border-radius: 4px;
+            padding: 3px 6px;
+            font-size: 12px;
+            font-weight: 700;
+            text-align: center;
+            background: #fff;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.15s ease;
+        }
+
+        .btn-sm {
+            padding: 3px 8px;
+            font-size: 11px;
+            border-radius: 6px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-outline {
+            background: #fff;
+            border-color: var(--gray-300);
+            color: var(--gray-700);
+        }
+        .btn-outline:hover {
+            background: var(--gray-100);
+        }
+
+        .btn-action {
+            background: #eff6ff;
+            color: var(--primary);
+            border: 1px solid #bfdbfe;
+        }
+        .btn-action:hover {
+            background: #dbeafe;
+        }
+
+        .btn-del {
+            background: transparent;
+            border: none;
+            color: #cbd5e1;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 2px 5px;
+            border-radius: 4px;
+            transition: all 0.15s;
+        }
+        .btn-del:hover {
+            color: var(--danger);
+            background: #fef2f2;
+        }
+
+        /* CONTAINER */
+        .container {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 16px;
+        }
+
+        /* PAPER STYLE */
+        .paper {
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid var(--gray-300);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            padding: 36px 40px;
+        }
+
+        /* MINISTRY HEADER */
+        .doc-header {
+            text-align: center;
+            margin-bottom: 28px;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 16px;
+        }
+
+        .doc-header h2 {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--gray-600);
+            letter-spacing: 0.5px;
+        }
+        .doc-header h3 {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--gray-900);
+            margin: 4px 0;
+            text-transform: uppercase;
+        }
+        .doc-header h4 {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-top: 6px;
+        }
+        .doc-header .donem-text {
+            font-size: 12px;
+            color: var(--gray-500);
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        /* SECTION HEADERS */
+        .section-box {
+            margin-bottom: 28px;
+            background: #fff;
+            border: 1px solid var(--gray-200);
+            border-radius: 10px;
+            padding: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.02);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--gray-900);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-num {
+            background: var(--primary);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 800;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+
+        .sub-header {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--gray-700);
+            margin: 10px 0 6px 0;
+        }
+
+        /* TABLES */
+        .table-responsive {
+            overflow-x: auto;
+            margin-bottom: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            background: #fff;
+        }
+
+        th, td {
+            border: 1px solid #cbd5e1;
+            padding: 6px 8px;
+            vertical-align: middle;
+        }
+
+        th {
+            background: #f8fafc;
+            color: #1e293b;
+            font-weight: 700;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        td input[type="text"],
+        td input[type="number"] {
+            width: 100%;
+            border: none;
+            background: transparent;
+            font-size: 11px;
+            padding: 2px;
+            color: #0f172a;
+            outline: none;
+        }
+
+        td input[type="text"]:focus,
+        td input[type="number"]:focus {
+            background: #eff6ff;
+            border-radius: 3px;
+        }
+
+        .text-left { text-align: left; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .font-bold { font-weight: 700; }
+        .bg-total { background: #eff6ff; font-weight: 700; }
+
+        .table-note {
+            font-size: 10px;
+            color: var(--gray-500);
+            font-style: italic;
+            margin-top: 4px;
+        }
+
+        /* ITEM 16 TOOLBAR & STYLES */
+        .temsilci-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: #f8fafc;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--gray-200);
+            margin-bottom: 12px;
+        }
+
+        .temsilci-stats {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .stat-pill {
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--gray-300);
+            background: #fff;
+        }
+        .stat-var { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+        .stat-yok { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+
+        .search-box {
+            padding: 4px 10px;
+            font-size: 11px;
+            border-radius: 6px;
+            border: 1px solid var(--gray-300);
+            width: 180px;
+        }
+
+        .filter-btn-group {
+            display: flex;
+            gap: 4px;
+        }
+
+        .filter-btn {
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 6px;
+            border: 1px solid var(--gray-300);
+            background: #fff;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .filter-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        select.table-select {
+            font-size: 11px;
+            padding: 2px 4px;
+            border-radius: 4px;
+            border: 1px solid var(--gray-300);
+            background: #fff;
+            font-weight: 600;
+            width: 100%;
+        }
+
+        textarea.note-area {
+            width: 100%;
+            border: 1px solid var(--gray-300);
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 11px;
+            resize: vertical;
+            margin-top: 4px;
+            background: #fff;
+        }
+
+        /* CUSTOM MADDE CARD */
+        .custom-madde-card {
+            border: 1px solid #c7d2fe;
+            background: #f5f7ff;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+        .custom-madde-card input.madde-title {
+            font-weight: 700;
+            font-size: 12px;
+            color: #1e1b4b;
+            border: none;
+            background: transparent;
+            border-bottom: 1px dashed #a5b4fc;
+            width: 80%;
+            margin-bottom: 4px;
+        }
+        .custom-madde-card input.madde-desc {
+            font-size: 11px;
+            color: #4b5563;
+            border: none;
+            background: transparent;
+            border-bottom: 1px dashed #d1d5db;
+            width: 90%;
+            margin-bottom: 6px;
+        }
+
+        /* PRINT STYLES */
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 20mm;
+            }
+            body {
+                background: #fff;
+                padding: 0;
+            }
+            .toolbar, .no-print, .btn-del {
+                display: none !important;
+            }
+            .container {
+                max-width: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            .paper {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+            }
+            .section-box {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                margin-bottom: 20px;
+                page-break-inside: avoid;
+            }
+            table {
+                font-size: 9.5px;
+            }
+            th, td {
+                padding: 4px 5px;
+            }
+        }
+
+        /* CATEGORY FILTER NAV */
+        .category-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 10px 24px;
+            background: #fff;
+            border-bottom: 1px solid var(--gray-200);
+            position: sticky;
+            top: 57px;
+            z-index: 90;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+            -webkit-overflow-scrolling: touch;
+        }
+        .cat-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #334155;
+            white-space: nowrap;
+            transition: all 0.15s ease;
+        }
+        .cat-btn:hover {
+            background: #f1f5f9;
+        }
+        .cat-btn.active {
+            background: #0f172a;
+            color: #fff;
+            border-color: #0f172a;
+            box-shadow: 0 2px 6px rgba(15,23,42,0.15);
+        }
+        .cat-badge {
+            font-size: 10px;
+            font-weight: 800;
+            padding: 1px 6px;
+            border-radius: 9999px;
+            background: rgba(0,0,0,0.06);
+            color: inherit;
+        }
+        .cat-btn.active .cat-badge {
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+        }
+
+        /* DROPDOWN MENU */
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 6px;
+            background: #fff;
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            padding: 6px;
+            min-width: 230px;
+            z-index: 200;
+            display: none;
+        }
+        .dropdown-menu.show {
+            display: block;
+        }
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gray-700);
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.15s ease;
+        }
+        .dropdown-item:hover {
+            background: #eff6ff;
+            color: var(--primary);
+        }
+
+        /* MODAL */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(3px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 16px;
+            visibility: hidden;
+            opacity: 0;
+            transition: all 0.2s ease;
+        }
+        .modal-overlay.show {
+            visibility: visible;
+            opacity: 1;
+        }
+        .modal-card {
+            background: #fff;
+            border-radius: 20px;
+            max-width: 440px;
+            width: 100%;
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            border: 1px solid var(--gray-200);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ÜST ARAÇ ÇUBUĞU -->
+    <div class="toolbar">
+        <div class="toolbar-title">
+            <h1>
+                <span>📋</span>
+                Müfettiş İstenecek Tablo ve Bilgiler
+                <span class="badge" id="badgeSummary">16 Konu / 19 Tablo</span>
+            </h1>
+        </div>
+
+        <div class="controls">
+            <div class="input-group" style="padding: 5px 10px; border-radius: 10px;">
+                <span style="font-weight: 800; color: var(--primary);">İl:</span>
+                <input type="text" id="cfgIl" value="ÇANAKKALE" style="width: 130px; text-transform: uppercase; font-size: 13px; font-weight: 800; padding: 4px 8px;">
+            </div>
+
+            <div class="input-group" style="padding: 5px 10px; border-radius: 10px;">
+                <span style="font-weight: 800; color: #4f46e5;">Dönem:</span>
+                <input type="number" id="cfgStartYear" style="width: 65px; font-size: 13px; font-weight: 800; padding: 4px 6px;">
+                <span style="font-weight: 800;">-</span>
+                <input type="number" id="cfgEndYear" style="width: 65px; font-size: 13px; font-weight: 800; padding: 4px 6px;">
+            </div>
+
+            <button class="btn btn-primary" onclick="applyConfiguration()" title="Tablo sütunlarını seçilen yıllara göre yeniden oluşturur">Yılları Güncelle</button>
+
+            <!-- İndir / Şablonlar Açılır Menüsü -->
+            <div style="position: relative; display: inline-block;">
+                <button class="btn btn-action" onclick="toggleDownloadMenu(event)" style="background:#eff6ff; color:#1d4ed8; font-weight:700; border:1px solid #bfdbfe;" title="Word ve çıktı seçenekleri">
+                    📥 İndir / Şablonlar ▾
+                </button>
+                <div class="dropdown-menu" id="downloadMenu">
+                    <div style="padding: 4px 10px; font-size: 10px; font-weight: 800; text-transform: uppercase; color: #94a3b8;">Word Formatı</div>
+                    <button class="dropdown-item" onclick="exportToWord(false)">
+                        <span>📄</span>
+                        <div>
+                            <div style="font-weight: 700;">Word Raporu (.doc)</div>
+                            <div style="font-size: 10px; color: #64748b;">Mevcut dolu tablolarla rapor çıktısı</div>
+                        </div>
+                    </button>
+                    <button class="dropdown-item" onclick="exportToWord(true)">
+                        <span>📝</span>
+                        <div>
+                            <div style="font-weight: 700;">Boş Word Şablonu (.doc)</div>
+                            <div style="font-size: 10px; color: #64748b;">Kuruma gönderilecek boş matbu form</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <button class="btn btn-outline" onclick="window.print()">🖨️ Yazdır / PDF</button>
+            <button class="btn btn-outline" onclick="saveToLocalStorage()" style="border-color: #2563eb; color: #2563eb; font-weight: 700;">💾 Kaydet</button>
+            <button class="btn btn-outline" onclick="openResetModal()" style="border-color: #fecdd3; color: #e11d48; font-weight: 700;">🔄 Sıfırla</button>
+        </div>
+    </div>
+
+    <!-- KATEGORİ SEÇİM BUTONLARI (GRUPLU) -->
+    <div class="category-nav no-print">
+        <button class="cat-btn active" onclick="filterCategory('all', this)">
+            <span>📊</span> Tümü <span class="cat-badge">16 Konu / 19 Tablo</span>
+        </button>
+        <button class="cat-btn" onclick="filterCategory('spor', this)">
+            <span>🏆</span> 1. Spor Faaliyetleri & Kulüpler <span class="cat-badge">Tablo 1 - 4</span>
+        </button>
+        <button class="cat-btn" onclick="filterCategory('personel_genclik', this)">
+            <span>👥</span> 2. Personel & Gençlik <span class="cat-badge">Tablo 5 - 6</span>
+        </button>
+        <button class="cat-btn" onclick="filterCategory('mali', this)">
+            <span>💰</span> 3. Mali Durum, Gelir & Bütçe <span class="cat-badge">Tablo 7 - 11</span>
+        </button>
+        <button class="cat-btn" onclick="filterCategory('tesis_idari', this)">
+            <span>🏢</span> 4. Tesisler, Taşınmaz & İnceleme <span class="cat-badge">Tablo 9, 12 - 16</span>
+        </button>
+    </div>
+
+    <!-- SIFIRLAMA ONAY MODALI -->
+    <div class="modal-overlay" id="resetModalOverlay" onclick="closeResetModal(event)">
+        <div class="modal-card" onclick="event.stopPropagation()">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: #ffe4e6; color: #e11d48; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+                    ⚠️
+                </div>
+                <div>
+                    <h3 style="font-size: 16px; font-weight: 800; color: #0f172a;">Tüm Verileri Sıfırla</h3>
+                    <p style="font-size: 12px; color: #64748b;">Bu işlem geri alınamaz</p>
+                </div>
+            </div>
+            <p style="font-size: 13px; color: #334155; line-height: 1.5; margin-bottom: 20px;">
+                İl Müdürlüğünden istenecek tüm özet istatistik tabloları (sporcu, personel, bütçe, gelir/gider, tesis ve ilçe verileri) sıfırlanacaktır. Devam etmek istiyor musunuz?
+            </p>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-outline" onclick="closeResetModal()">İptal</button>
+                <button class="btn" onclick="confirmResetData()" style="background: #e11d48; color: #fff; font-weight: 700;">Evet, Tümünü Sıfırla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BELGE ALANI -->
+    <div class="container">
+        <div class="paper">
+
+            <!-- RESMİ BAŞLIK -->
+            <div class="doc-header">
+                <h2>T.C. GENÇLİK VE SPOR BAKANLIĞI</h2>
+                <h2>Rehberlik ve Teftiş Başkanlığı</h2>
+                <h3 id="headerIlText">ÇANAKKALE GENÇLİK VE SPOR İL MÜDÜRLÜĞÜ</h3>
+                <h4>ÖZET BİLGİLER VE İSTATİSTİK TABLOLARI</h4>
+                <div class="donem-text" id="headerDonemText">Denetim Dönemi: 2015 - 2022</div>
+            </div>
+
+            <!-- 1- SPORCU SAYILARI -->
+            <div class="section-box" data-category="spor">
+                <div class="section-header">
+                    <div class="section-title">
+                        <span class="section-num">1</span>
+                        SPORCU SAYILARI
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table id="tblSporcu">
+                        <thead><tr id="trSporcuHead"></tr></thead>
+                        <tbody id="tbSporcuBody"></tbody>
+                    </table>
+                </div>
+                <div class="table-note">(1) Türkiye 1'incisi ve ulusal derece alan sporcu sayıları açıklanacaktır. (2) Uluslararası derece alan sporcular belirtilecektir.</div>
+            </div>
+
+            <!-- 2- ANTRENÖR DURUMU (Dinamik Branş Ekle / Çıkar) -->
+            <div class="section-box" data-category="spor">
+                <div class="section-header">
+                    <div class="section-title">
+                        <span class="section-num">2</span>
+                        ANTRENÖR DURUMU (<span id="lblAntrenorBranchCount">35</span> BRANŞ)
+                    </div>
+                    <div class="no-print" style="display: flex; gap: 6px;">
+                        <button class="btn btn-action btn-sm" onclick="addBranchPrompt()">➕ Yeni Branş Ekle</button>
+                        <button class="btn btn-outline btn-sm" onclick="resetBranchesDefault()" title="Varsayılan 35 branşa dön">↺ Sıfırla</button>
+                    </div>
+                </div>
+                <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                    <table>
+                        <thead style="position: sticky; top: 0; z-index: 5;">
+                            <tr>
+                                <th style="width: 35px;">NO</th>
+                                <th class="text-left">BRANŞI</th>
+                                <th style="width: 90px;">FAHRİ</th>
+                                <th style="width: 90px;">KADROLU</th>
+                                <th style="width: 90px;">SÖZLEŞMELİ</th>
+                                <th style="width: 90px;">TOPLAM</th>
+                                <th style="width: 45px;" class="no-print">İŞLEM</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbAntrenorBody"></tbody>
+                        <tfoot id="tfAntrenorFoot"></tfoot>
+                    </table>
+                </div>
+                <div class="table-note">Not: Branş ekleyebilir veya silebilirsiniz. Toplamlar otomatik hesaplanır.</div>
+            </div>
+
+            <!-- 3 & 4 HAKEM VE KULÜP -->
+            <div class="section-box" data-category="spor">
+                <div class="section-header">
+                    <div class="section-title">
+                        <span class="section-num">3-4</span>
+                        HAKEM DURUMU VE KULÜP SAYILARI
+                    </div>
+                </div>
+
+                <div class="sub-header">3- HAKEM DURUMU:</div>
+                <div class="table-responsive">
+                    <table id="tblHakem">
+                        <thead><tr id="trHakemHead"></tr></thead>
+                        <tbody id="tbHakemBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="sub-header" style="margin-top: 16px;">4- KULÜP SAYILARI:</div>
+                <div class="table-responsive">
+                    <table id="tblKulup">
+                        <thead><tr id="trKulupHead"></tr></thead>
+                        <tbody id="tbKulupBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 5- GENÇLİK HİZMETLERİ -->
+            <div class="section-box" data-category="personel_genclik">
+                <div class="section-header">
+                    <div class="section-title">
+                        <span class="section-num">5</span>
+                        GENÇLİK HİZMET VE FAALİYETLERİ
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table id="tblGenclik">
+                        <thead><tr id="trGenclikHead"></tr></thead>
+                        <tbody id="tbGenclikBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 6- PERSONEL DURUMU -->
+            <div class="section-box" id="secPersonel" data-category="personel_genclik">
+                <div class="section-header">
+                    <div class="section-title">
+                        <span class="section-num">6</span>
+                        <span id="titlePersonel">PERSONEL DURUMU</span>
+                    </div>
+                    <span class="table-note">Ek 5</span>
+                </div>
+                <div id="contentPersonel"></div>
+                <div class="table-note">Sözleşmeli personelin (antrenör, uzman vb.) niteliği belirtilecektir.</div>
+            </div>
+
+            <!-- 7 & 8 MALİ TABLOLAR -->
+            <div class="section-box" id="secMali" data-category="mali">
+                <div class="section-header">
+                    <div class="section-title">
+                        <span class="section-num">7-8</span>
+                        GİDERLER VE GELİRLER TABLOLARI
+                    </div>
+                </div>
+
+                <div class="sub-header" id="titleGiderler">7- GİDERLER:</div>
+                <div id="contentGiderler"></div>
+
+                <div class="sub-header" style="margin-top: 20px;">8- GELİRLER:</div>
+                <div class="table-responsive">
+                    <table id="tblGelirler">
+                        <thead><tr id="trGelirlerHead"></tr></thead>
+                        <tbody id="tbGelirlerBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 9- TESİSLER (Dinamik Tesis Türü Ekle / Çıkar) -->
+            <div class="section-box" data-category="tesis_idari">
+                <div class="section-header">
+                    <div class="section-title">
+                        <span class="section-num">9</span>
+                        TESİSLER (SPOR TESİSLERİ VE YURTLARIN MÜLKİYET / KAPASİTE DURUMU)
+                    </div>
+                    <div class="no-print" style="display: flex; gap: 6px;">
+                        <button class="btn btn-action btn-sm" onclick="addFacilityPrompt()">➕ Yeni Tesis Türü Ekle</button>
+                        <button class="btn btn-outline btn-sm" onclick="resetFacilitiesDefault()" title="Varsayılana dön">↺ Sıfırla</button>
+                    </div>
+                </div>
+                <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+                    <table id="tblTesisler">
+                        <thead style="position: sticky; top: 0; z-index: 5;">
+                            <tr id="trTesislerHead"></tr>
+                        </thead>
+                        <tbody id="tbTesislerBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 10 & 11 NAKİT & SPONSORLUK -->
+            <div class="section-box" data-category="mali">
+                <div class="section-header">
+                    <div class="section-title">
+                        <span class="section-num">10-11</span>
+                        NAKİT DURUMU, İL ÖZEL İDARESİ VE SPONSORLUK KAYNAKLARI
+                    </div>
+                </div>
+
+                <div class="sub-header">10- NAKİT DURUMU (KASA / BANKA MEVCUDU) VE İ.Ö.İ. YATIRIMLARI:</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div>
+                        <label style="font-size: 11px; font-weight: 600; color: var(--gray-600);">Kasa / Banka Mevcudu Tespit Tarihi:</label>
+                        <input type="text" id="txtNakitTarih" placeholder="../../2023" style="width: 100%; padding: 4px 8px; font-size: 11px; border: 1px solid var(--gray-300); border-radius: 4px;">
+                    </div>
+                    <div>
+                        <label style="font-size: 11px; font-weight: 600; color: var(--gray-600);">Mevcut Nakit Tutarı (TL):</label>
+                        <input type="text" id="txtNakitTutar" placeholder="0,00 TL" style="width: 100%; padding: 4px 8px; font-size: 11px; font-weight: bold; border: 1px solid var(--gray-300); border-radius: 4px;">
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table id="tblOzelIdare">
+                        <thead><tr id="trOzelIdareHead"></tr></thead>
+                        <tbody id="tbOzelIdareBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="sub-header" style="margin-top: 16px;">11- SPONSORLUK GELİRLERİ:</div>
+                <div class="table-responsive">
+                    <table id="tblSponsorluk">
+                        <thead><tr id="trSponsorlukHead"></tr></thead>
+                        <tbody id="tbSponsorlukBody"></tbody>
+                    </table>
+                </div>
+                <div style="margin-top: 8px;">
+                    <label style="font-size: 11px; font-weight: 600; color: var(--gray-600);">Sponsorluk Açıklamaları (Kimden, ne sağlandı):</label>
+                    <textarea class="note-area" id="txtSponsorlukAciklama" rows="2" placeholder="Sponsorluk detayları..."></textarea>
+                </div>
+            </div>
+
+            <!-- 12-15 AÇIKLAMA VE FİZİKSEL DOSYA BELGELERİ -->
+            <div class="section-box" data-category="tesis_idari">
+                <div class="section-header">
+                    <div class="section-title">
+                        <span class="section-num">12-15</span>
+                        FİZİKSEL DOSYA VE KURUL RAPORLARI
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <div style="font-size: 11px; font-weight: bold; color: var(--gray-800);">12- İl Antrenör Koordinasyon ve Değerlendirme Kurulu oluşturulup oluşturulmadığı, oluşturuldu ise Kurulun raporları:</div>
+                    <textarea class="note-area" id="txtM12" rows="2" placeholder="Dosyada fiziksel durum veya müfettiş notu..."></textarea>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <div style="font-size: 11px; font-weight: bold; color: var(--gray-800);">13- Varsa fahri olarak görevlendirilen antrenörlerin belgeleri (Antrenörlük belgesi, mezuniyet vb.):</div>
+                    <textarea class="note-area" id="txtM13" rows="2" placeholder="Belge durumu veya açıklama..."></textarea>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <div style="font-size: 11px; font-weight: bold; color: var(--gray-800);">14- İl Spor Merkezi Kayıtları ile branş itibariyle ücret tespitine ilişkin onay:</div>
+                    <textarea class="note-area" id="txtM14" rows="2" placeholder="Onay ve ücret tespit durumu..."></textarea>
+                </div>
+
+                <div>
+                    <div style="font-size: 11px; font-weight: bold; color: var(--gray-800);" id="lblM15">15- Belirtilen denetim yıllarında kız-erkek branşlarında Spor Merkezi çalışmalarına katılanların listesi:</div>
+                    <textarea class="note-area" id="txtM15" rows="2" placeholder="Katılımcı listesi durumu veya açıklama..."></textarea>
+                </div>
+            </div>
+
+            <!-- 16- SPOR DALI TEMSİLCİLERİ (Dinamik Branşlar) -->
+            <div class="section-box" data-category="tesis_idari" style="border: 2px solid var(--primary-light); background: #fdfefe;">
+                <div class="section-header">
+                    <div class="section-title">
+                        <span class="section-num">16</span>
+                        <span id="titleTemsilciler">SPOR DALI TEMSİLCİLERİ VE FAALİYET PROGRAMLARI DURUMU</span>
+                    </div>
+                </div>
+
+                <p style="font-size: 11px; color: var(--gray-600); margin-bottom: 10px;">
+                    Antrenör durumundaki spor branşları itibarıyla mevcutta il temsilcisi bulunup bulunmadığı, atamaların yönetmeliğe uygunluğu ve yıllık faaliyet programlarının federasyonlarca tasdik durumu:
+                </p>
+
+                <!-- Arama & İstatistikler & Dinamik Branş Ekle -->
+                <div class="temsilci-toolbar no-print">
+                    <div class="temsilci-stats">
+                        <span class="stat-pill">Toplam: <b id="statTotCount">35</b> Branş</span>
+                        <span class="stat-pill stat-var" id="statVarCount">Temsilci Var: 0</span>
+                        <span class="stat-pill stat-yok" id="statYokCount">Temsilci Yok: 0</span>
+                    </div>
+
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <button class="btn btn-action btn-sm" onclick="addBranchPrompt()">➕ Branş Ekle</button>
+                        <div class="filter-btn-group">
+                            <button class="filter-btn active" id="btnFiltAll" onclick="filterTemsilci('all')">Tümü</button>
+                            <button class="filter-btn" id="btnFiltVar" onclick="filterTemsilci('var')">Var Olanlar</button>
+                            <button class="filter-btn" id="btnFiltYok" onclick="filterTemsilci('yok')">Yok Olanlar</button>
+                        </div>
+                        <input type="text" class="search-box" id="txtSearchTemsilci" placeholder="Branş ara..." oninput="filterTemsilci()">
+                    </div>
+                </div>
+
+                <!-- Tablo -->
+                <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
+                    <table>
+                        <thead style="position: sticky; top: 0; z-index: 5;">
+                            <tr>
+                                <th style="width: 35px;">NO</th>
+                                <th class="text-left" style="min-width: 140px;">SPOR BRANŞI</th>
+                                <th style="width: 110px;">TEMSİLCİ VAR MI?</th>
+                                <th class="text-left" style="min-width: 150px;">TEMSİLCİ ADI SOYADI</th>
+                                <th class="text-left" style="min-width: 160px;">ATAMA ONAY TARİH / SAYISI</th>
+                                <th style="width: 140px;">FAALİYET PROG. TASDİK</th>
+                                <th class="text-left" style="min-width: 150px;">AÇIKLAMA / NOT</th>
+                                <th style="width: 45px;" class="no-print">İŞLEM</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbTemsilciBody"></tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top: 12px;">
+                    <label style="font-size: 11px; font-weight: 700; color: var(--gray-700);">16. Madde Genel Değerlendirmesi / Müfettiş Notu:</label>
+                    <textarea class="note-area" id="txtM16Genel" rows="2" placeholder="Spor dalı temsilcilikleri geneline ilişkin tespitler, mevzuat uygunluk durumu veya toplu not..."></textarea>
+                </div>
+            </div>
+
+            <!-- 17+ DİNAMİK EKLENEN ÖZEL MADDELER -->
+            <div id="customMaddelerContainer"></div>
+
+            <div class="no-print" style="margin-top: 16px;">
+                <button class="btn btn-outline" style="width: 100%; padding: 12px; font-size: 13px; font-weight: 700; border-style: dashed; border-color: #6366f1; color: #4338ca; justify-content: center;" onclick="addCustomMaddePrompt()">
+                    ➕ Yeni İnceleme / Bilgi Talebi Maddesi Ekle (Madde <span id="lblNextMaddeNum">17</span>)
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const DEFAULT_BRANCHES = [
+            "ATICILIK", "ATLETİZM", "BADMİNTON", "BASKETBOL", "BED. ENG. TENİS", "BİSİKLET", "BOCCE", "BOKS",
+            "BUZ HOKEYİ", "BUZ PATENİ", "CİMNASTİK", "CURLİNG", "DART", "ESKRİM", "FUTBOL", "GOALBALL",
+            "GÖRME ENG. FUTBOL", "GÜREŞ", "HALTER", "HENTBOL", "HOKEY", "JUDO", "KARATE", "KAYAK",
+            "KİCK-BOX", "KÜREK", "MODERN PENTATLON", "MASA TENİSİ", "MUAY-TAİ", "OKÇULUK", "TAEKWONDO",
+            "TENİS", "VOLEYBOL", "WUSHU", "YÜZME"
+        ];
+
+        const DEFAULT_FACILITY_TYPES = [
+            "YURT", "DOĞAL ÇİM YÜZEYLİ STAD", "STADYUM", "TOPRAK YÜZEYLİ STAD", "SEMT SAHASI",
+            "SENTETİK ÇİM YÜZEYLİ SAHA", "SPOR SALONU", "YÜZME HAVUZU", "KAMP EĞİTİM MERKEZİ",
+            "ATLETİZM PİSTİ", "GENÇLİK MERKEZİ", "BUZ PİSTİ", "ATIŞ POLİGONU", "BİNİCİLİK TESİSLERİ",
+            "TENİS TESİSLERİ", "GOLF SAHASI", "LOKAL BİNALARI", "BOWLİNG SALONU", "BİLARDO SALONU",
+            "HOBİ KARTİNG", "DİĞER"
+        ];
+
+        let branches = [];
+        let facilityTypes = [];
+        let customMaddeler = [];
+        let customSporcu = [];
+        let customHakem = [];
+        let customKulup = [];
+        let customGenclik = [];
+        let customPersonel = [];
+        let customPersonelIlce = [];
+        let customPersonelYurt = [];
+        let customPersonelGm = [];
+        let customGider = [];
+        let customGelir = [];
+        let customOzelIdare = [];
+        let customSponsor = [];
+
+        let years = [];
+        let preYears = [];
+        let postYears = [];
+        let isSplitPeriod = false;
+        let currentFilter = 'all';
+
+        // Uygulama Başlangıcı
+        document.addEventListener('DOMContentLoaded', () => {
+            initDynamicLists();
+            loadFromLocalStorage();
+            applyConfiguration();
+        });
+
+        function initDynamicLists() {
+            try {
+                const bSaved = localStorage.getItem('cfg_branches');
+                branches = bSaved ? JSON.parse(bSaved) : [...DEFAULT_BRANCHES];
+            } catch(e) {
+                branches = [...DEFAULT_BRANCHES];
+            }
+
+            try {
+                const fSaved = localStorage.getItem('cfg_facilities');
+                facilityTypes = fSaved ? JSON.parse(fSaved) : [...DEFAULT_FACILITY_TYPES];
+            } catch(e) {
+                facilityTypes = [...DEFAULT_FACILITY_TYPES];
+            }
+
+            try {
+                const mSaved = localStorage.getItem('cfg_custom_maddeler');
+                customMaddeler = mSaved ? JSON.parse(mSaved) : [];
+            } catch(e) {
+                customMaddeler = [];
+            }
+
+            const loadArr = (k) => {
+                try {
+                    const s = localStorage.getItem('cfg_' + k);
+                    return s ? JSON.parse(s) : [];
+                } catch(e) { return []; }
+            };
+            customSporcu = loadArr('customSporcu');
+            customHakem = loadArr('customHakem');
+            customKulup = loadArr('customKulup');
+            customGenclik = loadArr('customGenclik');
+            customPersonel = loadArr('customPersonel');
+            customPersonelIlce = loadArr('customPersonelIlce');
+            customPersonelYurt = loadArr('customPersonelYurt');
+            customPersonelGm = loadArr('customPersonelGm');
+            customGider = loadArr('customGider');
+            customGelir = loadArr('customGelir');
+            customOzelIdare = loadArr('customOzelIdare');
+            customSponsor = loadArr('customSponsor');
+
+            // Varsayılan: Bulunulan yıldan 1 önceki seneden 5 yıl geriye git (Örn: 2026 ise 2021-2025)
+            const curY = new Date().getFullYear();
+            const defEndY = curY - 1; // 2025
+            const defStartY = curY - 5; // 2021
+            if (!document.getElementById('cfgStartYear').value) {
+                document.getElementById('cfgStartYear').value = localStorage.getItem('cfg_start_year') || defStartY;
+            }
+            if (!document.getElementById('cfgEndYear').value) {
+                document.getElementById('cfgEndYear').value = localStorage.getItem('cfg_end_year') || defEndY;
+            }
+        }
+
+        function addHtmlCustomRow(type, inputId) {
+            const inputEl = document.getElementById(inputId);
+            if (!inputEl) return;
+            const val = inputEl.value.trim();
+            if (!val) { alert('Lütfen bir ad giriniz.'); return; }
+            
+            let targetArr;
+            if (type === 'customSporcu') targetArr = customSporcu;
+            else if (type === 'customHakem') targetArr = customHakem;
+            else if (type === 'customKulup') targetArr = customKulup;
+            else if (type === 'customGenclik') targetArr = customGenclik;
+            else if (type === 'customPersonel') targetArr = customPersonel;
+            else if (type === 'customPersonelIlce') targetArr = customPersonelIlce;
+            else if (type === 'customPersonelYurt') targetArr = customPersonelYurt;
+            else if (type === 'customPersonelGm') targetArr = customPersonelGm;
+            else if (type === 'customGider') targetArr = customGider;
+            else if (type === 'customGelir') targetArr = customGelir;
+            else if (type === 'customOzelIdare') targetArr = customOzelIdare;
+            else if (type === 'customSponsor') targetArr = customSponsor;
+            if (!targetArr) return;
+
+            if (targetArr.includes(val)) { alert('Bu satır zaten mevcut!'); return; }
+            targetArr.push(val);
+            localStorage.setItem('cfg_' + type, JSON.stringify(targetArr));
+            applyConfiguration();
+        }
+
+        function removeHtmlCustomRow(type, val) {
+            if (!confirm(`"${val}" satırını kaldırmak istediğinize emin misiniz?`)) return;
+            let targetArr;
+            if (type === 'customSporcu') { customSporcu = customSporcu.filter(x => x !== val); targetArr = customSporcu; }
+            else if (type === 'customHakem') { customHakem = customHakem.filter(x => x !== val); targetArr = customHakem; }
+            else if (type === 'customKulup') { customKulup = customKulup.filter(x => x !== val); targetArr = customKulup; }
+            else if (type === 'customGenclik') { customGenclik = customGenclik.filter(x => x !== val); targetArr = customGenclik; }
+            else if (type === 'customPersonel') { customPersonel = customPersonel.filter(x => x !== val); targetArr = customPersonel; }
+            else if (type === 'customPersonelIlce') { customPersonelIlce = customPersonelIlce.filter(x => x !== val); targetArr = customPersonelIlce; }
+            else if (type === 'customPersonelYurt') { customPersonelYurt = customPersonelYurt.filter(x => x !== val); targetArr = customPersonelYurt; }
+            else if (type === 'customPersonelGm') { customPersonelGm = customPersonelGm.filter(x => x !== val); targetArr = customPersonelGm; }
+            else if (type === 'customGider') { customGider = customGider.filter(x => x !== val); targetArr = customGider; }
+            else if (type === 'customGelir') { customGelir = customGelir.filter(x => x !== val); targetArr = customGelir; }
+            else if (type === 'customOzelIdare') { customOzelIdare = customOzelIdare.filter(x => x !== val); targetArr = customOzelIdare; }
+            else if (type === 'customSponsor') { customSponsor = customSponsor.filter(x => x !== val); targetArr = customSponsor; }
+            if (targetArr) localStorage.setItem('cfg_' + type, JSON.stringify(targetArr));
+            applyConfiguration();
+        }
+
+        function applyConfiguration() {
+            const curY = new Date().getFullYear();
+            const defEndY = curY - 1;
+            const defStartY = curY - 5;
+            const startYear = parseInt(document.getElementById('cfgStartYear').value) || defStartY;
+            const endYear = parseInt(document.getElementById('cfgEndYear').value) || defEndY;
+            localStorage.setItem('cfg_start_year', startYear);
+            localStorage.setItem('cfg_end_year', endYear);
+            const il = (document.getElementById('cfgIl').value || '........').toUpperCase();
+
+            document.getElementById('headerIlText').textContent = il + ' GENÇLİK VE SPOR İL MÜDÜRLÜĞÜ';
+            document.getElementById('headerDonemText').textContent = `Denetim Dönemi: ${startYear} - ${endYear}`;
+            document.getElementById('lblM15').textContent = `15- ${startYear}-${endYear} yıllarında kız-erkek branşlarında Spor Merkezi çalışmalarına katılanların listesi:`;
+            document.getElementById('titleTemsilciler').textContent = `SPOR DALI TEMSİLCİLERİ VE FAALİYET PROGRAMLARI DURUMU (${endYear} / Mevcut Durum)`;
+            document.getElementById('lblAntrenorBranchCount').textContent = branches.length;
+            document.getElementById('statTotCount').textContent = branches.length;
+            document.getElementById('lblNextMaddeNum').textContent = 17 + customMaddeler.length;
+            document.getElementById('badgeSummary').textContent = `${16 + customMaddeler.length} Konu / ${branches.length} Branş`;
+
+            // Yılları hesapla
+            const s = Math.min(startYear, endYear);
+            const e = Math.max(startYear, endYear);
+            years = [];
+            for (let y = s; y <= e; y++) years.push(String(y));
+
+            const hasPre = years.some(y => parseInt(y) <= 2018);
+            const hasPost = years.some(y => parseInt(y) >= 2019);
+            isSplitPeriod = hasPre && hasPost;
+
+            preYears = years.filter(y => parseInt(y) <= 2018);
+            postYears = years.filter(y => parseInt(y) >= 2019);
+
+            renderSporcuTable();
+            renderAntrenorTable();
+            renderHakemTable();
+            renderKulupTable();
+            renderGenclikTable();
+            renderPersonelSection();
+            renderMaliSection();
+            renderTesislerTable();
+            renderNakitVeSponsorTable();
+            renderTemsilciTable();
+            renderCustomMaddeler();
+            updateTemsilciStats();
+        }
+
+        // --- DİNAMİK BRANŞ İŞLEMLERİ ---
+        function addBranchPrompt() {
+            const input = prompt("Eklenecek yeni spor branşının adını giriniz:");
+            if (!input) return;
+            const name = input.trim().toUpperCase();
+            if (!name) return;
+            if (branches.includes(name)) {
+                alert('Bu spor branşı zaten mevcut!');
+                return;
+            }
+            branches.push(name);
+            localStorage.setItem('cfg_branches', JSON.stringify(branches));
+            applyConfiguration();
+        }
+
+        function addBranchFromInput(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const name = el.value.trim().toUpperCase();
+            if (!name) {
+                alert('Lütfen bir spor branşı adı giriniz.');
+                return;
+            }
+            if (branches.includes(name)) {
+                alert('Bu branş zaten listede mevcut!');
+                return;
+            }
+            branches.push(name);
+            localStorage.setItem('cfg_branches', JSON.stringify(branches));
+            applyConfiguration();
+        }
+
+        function addFacilityFromInput(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const name = el.value.trim().toUpperCase();
+            if (!name) {
+                alert('Lütfen bir tesis türü adı giriniz.');
+                return;
+            }
+            if (facilityTypes.includes(name)) {
+                alert('Bu tesis türü zaten mevcut!');
+                return;
+            }
+            facilityTypes.push(name);
+            localStorage.setItem('cfg_facilities', JSON.stringify(facilityTypes));
+            applyConfiguration();
+        }
+
+        function removeBranch(name) {
+            if (branches.length <= 1) {
+                alert('En az bir spor branşı bulunmalıdır.');
+                return;
+            }
+            if (!confirm(`"${name}" branşını tablolardan kaldırmak istediğinize emin misiniz?`)) return;
+            branches = branches.filter(b => b !== name);
+            localStorage.setItem('cfg_branches', JSON.stringify(branches));
+            applyConfiguration();
+        }
+
+        function resetBranchesDefault() {
+            if (!confirm('Branş listesini orijinal 35 branşa sıfırlamak istiyor musunuz?')) return;
+            branches = [...DEFAULT_BRANCHES];
+            localStorage.setItem('cfg_branches', JSON.stringify(branches));
+            applyConfiguration();
+        }
+
+        // --- DİNAMİK TESİS İŞLEMLERİ ---
+        function addFacilityPrompt() {
+            const input = prompt("Eklenecek yeni tesis türünün adını giriniz:");
+            if (!input) return;
+            const name = input.trim().toUpperCase();
+            if (!name) return;
+            if (facilityTypes.includes(name)) {
+                alert('Bu tesis türü zaten mevcut!');
+                return;
+            }
+            facilityTypes.push(name);
+            localStorage.setItem('cfg_facilities', JSON.stringify(facilityTypes));
+            applyConfiguration();
+        }
+
+        function removeFacility(name) {
+            if (facilityTypes.length <= 1) {
+                alert('En az bir tesis türü bulunmalıdır.');
+                return;
+            }
+            if (!confirm(`"${name}" tesis türünü tablodan kaldırmak istediğinize emin misiniz?`)) return;
+            facilityTypes = facilityTypes.filter(f => f !== name);
+            localStorage.setItem('cfg_facilities', JSON.stringify(facilityTypes));
+            applyConfiguration();
+        }
+
+        function resetFacilitiesDefault() {
+            if (!confirm('Tesis türlerini orijinal 21 türe sıfırlamak istiyor musunuz?')) return;
+            facilityTypes = [...DEFAULT_FACILITY_TYPES];
+            localStorage.setItem('cfg_facilities', JSON.stringify(facilityTypes));
+            applyConfiguration();
+        }
+
+        // --- DİNAMİK EK MADDE İŞLEMLERİ ---
+        function addCustomMaddePrompt() {
+            const nextNum = 17 + customMaddeler.length;
+            const titleInput = prompt(`${nextNum}. Madde için konu başlığı giriniz:`, `Ek Talep / İnceleme Konusu (${nextNum})`);
+            if (titleInput === null) return;
+            const newMadde = {
+                id: 'cm_' + Date.now(),
+                num: String(nextNum),
+                title: titleInput.trim() || `Ek Konu (${nextNum})`,
+                desc: 'İl Müdürlüğünden talep edilecek belge, onay veya açıklama konusu.',
+                answer: ''
+            };
+            customMaddeler.push(newMadde);
+            localStorage.setItem('cfg_custom_maddeler', JSON.stringify(customMaddeler));
+            applyConfiguration();
+        }
+
+        function removeCustomMadde(id) {
+            if (!confirm('Bu ek talep maddesini kaldırmak istediğinize emin misiniz?')) return;
+            customMaddeler = customMaddeler.filter(m => m.id !== id);
+            // Numaralandırmayı güncelle
+            customMaddeler = customMaddeler.map((m, idx) => ({ ...m, num: String(17 + idx) }));
+            localStorage.setItem('cfg_custom_maddeler', JSON.stringify(customMaddeler));
+            applyConfiguration();
+        }
+
+        function updateCustomMadde(id, field, val) {
+            const m = customMaddeler.find(x => x.id === id);
+            if (m) {
+                m[field] = val;
+                localStorage.setItem('cfg_custom_maddeler', JSON.stringify(customMaddeler));
+            }
+        }
+
+        function renderCustomMaddeler() {
+            const cont = document.getElementById('customMaddelerContainer');
+            if (!cont) return;
+            cont.innerHTML = customMaddeler.map(m => `
+                <div class="custom-madde-card">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <span class="section-num" style="display: inline-flex; vertical-align: middle; margin-right: 6px;">${m.num}</span>
+                            <input type="text" class="madde-title" value="${m.title}" oninput="updateCustomMadde('${m.id}', 'title', this.value)" placeholder="Madde Başlığı..."><br>
+                            <input type="text" class="madde-desc" value="${m.desc}" oninput="updateCustomMadde('${m.id}', 'desc', this.value)" placeholder="Açıklama / talep kapsamı...">
+                        </div>
+                        <button class="btn-del no-print" onclick="removeCustomMadde('${m.id}')" title="Maddeyi Sil">🗑️ Sil</button>
+                    </div>
+                    <textarea class="note-area" rows="2" oninput="updateCustomMadde('${m.id}', 'answer', this.value)" placeholder="Bu hususa ilişkin açıklama veya müfettiş notu...">${m.answer || ''}</textarea>
+                </div>
+            `).join('');
+        }
+
+        // 1- Sporcu Sayıları
+        function renderSporcuTable() {
+            const rows = [
+                { id: 'lisansli', label: 'Lisanslı Sporcu Sayısı (Bayan/Bay)' },
+                { id: 'faal', label: 'Faal (Bayan/Bay)' },
+                { id: 'milli', label: 'Milli Olmuş Sporcu Sayısı' },
+                { id: 'turkiye1', label: "Türkiye 1'incisi Olmuş Sporcu Sayısı (1)" },
+                { id: 'ulusalDerece', label: 'Ulusal Derece Alan Sporcu Sayısı (1)' },
+                { id: 'uluslararasiDerece', label: 'Uluslararası Derece Alan Sporcu Sayısı (2)' }
+            ];
+
+            const trHead = document.getElementById('trSporcuHead');
+            trHead.innerHTML = '<th class="text-left" style="min-width: 220px;">GÖSTERGE</th>' + 
+                years.map(y => `<th style="min-width: 65px;">${y}</th>`).join('') +
+                '<th style="width: 45px;" class="no-print">İŞLEM</th>';
+
+            const tbBody = document.getElementById('tbSporcuBody');
+            let html = rows.map(r => `
+                <tr>
+                    <td class="font-bold">${r.label}</td>
+                    ${years.map(y => `<td><input type="text" class="text-center" data-key="sporcu_${r.id}_${y}" placeholder="-"></td>`).join('')}
+                    <td class="no-print"></td>
+                </tr>
+            `).join('');
+
+            html += customSporcu.map(c => `
+                <tr>
+                    <td class="font-bold">${c}</td>
+                    ${years.map(y => `<td><input type="text" class="text-center" data-key="sporcu_${c}_${y}" placeholder="-"></td>`).join('')}
+                    <td class="text-center no-print">
+                        <button class="btn-del" onclick="removeHtmlCustomRow('customSporcu', '${c}')">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            html += `
+                <tr class="no-print" style="background:#eff6ff;">
+                    <td style="padding: 4px;">
+                        <input type="text" id="txtAddSporcu" placeholder="Yeni gösterge satırı yazınız..." style="width: 100%; padding: 4px 6px; font-size: 11px; font-weight: bold; border: 1px solid #bfdbfe; border-radius: 4px;" onkeydown="if(event.key==='Enter') addHtmlCustomRow('customSporcu', 'txtAddSporcu')">
+                    </td>
+                    <td colspan="${years.length}" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customSporcu', 'txtAddSporcu')">➕ Satır Ekle</button>
+                    </td>
+                    <td class="text-center" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customSporcu', 'txtAddSporcu')" title="Ekle">➕</button>
+                    </td>
+                </tr>
+            `;
+
+            tbBody.innerHTML = html;
+        }
+
+        // 2- Antrenör Tablosu
+        function renderAntrenorTable() {
+            const tbBody = document.getElementById('tbAntrenorBody');
+            tbBody.innerHTML = branches.map((b, idx) => `
+                <tr>
+                    <td class="text-center font-bold">${idx + 1}</td>
+                    <td class="font-bold">${b}</td>
+                    <td><input type="number" class="text-center ant-calc" data-key="ant_${b}_fahri" oninput="calcAntTotals()" placeholder="0"></td>
+                    <td><input type="number" class="text-center ant-calc" data-key="ant_${b}_kadrolu" oninput="calcAntTotals()" placeholder="0"></td>
+                    <td><input type="number" class="text-center ant-calc" data-key="ant_${b}_sozlesmeli" oninput="calcAntTotals()" placeholder="0"></td>
+                    <td class="text-center font-bold bg-total" id="antRowTot_${idx}">0</td>
+                    <td class="text-center no-print">
+                        <button class="btn-del" onclick="removeBranch('${b}')" title="Branşı Kaldır">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('tfAntrenorFoot').innerHTML = `
+                <tr class="no-print" style="background:#eff6ff;">
+                    <td colspan="2" style="padding: 4px;">
+                        <input type="text" id="txtInlineBranchAdd2" placeholder="Yeni branş adı yazınız (Örn: E-SPOR)..." style="width: 100%; padding: 4px 6px; font-size: 11px; font-weight: bold; border: 1px solid #bfdbfe; border-radius: 4px;" onkeydown="if(event.key==='Enter') addBranchFromInput('txtInlineBranchAdd2')">
+                    </td>
+                    <td colspan="4" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addBranchFromInput('txtInlineBranchAdd2')">➕ Tabloya Branş Ekle</button>
+                    </td>
+                    <td class="text-center" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addBranchFromInput('txtInlineBranchAdd2')" title="Ekle">➕</button>
+                    </td>
+                </tr>
+                <tr class="bg-total">
+                    <td colspan="2" class="text-center">GENEL TOPLAM</td>
+                    <td class="text-center" id="antTotFahri">0</td>
+                    <td class="text-center" id="antTotKadrolu">0</td>
+                    <td class="text-center" id="antTotSozlesmeli">0</td>
+                    <td class="text-center" id="antTotAll">0</td>
+                    <td class="no-print"></td>
+                </tr>
+            `;
+            calcAntTotals();
+        }
+
+        function calcAntTotals() {
+            let totF = 0, totK = 0, totS = 0, totAll = 0;
+            branches.forEach((b, idx) => {
+                const f = parseInt(document.querySelector(`[data-key="ant_${b}_fahri"]`)?.value) || 0;
+                const k = parseInt(document.querySelector(`[data-key="ant_${b}_kadrolu"]`)?.value) || 0;
+                const s = parseInt(document.querySelector(`[data-key="ant_${b}_sozlesmeli"]`)?.value) || 0;
+                const rowTot = f + k + s;
+                const cell = document.getElementById(`antRowTot_${idx}`);
+                if (cell) cell.textContent = rowTot;
+                totF += f; totK += k; totS += s; totAll += rowTot;
+            });
+            const tfF = document.getElementById('antTotFahri');
+            if (tfF) tfF.textContent = totF;
+            const tfK = document.getElementById('antTotKadrolu');
+            if (tfK) tfK.textContent = totK;
+            const tfS = document.getElementById('antTotSozlesmeli');
+            if (tfS) tfS.textContent = totS;
+            const tfAll = document.getElementById('antTotAll');
+            if (tfAll) tfAll.textContent = totAll;
+        }
+
+        // 3- Hakem Tablosu
+        function renderHakemTable() {
+            const rows = [
+                { id: 'toplam', label: 'Toplam Hakem Sayısı', isBold: true },
+                { id: 'aday', label: 'Aday Hakem' },
+                { id: 'bolge', label: 'İl / Bölge Hakemi' },
+                { id: 'milli', label: 'Milli Hakem' },
+                { id: 'ulusal', label: 'Ulusal Hakem' },
+                { id: 'uluslararasi', label: 'Uluslararası Hakem' }
+            ];
+            document.getElementById('trHakemHead').innerHTML = '<th class="text-left">HAKEM KATEGORİSİ</th>' + 
+                years.map(y => `<th style="width: 70px;">${y}</th>`).join('') +
+                '<th style="width: 45px;" class="no-print">İŞLEM</th>';
+
+            let html = rows.map(r => `
+                <tr class="${r.isBold ? 'bg-total' : ''}">
+                    <td>${r.label}</td>
+                    ${years.map(y => `<td><input type="text" class="text-center" data-key="hakem_${r.id}_${y}" placeholder="-"></td>`).join('')}
+                    <td class="no-print"></td>
+                </tr>
+            `).join('');
+
+            html += customHakem.map(c => `
+                <tr>
+                    <td class="font-bold">${c}</td>
+                    ${years.map(y => `<td><input type="text" class="text-center" data-key="hakem_${c}_${y}" placeholder="-"></td>`).join('')}
+                    <td class="text-center no-print">
+                        <button class="btn-del" onclick="removeHtmlCustomRow('customHakem', '${c}')">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            html += `
+                <tr class="no-print" style="background:#eff6ff;">
+                    <td style="padding: 4px;">
+                        <input type="text" id="txtAddHakem" placeholder="Yeni kategori yazınız..." style="width: 100%; padding: 4px 6px; font-size: 11px; font-weight: bold; border: 1px solid #bfdbfe; border-radius: 4px;" onkeydown="if(event.key==='Enter') addHtmlCustomRow('customHakem', 'txtAddHakem')">
+                    </td>
+                    <td colspan="${years.length}" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customHakem', 'txtAddHakem')">➕ Kategori Ekle</button>
+                    </td>
+                    <td class="text-center" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customHakem', 'txtAddHakem')" title="Ekle">➕</button>
+                    </td>
+                </tr>
+            `;
+
+            document.getElementById('tbHakemBody').innerHTML = html;
+        }
+
+        // 4- Kulüp Tablosu
+        function renderKulupTable() {
+            const rows = [
+                { id: 'faalKulup', label: 'Faal Kulüp Sayısı' },
+                { id: 'faalBrans', label: 'Kulüplerin Faaliyet Gösterdiği Faal Branş Sayısı' }
+            ];
+            document.getElementById('trKulupHead').innerHTML = '<th class="text-left">GÖSTERGE</th>' + 
+                years.map(y => `<th style="width: 70px;">${y}</th>`).join('') +
+                '<th style="width: 45px;" class="no-print">İŞLEM</th>';
+
+            let html = rows.map(r => `
+                <tr>
+                    <td class="font-bold">${r.label}</td>
+                    ${years.map(y => `<td><input type="text" class="text-center" data-key="kulup_${r.id}_${y}" placeholder="-"></td>`).join('')}
+                    <td class="no-print"></td>
+                </tr>
+            `).join('');
+
+            html += customKulup.map(c => `
+                <tr>
+                    <td class="font-bold">${c}</td>
+                    ${years.map(y => `<td><input type="text" class="text-center" data-key="kulup_${c}_${y}" placeholder="-"></td>`).join('')}
+                    <td class="text-center no-print">
+                        <button class="btn-del" onclick="removeHtmlCustomRow('customKulup', '${c}')">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            html += `
+                <tr class="no-print" style="background:#eff6ff;">
+                    <td style="padding: 4px;">
+                        <input type="text" id="txtAddKulup" placeholder="Yeni gösterge yazınız..." style="width: 100%; padding: 4px 6px; font-size: 11px; font-weight: bold; border: 1px solid #bfdbfe; border-radius: 4px;" onkeydown="if(event.key==='Enter') addHtmlCustomRow('customKulup', 'txtAddKulup')">
+                    </td>
+                    <td colspan="${years.length}" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customKulup', 'txtAddKulup')">➕ Gösterge Ekle</button>
+                    </td>
+                    <td class="text-center" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customKulup', 'txtAddKulup')" title="Ekle">➕</button>
+                    </td>
+                </tr>
+            `;
+
+            document.getElementById('tbKulupBody').innerHTML = html;
+        }
+
+        // 5- Gençlik Hizmetleri
+        function renderGenclikTable() {
+            const rows = [
+                { id: 'merkezSayisi', label: 'Gençlik Merkezi Sayısı' },
+                { id: 'kayitliUye', label: 'Kayıtlı Üye Sayısı' },
+                { id: 'aktifUye', label: 'Aktif Üye Sayısı' },
+                { id: 'faaliyetSayisi', label: 'Düzenlenen Faaliyet Sayısı' },
+                { id: 'faaliyetKatilimci', label: 'Faaliyetlere Katılan Genç Sayısı' },
+                { id: 'kampSayisi', label: 'Gençlik Kampı Sayısı' },
+                { id: 'kampYararlanan', label: 'Kamplardan Yararlanan Genç Sayısı' },
+                { id: 'liderSayisi', label: 'Gençlik Lideri Sayısı' },
+                { id: 'genclikNoktasi', label: 'Gençlik Noktası / Ofisi Sayısı' }
+            ];
+            document.getElementById('trGenclikHead').innerHTML = '<th class="text-left">GENÇLİK FAALİYETİ GÖSTERGESİ</th>' + 
+                years.map(y => `<th style="width: 70px;">${y}</th>`).join('') +
+                '<th style="width: 45px;" class="no-print">İŞLEM</th>';
+
+            let html = rows.map(r => `
+                <tr>
+                    <td class="font-bold">${r.label}</td>
+                    ${years.map(y => `<td><input type="text" class="text-center" data-key="genclik_${r.id}_${y}" placeholder="-"></td>`).join('')}
+                    <td class="no-print"></td>
+                </tr>
+            `).join('');
+
+            html += customGenclik.map(c => `
+                <tr>
+                    <td class="font-bold">${c}</td>
+                    ${years.map(y => `<td><input type="text" class="text-center" data-key="genclik_${c}_${y}" placeholder="-"></td>`).join('')}
+                    <td class="text-center no-print">
+                        <button class="btn-del" onclick="removeHtmlCustomRow('customGenclik', '${c}')">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            html += `
+                <tr class="no-print" style="background:#eff6ff;">
+                    <td style="padding: 4px;">
+                        <input type="text" id="txtAddGenclik" placeholder="Yeni faaliyet göstergesi yazınız..." style="width: 100%; padding: 4px 6px; font-size: 11px; font-weight: bold; border: 1px solid #bfdbfe; border-radius: 4px;" onkeydown="if(event.key==='Enter') addHtmlCustomRow('customGenclik', 'txtAddGenclik')">
+                    </td>
+                    <td colspan="${years.length}" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customGenclik', 'txtAddGenclik')">➕ Faaliyet Ekle</button>
+                    </td>
+                    <td class="text-center" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customGenclik', 'txtAddGenclik')" title="Ekle">➕</button>
+                    </td>
+                </tr>
+            `;
+
+            document.getElementById('tbGenclikBody').innerHTML = html;
+        }
+
+                // 6- Personel Durumu (4 Alt Bölüm: İl, İlçe, Yurt, Gençlik Merkezi)
+        function renderPersonelSection() {
+            const startYear = document.getElementById('cfgStartYear').value;
+            const endYear = document.getElementById('cfgEndYear').value;
+            const titleEl = document.getElementById('titlePersonel');
+            const contentEl = document.getElementById('contentPersonel');
+
+            // Personel Durumu için yıllar: Denetim dönemi + Mevcut Teftiş Yılı (endYear + 1)
+            // Norm Kadro ile mevcut durumu kıyaslamak için dönem 2021-2025 ise 2026, 2022-2026 ise 2027 eklenir.
+            const lastY = parseInt(years[years.length - 1] || endYear || '2025');
+            const personelYears = [...years, (lastY + 1).toString()];
+            titleEl.textContent = `PERSONEL DURUMU (${startYear} - ${personelYears[personelYears.length - 1]})`;
+
+            const idariRows = [
+                { id: 'ilMudur', label: 'İl Müdürü' },
+                { id: 'hizmetMudur', label: 'Hizmet Müdürü' },
+                { id: 'subeMudur', label: 'Şube Müdürü' },
+                { id: 'sef', label: 'Şef' },
+                { id: 'muhendis', label: 'Mühendis' },
+                { id: 'arastirmaci', label: 'Araştırmacı' },
+                { id: 'memur', label: 'Memur' },
+                { id: 'sozlesmeliToplam', label: '(1) Sözleşmeli Personel sayısı', isBold: true },
+                { id: 'sozlesmeliAntrenor', label: '• Sözleşmeli Antrenör', isBullet: true },
+                { id: 'sozlesmeliUzman', label: '• Sözleşmeli Spor Eğitim Uzmanı', isBullet: true },
+                { id: 'sozlesmeli4C', label: '• Sözleşmeli İdari Destek Personeli 4/C', isBullet: true },
+                { id: 'sozlesmeliYurt', label: '• Sözleşmeli Yurt Yönetim Personeli', isBullet: true },
+                { id: 'surekliIsci', label: 'Sürekli İşçi Kadrosuna geçenlerin sayısı' },
+                { id: 'yardimciHizmet', label: 'Yardımcı hizmet personeli sayısı' }
+            ];
+
+            const ilceRows = [
+                { id: 'ilceMudur', label: 'İlçe Müdürü' },
+                { id: 'temizlik', label: 'Temizlik Personeli' },
+                { id: 'guvenlik', label: 'Güvenlik Personeli' },
+                { id: 'teknik', label: 'Teknik Personel' }
+            ];
+
+            const yurtRows = [
+                { id: 'yurtMudur', label: 'Yurt Müdürü' },
+                { id: 'yurtMudurYrd', label: 'Yurt Müdür Yrd.' },
+                { id: 'yurtYonetimMemuru', label: 'Yurt Yönetim Memuru' },
+                { id: 'yurtYonetimPersoneli', label: 'Yurt Yönetim Personeli' },
+                { id: 'temizlik', label: 'Temizlik Personeli' },
+                { id: 'guvenlik', label: 'Güvenlik Personeli' },
+                { id: 'teknik', label: 'Teknik Personel' }
+            ];
+
+            const gmRows = [
+                { id: 'gmMudur', label: 'Gençlik Merkezi Müdürü' },
+                { id: 'lider', label: 'Lider' },
+                { id: 'nokta', label: 'Nokta' },
+                { id: 'temizlik', label: 'Temizlik Personeli' },
+                { id: 'guvenlik', label: 'Güvenlik Personeli' },
+                { id: 'teknik', label: 'Teknik Personel' }
+            ];
+
+            contentEl.innerHTML = `
+                <!-- a-) İl Müdürlüğü İdari Personel -->
+                <div class="sub-header" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>a-) İl Müdürlüğü İdari Personel Açısından Bakıldığında;</span>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="text-left" style="min-width:240px;">Unvan</th>
+                                ${personelYears.map(y=>`<th>${y}</th>`).join('')}
+                                <th style="background:#fef3c7; color:#92400e; min-width:85px;">Norm Kadro</th>
+                                <th class="no-print" style="width:40px;">İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${idariRows.map(r=>`
+                                <tr class="${r.isBold?'bg-total':''}">
+                                    <td style="${r.isBullet?'padding-left:18px; font-style:italic;':''}">${r.label}</td>
+                                    ${personelYears.map(y=>`<td><input type="text" class="text-center" data-key="pers_idari_${r.id}_${y}" placeholder="-"></td>`).join('')}
+                                    <td style="background:#fffbeb;"><input type="text" class="text-center" style="font-weight:bold; color:#b45309;" data-key="pers_idari_${r.id}_normKadro" placeholder="-"></td>
+                                    <td class="no-print"></td>
+                                </tr>
+                            `).join('')}
+                            ${(customPersonel || []).map(rName => `
+                                <tr>
+                                    <td>${rName}</td>
+                                    ${personelYears.map(y=>`<td><input type="text" class="text-center" data-key="pers_idari_${rName}_${y}" placeholder="-"></td>`).join('')}
+                                    <td style="background:#fffbeb;"><input type="text" class="text-center" style="font-weight:bold; color:#b45309;" data-key="pers_idari_${rName}_normKadro" placeholder="-"></td>
+                                    <td class="no-print text-center">
+                                        <button class="btn-del" onclick="removeHtmlCustomRow('customPersonel', '${rName}')">🗑️</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot class="no-print">
+                            <tr style="background:#eff6ff;">
+                                <td>
+                                    <div style="display:flex; gap:4px;">
+                                        <input type="text" id="in_customPersonel" placeholder="Yeni idari unvan yazınız..." style="width:100%; font-size:11px; padding:3px 6px;">
+                                        <button class="btn btn-action" onclick="addHtmlCustomRow('customPersonel', 'in_customPersonel')">+ Ekle</button>
+                                    </div>
+                                </td>
+                                <td colspan="${personelYears.length + 2}"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- b-) İlçe Müdürlüğü Personeli -->
+                <div class="sub-header" style="margin-top:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <span>b-) İlçe Müdürlüğü Personeli Açısından Bakıldığında;</span>
+                    <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:bold; color:var(--gray-700);">
+                        <span>İlçe:</span>
+                        <input type="text" data-key="pers_ilce_name" placeholder="... İlçe Müdürlüğü (Örn: İpekyolu)" style="font-weight:bold; padding:2px 8px; width:220px; font-size:11px; border:1px solid var(--gray-300); border-radius:4px;">
+                        <span>İlçe Müdürlüğü</span>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="text-left" style="min-width:200px;">Unvan</th>
+                                ${personelYears.map(y=>`<th>${y}</th>`).join('')}
+                                <th style="background:#fef3c7; color:#92400e; min-width:85px;">Norm Kadro</th>
+                                <th class="no-print" style="width:40px;">İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${ilceRows.map(r=>`
+                                <tr>
+                                    <td>${r.label}</td>
+                                    ${personelYears.map(y=>`<td><input type="text" class="text-center" data-key="pers_ilce_${r.id}_${y}" placeholder="-"></td>`).join('')}
+                                    <td style="background:#fffbeb;"><input type="text" class="text-center" style="font-weight:bold; color:#b45309;" data-key="pers_ilce_${r.id}_normKadro" placeholder="-"></td>
+                                    <td class="no-print"></td>
+                                </tr>
+                            `).join('')}
+                            ${(customPersonelIlce || []).map(rName => `
+                                <tr>
+                                    <td>${rName}</td>
+                                    ${personelYears.map(y=>`<td><input type="text" class="text-center" data-key="pers_ilce_${rName}_${y}" placeholder="-"></td>`).join('')}
+                                    <td style="background:#fffbeb;"><input type="text" class="text-center" style="font-weight:bold; color:#b45309;" data-key="pers_ilce_${rName}_normKadro" placeholder="-"></td>
+                                    <td class="no-print text-center">
+                                        <button class="btn-del" onclick="removeHtmlCustomRow('customPersonelIlce', '${rName}')">🗑️</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot class="no-print">
+                            <tr style="background:#eff6ff;">
+                                <td>
+                                    <div style="display:flex; gap:4px;">
+                                        <input type="text" id="in_customPersonelIlce" placeholder="Yeni ilçe unvanı yazınız..." style="width:100%; font-size:11px; padding:3px 6px;">
+                                        <button class="btn btn-action" onclick="addHtmlCustomRow('customPersonelIlce', 'in_customPersonelIlce')">+ Ekle</button>
+                                    </div>
+                                </td>
+                                <td colspan="${personelYears.length + 2}"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- c-) Yurt Müdürlükleri Personeli -->
+                <div class="sub-header" style="margin-top:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <span>c-) Yurt Müdürlükleri Personeli Açısından Bakıldığında;</span>
+                    <div style="display:flex; align-items:center; gap:10px; font-size:11px; font-weight:bold; color:var(--gray-700);">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span>Yurt:</span>
+                            <input type="text" data-key="pers_yurt_name" placeholder="... Yurt Müdürlüğü (Örn: Süleyman Şah)" style="font-weight:bold; padding:2px 8px; width:220px; font-size:11px; border:1px solid var(--gray-300); border-radius:4px;">
+                            <span>Yurt Müdürlüğü</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span>Kapasite:</span>
+                            <input type="text" data-key="pers_yurt_kapasite" placeholder="Örn: 1500" style="font-weight:bold; padding:2px 8px; width:80px; font-size:11px; text-align:center; border:1px solid var(--gray-300); border-radius:4px;">
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="text-left" style="min-width:200px;">Unvan</th>
+                                ${personelYears.map(y=>`<th>${y}</th>`).join('')}
+                                <th style="background:#fef3c7; color:#92400e; min-width:85px;">Norm Kadro</th>
+                                <th class="no-print" style="width:40px;">İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${yurtRows.map(r=>`
+                                <tr>
+                                    <td>${r.label}</td>
+                                    ${personelYears.map(y=>`<td><input type="text" class="text-center" data-key="pers_yurt_${r.id}_${y}" placeholder="-"></td>`).join('')}
+                                    <td style="background:#fffbeb;"><input type="text" class="text-center" style="font-weight:bold; color:#b45309;" data-key="pers_yurt_${r.id}_normKadro" placeholder="-"></td>
+                                    <td class="no-print"></td>
+                                </tr>
+                            `).join('')}
+                            ${(customPersonelYurt || []).map(rName => `
+                                <tr>
+                                    <td>${rName}</td>
+                                    ${personelYears.map(y=>`<td><input type="text" class="text-center" data-key="pers_yurt_${rName}_${y}" placeholder="-"></td>`).join('')}
+                                    <td style="background:#fffbeb;"><input type="text" class="text-center" style="font-weight:bold; color:#b45309;" data-key="pers_yurt_${rName}_normKadro" placeholder="-"></td>
+                                    <td class="no-print text-center">
+                                        <button class="btn-del" onclick="removeHtmlCustomRow('customPersonelYurt', '${rName}')">🗑️</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot class="no-print">
+                            <tr style="background:#eff6ff;">
+                                <td>
+                                    <div style="display:flex; gap:4px;">
+                                        <input type="text" id="in_customPersonelYurt" placeholder="Yeni yurt unvanı yazınız..." style="width:100%; font-size:11px; padding:3px 6px;">
+                                        <button class="btn btn-action" onclick="addHtmlCustomRow('customPersonelYurt', 'in_customPersonelYurt')">+ Ekle</button>
+                                    </div>
+                                </td>
+                                <td colspan="${personelYears.length + 2}"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- d-) Gençlik Merkezi Müdürlüğü Personeli -->
+                <div class="sub-header" style="margin-top:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <span>d-) Gençlik Merkezi Müdürlüğü Personeli Açısından Bakıldığında;</span>
+                    <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:bold; color:var(--gray-700);">
+                        <span>Merkez:</span>
+                        <input type="text" data-key="pers_gm_name" placeholder="... Gençlik Merkezi (Örn: Tuşba)" style="font-weight:bold; padding:2px 8px; width:220px; font-size:11px; border:1px solid var(--gray-300); border-radius:4px;">
+                        <span>Gençlik Merkezi Müdürlüğü</span>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="text-left" style="min-width:200px;">Unvan</th>
+                                ${personelYears.map(y=>`<th>${y}</th>`).join('')}
+                                <th style="background:#fef3c7; color:#92400e; min-width:85px;">Norm Kadro</th>
+                                <th class="no-print" style="width:40px;">İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${gmRows.map(r=>`
+                                <tr>
+                                    <td>${r.label}</td>
+                                    ${personelYears.map(y=>`<td><input type="text" class="text-center" data-key="pers_gm_${r.id}_${y}" placeholder="-"></td>`).join('')}
+                                    <td style="background:#fffbeb;"><input type="text" class="text-center" style="font-weight:bold; color:#b45309;" data-key="pers_gm_${r.id}_normKadro" placeholder="-"></td>
+                                    <td class="no-print"></td>
+                                </tr>
+                            `).join('')}
+                            ${(customPersonelGm || []).map(rName => `
+                                <tr>
+                                    <td>${rName}</td>
+                                    ${personelYears.map(y=>`<td><input type="text" class="text-center" data-key="pers_gm_${rName}_${y}" placeholder="-"></td>`).join('')}
+                                    <td style="background:#fffbeb;"><input type="text" class="text-center" style="font-weight:bold; color:#b45309;" data-key="pers_gm_${rName}_normKadro" placeholder="-"></td>
+                                    <td class="no-print text-center">
+                                        <button class="btn-del" onclick="removeHtmlCustomRow('customPersonelGm', '${rName}')">🗑️</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot class="no-print">
+                            <tr style="background:#eff6ff;">
+                                <td>
+                                    <div style="display:flex; gap:4px;">
+                                        <input type="text" id="in_customPersonelGm" placeholder="Yeni gençlik merkezi unvanı yazınız..." style="width:100%; font-size:11px; padding:3px 6px;">
+                                        <button class="btn btn-action" onclick="addHtmlCustomRow('customPersonelGm', 'in_customPersonelGm')">+ Ekle</button>
+                                    </div>
+                                </td>
+                                <td colspan="${personelYears.length + 2}"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            `;
+        }
+
+        // 7 & 8 Mali Tablolar
+        function renderMaliSection() {
+            const startYear = document.getElementById('cfgStartYear').value;
+            const endYear = document.getElementById('cfgEndYear').value;
+            const titleGiderEl = document.getElementById('titleGiderler');
+            const contentGiderEl = document.getElementById('contentGiderler');
+
+            const baseGiderRows = [
+                { id: 'sporFaaliyet', label: 'Spor Faaliyet Giderleri' },
+                { id: 'yatirim', label: 'Yatırım Giderleri' },
+                { id: 'bakimOnarim', label: 'Bakım Onarım' },
+                { id: 'personel', label: 'Personel Giderleri' },
+                { id: 'genclikHizmet', label: 'Gençlik Hizmetleri Giderleri' },
+                { id: 'yurtHizmet', label: 'Yurt Hizmetleri Giderleri' },
+                { id: 'hizmetYonetim', label: 'Hizmet Yönetim Giderleri' },
+                { id: 'sosyalTransfer', label: 'Sosyal Transferler' },
+                { id: 'hizmetAlimi', label: 'Hizmet Alımı' }
+            ];
+
+            const renderCustomGiderRows = (yList, keyPrefix) => customGider.map(c => `
+                <tr>
+                    <td class="font-bold">${c}</td>
+                    ${yList.map(y => `<td><input type="text" class="text-right" data-key="${keyPrefix}_${c}_${y}" placeholder="0,00"></td>`).join('')}
+                    <td class="text-center no-print">
+                        <button class="btn-del" onclick="removeHtmlCustomRow('customGider', '${c}')">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            const inlineAddGiderRow = (yList) => `
+                <tr class="no-print" style="background:#eff6ff;">
+                    <td style="padding: 4px;">
+                        <input type="text" id="txtAddGider" placeholder="Yeni gider kalemi yazınız..." style="width: 100%; padding: 4px 6px; font-size: 11px; font-weight: bold; border: 1px solid #bfdbfe; border-radius: 4px;" onkeydown="if(event.key==='Enter') addHtmlCustomRow('customGider', 'txtAddGider')">
+                    </td>
+                    <td colspan="${yList.length}" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customGider', 'txtAddGider')">➕ Gider Kalemi Ekle</button>
+                    </td>
+                    <td class="text-center" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customGider', 'txtAddGider')" title="Ekle">➕</button>
+                    </td>
+                </tr>
+            `;
+
+            if (isSplitPeriod) {
+                titleGiderEl.textContent = '7- GİDERLER (Birleşme Öncesi ve Birleşme Sonrası):';
+                contentGiderEl.innerHTML = `
+                    <div class="sub-header">A) Birleşme Öncesi Dönem (${preYears[0]}-${preYears[preYears.length-1]}):</div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead><tr><th class="text-left">GİDER KALEMİ</th>${preYears.map(y=>`<th>${y}</th>`).join('')}</tr></thead>
+                            <tbody>${baseGiderRows.map(r=>`<tr><td>${r.label}</td>${preYears.map(y=>`<td><input type="text" class="text-right" data-key="gider_pre_${r.id}_${y}" placeholder="0,00"></td>`).join('')}</tr>`).join('')}
+                            <tr class="bg-total"><td>TOPLAM</td>${preYears.map(y=>`<td><input type="text" class="text-right" data-key="gider_pre_toplam_${y}" placeholder="0,00"></td>`).join('')}</tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="sub-header" style="margin-top: 14px;">B) Birleşme Sonrası Dönem (${postYears[0]}-${postYears[postYears.length-1]}):</div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead><tr><th class="text-left">GİDER KALEMİ</th>${postYears.map(y=>`<th>${y}</th>`).join('')}<th style="width: 45px;" class="no-print">İŞLEM</th></tr></thead>
+                            <tbody>${baseGiderRows.map(r=>`<tr><td>${r.label}</td>${postYears.map(y=>`<td><input type="text" class="text-right" data-key="gider_post_${r.id}_${y}" placeholder="0,00"></td>`).join('')}<td class="no-print"></td></tr>`).join('')}
+                            ${renderCustomGiderRows(postYears, 'gider_post')}
+                            <tr class="bg-total"><td>TOPLAM</td>${postYears.map(y=>`<td><input type="text" class="text-right" data-key="gider_post_toplam_${y}" placeholder="0,00"></td>`).join('')}<td class="no-print"></td></tr>
+                            ${inlineAddGiderRow(postYears)}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } else {
+                titleGiderEl.textContent = `7- GİDERLER (${startYear} - ${endYear}):`;
+                contentGiderEl.innerHTML = `
+                    <div class="table-responsive">
+                        <table>
+                            <thead><tr><th class="text-left">GİDER KALEMİ</th>${years.map(y=>`<th>${y}</th>`).join('')}<th style="width: 45px;" class="no-print">İŞLEM</th></tr></thead>
+                            <tbody>${baseGiderRows.map(r=>`<tr><td>${r.label}</td>${years.map(y=>`<td><input type="text" class="text-right" data-key="gider_post_${r.id}_${y}" placeholder="0,00"></td>`).join('')}<td class="no-print"></td></tr>`).join('')}
+                            ${renderCustomGiderRows(years, 'gider_post')}
+                            <tr class="bg-total"><td>TOPLAM</td>${years.map(y=>`<td><input type="text" class="text-right" data-key="gider_post_toplam_${y}" placeholder="0,00"></td>`).join('')}<td class="no-print"></td></tr>
+                            ${inlineAddGiderRow(years)}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            // 8- Gelirler
+            const baseGelirRows = [
+                { id: 'gsgm', label: 'GSGM Yardımı' },
+                { id: 'ozelIdare', label: 'İl Özel İdaresinden Alınan Nakit Yardımlar' },
+                { id: 'ozelGelir', label: 'Özel Gelirler' }
+            ];
+            document.getElementById('trGelirlerHead').innerHTML = '<th class="text-left">GELİR KALEMİ</th>' + 
+                years.map(y => `<th style="width: 75px;">${y}</th>`).join('') +
+                '<th style="width: 45px;" class="no-print">İŞLEM</th>';
+
+            let gHtml = baseGelirRows.map(r => `
+                <tr>
+                    <td>${r.label}</td>
+                    ${years.map(y => `<td><input type="text" class="text-right" data-key="gelir_${r.id}_${y}" placeholder="0,00"></td>`).join('')}
+                    <td class="no-print"></td>
+                </tr>
+            `).join('');
+
+            gHtml += customGelir.map(c => `
+                <tr>
+                    <td class="font-bold">${c}</td>
+                    ${years.map(y => `<td><input type="text" class="text-right" data-key="gelir_${c}_${y}" placeholder="0,00"></td>`).join('')}
+                    <td class="text-center no-print">
+                        <button class="btn-del" onclick="removeHtmlCustomRow('customGelir', '${c}')">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            gHtml += `
+                <tr class="bg-total">
+                    <td>TOPLAM</td>
+                    ${years.map(y => `<td><input type="text" class="text-right" data-key="gelir_toplam_${y}" placeholder="0,00"></td>`).join('')}
+                    <td class="no-print"></td>
+                </tr>
+                <tr class="no-print" style="background:#eff6ff;">
+                    <td style="padding: 4px;">
+                        <input type="text" id="txtAddGelir" placeholder="Yeni gelir kalemi yazınız..." style="width: 100%; padding: 4px 6px; font-size: 11px; font-weight: bold; border: 1px solid #bfdbfe; border-radius: 4px;" onkeydown="if(event.key==='Enter') addHtmlCustomRow('customGelir', 'txtAddGelir')">
+                    </td>
+                    <td colspan="${years.length}" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customGelir', 'txtAddGelir')">➕ Gelir Kalemi Ekle</button>
+                    </td>
+                    <td class="text-center" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customGelir', 'txtAddGelir')" title="Ekle">➕</button>
+                    </td>
+                </tr>
+            `;
+
+            document.getElementById('tbGelirlerBody').innerHTML = gHtml;
+        }
+
+        // 9- Tesisler Tablosu
+        function renderTesislerTable() {
+            document.getElementById('trTesislerHead').innerHTML = `
+                <th style="width: 35px;">NO</th>
+                <th class="text-left" style="min-width: 170px;">TESİS TÜRÜ</th>
+                <th style="width: 90px;">MÜLKİYET</th>
+                <th style="width: 80px;">KAPASİTE</th>
+                ${years.map(y => `<th style="width: 60px;">${y}</th>`).join('')}
+                <th style="width: 45px;" class="no-print">İŞLEM</th>
+            `;
+
+            document.getElementById('tbTesislerBody').innerHTML = facilityTypes.map((t, idx) => `
+                <tr>
+                    <td class="text-center font-bold">${idx + 1}</td>
+                    <td class="font-bold">${t}</td>
+                    <td><input type="text" class="text-center" data-key="tesis_${t}_mulkiyet" placeholder="İl Md / Bld"></td>
+                    <td><input type="text" class="text-center" data-key="tesis_${t}_kapasite" placeholder="Kişi"></td>
+                    ${years.map(y => `<td><input type="text" class="text-center" data-key="tesis_${t}_${y}" placeholder="-"></td>`).join('')}
+                    <td class="text-center no-print">
+                        <button class="btn-del" onclick="removeFacility('${t}')" title="Türü Kaldır">🗑️</button>
+                    </td>
+                </tr>
+            `).join('') + `
+                <tr class="no-print" style="background:#eff6ff;">
+                    <td colspan="2" style="padding: 4px;">
+                        <input type="text" id="txtInlineFacAdd" placeholder="Yeni tesis türü yazınız (Örn: CİRİT SAHASI)..." style="width: 100%; padding: 4px 6px; font-size: 11px; font-weight: bold; border: 1px solid #bfdbfe; border-radius: 4px;" onkeydown="if(event.key==='Enter') addFacilityFromInput('txtInlineFacAdd')">
+                    </td>
+                    <td colspan="${years.length + 2}" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addFacilityFromInput('txtInlineFacAdd')">➕ Tabloya Tesis Türü Ekle</button>
+                    </td>
+                    <td class="text-center" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addFacilityFromInput('txtInlineFacAdd')" title="Ekle">➕</button>
+                    </td>
+                </tr>
+            `;
+        }
+
+        // 10 & 11 Nakit ve Sponsorluk Tabloları
+        function renderNakitVeSponsorTable() {
+            document.getElementById('trOzelIdareHead').innerHTML = '<th class="text-left">KAYNAK TÜRÜ</th>' + 
+                years.map(y => `<th>${y}</th>`).join('') +
+                '<th style="width: 45px;" class="no-print">İŞLEM</th>';
+
+            let oHtml = `
+                <tr>
+                    <td class="font-bold">İl Özel İdaresinden Yapılan Yatırımlar (1)</td>
+                    ${years.map(y => `<td><input type="text" class="text-right" data-key="ozel_idare_${y}" placeholder="0,00"></td>`).join('')}
+                    <td class="no-print"></td>
+                </tr>
+            `;
+            oHtml += customOzelIdare.map(c => `
+                <tr>
+                    <td class="font-bold">${c}</td>
+                    ${years.map(y => `<td><input type="text" class="text-right" data-key="ozel_idare_${c}_${y}" placeholder="0,00"></td>`).join('')}
+                    <td class="text-center no-print">
+                        <button class="btn-del" onclick="removeHtmlCustomRow('customOzelIdare', '${c}')">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+            oHtml += `
+                <tr class="no-print" style="background:#eff6ff;">
+                    <td style="padding: 4px;">
+                        <input type="text" id="txtAddOzelIdare" placeholder="Yeni yatırım kalemi yazınız..." style="width: 100%; padding: 4px 6px; font-size: 11px; font-weight: bold; border: 1px solid #bfdbfe; border-radius: 4px;" onkeydown="if(event.key==='Enter') addHtmlCustomRow('customOzelIdare', 'txtAddOzelIdare')">
+                    </td>
+                    <td colspan="${years.length}" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customOzelIdare', 'txtAddOzelIdare')">➕ Yatırım Ekle</button>
+                    </td>
+                    <td class="text-center" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customOzelIdare', 'txtAddOzelIdare')" title="Ekle">➕</button>
+                    </td>
+                </tr>
+            `;
+            document.getElementById('tbOzelIdareBody').innerHTML = oHtml;
+
+            document.getElementById('trSponsorlukHead').innerHTML = '<th class="text-left">SPONSORLUK GELİRİ</th>' + 
+                years.map(y => `<th>${y}</th>`).join('') +
+                '<th style="width: 45px;" class="no-print">İŞLEM</th>';
+
+            let sHtml = `
+                <tr>
+                    <td class="font-bold">Sponsorlardan Elde Edilen Kaynaklar (1)</td>
+                    ${years.map(y => `<td><input type="text" class="text-right" data-key="sponsorluk_${y}" placeholder="0,00"></td>`).join('')}
+                    <td class="no-print"></td>
+                </tr>
+            `;
+            sHtml += customSponsor.map(c => `
+                <tr>
+                    <td class="font-bold">${c}</td>
+                    ${years.map(y => `<td><input type="text" class="text-right" data-key="sponsorluk_${c}_${y}" placeholder="0,00"></td>`).join('')}
+                    <td class="text-center no-print">
+                        <button class="btn-del" onclick="removeHtmlCustomRow('customSponsor', '${c}')">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+            sHtml += `
+                <tr class="no-print" style="background:#eff6ff;">
+                    <td style="padding: 4px;">
+                        <input type="text" id="txtAddSponsor" placeholder="Yeni sponsor kalemi yazınız..." style="width: 100%; padding: 4px 6px; font-size: 11px; font-weight: bold; border: 1px solid #bfdbfe; border-radius: 4px;" onkeydown="if(event.key==='Enter') addHtmlCustomRow('customSponsor', 'txtAddSponsor')">
+                    </td>
+                    <td colspan="${years.length}" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customSponsor', 'txtAddSponsor')">➕ Sponsorluk Ekle</button>
+                    </td>
+                    <td class="text-center" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addHtmlCustomRow('customSponsor', 'txtAddSponsor')" title="Ekle">➕</button>
+                    </td>
+                </tr>
+            `;
+            document.getElementById('tbSponsorlukBody').innerHTML = sHtml;
+        }
+
+        // 16- Spor Dalı Temsilcileri Tablosu
+        function renderTemsilciTable() {
+            const filterSearch = (document.getElementById('txtSearchTemsilci')?.value || '').toLowerCase().trim();
+            const tbBody = document.getElementById('tbTemsilciBody');
+            
+            const filtered = branches.filter((b, idx) => {
+                if (filterSearch && !b.toLowerCase().includes(filterSearch)) return false;
+                const varMi = localStorage.getItem(`temsilci_${b}_varMi`) || '';
+                if (currentFilter === 'var' && varMi !== 'var') return false;
+                if (currentFilter === 'yok' && varMi !== 'yok') return false;
+                return true;
+            });
+
+            tbBody.innerHTML = filtered.map(b => {
+                const idx = branches.indexOf(b);
+                const varMi = localStorage.getItem(`temsilci_${b}_varMi`) || '';
+                const adSoyad = localStorage.getItem(`temsilci_${b}_adSoyad`) || '';
+                const atama = localStorage.getItem(`temsilci_${b}_atama`) || '';
+                const tasdik = localStorage.getItem(`temsilci_${b}_tasdik`) || '';
+                const not = localStorage.getItem(`temsilci_${b}_not`) || '';
+
+                const rowBg = varMi === 'var' ? 'style="background:#f0fdf4;"' : (varMi === 'yok' ? 'style="background:#fef2f2;"' : '');
+
+                return `
+                    <tr ${rowBg}>
+                        <td class="text-center font-bold">${idx + 1}</td>
+                        <td class="font-bold">${b}</td>
+                        <td class="text-center">
+                            <select class="table-select" data-key="temsilci_${b}_varMi" onchange="onTemsilciVarChange(this, '${b}')">
+                                <option value="" ${varMi===''?'selected':''}>Seçiniz...</option>
+                                <option value="var" ${varMi==='var'?'selected':''}>✓ VAR</option>
+                                <option value="yok" ${varMi==='yok'?'selected':''}>✗ YOK</option>
+                            </select>
+                        </td>
+                        <td><input type="text" data-key="temsilci_${b}_adSoyad" value="${adSoyad}" placeholder="Temsilci Adı Soyadı..." oninput="saveSingleField(this)"></td>
+                        <td><input type="text" data-key="temsilci_${b}_atama" value="${atama}" placeholder="Tarih / Sayı (Yönetmelik Uygun)..." oninput="saveSingleField(this)"></td>
+                        <td class="text-center">
+                            <select class="table-select" data-key="temsilci_${b}_tasdik" onchange="saveSingleField(this)">
+                                <option value="" ${tasdik===''?'selected':''}>Seçiniz...</option>
+                                <option value="tasdikli" ${tasdik==='tasdikli'?'selected':''}>✓ Tasdikli</option>
+                                <option value="tasdiksiz" ${tasdik==='tasdiksiz'?'selected':''}>✗ Tasdiksiz</option>
+                            </select>
+                        </td>
+                        <td><input type="text" data-key="temsilci_${b}_not" value="${not}" placeholder="Açıklama / not..." oninput="saveSingleField(this)"></td>
+                        <td class="text-center no-print">
+                            <button class="btn-del" onclick="removeBranch('${b}')" title="Branşı Kaldır">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('') + `
+                <tr class="no-print" style="background:#eff6ff;">
+                    <td class="text-center font-bold" style="color: var(--primary);">+</td>
+                    <td colspan="2" style="padding: 4px;">
+                        <input type="text" id="txtInlineBranchAdd16" placeholder="Yeni spor branşı adı yazınız (Örn: BİLARDO)..." style="width: 100%; padding: 4px 8px; font-size: 11px; font-weight: bold; border: 1px solid #bfdbfe; border-radius: 4px;" onkeydown="if(event.key==='Enter') addBranchFromInput('txtInlineBranchAdd16')">
+                    </td>
+                    <td colspan="4" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addBranchFromInput('txtInlineBranchAdd16')">➕ Tabloya Yeni Branş Ekle</button>
+                    </td>
+                    <td class="text-center" style="padding: 4px;">
+                        <button class="btn btn-action btn-sm" onclick="addBranchFromInput('txtInlineBranchAdd16')" title="Ekle">➕</button>
+                    </td>
+                </tr>
+            `;
+
+            if (filtered.length === 0) {
+                tbBody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding: 24px; color: var(--gray-400);">Arama kriterine uygun spor branşı bulunamadı.</td></tr>';
+            }
+        }
+
+        function onTemsilciVarChange(sel, b) {
+            saveSingleField(sel);
+            updateTemsilciStats();
+            renderTemsilciTable();
+        }
+
+        function filterTemsilci(mode) {
+            if (mode) {
+                currentFilter = mode;
+                document.getElementById('btnFiltAll').classList.toggle('active', mode === 'all');
+                document.getElementById('btnFiltVar').classList.toggle('active', mode === 'var');
+                document.getElementById('btnFiltYok').classList.toggle('active', mode === 'yok');
+            }
+            renderTemsilciTable();
+        }
+
+        function updateTemsilciStats() {
+            let varC = 0, yokC = 0;
+            branches.forEach((b) => {
+                const v = localStorage.getItem(`temsilci_${b}_varMi`);
+                if (v === 'var') varC++;
+                if (v === 'yok') yokC++;
+            });
+            document.getElementById('statVarCount').textContent = `Temsilci Var: ${varC}`;
+            document.getElementById('statYokCount').textContent = `Temsilci Yok: ${yokC}`;
+        }
+
+        function saveSingleField(el) {
+            const key = el.getAttribute('data-key');
+            if (key) {
+                localStorage.setItem(key, el.value);
+            }
+        }
+
+        function saveToLocalStorage() {
+            document.querySelectorAll('input[data-key], select[data-key], textarea[id]').forEach(el => {
+                const key = el.getAttribute('data-key') || el.id;
+                localStorage.setItem(key, el.value);
+            });
+            localStorage.setItem('cfg_branches', JSON.stringify(branches));
+            localStorage.setItem('cfg_facilities', JSON.stringify(facilityTypes));
+            localStorage.setItem('cfg_custom_maddeler', JSON.stringify(customMaddeler));
+            alert('Tüm veriler ve dinamik listeler tarayıcınıza başarıyla kaydedildi!');
+        }
+
+        function loadFromLocalStorage() {
+            document.querySelectorAll('input[data-key], select[data-key], textarea[id]').forEach(el => {
+                const key = el.getAttribute('data-key') || el.id;
+                const val = localStorage.getItem(key);
+                if (val !== null) el.value = val;
+            });
+        }
+
+        function toggleDownloadMenu(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('downloadMenu');
+            if (menu) menu.classList.toggle('show');
+        }
+
+        document.addEventListener('click', () => {
+            const menu = document.getElementById('downloadMenu');
+            if (menu) menu.classList.remove('show');
+        });
+
+        function filterCategory(catId, btn) {
+            document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            
+            document.querySelectorAll('.section-box').forEach(sec => {
+                const secCat = sec.getAttribute('data-category');
+                if (catId === 'all' || !secCat || secCat === catId) {
+                    sec.style.display = '';
+                } else {
+                    sec.style.display = 'none';
+                }
+            });
+        }
+
+        function openResetModal() {
+            document.getElementById('resetModalOverlay').classList.add('show');
+        }
+
+        function closeResetModal(e) {
+            if (e && e.target !== e.currentTarget && e.currentTarget !== document.getElementById('resetModalOverlay')) return;
+            document.getElementById('resetModalOverlay').classList.remove('show');
+        }
+
+        function confirmResetData() {
+            localStorage.clear();
+            document.getElementById('cfgStartYear').value = '';
+            document.getElementById('cfgEndYear').value = '';
+            initDynamicLists();
+            applyConfiguration();
+            closeResetModal();
+            alert('Tüm alanlar ve listeler varsayılana döndürüldü.');
+        }
+
+        function exportToWord(isBlank = false) {
+            const il = (document.getElementById('cfgIl')?.value || '........').toUpperCase();
+            const curY = new Date().getFullYear();
+            const startYear = document.getElementById('cfgStartYear')?.value || (curY - 5);
+            const endYear = document.getElementById('cfgEndYear')?.value || (curY - 1);
+            
+            // 1. Paper içeriğinin bir kopyasını al
+            const paperEl = document.querySelector('.paper');
+            if (!paperEl) {
+                alert('Belge alanı bulunamadı.');
+                return;
+            }
+
+            const clone = paperEl.cloneNode(true);
+
+            // 2. Form elemanlarını metin karşılıklarıyla değiştir
+            clone.querySelectorAll('input').forEach(input => {
+                const span = document.createElement('span');
+                const val = isBlank ? '' : input.value.trim();
+                span.textContent = val !== '' ? val : (isBlank ? '' : '-');
+                if (input.classList.contains('text-center')) span.style.display = 'block';
+                if (input.classList.contains('text-right')) span.style.display = 'block';
+                input.parentNode.replaceChild(span, input);
+            });
+
+            clone.querySelectorAll('select').forEach(select => {
+                const span = document.createElement('span');
+                const opt = select.options[select.selectedIndex];
+                span.textContent = isBlank ? '' : (opt ? opt.text : '-');
+                select.parentNode.replaceChild(span, select);
+            });
+
+            clone.querySelectorAll('textarea').forEach(textarea => {
+                const div = document.createElement('div');
+                const val = isBlank ? '' : textarea.value.trim();
+                div.innerHTML = val ? val.replace(/\n/g, '<br>') : (isBlank ? '<br><br>' : '-');
+                div.style.padding = '4px';
+                textarea.parentNode.replaceChild(div, textarea);
+            });
+
+            // 3. no-print, butonlar ve araç çubuklarını temizle
+            clone.querySelectorAll('.no-print, button, .temsilci-toolbar, .btn-del').forEach(el => el.remove());
+
+            // 4. Tablo stillerini Word uyumlu hale getir
+            clone.querySelectorAll('table').forEach(tbl => {
+                tbl.setAttribute('border', '1');
+                tbl.setAttribute('cellspacing', '0');
+                tbl.setAttribute('cellpadding', '4');
+                tbl.style.borderCollapse = 'collapse';
+                tbl.style.width = '100%';
+                tbl.style.marginBottom = '12pt';
+                tbl.style.fontFamily = "'Times New Roman', serif";
+                tbl.style.fontSize = '9.5pt';
+            });
+
+            clone.querySelectorAll('th').forEach(th => {
+                th.style.backgroundColor = '#f1f5f9';
+                th.style.fontWeight = 'bold';
+                th.style.textAlign = 'center';
+                th.style.border = '1px solid #64748b';
+                th.style.padding = '5px 6px';
+            });
+
+            clone.querySelectorAll('td').forEach(td => {
+                td.style.border = '1px solid #94a3b8';
+                td.style.padding = '4px 6px';
+            });
+
+            // 5. HTML ve Word Office XML yapısını hazırla
+            const docTitle = isBlank ? `${il} Boş Özet Tablolar Şablonu` : `${il} Özet Bilgiler (${startYear}-${endYear})`;
+            const headerHtml = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' 
+                      xmlns:w='urn:schemas-microsoft-com:office:word' 
+                      xmlns='http://www.w3.org/TR/REC-html40'>
+                <head>
+                    <meta charset='utf-8'>
+                    <title>${docTitle}</title>
+                    <!--[if gte mso 9]>
+                    <xml>
+                        <w:WordDocument>
+                            <w:View>Print</w:View>
+                            <w:Zoom>100</w:Zoom>
+                            <w:DoNotOptimizeForBrowser/>
+                        </w:WordDocument>
+                    </xml>
+                    <![endif]-->
+                    <style>
+                        @page WordSection1 {
+                            size: 21.0cm 29.7cm;
+                            margin: 2.5cm 2.5cm 2.5cm 2.5cm;
+                            mso-page-orientation: portrait;
+                            mso-header-margin: 36.0pt;
+                            mso-footer-margin: 36.0pt;
+                            mso-paper-source: 0;
+                        }
+                        div.WordSection1 {
+                            page: WordSection1;
+                        }
+                        body {
+                            font-family: 'Times New Roman', serif;
+                            font-size: 10pt;
+                            color: #000;
+                        }
+                        h2, h3, h4 {
+                            text-align: center;
+                            margin: 0;
+                            padding: 2pt 0;
+                        }
+                        h2 { font-size: 13pt; font-weight: bold; }
+                        h3 { font-size: 12pt; font-weight: bold; }
+                        h4 { font-size: 11pt; font-weight: bold; }
+                        .donem-text {
+                            text-align: center;
+                            font-weight: bold;
+                            margin-top: 4pt;
+                            margin-bottom: 12pt;
+                        }
+                        .section-title {
+                            font-size: 11pt;
+                            font-weight: bold;
+                            border-bottom: 1.5pt solid #000;
+                            padding-bottom: 3pt;
+                            margin-top: 14pt;
+                            margin-bottom: 6pt;
+                        }
+                        .sub-header {
+                            font-size: 10pt;
+                            font-weight: bold;
+                            margin-top: 8pt;
+                            margin-bottom: 4pt;
+                        }
+                        .table-note {
+                            font-size: 8pt;
+                            font-style: italic;
+                            color: #444;
+                            margin-top: 3pt;
+                            margin-bottom: 8pt;
+                        }
+                        .custom-madde-card {
+                            border: 1pt solid #999;
+                            padding: 8pt;
+                            margin-top: 8pt;
+                            margin-bottom: 8pt;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="WordSection1">
+                        ${clone.innerHTML}
+                    </div>
+                </body>
+                </html>
+            `;
+
+            // 6. Blob oluştur ve indir
+            const blob = new Blob(['\ufeff' + headerHtml], { type: 'application/msword;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = isBlank ? `${il}_Bos_Ozet_Tablo_Sablonu_${startYear}-${endYear}.doc` : `${il}_Ozet_Bilgiler_${startYear}-${endYear}.doc`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

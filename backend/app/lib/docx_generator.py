@@ -2,8 +2,9 @@ import base64
 import io
 import os
 import sys
+import re
 import docx
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import parse_xml, OxmlElement
@@ -821,3 +822,750 @@ def generate_degerlendirme_docx(output_path, data):
     eval_table.rows[0].cells[0].width = Inches(3.0)
     
     doc.save(output_path)
+
+
+def generate_ozet_tablolar_docx(output_path, data):
+    """
+    Gençlik ve Spor İl Müdürlüğü Özet Bilgiler (Müfettiş Özet Bilgiler) Word belgesini
+    15 ana başlık ve dinamik tablolar halinde oluşturur.
+    """
+    doc = docx.Document()
+    
+    # Sayfa kenar boşlukları (0.75 inç - tabloların rahat sığması için)
+    # Sayfa ve Kağıt Boyutu: Standart Resmi A4 (21 x 29.7 cm, code="9") ve 2.5 cm kenar boşlukları
+    for section in doc.sections:
+        section.page_width = Cm(21.0)
+        section.page_height = Cm(29.7)
+        section.top_margin = Cm(2.5)
+        section.bottom_margin = Cm(2.5)
+        section.left_margin = Cm(2.5)
+        section.right_margin = Cm(2.5)
+        
+        # Word'ün kağıt boyutunu doğrudan resmi "A4" olarak tanıması için code="9" ve orient="portrait" ekle
+        sectPr = section._sectPr
+        pgSz = sectPr.find(qn('w:pgSz'))
+        if pgSz is not None:
+            pgSz.set(qn('w:code'), '9')
+            pgSz.set(qn('w:w'), '11906')
+            pgSz.set(qn('w:h'), '16838')
+            pgSz.set(qn('w:orient'), 'portrait')
+        
+    style = doc.styles['Normal']
+    style.font.name = 'Times New Roman'
+    style.font.size = Pt(10)
+
+    def set_cell_width(cell, width_cm):
+        cell.width = width_cm
+        tcPr = cell._tc.get_or_add_tcPr()
+        dxa = int(width_cm.inches * 1440)
+        tcW = parse_xml(f'<w:tcW {nsdecls("w")} w:w="{dxa}" w:type="dxa"/>')
+        existing_tcW = tcPr.find(qn('w:tcW'))
+        if existing_tcW is not None:
+            tcPr.remove(existing_tcW)
+        tcPr.append(tcW)
+    
+    def apply_table_style(table, col_widths=None):
+        tblPr = table._tbl.tblPr
+        borders = parse_xml(
+            '<w:tblBorders %s>'
+            '<w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
+            '<w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
+            '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
+            '<w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
+            '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
+            '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/>'
+            '</w:tblBorders>' % nsdecls('w')
+        )
+        tblPr.append(borders)
+        
+        # Sola dayalı: Başlıklarla (1- SPORCU SAYILARI vb.) tam aynı hizada başlar
+        table.alignment = WD_TABLE_ALIGNMENT.LEFT
+        table.autofit = False
+
+        # Tablo genişliğini sayfa metin alanına (16.0 cm = 9072 dxa) tam yay
+        existing_tblW = tblPr.find(qn('w:tblW'))
+        if existing_tblW is not None:
+            tblPr.remove(existing_tblW)
+        tblW = parse_xml(f'<w:tblW {nsdecls("w")} w:w="9072" w:type="dxa"/>')
+        tblPr.append(tblW)
+
+        # Sütun genişliklerini uygula
+        if col_widths and len(col_widths) == len(table.columns):
+            for row in table.rows:
+                for idx, width in enumerate(col_widths):
+                    if idx < len(row.cells):
+                        set_cell_width(row.cells[idx], width)
+        else:
+            num_cols = len(table.columns)
+            if num_cols > 0:
+                eq_w = Cm(16.0 / num_cols)
+                for row in table.rows:
+                    for cell in row.cells:
+                        set_cell_width(cell, eq_w)
+        
+        # Header shading
+        for cell in table.rows[0].cells:
+            shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="F2F2F2"/>')
+            cell._tc.get_or_add_tcPr().append(shd)
+
+    def add_section_header(title):
+        p = doc.add_paragraph()
+        p.paragraph_format.space_before = Pt(12)
+        p.paragraph_format.space_after = Pt(4)
+        run = p.add_run(title)
+        run.bold = True
+        run.font.size = Pt(11)
+        run.font.name = 'Times New Roman'
+        return p
+
+    def add_note(note_text):
+        p = doc.add_paragraph()
+        p.paragraph_format.space_before = Pt(2)
+        p.paragraph_format.space_after = Pt(6)
+        run = p.add_run(note_text)
+        run.italic = True
+        run.font.size = Pt(8.5)
+        run.font.name = 'Times New Roman'
+
+    import datetime
+    cur_year = datetime.datetime.now().year
+    def_end = cur_year - 1
+    def_start = cur_year - 5
+    def_years = [str(y) for y in range(def_start, def_end + 1)]
+
+    TURKISH_PROVINCES = [
+        "ADANA", "ADIYAMAN", "AFYONKARAHİSAR", "AĞRI", "AKSARAY", "AMASYA", "ANKARA", "ANTALYA", 
+        "ARDAHAN", "ARTVİN", "AYDIN", "BALIKESİR", "BARTIN", "BATMAN", "BAYBURT", "BİLECİK", 
+        "BİNGÖL", "BİTLİS", "BOLU", "BURDUR", "BURSA", "ÇANAKKALE", "ÇANKIRI", "ÇORUM", 
+        "DENİZLİ", "DİYARBAKIR", "DÜZCE", "EDİRNE", "ELAZIĞ", "ERZİNCAN", "ERZURUM", "ESKİŞEHİR", 
+        "GAZİANTEP", "GİRESUN", "GÜMÜŞHANE", "HAKKARİ", "HATAY", "IĞDIR", "ISPARTA", "İSTANBUL", 
+        "İZMİR", "KAHRAMANMARAŞ", "KARABÜK", "KARAMAN", "KARS", "KASTAMONU", "KAYSERİ", "KIRIKKALE", 
+        "KIRKLARELİ", "KIRŞEHİR", "KİLİS", "KOCAELİ", "KONYA", "KÜTAHYA", "MALATYA", "MANİSA", 
+        "MARDİN", "MERSİN", "MUĞLA", "MUŞ", "NEVŞEHİR", "NİĞDE", "ORDU", "OSMANİYE", 
+        "RİZE", "SAKARYA", "SAMSUN", "SİİRT", "SİNOP", "SİVAS", "ŞANLIURFA", "ŞIRNAK", 
+        "TEKİRDAĞ", "TOKAT", "TRABZON", "TUNCELİ", "UŞAK", "VAN", "YALOVA", "YOZGAT", "ZONGULDAK"
+    ]
+
+    raw_il = (data.get("ilAdi") or "VAN").strip()
+    text_norm = raw_il.upper().replace('i', 'İ').replace('ı', 'I')
+    
+    matched_city = None
+    for prov in sorted(TURKISH_PROVINCES, key=len, reverse=True):
+        pattern = r'(?<![A-ZÇĞİÖŞÜ])' + prov + r'(?![A-ZÇĞİÖŞÜ])'
+        if re.search(pattern, text_norm):
+            matched_city = prov
+            break
+
+    if matched_city:
+        header_il_line = f"{matched_city} GENÇLİK VE SPOR İL MÜDÜRLÜĞÜ"
+    else:
+        cleaned_il = re.sub(r'^\s*\d+\s*[-–.]\s*', '', text_norm)
+        for bad in ['GENEL RAPORU', 'RAPORU', 'RAPOR', 'GENÇLİK VE SPOR İL MÜDÜRLÜĞÜ', 'GENCLIK VE SPOR IL MUDURLUGU', 'İL MÜDÜRLÜĞÜ', 'IL MUDURLUGU', 'DENETİMİ', 'DENETİM']:
+            cleaned_il = cleaned_il.replace(bad, '')
+        cleaned_il = re.sub(r'\d+$', '', cleaned_il).strip(' -–.')
+        if not cleaned_il:
+            cleaned_il = "VAN"
+        header_il_line = f"{cleaned_il} GENÇLİK VE SPOR İL MÜDÜRLÜĞÜ"
+
+    donem = data.get("denetimDonemi") or f"{def_start} - {def_end}"
+    years = [str(y) for y in data.get("years", def_years)]
+    has_pre = any(int(y) <= 2018 for y in years)
+    has_post = any(int(y) >= 2019 for y in years)
+    is_split = has_pre and has_post
+    pre_years = [y for y in years if int(y) <= 2018]
+    post_years = [y for y in years if int(y) >= 2019]
+
+    tables_data = data.get("tables", {})
+
+    # Başlık
+    p_head = doc.add_paragraph()
+    p_head.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_head.paragraph_format.space_after = Pt(14)
+    r = p_head.add_run(
+        "T.C.\n"
+        "GENÇLİK VE SPOR BAKANLIĞI\n"
+        "Rehberlik ve Teftiş Başkanlığı\n\n"
+        f"{header_il_line}\n"
+        f"ÖZET BİLGİLER ( {donem} )\n"
+    )
+    r.bold = True
+    r.font.size = Pt(12)
+    r.font.name = 'Times New Roman'
+
+    # 1- SPORCU SAYILARI
+    add_section_header("1- SPORCU SAYILARI:")
+    sporcu_rows = [
+        ("lisansli", "Lisanslı Sporcu Sayısı (Bayan/Bay)"),
+        ("faal", "Faal (Bayan/Bay)"),
+        ("milli", "Milli Olmuş Sporcu Sayısı"),
+        ("turkiye1", "Türkiye 1'incisi Olmuş Sporcu Sayısı (1)"),
+        ("ulusalDerece", "Ulusal Derece Alan Sporcu Sayısı (1)"),
+        ("uluslararasiDerece", "Uluslararası Derece Alan Sporcu Sayısı (2)")
+    ]
+    for c_row in tables_data.get("customSporcuRows", []):
+        sporcu_rows.append((c_row, c_row))
+    t1 = doc.add_table(rows=len(sporcu_rows) + 1, cols=len(years) + 1)
+    t1_widths = [Cm(5.5)] + [Cm((16.0 - 5.5) / max(1, len(years)))] * len(years)
+    apply_table_style(t1, t1_widths)
+    set_cell_run_text(t1.cell(0, 0), "GÖSTERGE", bold=True, font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+    for i, yr in enumerate(years):
+        set_cell_run_text(t1.cell(0, i + 1), yr, bold=True, font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+    
+    sporcu_data = tables_data.get("sporcuSayilari", {})
+    for r_idx, (k, label) in enumerate(sporcu_rows):
+        set_cell_run_text(t1.cell(r_idx + 1, 0), label, bold=False, font_size=8.5)
+        row_vals = sporcu_data.get(k, {})
+        for c_idx, yr in enumerate(years):
+            val = str(row_vals.get(yr, ""))
+            set_cell_run_text(t1.cell(r_idx + 1, c_idx + 1), val, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_note("(1),(2) Branş belirtilecek. Ek 1")
+
+    # 2- ANTRENÖR DURUMU
+    add_section_header("2- ANTRENÖR DURUMU:")
+    default_branches = [
+        "ATICILIK", "ATLETİZM", "BADMİNTON", "BASKETBOL", "BED. ENG. TENİS", "BİSİKLET", "BOCCE", "BOKS",
+        "BUZ HOKEYİ", "BUZ PATENİ", "CİMNASTİK", "CURLİNG", "DART", "ESKRİM", "FUTBOL", "GOALBALL",
+        "GÖRME ENG. FUTBOL", "GÜREŞ", "HALTER", "HENTBOL", "HOKEY", "JUDO", "KARATE", "KAYAK",
+        "KİCK-BOX", "KÜREK", "MODERN PENTATLON", "MASA TENİSİ", "MUAY-TAİ", "OKÇULUK", "TAEKWONDO",
+        "TENİS", "VOLEYBOL", "WUSHU", "YÜZME"
+    ]
+    ant_branches = tables_data.get("customBranches") or default_branches
+    antrenor_data = tables_data.get("antrenorDurumu", [])
+    ant_dict = {item.get("branch"): item for item in antrenor_data if isinstance(item, dict)}
+
+    t2 = doc.add_table(rows=len(ant_branches) + 2, cols=5)
+    apply_table_style(t2, [Cm(6.0), Cm(2.5), Cm(2.5), Cm(2.5), Cm(2.5)])
+    headers2 = ["BRANŞI", "FAHRİ", "KADROLU", "SÖZLEŞMELİ", "TOPLAM"]
+    for i, h in enumerate(headers2):
+        set_cell_run_text(t2.cell(0, i), h, bold=True, font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+    
+    tot_fahri, tot_kadrolu, tot_sozlesmeli, tot_all = 0, 0, 0, 0
+    for r_idx, br in enumerate(ant_branches):
+        item = ant_dict.get(br, {})
+        f_val = str(item.get("fahri", ""))
+        k_val = str(item.get("kadrolu", ""))
+        s_val = str(item.get("sozlesmeli", ""))
+        
+        # Calculate row total if numbers
+        row_tot = 0
+        has_num = False
+        for v in (f_val, k_val, s_val):
+            if v and v.isdigit():
+                row_tot += int(v)
+                has_num = True
+        t_val = str(row_tot) if has_num else ""
+        
+        if f_val.isdigit(): tot_fahri += int(f_val)
+        if k_val.isdigit(): tot_kadrolu += int(k_val)
+        if s_val.isdigit(): tot_sozlesmeli += int(s_val)
+        if has_num: tot_all += row_tot
+
+        set_cell_run_text(t2.cell(r_idx + 1, 0), br, font_size=8)
+        set_cell_run_text(t2.cell(r_idx + 1, 1), f_val, font_size=8, align=WD_ALIGN_PARAGRAPH.CENTER)
+        set_cell_run_text(t2.cell(r_idx + 1, 2), k_val, font_size=8, align=WD_ALIGN_PARAGRAPH.CENTER)
+        set_cell_run_text(t2.cell(r_idx + 1, 3), s_val, font_size=8, align=WD_ALIGN_PARAGRAPH.CENTER)
+        set_cell_run_text(t2.cell(r_idx + 1, 4), t_val, font_size=8, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+    # Toplam satırı
+    last_r = len(ant_branches) + 1
+    set_cell_run_text(t2.cell(last_r, 0), "TOPLAM", bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.RIGHT)
+    set_cell_run_text(t2.cell(last_r, 1), str(tot_fahri) if tot_fahri else "", bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+    set_cell_run_text(t2.cell(last_r, 2), str(tot_kadrolu) if tot_kadrolu else "", bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+    set_cell_run_text(t2.cell(last_r, 3), str(tot_sozlesmeli) if tot_sozlesmeli else "", bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+    set_cell_run_text(t2.cell(last_r, 4), str(tot_all) if tot_all else "", bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+    # 3- HAKEM DURUMU
+    add_section_header("3- HAKEM DURUMU:")
+    hakem_data = tables_data.get("hakemDurumu", {})
+    h_rows = [
+        ("aday", "Aday (1)"), ("bolge", "Bölge (1)"), ("milli", "Milli (1)"),
+        ("ulusal", "Ulusal (1)"), ("uluslararasi", "Uluslararası (1)")
+    ]
+    for c_row in tables_data.get("customHakemRows", []):
+        h_rows.append((c_row, c_row))
+    h_rows.append(("toplam", "Toplam"))
+    t3 = doc.add_table(rows=len(h_rows) + 1, cols=2)
+    apply_table_style(t3, [Cm(10.0), Cm(6.0)])
+    set_cell_run_text(t3.cell(0, 0), "KATEGORİ", bold=True, font_size=9)
+    set_cell_run_text(t3.cell(0, 1), "SAYI", bold=True, font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+    for idx, (hk, hlbl) in enumerate(h_rows):
+        set_cell_run_text(t3.cell(idx + 1, 0), hlbl, bold=(hk == "toplam"), font_size=8.5)
+        set_cell_run_text(t3.cell(idx + 1, 1), str(hakem_data.get(hk, "")), bold=(hk == "toplam"), font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_note("Branşları belirtilecektir. Ek 2")
+
+    # 4- KULÜP SAYILARI
+    add_section_header("4- KULÜP SAYILARI:")
+    kulup_data = tables_data.get("kulupSayilari", {})
+    k_rows = [("faalKulup", "Faal Kulüp Sayısı"), ("faalBrans", "Faal Branş Sayısı (1)")]
+    for c_row in tables_data.get("customKulupRows", []):
+        k_rows.append((c_row, c_row))
+    t4 = doc.add_table(rows=len(k_rows) + 1, cols=2)
+    apply_table_style(t4, [Cm(10.0), Cm(6.0)])
+    set_cell_run_text(t4.cell(0, 0), "GÖSTERGE", bold=True, font_size=9)
+    set_cell_run_text(t4.cell(0, 1), "DEĞER", bold=True, font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+    for idx, (kk, klbl) in enumerate(k_rows):
+        set_cell_run_text(t4.cell(idx + 1, 0), klbl, font_size=8.5)
+        set_cell_run_text(t4.cell(idx + 1, 1), str(kulup_data.get(kk, "")), font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_note("(1) Kulüplerin faal oldukları branşlar belirtilecektir. Ek 3")
+
+    # 5- GENÇLİK HİZMET VE FAALİYETLERİ
+    add_section_header("5- GENÇLİK HİZMET VE FAALİYETLERİ:")
+    genclik_rows = [
+        ("merkezSayisi", "Gençlik Merkezi Sayısı"),
+        ("kayitliUye", "Kayıtlı Üye Sayısı"),
+        ("aktifUye", "Aktif Üye Sayısı"),
+        ("ulusalFaaliyet", "Ulusal Faaliyetlere Katılan Üye Sayısı"),
+        ("uluslararasiFaaliyet", "Uluslararası Faal. Katılan Üye Sayısı"),
+        ("kampGonderilen", "Gençlik Kamplarına Gönderilenlerin Sayısı"),
+        ("liderSayisi", "Lider sayısı"),
+        ("noktaSayisi", "Nokta sayısı")
+    ]
+    for c_row in tables_data.get("customGenclikRows", []):
+        genclik_rows.append((c_row, c_row))
+    t5 = doc.add_table(rows=len(genclik_rows) + 1, cols=len(years) + 1)
+    t5_widths = [Cm(5.5)] + [Cm((16.0 - 5.5) / max(1, len(years)))] * len(years)
+    apply_table_style(t5, t5_widths)
+    set_cell_run_text(t5.cell(0, 0), "FAALİYET TÜRÜ", bold=True, font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+    for i, yr in enumerate(years):
+        set_cell_run_text(t5.cell(0, i + 1), yr, bold=True, font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+    genclik_data = tables_data.get("genclikHizmetleri", {})
+    for r_idx, (gk, glbl) in enumerate(genclik_rows):
+        set_cell_run_text(t5.cell(r_idx + 1, 0), glbl, font_size=8.5)
+        row_vals = genclik_data.get(gk, {})
+        for c_idx, yr in enumerate(years):
+            set_cell_run_text(t5.cell(r_idx + 1, c_idx + 1), str(row_vals.get(yr, "")), font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+    # 6- PERSONEL DURUMU (Denetim Dönemi + Mevcut Teftiş Yılı: endYear + 1)
+    # Norm Kadro ile mevcut durumu kıyaslamak için dönem 2021-2025 ise 2026, 2022-2026 ise 2027 eklenir.
+    add_section_header("6- PERSONEL DURUMU:")
+    personel_data = tables_data.get("personelDurumu", {})
+
+    personel_years = list(years)
+    if years:
+        next_yr_str = str(int(years[-1]) + 1)
+        if next_yr_str not in personel_years:
+            personel_years.append(next_yr_str)
+
+    def render_breakdown_table(title_text, rows_spec, p_dict, custom_rows=None):
+        if title_text:
+            p_sub = doc.add_paragraph()
+            p_sub.paragraph_format.space_before = Pt(8)
+            p_sub.paragraph_format.space_after = Pt(3)
+            r_sub = p_sub.add_run(title_text)
+            r_sub.bold = True
+            r_sub.font.size = Pt(9.5)
+
+        all_rows = list(rows_spec)
+        if custom_rows:
+            for cr in custom_rows:
+                all_rows.append((cr, cr))
+
+        total_cols = len(personel_years) + 2  # Unvan + personel_years + Norm Kadro
+        total_rows = 1 + len(all_rows)
+
+        tbl = doc.add_table(rows=total_rows, cols=total_cols)
+        p_widths = [Cm(4.8)] + [Cm((16.0 - 4.8 - 2.0) / max(1, len(personel_years)))] * len(personel_years) + [Cm(2.0)]
+        apply_table_style(tbl, p_widths)
+
+        # En Üst Satır (Row 0): Unvan | 2021 | 2022 | ... | 2026 | Norm Kadro
+        set_cell_run_text(tbl.cell(0, 0), "Unvan", bold=True, font_size=8.5)
+        for i, yr in enumerate(personel_years):
+            set_cell_run_text(tbl.cell(0, i + 1), yr, bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+        set_cell_run_text(tbl.cell(0, total_cols - 1), "Norm Kadro", bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+        # Veri Satırları (Row 1..N)
+        for r_idx, (rk, rlbl) in enumerate(all_rows):
+            curr_row = r_idx + 1
+            is_bold = "(1)" in rlbl or "Toplam" in rlbl
+            set_cell_run_text(tbl.cell(curr_row, 0), rlbl, bold=is_bold, font_size=8)
+            row_data = p_dict.get(rk, {}) if isinstance(p_dict, dict) else {}
+            for c_idx, yr in enumerate(personel_years):
+                val = str(row_data.get(yr, ""))
+                set_cell_run_text(tbl.cell(curr_row, c_idx + 1), val, bold=is_bold, font_size=8, align=WD_ALIGN_PARAGRAPH.CENTER)
+            norm_val = str(row_data.get("normKadro", ""))
+            set_cell_run_text(tbl.cell(curr_row, total_cols - 1), norm_val, bold=is_bold, font_size=8, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+    # a-) İl Müdürlüğü İdari Personel Açısından Bakıldığında;
+    pers_idari_rows = [
+        ("ilMudur", "İl Müdürü"),
+        ("hizmetMudur", "Hizmet Müdürü"),
+        ("subeMudur", "Şube Müdürü"),
+        ("sef", "Şef"),
+        ("muhendis", "Mühendis"),
+        ("arastirmaci", "Araştırmacı"),
+        ("memur", "Memur"),
+        ("sozlesmeliToplam", "(1) Sözleşmeli Personel sayısı"),
+        ("sozlesmeliAntrenor", "• Sözleşmeli Antrenör"),
+        ("sozlesmeliUzman", "• Sözleşmeli Spor Eğitim Uzmanı"),
+        ("sozlesmeli4C", "• Sözleşmeli İdari Destek Personeli 4/C"),
+        ("sozlesmeliYurt", "• Sözleşmeli Yurt Yönetim Personeli"),
+        ("surekliIsci", "Sürekli İşçi Kadrosuna geçenlerin sayısı"),
+        ("yardimciHizmet", "Yardımcı hizmet personeli sayısı")
+    ]
+    idari_dict = personel_data.get("idariPersonel") or personel_data.get("birlesmeSonrasi") or {}
+    custom_idari = tables_data.get("customPersonelRows", [])
+    render_breakdown_table("a-) İl Müdürlüğü İdari Personel Açısından Bakıldığında;", pers_idari_rows, idari_dict, custom_idari)
+
+    # b-) İlçe Müdürlüğü Personeli Açısından Bakıldığında;
+    pers_ilce_rows = [
+        ("ilceMudur", "İlçe Müdürü"),
+        ("temizlik", "Temizlik Personeli"),
+        ("guvenlik", "Güvenlik Personeli"),
+        ("teknik", "Teknik Personel")
+    ]
+    ilce_list = personel_data.get("ilcePersonelList") or [{"name": "", "rows": {}}]
+    for idx, ilce_item in enumerate(ilce_list):
+        ilce_name = (ilce_item.get("name") or "").strip()
+        unit_label = f" ({ilce_name} İlçe Müdürlüğü)" if ilce_name else " (... İlçe Müdürlüğü)"
+        subtitle = f"b-) İlçe Müdürlüğü Personeli Açısından Bakıldığında{unit_label};" if len(ilce_list) > 1 or idx == 0 else f"{unit_label};"
+        render_breakdown_table(subtitle, pers_ilce_rows, ilce_item.get("rows", {}), ilce_item.get("customRows", []))
+
+    # c-) Yurt Müdürlükleri Personeli Açısından Bakıldığında;
+    pers_yurt_rows = [
+        ("yurtMudur", "Yurt Müdürü"),
+        ("yurtMudurYrd", "Yurt Müdür Yrd."),
+        ("yurtYonetimMemuru", "Yurt Yönetim Memuru"),
+        ("yurtYonetimPersoneli", "Yurt Yönetim Personeli"),
+        ("temizlik", "Temizlik Personeli"),
+        ("guvenlik", "Güvenlik Personeli"),
+        ("teknik", "Teknik Personel")
+    ]
+    yurt_list = personel_data.get("yurtPersonelList") or [{"name": "", "kapasite": "", "rows": {}}]
+    for idx, yurt_item in enumerate(yurt_list):
+        yurt_name = (yurt_item.get("name") or "").strip()
+        cap = (yurt_item.get("kapasite") or "").strip()
+        info_parts = []
+        if yurt_name:
+            info_parts.append(f"{yurt_name} Yurt Müdürlüğü")
+        else:
+            info_parts.append("... Yurt Müdürlüğü")
+        if cap:
+            info_parts.append(f"Kapasite: {cap}")
+        unit_label = f" ({' - '.join(info_parts)})"
+        subtitle = f"c-) Yurt Müdürlükleri Personeli Açısından Bakıldığında{unit_label};" if len(yurt_list) > 1 or idx == 0 else f"{unit_label};"
+        render_breakdown_table(subtitle, pers_yurt_rows, yurt_item.get("rows", {}), yurt_item.get("customRows", []))
+
+    # d-) Gençlik Merkezi Müdürlüğü Personeli Açısından Bakıldığında;
+    pers_gm_rows = [
+        ("gmMudur", "Gençlik Merkezi Müdürü"),
+        ("lider", "Lider"),
+        ("nokta", "Nokta"),
+        ("temizlik", "Temizlik Personeli"),
+        ("guvenlik", "Güvenlik Personeli"),
+        ("teknik", "Teknik Personel")
+    ]
+    gm_list = personel_data.get("genclikMerkeziList") or [{"name": "", "rows": {}}]
+    for idx, gm_item in enumerate(gm_list):
+        gm_name = (gm_item.get("name") or "").strip()
+        unit_label = f" ({gm_name} Gençlik Merkezi Müdürlüğü)" if gm_name else " (... Gençlik Merkezi Müdürlüğü)"
+        subtitle = f"d-) Gençlik Merkezi Müdürlüğü Personeli Açısından Bakıldığında{unit_label};" if len(gm_list) > 1 or idx == 0 else f"{unit_label};"
+        render_breakdown_table(subtitle, pers_gm_rows, gm_item.get("rows", {}), gm_item.get("customRows", []))
+
+    # 7- GİDERLER
+    add_section_header("7- GİDERLER:")
+    base_gider = [
+        ("sporFaaliyet", "Spor Faaliyet Giderleri"), ("yatirim", "Yatırım Giderleri"),
+        ("bakimOnarim", "Bakım Onarım"), ("personel", "Personel Giderleri"),
+        ("genclikHizmet", "Gençlik Hizmetleri Giderleri"), ("yurtHizmet", "Yurt Hizmetleri Giderleri"),
+        ("hizmetYonetim", "Hizmet Yönetim Giderleri"), ("sosyalTransfer", "Sosyal Transferler"),
+        ("hizmetAlimi", "Hizmet Alımı")
+    ]
+    for c_row in tables_data.get("customGiderRows", []):
+        base_gider.append((c_row, c_row))
+    base_gider.append(("toplam", "TOPLAM"))
+    gider_rows = base_gider
+    gider_data = tables_data.get("giderler", {})
+
+    def render_gider_table(sub_title, g_years, g_dict_key):
+        if sub_title:
+            p_sub = doc.add_paragraph()
+            p_sub.paragraph_format.space_before = Pt(6)
+            p_sub.paragraph_format.space_after = Pt(2)
+            r_sub = p_sub.add_run(sub_title)
+            r_sub.bold = True
+            r_sub.font.size = Pt(9.5)
+
+        tbl = doc.add_table(rows=len(gider_rows) + 1, cols=len(g_years) + 1)
+        g_widths = [Cm(5.5)] + [Cm((16.0 - 5.5) / max(1, len(g_years)))] * len(g_years)
+        apply_table_style(tbl, g_widths)
+        set_cell_run_text(tbl.cell(0, 0), "GİDER KALEMİ", bold=True, font_size=8.5)
+        for i, yr in enumerate(g_years):
+            set_cell_run_text(tbl.cell(0, i + 1), yr, bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+        cur_dict = gider_data.get(g_dict_key, {})
+        for r_idx, (gk, glbl) in enumerate(gider_rows):
+            is_tot = (gk == "toplam")
+            set_cell_run_text(tbl.cell(r_idx + 1, 0), glbl, bold=is_tot, font_size=8)
+            row_vals = cur_dict.get(gk, {})
+            for c_idx, yr in enumerate(g_years):
+                set_cell_run_text(tbl.cell(r_idx + 1, c_idx + 1), str(row_vals.get(yr, "")), bold=is_tot, font_size=8, align=WD_ALIGN_PARAGRAPH.RIGHT)
+
+    if is_split:
+        render_gider_table("A) Birleşme Öncesi Dönem:", pre_years, "birlesmeOncesi")
+        render_gider_table("B) Birleşme Sonrası Dönem:", post_years, "birlesmeSonrasi")
+    else:
+        # Tek dönem (Örn: 2020-2025) - Birleşme ibaresi yok, tek tablo
+        render_gider_table(None, years, "birlesmeSonrasi")
+
+    # 8- GELİRLER
+    add_section_header("8- GELİRLER:")
+    base_gelir = [
+        ("gsgm", "GSGM Yardımı"), ("ozelIdare", "İl Özel İdaresinden Alınan Nakit Yardımlar"),
+        ("ozelGelir", "Özel Gelirler")
+    ]
+    for c_row in tables_data.get("customGelirRows", []):
+        base_gelir.append((c_row, c_row))
+    base_gelir.append(("toplam", "Toplam"))
+    gelir_rows = base_gelir
+    t8 = doc.add_table(rows=len(gelir_rows) + 1, cols=len(years) + 1)
+    t8_widths = [Cm(5.5)] + [Cm((16.0 - 5.5) / max(1, len(years)))] * len(years)
+    apply_table_style(t8, t8_widths)
+    set_cell_run_text(t8.cell(0, 0), "GELİR KALEMİ", bold=True, font_size=8.5)
+    for i, yr in enumerate(years):
+        set_cell_run_text(t8.cell(0, i + 1), yr, bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+    gelir_data = tables_data.get("gelirler", {})
+    for r_idx, (gk, glbl) in enumerate(gelir_rows):
+        is_tot = (gk == "toplam")
+        set_cell_run_text(t8.cell(r_idx + 1, 0), glbl, bold=is_tot, font_size=8)
+        row_vals = gelir_data.get(gk, {})
+        for c_idx, yr in enumerate(years):
+            set_cell_run_text(t8.cell(r_idx + 1, c_idx + 1), str(row_vals.get(yr, "")), bold=is_tot, font_size=8, align=WD_ALIGN_PARAGRAPH.RIGHT)
+
+    # 9- TESİSLER
+    add_section_header("9- TESİSLER (SPOR TESİSLERİ - YURT - MÜLKİYET DURUMU):")
+    tesis_data = tables_data.get("tesisler", {})
+    default_facilities = [
+        "YURT", "DOĞAL ÇİM YÜZEYLİ STAD", "STADYUM", "TOPRAK YÜZEYLİ STAD", "SEMT SAHASI",
+        "SENTETİK ÇİM YÜZEYLİ SAHA", "SPOR SALONU", "YÜZME HAVUZU", "KAMP EĞİTİM MERKEZİ",
+        "ATLETİZM PİSTİ", "GENÇLİK MERKEZİ", "BUZ PİSTİ", "ATIŞ POLİGONU", "BİNİCİLİK TESİSLERİ",
+        "TENİS TESİSLERİ", "GOLF SAHASI", "LOKAL BİNALARI", "BOWLİNG SALONU", "BİLARDO SALONU",
+        "HOBİ KARTİNG", "DİĞER"
+    ]
+    tesis_turleri = tables_data.get("customFacilities") or default_facilities
+    mulkiyet_list = {item.get("type"): item for item in tesis_data.get("mulkiyetList", []) if isinstance(item, dict)}
+
+    t9_a = doc.add_table(rows=len(tesis_turleri) + 2, cols=3)
+    apply_table_style(t9_a, [Cm(8.0), Cm(4.0), Cm(4.0)])
+    set_cell_run_text(t9_a.cell(0, 0), "TESİS TÜRÜ", bold=True, font_size=8.5)
+    set_cell_run_text(t9_a.cell(0, 1), "ADET", bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+    set_cell_run_text(t9_a.cell(0, 2), "KAPASİTE", bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+    tot_adet, tot_kap = 0, 0
+    for r_idx, tt in enumerate(tesis_turleri):
+        item = mulkiyet_list.get(tt, {})
+        ad_v = str(item.get("adet", ""))
+        kp_v = str(item.get("kapasite", ""))
+        if ad_v.isdigit(): tot_adet += int(ad_v)
+        if kp_v.isdigit(): tot_kap += int(kp_v)
+        set_cell_run_text(t9_a.cell(r_idx + 1, 0), tt, font_size=8)
+        set_cell_run_text(t9_a.cell(r_idx + 1, 1), ad_v, font_size=8, align=WD_ALIGN_PARAGRAPH.CENTER)
+        set_cell_run_text(t9_a.cell(r_idx + 1, 2), kp_v, font_size=8, align=WD_ALIGN_PARAGRAPH.CENTER)
+    
+    last_r_t9 = len(tesis_turleri) + 1
+    set_cell_run_text(t9_a.cell(last_r_t9, 0), "TOPLAM", bold=True, font_size=8.5)
+    set_cell_run_text(t9_a.cell(last_r_t9, 1), str(tot_adet) if tot_adet else "", bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+    set_cell_run_text(t9_a.cell(last_r_t9, 2), str(tot_kap) if tot_kap else "", bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+    # 9-b Yıllara Göre Tesis Dağılımı
+    p_9b = doc.add_paragraph()
+    p_9b.paragraph_format.space_before = Pt(8)
+    p_9b.paragraph_format.space_after = Pt(2)
+    p_9b.add_run("Tesislerin Yıllara Göre Dağılımı:").bold = True
+    
+    tesis_yil_rows = [
+        ("sporSalonu", "Spor salonu"), ("yurt", "Yurt"), ("yuzmeHavuzu", "Yüzme havuzu"),
+        ("bagimsizAtletizm", "Bağımsız Atletizm sahası"), ("stadyum", "Stadyum"),
+        ("futbolSahasi", "Futbol sahası"), ("kayak", "Kayak tesisi"), ("poligon", "Poligon"),
+        ("kampEgitim", "Kamp Eğitim Merkezi"), ("sporcuEgitim", "Sporcu Eğitim Merkezi (1)"),
+        ("digerKurum", "Diğer kurumların tesisleri (2)"), ("diger", "Diğer tesisler (3)")
+    ]
+    t9_b = doc.add_table(rows=len(tesis_yil_rows) + 1, cols=len(years) + 1)
+    t9b_widths = [Cm(5.5)] + [Cm((16.0 - 5.5) / max(1, len(years)))] * len(years)
+    apply_table_style(t9_b, t9b_widths)
+    set_cell_run_text(t9_b.cell(0, 0), "TESİS", bold=True, font_size=8.5)
+    for i, yr in enumerate(years):
+        set_cell_run_text(t9_b.cell(0, i + 1), yr, bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+    yillara_gore = tesis_data.get("yillaraGore", {})
+    for r_idx, (tk, tlbl) in enumerate(tesis_yil_rows):
+        set_cell_run_text(t9_b.cell(r_idx + 1, 0), tlbl, font_size=8)
+        row_vals = yillara_gore.get(tk, {})
+        for c_idx, yr in enumerate(years):
+            set_cell_run_text(t9_b.cell(r_idx + 1, c_idx + 1), str(row_vals.get(yr, "")), font_size=8, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_note("(1) Branş açıklanacak. (2) Kurum adı ve tesisin nevi belirtilecek. (3) Hangi spor tesisi olduğu belirtilecek.")
+
+    # 10- İL ÖZEL İDARESİ & NAKİT DURUMU
+    add_section_header("10- İL ÖZEL İDARESİ KAYNAKLARINDAN YARARLANMA VE NAKİT DURUMU:")
+    nakit_data = tables_data.get("nakitDurumu", {})
+    t10_nakit = doc.add_table(rows=2, cols=2)
+    apply_table_style(t10_nakit, [Cm(10.0), Cm(6.0)])
+    nakit_tarih = nakit_data.get("nakitTarihi") or "..../..../........"
+    set_cell_run_text(t10_nakit.cell(0, 0), f"Nakit Durumu ({nakit_tarih} tarihi itibariyle)", bold=True, font_size=8.5)
+    set_cell_run_text(t10_nakit.cell(0, 1), "TUTAR / AÇIKLAMA", bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+    set_cell_run_text(t10_nakit.cell(1, 0), "Banka / Kasa Mevcutları Toplamı", font_size=8.5)
+    set_cell_run_text(t10_nakit.cell(1, 1), str(nakit_data.get("nakitTutari", "")), font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+    p_10b = doc.add_paragraph()
+    p_10b.paragraph_format.space_before = Pt(6)
+    p_10b.paragraph_format.space_after = Pt(2)
+    p_10b.add_run("İl Özel İdaresinden Yapılan Yatırımlar:").bold = True
+    
+    custom_ozel = tables_data.get("customOzelIdareRows", [])
+    ozel_rows = [("ozelIdareYatirim", "İl Özel İdaresinden yapılan yatırımlar (1)")]
+    for c_row in custom_ozel:
+        ozel_rows.append((c_row, c_row))
+    t10_ozel = doc.add_table(rows=len(ozel_rows) + 1, cols=len(years) + 1)
+    t10_widths = [Cm(5.5)] + [Cm((16.0 - 5.5) / max(1, len(years)))] * len(years)
+    apply_table_style(t10_ozel, t10_widths)
+    set_cell_run_text(t10_ozel.cell(0, 0), "KAYNAK TÜRÜ", bold=True, font_size=8.5)
+    for i, yr in enumerate(years):
+        set_cell_run_text(t10_ozel.cell(0, i + 1), yr, bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+    for r_idx, (ok, olbl) in enumerate(ozel_rows):
+        set_cell_run_text(t10_ozel.cell(r_idx + 1, 0), olbl, font_size=8)
+        row_vals = nakit_data.get(ok, {})
+        for c_idx, yr in enumerate(years):
+            set_cell_run_text(t10_ozel.cell(r_idx + 1, c_idx + 1), str(row_vals.get(yr, "")), font_size=8, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_note("(1) İ.Ö.İ. den yapılan yatırımlar açıklanacaktır.")
+
+    # 11- SPONSORLUK
+    add_section_header("11- SPONSORLUK:")
+    sponsor_data = tables_data.get("sponsorluk", {})
+    t11 = doc.add_table(rows=2, cols=len(years) + 1)
+    t11_widths = [Cm(5.5)] + [Cm((16.0 - 5.5) / max(1, len(years)))] * len(years)
+    apply_table_style(t11, t11_widths)
+    set_cell_run_text(t11.cell(0, 0), "SPONSORLUK GELİRİ", bold=True, font_size=8.5)
+    for i, yr in enumerate(years):
+        set_cell_run_text(t11.cell(0, i + 1), yr, bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+    set_cell_run_text(t11.cell(1, 0), "Sponsorlardan Elde Edilen Kaynaklar (1)", font_size=8)
+    spons_yats = sponsor_data.get("yillikKaynak", {})
+    for c_idx, yr in enumerate(years):
+        set_cell_run_text(t11.cell(1, c_idx + 1), str(spons_yats.get(yr, "")), font_size=8, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_note("(1) Kimden ve ne sağlandığı belirtilecektir.")
+
+    # 12-15 AÇIKLAMA VE FİZİKSEL DOSYA BELGELERİ
+    add_section_header("AŞAĞIDA BELİRTİLEN KONULARDA GEREKLİ AÇIKLAMALARI YAPINIZ VE BELGELERİ EKLEYİNİZ:")
+    aciklamalar = tables_data.get("aciklamalar", {})
+    maddeler = [
+        ("m12", "12- İl Antrenör Koordinasyon ve Değerlendirme Kurulu oluşturulup oluşturulmadığı, oluşturuldu ise Kurulun raporları. (Dosyada Fiziksel)", aciklamalar.get("m12_kurulRaporu", "")),
+        ("m13", "13- Varsa fahri olarak görevlendirilen antrenörlerin belgeleri. (Antrenörlük belgesi, mezuniyet belgesi vb.) (Dosyada Fiziksel)", aciklamalar.get("m13_fahriBelgeleri", "")),
+        ("m14", "14- İl Spor Merkezi Kayıtları ile branş itibariyle ücret tespitine ilişkin onay.", aciklamalar.get("m14_ucretOnayi", "")),
+        ("m15", "15- Belirtilen denetim yıllarında kız-erkek branşlarında Spor Merkezi çalışmalarına katılanların listesi.", aciklamalar.get("m15_sporMerkeziListesi", ""))
+    ]
+    for mid, mtitle, mtext in maddeler:
+        p_m = doc.add_paragraph()
+        p_m.paragraph_format.space_before = Pt(6)
+        p_m.paragraph_format.space_after = Pt(2)
+        r_m = p_m.add_run(mtitle)
+        r_m.bold = True
+        r_m.font.size = Pt(9.5)
+        
+        p_desc = doc.add_paragraph()
+        p_desc.paragraph_format.left_indent = Inches(0.2)
+        p_desc.paragraph_format.space_after = Pt(6)
+        r_desc = p_desc.add_run(f"Cevap / Açıklama: {mtext if mtext else '....................................................................................................'}")
+        r_desc.font.size = Pt(9)
+
+    # 16- SPOR DALI TEMSİLCİLERİ TABLOSU
+    add_section_header(f"16- SPOR DALI TEMSİLCİLERİ VE FAALİYET PROGRAMLARI DURUMU ({years[-1]} / MEVCUT YIL):")
+    p_not16 = doc.add_paragraph()
+    p_not16.paragraph_format.space_after = Pt(4)
+    r_not16 = p_not16.add_run("Spor Dalı Temsilcilerinin yönetmeliğe uygun atanıp atanmadığı, mevcutta il temsilcisi bulunup bulunmadığı ve yıllık faaliyet programlarının federasyonlarca tasdik durumu:")
+    r_not16.font.size = Pt(8.5)
+    r_not16.font.italic = True
+
+    t16 = doc.add_table(rows=len(ant_branches) + 1, cols=7)
+    t16_widths = [Cm(1.0), Cm(3.0), Cm(2.2), Cm(3.0), Cm(2.5), Cm(2.3), Cm(2.0)]
+    apply_table_style(t16, t16_widths)
+    headers16 = [
+        ("NO", 0.4), 
+        ("SPOR BRANŞI", 1.4), 
+        ("TEMSİLCİ VAR MI?", 0.9), 
+        ("TEMSİLCİ ADI SOYADI", 1.4), 
+        ("ATAMA ONAY TARİH / SAYISI", 1.3), 
+        ("FAALİYET PROG. TASDİK", 1.1), 
+        ("AÇIKLAMA", 1.2)
+    ]
+    for i, (h, w) in enumerate(headers16):
+        c = t16.cell(0, i)
+        set_cell_run_text(c, h, bold=True, font_size=8, align=WD_ALIGN_PARAGRAPH.CENTER)
+        c.width = Inches(w)
+
+    spor_temsilci_data = tables_data.get("sporDaliTemsilcileri", {})
+    for r_idx, br in enumerate(ant_branches):
+        b_info = spor_temsilci_data.get(br, {})
+        c0 = t16.cell(r_idx + 1, 0)
+        c1 = t16.cell(r_idx + 1, 1)
+        c2 = t16.cell(r_idx + 1, 2)
+        c3 = t16.cell(r_idx + 1, 3)
+        c4 = t16.cell(r_idx + 1, 4)
+        c5 = t16.cell(r_idx + 1, 5)
+        c6 = t16.cell(r_idx + 1, 6)
+
+        set_cell_run_text(c0, str(r_idx + 1), font_size=7.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+        set_cell_run_text(c1, br, font_size=7.5, bold=True)
+        
+        var_mi = str(b_info.get("varMi", ""))
+        if var_mi in ["var", "Var", "evet", "Evet"]:
+            var_mi_str = "VAR"
+        elif var_mi in ["yok", "Yok", "hayir", "Hayır"]:
+            var_mi_str = "YOK"
+        else:
+            var_mi_str = var_mi
+        set_cell_run_text(c2, var_mi_str, font_size=7.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+        set_cell_run_text(c3, str(b_info.get("adSoyad", "")), font_size=7.5)
+        set_cell_run_text(c4, str(b_info.get("atamaOnay", "")), font_size=7.5)
+
+        tasdik = str(b_info.get("faaliyetTasdik", ""))
+        if tasdik in ["tasdikli", "Tasdikli", "evet", "Evet"]:
+            tasdik_str = "TASDİKLİ"
+        elif tasdik in ["tasdiksiz", "Tasdiksiz", "hayir", "Hayır"]:
+            tasdik_str = "TASDİKSİZ"
+        else:
+            tasdik_str = tasdik
+        set_cell_run_text(c5, tasdik_str, font_size=7.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+        set_cell_run_text(c6, str(b_info.get("aciklama", "")), font_size=7.5)
+
+    # Müfettiş genel değerlendirmesi
+    genel_not_16 = aciklamalar.get("m16_sporDaliTemsilcileri", "")
+    if genel_not_16:
+        p_gn = doc.add_paragraph()
+        p_gn.paragraph_format.space_before = Pt(6)
+        r_gn_lbl = p_gn.add_run("Müfettiş Genel Notu / Değerlendirmesi: ")
+        r_gn_lbl.bold = True
+        r_gn_lbl.font.size = Pt(8.5)
+        r_gn_txt = p_gn.add_run(genel_not_16)
+        r_gn_txt.font.size = Pt(8.5)
+
+    # Varsa Ek Dinamik Maddeler (17, 18 vb.)
+    custom_maddeler = tables_data.get("customMaddeler", [])
+    for cm in custom_maddeler:
+        if not isinstance(cm, dict):
+            continue
+        c_num = cm.get("num", "")
+        c_title = cm.get("title", "Ek Konu / Talep")
+        c_desc = cm.get("desc", "")
+        c_answer = cm.get("answer", "")
+        
+        p_cm = doc.add_paragraph()
+        p_cm.paragraph_format.space_before = Pt(8)
+        p_cm.paragraph_format.space_after = Pt(2)
+        r_cm = p_cm.add_run(f"{c_num}- {c_title}" if c_num else c_title)
+        r_cm.bold = True
+        r_cm.font.size = Pt(9.5)
+
+        if c_desc:
+            p_cmd = doc.add_paragraph()
+            p_cmd.paragraph_format.space_after = Pt(2)
+            r_cmd = p_cmd.add_run(c_desc)
+            r_cmd.font.size = Pt(8.5)
+            r_cmd.font.italic = True
+
+        p_cma = doc.add_paragraph()
+        p_cma.paragraph_format.left_indent = Inches(0.2)
+        p_cma.paragraph_format.space_after = Pt(6)
+        r_cma = p_cma.add_run(f"Cevap / Açıklama: {c_answer if c_answer else '....................................................................................................'}")
+        r_cma.font.size = Pt(9)
+
+    doc.save(output_path)
+

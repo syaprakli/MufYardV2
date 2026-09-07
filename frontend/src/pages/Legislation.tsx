@@ -1,10 +1,10 @@
-import { Search, Plus, Loader2, Tag, Pin, FileText, Trash2, Shield, ChevronRight, ChevronDown, Upload, Folder, Filter, Archive, ExternalLink, X, Check } from "lucide-react";
+import { Search, Plus, Loader2, Tag, Pin, FileText, Trash2, Shield, ChevronRight, ChevronDown, Upload, Folder, FolderOpen, Filter, Archive, ExternalLink, X, Check, Edit } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
 import { useState, useEffect, useMemo } from "react";
-import { fetchLegislations, createLegislation, deleteLegislation, uploadLegislationFile, openLegislationFolder, promoteToPublic, approveLegislation, rejectLegislation, fetchExternalLegislation, type Legislation } from "../lib/api/legislation";
+import { fetchLegislations, createLegislation, updateLegislation, deleteLegislation, uploadLegislationFile, openLegislationFolder, openLegislationFileLocation, syncLegislationFolder, promoteToPublic, approveLegislation, rejectLegislation, fetchExternalLegislation, type Legislation } from "../lib/api/legislation";
 import { RefreshCcw, UserCheck, Zap } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/hooks/useAuth";
@@ -26,6 +26,7 @@ export default function Legislation() {
     const [legislations, setLegislations] = useState<Legislation[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingLeg, setEditingLeg] = useState<Legislation | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [visibilityTab, setVisibilityTab] = useState<"all" | "personal">("all");
 
@@ -99,42 +100,94 @@ export default function Legislation() {
         }
     };
 
-    const handleCreateLeg = async (e: React.FormEvent) => {
+    const handleOpenCreate = () => {
+        setEditingLeg(null);
+        resetForm();
+        setIsModalOpen(true);
+    };
+
+    const handleOpenEdit = (leg: Legislation) => {
+        setEditingLeg(leg);
+        setNewLeg({
+            title: leg.title || "",
+            category: leg.category || "Genel",
+            doc_type: leg.doc_type || "Kanun",
+            summary: leg.summary || "",
+            content: leg.content || "",
+            tagsString: (leg.tags || []).join(", "),
+            official_gazette_info: leg.official_gazette_info || "",
+            document_url: leg.document_url || "",
+            local_path: leg.local_path || "",
+            is_pinned: leg.is_pinned || false,
+            is_public: leg.is_public ?? true
+        });
+        setUploadingFile(null);
+        setNewCategory("");
+        setIsCreatingCategory(false);
+        setNewDocType("");
+        setIsCreatingDocType(false);
+        setIsModalOpen(true);
+    };
+
+    const handleSaveLeg = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             setIsUploading(true);
             let finalLocalPath = newLeg.local_path;
-            const categoryToUse = isCreatingCategory ? newCategory : newLeg.category;
-            const docTypeToUse = isCreatingDocType ? newDocType : newLeg.doc_type;
+            let finalDocUrl = newLeg.document_url;
+            const categoryToUse = isCreatingCategory && newCategory.trim() ? newCategory.trim() : newLeg.category;
+            const docTypeToUse = isCreatingDocType && newDocType.trim() ? newDocType.trim() : newLeg.doc_type;
 
             if (uploadingFile) {
                 const uploaded = await uploadLegislationFile(uploadingFile, categoryToUse, docTypeToUse, user?.uid || undefined, newLeg.is_public);
-                finalLocalPath = uploaded.file_url;
+                finalLocalPath = uploaded.local_path || uploaded.file_url;
+                if (uploaded.file_url) {
+                    finalDocUrl = uploaded.file_url;
+                }
             }
 
-
             const tags = newLeg.tagsString.split(',').map(t => t.trim()).filter(t => t !== "");
-            await createLegislation({
-                title: newLeg.title,
-                category: categoryToUse,
-                doc_type: docTypeToUse,
-                summary: newLeg.summary,
-                content: newLeg.content,
-                tags: tags,
-                official_gazette_info: newLeg.official_gazette_info,
-                document_url: newLeg.document_url,
-                local_path: finalLocalPath,
-                is_pinned: newLeg.is_pinned,
-                owner_id: user?.uid || undefined,
-                is_public: newLeg.is_public
-            }, isAdminOrMod);
+
+            if (editingLeg) {
+                await updateLegislation(editingLeg.id, {
+                    title: newLeg.title,
+                    category: categoryToUse,
+                    doc_type: docTypeToUse,
+                    summary: newLeg.summary,
+                    content: newLeg.content,
+                    tags: tags,
+                    official_gazette_info: newLeg.official_gazette_info,
+                    document_url: finalDocUrl,
+                    local_path: finalLocalPath,
+                    is_pinned: newLeg.is_pinned,
+                    is_public: newLeg.is_public,
+                    last_updated_by_name: user?.displayName || user?.email || "Müfettiş"
+                });
+                toast.success("Mevzuat ve dosya başarıyla güncellendi.");
+            } else {
+                await createLegislation({
+                    title: newLeg.title,
+                    category: categoryToUse,
+                    doc_type: docTypeToUse,
+                    summary: newLeg.summary,
+                    content: newLeg.content,
+                    tags: tags,
+                    official_gazette_info: newLeg.official_gazette_info,
+                    document_url: finalDocUrl,
+                    local_path: finalLocalPath,
+                    is_pinned: newLeg.is_pinned,
+                    owner_id: user?.uid || undefined,
+                    is_public: newLeg.is_public
+                }, isAdminOrMod);
+                toast.success("Mevzuat başarıyla eklendi.");
+            }
 
             setIsModalOpen(false);
+            setEditingLeg(null);
             resetForm();
-            toast.success("Mevzuat başarıyla eklendi.");
             loadLegislations();
         } catch (error: any) {
-            toast.error(error.message || "Mevzuat eklenemedi.");
+            toast.error(error.message || (editingLeg ? "Mevzuat güncellenemedi." : "Mevzuat eklenemedi."));
         } finally {
             setIsUploading(false);
         }
@@ -144,7 +197,7 @@ export default function Legislation() {
         setNewLeg({ 
             title: "", 
             category: "Genel", 
-            doc_type: "Kanun",
+            doc_type: "Kanun", 
             summary: "", 
             content: "", 
             tagsString: "", 
@@ -162,15 +215,47 @@ export default function Legislation() {
         setIsCreatingDocType(false);
     };
 
-    const handleOpenFolder = async (cat?: string) => {
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    const handleOpenFolder = async (cat?: string, docType?: string) => {
         try {
-            // Priority: provided cat > selectedSubType (if in selectedCategory) > selectedCategory
             const categoryToOpen = cat || (selectedCategory !== "Tümü" ? selectedCategory : undefined);
-            const docTypeToOpen = selectedSubType || undefined;
-            
+            const docTypeToOpen = docType || (selectedSubType || undefined);
             await openLegislationFolder(categoryToOpen, docTypeToOpen);
+            toast.success("Mevzuat klasörü Windows Gezgininde açıldı.");
         } catch (error: any) {
             toast.error("Klasör açılamadı: " + error.message);
+        }
+    };
+
+    const handleOpenFileLocation = async (leg: Legislation) => {
+        try {
+            const targetPath = leg.local_path || leg.document_url;
+            const res = await openLegislationFileLocation(targetPath, leg.category, leg.doc_type);
+            if (res.type === 'file') {
+                toast.success("Dosya klasöründe seçildi ve açıldı.");
+            } else {
+                toast.success(res.message || "İlgili mevzuat klasörü açıldı.");
+            }
+        } catch (error: any) {
+            toast.error("Dosya konumu açılamadı: " + error.message);
+        }
+    };
+
+    const handleSync = async () => {
+        try {
+            setIsSyncing(true);
+            const res = await syncLegislationFolder();
+            if (res.imported_count > 0) {
+                toast.success(`${res.imported_count} yeni mevzuat dosyası kütüphaneye aktarıldı!`);
+            } else {
+                toast.success("Mevzuat klasörü taranmıştır, yeni dosya bulunamadı.");
+            }
+            loadLegislations();
+        } catch (error: any) {
+            toast.error("Klasör senkronizasyon hatası: " + error.message);
+        } finally {
+            setIsSyncing(false);
         }
     };
 
@@ -212,19 +297,6 @@ export default function Legislation() {
         } catch (error) {
             toast.error("İşlem başarısız oldu.");
         }
-    };
-
-    const handleSync = () => {
-        toast.promise(
-            new Promise(resolve => setTimeout(resolve, 1500)),
-            {
-                loading: 'Yerel klasör senkronize ediliyor...',
-                success: 'Mevzuat başarıyla eşitlendi. (C:/MufYard/Mevzuat)',
-                error: 'Senkronizasyon hatası.',
-            }
-        ).then(() => {
-            handleOpenFolder();
-        });
     };
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -354,22 +426,28 @@ export default function Legislation() {
                         </button>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        {isElectron && (
-                            <Button 
-                                onClick={handleSync} 
-                                variant="outline" 
-                                className="flex-1 md:flex-none h-11 md:h-9 px-3 rounded-lg border-emerald-200 text-emerald-700 text-[9px] md:text-[10px] font-black uppercase tracking-widest bg-emerald-50/20"
-                            >
-                                <RefreshCcw size={14} className="mr-1.5" /> Senk
-                            </Button>
-                        )}
+                    <div className="flex flex-wrap items-center gap-2">
                         <Button 
-                            onClick={() => {
-                                // Artık herkese açık seçimini yapabiliyorlar
-                                setIsModalOpen(true);
-                            }} 
-                            className="flex-[2] md:flex-none h-11 md:h-9 px-6 rounded-lg shadow-lg shadow-primary/20 bg-primary text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest"
+                            onClick={() => handleOpenFolder()} 
+                            variant="outline" 
+                            className="h-11 md:h-9 px-3 rounded-lg border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-[9px] md:text-[10px] font-bold uppercase tracking-wider hover:bg-slate-100 dark:hover:bg-slate-800"
+                            title="Bilgisayarınızdaki Mevzuat klasörünü açar. Dosyalarınızı doğrudan bu klasöre kopyalayabilirsiniz."
+                        >
+                            <Folder size={14} className="mr-1.5 text-amber-500" /> Klasörü Aç
+                        </Button>
+                        <Button 
+                            onClick={handleSync} 
+                            variant="outline" 
+                            disabled={isSyncing}
+                            className="h-11 md:h-9 px-3 rounded-lg border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-400 text-[9px] md:text-[10px] font-bold uppercase tracking-wider bg-emerald-50/40 dark:bg-emerald-950/30 hover:bg-emerald-100/60 shadow-sm"
+                            title="Mevzuat klasörüne attığınız yeni dosyaları tarar ve kütüphaneye otomatik olarak ekler."
+                        >
+                            {isSyncing ? <Loader2 size={13} className="animate-spin mr-1.5" /> : <RefreshCcw size={13} className="mr-1.5" />}
+                            Klasörü Tara
+                        </Button>
+                        <Button 
+                            onClick={handleOpenCreate} 
+                            className="h-11 md:h-9 px-5 rounded-lg shadow-lg shadow-primary/20 bg-primary text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest"
                         >
                             <Plus size={16} className="mr-1.5" /> EKLE
                         </Button>
@@ -399,6 +477,36 @@ export default function Legislation() {
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-3 md:p-2 space-y-0.5 custom-scrollbar">
+                            {/* Yerel Mevzuat Klasörü Kartı */}
+                            <div className="p-3 mb-2 bg-blue-50/70 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50 text-xs">
+                                <div className="flex items-center gap-1.5 font-bold text-blue-900 dark:text-blue-200 mb-1">
+                                    <Folder size={14} className="text-blue-600 dark:text-blue-400" />
+                                    <span>Yerel Mevzuat Klasörü</span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight mb-2.5">
+                                    Webden tek tek yüklemek yerine dosyalarınızı bu klasöre atıp <strong>"Klasörü Tara"</strong> ile aktarabilirsiniz.
+                                </p>
+                                <div className="flex gap-1.5">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleOpenFolder()}
+                                        className="flex-1 h-7 text-[10px] font-bold border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100/50"
+                                    >
+                                        <ExternalLink size={11} className="mr-1" /> Klasörü Aç
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleSync}
+                                        disabled={isSyncing}
+                                        className="flex-1 h-7 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                                    >
+                                        {isSyncing ? <Loader2 size={11} className="animate-spin mr-1" /> : <RefreshCcw size={11} className="mr-1" />}
+                                        Tara
+                                    </Button>
+                                </div>
+                            </div>
+
                             {CATEGORIES.map(cat => (
                                 <div key={cat} className="flex flex-col">
                                     <div className={cn(
@@ -422,14 +530,14 @@ export default function Legislation() {
                                             <span className="truncate">{cat}</span>
                                         </div>
                                         
-                                        {cat !== "Tümü" && isElectron && (
+                                        {cat !== "Tümü" && (
                                             <button 
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleOpenFolder(cat);
                                                 }}
                                                 className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-primary/10 text-primary transition-all mr-1"
-                                                title="Klasörü Windows'ta Aç"
+                                                title="Bu Klasörü Windows Gezgininde Aç"
                                             >
                                                 <ExternalLink size={12} />
                                             </button>
@@ -515,9 +623,12 @@ export default function Legislation() {
                                             leg={leg}
                                             isOwner={leg.owner_id === user?.uid}
                                             canDelete={isAdminOrMod || leg.owner_id === user?.uid}
+                                            canEdit={isAdminOrMod || leg.owner_id === user?.uid}
                                             isAdmin={isAdminOrMod}
                                             onDelete={() => handleDelete(leg.id)}
+                                            onEdit={() => handleOpenEdit(leg)}
                                             onPromote={() => handlePromote(leg.id, leg.title)}
+                                            onOpenFileLocation={() => handleOpenFileLocation(leg)}
                                             onApprove={async () => {
                                                 try {
                                                     await approveLegislation(leg.id, user?.displayName || user?.email || "Admin");
@@ -557,23 +668,122 @@ export default function Legislation() {
 
             <Modal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title="Arşive Yeni Belge Ekle"
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setEditingLeg(null);
+                }}
+                title={editingLeg ? "Mevzuatı Düzenle & Dosya Güncelle" : "Arşive Yeni Belge Ekle"}
                 size="large"
             >
-                <div className="mb-6 p-4 bg-primary/5 rounded-2xl border border-primary/10 border-dashed relative overflow-hidden group">
-                    <div className="flex flex-col gap-4 relative z-10">
+                <div className="mb-6 space-y-3">
+                    {/* Hedef Klasör Bilgisi Kartı */}
+                    <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                                <FolderOpen size={16} />
+                            </div>
+                            <div className="min-w-0">
+                                <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                    Kaydedileceği Yerel Klasör (Bilgisayarınızda)
+                                </div>
+                                <div className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 truncate">
+                                    Belgelerim\MufYARD\Mevzuat\{isCreatingCategory && newCategory.trim() ? newCategory.trim() : newLeg.category}\{isCreatingDocType && newDocType.trim() ? newDocType.trim() : newLeg.doc_type}
+                                </div>
+                            </div>
+                        </div>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-3 text-[11px] font-bold text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/60 hover:bg-amber-50 dark:hover:bg-amber-950/30 shrink-0 self-end sm:self-center"
+                            onClick={() => handleOpenFolder(
+                                isCreatingCategory && newCategory.trim() ? newCategory.trim() : newLeg.category,
+                                isCreatingDocType && newDocType.trim() ? newDocType.trim() : newLeg.doc_type
+                            )}
+                            title="Bu hedef klasörü Windows Gezgininde aç"
+                        >
+                            <FolderOpen size={12} className="mr-1.5" />
+                            Klasörü Aç
+                        </Button>
+                    </div>
+
+                    <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 border-dashed relative overflow-hidden group">
+                        <div className="flex flex-col gap-4 relative z-10">
+                            {/* Mevcut dosya bilgisi (Düzenleme modu için) */}
+                            {editingLeg && newLeg.local_path && (
+                                <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <FileText size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                        <div className="min-w-0">
+                                            <span className="font-bold text-emerald-800 dark:text-emerald-300">Mevcut Dosya: </span>
+                                            <span className="text-slate-600 dark:text-slate-300 truncate inline-block max-w-[160px] sm:max-w-[240px] align-bottom">
+                                                {newLeg.local_path.split('/').pop()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 px-2 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                                            onClick={() => {
+                                                const url = newLeg.local_path.startsWith('http') ? newLeg.local_path : `${BASE_URL}${newLeg.local_path}`;
+                                                window.open(url, '_blank');
+                                            }}
+                                            title="Dosyayı tarayıcıda aç"
+                                        >
+                                            <ExternalLink size={12} className="mr-1" /> Web
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 px-2 text-xs border-amber-300 text-amber-700 dark:text-amber-400 hover:bg-amber-100"
+                                            onClick={() => handleOpenFileLocation({
+                                                local_path: newLeg.local_path,
+                                                category: isCreatingCategory && newCategory.trim() ? newCategory.trim() : newLeg.category,
+                                                doc_type: isCreatingDocType && newDocType.trim() ? newDocType.trim() : newLeg.doc_type,
+                                            } as any)}
+                                            title="Dosyayı Windows Gezgininde seç ve göster"
+                                        >
+                                            <FolderOpen size={12} className="mr-1" /> Klasörde
+                                        </Button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewLeg(prev => ({ ...prev, local_path: "" }))}
+                                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors ml-1"
+                                            title="Dosyayı Kaldır"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                        {/* Dosya eklenmemiş uyarısı */}
+                        {editingLeg && !newLeg.local_path && !uploadingFile && (
+                            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                                <FileText size={16} className="text-amber-600 shrink-0" />
+                                <span><strong>Dosya Eksik:</strong> Bu mevzuata henüz dosya eklenmemiş. Aşağıdaki butondan dosya seçip yükleyebilirsiniz.</span>
+                            </div>
+                        )}
+
                         <div className="flex items-center justify-between gap-4">
                             <div className="flex-1">
-                                <h4 className="text-sm font-bold text-primary mb-1 text-outfit">Hızlı Belge Aktarımı</h4>
-                                <p className="text-[11px] text-slate-500 font-medium">Yerel bir dosya yükleyin veya mevzuat.gov.tr bağlantısı kullanın.</p>
+                                <h4 className="text-sm font-bold text-primary mb-1 text-outfit">
+                                    {editingLeg ? (newLeg.local_path ? "Dosyayı Değiştir / Yenisini Seç" : "Mevzuata Dosya Ekle") : "Hızlı Belge Aktarımı"}
+                                </h4>
+                                <p className="text-[11px] text-slate-500 font-medium">
+                                    {editingLeg ? "Mevzuat belgesini (PDF, Word, resim veya metin) seçerek güncelleyebilirsiniz." : "Yerel bir dosya yükleyin veya mevzuat.gov.tr bağlantısı kullanın."}
+                                </p>
                             </div>
                             <label className={cn(
-                                "cursor-pointer px-4 py-2 rounded-xl bg-card border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-sm flex items-center gap-2",
+                                "cursor-pointer px-4 py-2 rounded-xl bg-card border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-sm flex items-center gap-2 shrink-0",
                                 isUploading && "opacity-50 pointer-events-none"
                             )}>
                                 <Upload size={14} />
-                                {uploadingFile ? 'Yüklenecek' : 'Dosya Seç'}
+                                {uploadingFile ? 'Seçildi' : (editingLeg && newLeg.local_path ? 'Dosyayı Değiştir' : 'Dosya Seç')}
                                 <input type="file" className="hidden" accept=".pdf,.docx,.txt,.jpg,.jpeg,.png" onChange={handleFileSelect} />
                             </label>
                         </div>
@@ -600,8 +810,17 @@ export default function Legislation() {
                         </div>
                     </div>
                     {uploadingFile && (
-                        <div className="mt-2 text-[10px] font-black text-primary flex items-center gap-1 animate-in fade-in duration-300">
-                            <FileText size={12} /> {uploadingFile.name}
+                        <div className="mt-3 p-2 rounded-xl bg-primary/10 text-xs font-bold text-primary flex items-center justify-between animate-in fade-in duration-300">
+                            <span className="flex items-center gap-1.5 truncate">
+                                <FileText size={14} className="shrink-0" /> Seçilen Yeni Dosya: {uploadingFile.name}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setUploadingFile(null)}
+                                className="text-rose-600 hover:text-rose-700 text-[11px] font-bold underline ml-2 shrink-0"
+                            >
+                                Vazgeç
+                            </button>
                         </div>
                     )}
                     
@@ -611,8 +830,9 @@ export default function Legislation() {
                     </div>
                     )}
                 </div>
+            </div>
 
-                <form onSubmit={handleCreateLeg} className="space-y-4">
+                <form onSubmit={handleSaveLeg} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mevzuat / Belge Adı</label>
@@ -777,10 +997,13 @@ export default function Legislation() {
                     </div>
 
                     <div className="pt-4 flex gap-3">
-                        <Button type="button" variant="outline" className="flex-1 h-12 rounded-xl text-slate-500 font-bold" onClick={() => setIsModalOpen(false)} disabled={isUploading}>Vazgeç</Button>
+                        <Button type="button" variant="outline" className="flex-1 h-12 rounded-xl text-slate-500 font-bold" onClick={() => {
+                            setIsModalOpen(false);
+                            setEditingLeg(null);
+                        }} disabled={isUploading}>Vazgeç</Button>
                         <Button type="submit" disabled={isUploading} className="flex-1 h-12 rounded-xl bg-primary text-white shadow-lg shadow-primary/20 font-bold">
                             {isUploading ? <Loader2 className="animate-spin mr-2" /> : null}
-                            Arşive İşle
+                            {editingLeg ? "Değişiklikleri Kaydet" : "Arşive İşle"}
                         </Button>
                     </div>
                 </form>
@@ -793,20 +1016,26 @@ function LegislationRow({
     leg, 
     isOwner, 
     canDelete, 
+    canEdit,
     isAdmin, 
     onDelete, 
+    onEdit,
     onPromote,
     onApprove,
-    onReject 
+    onReject,
+    onOpenFileLocation 
 }: { 
     leg: Legislation, 
     isOwner: boolean, 
     canDelete?: boolean, 
+    canEdit?: boolean,
     isAdmin?: boolean,
     onDelete: () => void, 
+    onEdit: () => void,
     onPromote: () => void,
     onApprove: () => void,
-    onReject: () => void
+    onReject: () => void,
+    onOpenFileLocation: () => void
 }) {
 
     return (
@@ -841,11 +1070,25 @@ function LegislationRow({
                     <h4 className="text-[13px] md:text-[13px] font-bold text-muted-foreground dark:text-slate-200 group-hover:text-primary transition-colors truncate tracking-tight font-outfit uppercase min-w-0">
                         {leg.title}
                     </h4>
-                    {leg.summary && (
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate italic mt-0.5 max-w-full md:max-w-[90%]">
-                            {leg.summary}
-                        </p>
-                    )}
+                    <div className="flex items-center gap-2 mt-0.5 min-w-0">
+                        {leg.summary && (
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate italic min-w-0">
+                                {leg.summary}
+                            </p>
+                        )}
+                        {leg.local_path && (
+                            <span 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenFileLocation();
+                                }}
+                                className="cursor-pointer inline-flex items-center gap-1 text-[9px] font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 px-1.5 py-0.5 rounded border border-amber-200/50 dark:border-amber-800/40 shrink-0 transition-colors" 
+                                title={`Klasörde Göster: ${leg.local_path}`}
+                            >
+                                <FolderOpen size={10} /> {leg.category}{leg.doc_type ? ` / ${leg.doc_type}` : ''}
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
             <div className="hidden md:block md:col-span-2">
@@ -872,20 +1115,56 @@ function LegislationRow({
             </div>
 
             <div className="md:col-span-2 flex items-center justify-end gap-1 px-0 md:px-1 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-slate-50">
-                {(leg.local_path || leg.document_url) && (
+                {(leg.local_path || leg.document_url) ? (
+                    <>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="w-10 h-10 md:w-7 md:h-7 rounded-lg text-primary dark:text-primary-light hover:bg-primary/10 border border-primary/5 dark:border-primary/20 shadow-sm bg-card"
+                            title="Web'de Görüntüle"
+                            onClick={() => {
+                                const url = leg.local_path
+                                    ? (leg.local_path.startsWith('http') ? leg.local_path : `${BASE_URL}${leg.local_path}`)
+                                    : leg.document_url;
+                                if (url) window.open(url, '_blank');
+                            }}
+                        >
+                            <ExternalLink size={14} className="md:w-3 md:h-3" />
+                        </Button>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="w-10 h-10 md:w-7 md:h-7 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-amber-200/50 dark:border-amber-800/40 shadow-sm bg-card"
+                            title="Klasörde Göster (Windows Gezgini)"
+                            onClick={onOpenFileLocation}
+                        >
+                            <FolderOpen size={14} className="md:w-3 md:h-3" />
+                        </Button>
+                    </>
+                ) : (
+                    canEdit && (
+                        <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="h-8 md:h-7 px-2 text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-800/60 rounded-lg flex items-center gap-1 shadow-sm"
+                            title="Bu mevzuata henüz dosya eklenmemiş. Dosya eklemek için tıklayın."
+                            onClick={onEdit}
+                        >
+                            <Upload size={12} />
+                            <span className="inline">Dosya Ekle</span>
+                        </Button>
+                    )
+                )}
+
+                {canEdit && (
                     <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="w-10 h-10 md:w-7 md:h-7 rounded-lg text-primary dark:text-primary-light hover:bg-primary/10 border border-primary/5 dark:border-primary/20 shadow-sm bg-card"
-                        title="Dosyayı Görüntele"
-                        onClick={() => {
-                            const url = leg.local_path
-                                ? (leg.local_path.startsWith('http') ? leg.local_path : `${BASE_URL}${leg.local_path}`)
-                                : leg.document_url;
-                            if (url) window.open(url, '_blank');
-                        }}
+                        className="w-10 h-10 md:w-7 md:h-7 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-blue-100 dark:border-blue-900/30 shadow-sm bg-card"
+                        title="Mevzuatı Düzenle / Dosya Güncelle"
+                        onClick={onEdit}
                     >
-                        <ExternalLink size={14} className="md:w-3 md:h-3" />
+                        <Edit size={14} className="md:w-3 md:h-3" />
                     </Button>
                 )}
                 

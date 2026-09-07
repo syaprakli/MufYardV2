@@ -59,7 +59,7 @@ class TaskFolderMetadata(BaseModel):
     baslama_tarihi: Optional[str] = None
 
 @router.post("/upload", response_model=UploadResponse)
-@limiter.limit("5/minute")
+@limiter.limit("60/minute")
 async def upload_file(
     request: Request,
     file: UploadFile = File(...),
@@ -114,30 +114,35 @@ async def upload_file(
         elif "pdf" in mime_type: media_type = "pdf"
 
         if not IS_DESKTOP:
-            from app.lib.firebase_admin import bucket
-            timestamp = int(datetime.utcnow().timestamp())
-            base, ext = os.path.splitext(file.filename)
-            blob_path = f"uploads/{base}_{timestamp}{ext}"
-            
-            def _upload():
-                blob = bucket.blob(blob_path)
-                blob.upload_from_string(
-                    file_bytes,
-                    content_type=mime_type,
-                )
-                try:
-                    blob.make_public()
-                except Exception:
-                    pass
-                return blob.public_url
-                
-            public_url = await asyncio.to_thread(_upload)
-            return {
-                "url": public_url,
-                "name": file.filename,
-                "type": media_type,
-                "path": blob_path
-            }
+            try:
+                from app.lib.firebase_admin import bucket
+                if bucket is not None:
+                    timestamp = int(datetime.utcnow().timestamp())
+                    base, ext = os.path.splitext(file.filename)
+                    blob_path = f"uploads/{base}_{timestamp}{ext}"
+                    
+                    def _upload():
+                        blob = bucket.blob(blob_path)
+                        blob.upload_from_string(
+                            file_bytes,
+                            content_type=mime_type,
+                        )
+                        try:
+                            blob.make_public()
+                        except Exception:
+                            pass
+                        return blob.public_url
+                        
+                    public_url = await asyncio.to_thread(_upload)
+                    if public_url:
+                        return {
+                            "url": public_url,
+                            "name": file.filename,
+                            "type": media_type,
+                            "path": blob_path
+                        }
+            except Exception as fb_err:
+                logger.warning(f"Firebase Storage upload failed, falling back to local file storage: {fb_err}")
 
         def save_file(f, p):
             with open(p, "wb") as buffer:
@@ -629,7 +634,8 @@ from app.lib.docx_generator import (
     generate_kapak_docx,
     generate_dizi_docx,
     generate_evrak_talebi_docx,
-    generate_degerlendirme_docx
+    generate_degerlendirme_docx,
+    generate_ozet_tablolar_docx
 )
 
 class KapakDocxRequest(BaseModel):
@@ -807,3 +813,44 @@ async def generate_docx_degerlendirme_endpoint(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class OzetTablolarDocxRequest(BaseModel):
+    ilAdi: Optional[str] = ""
+    denetimDonemi: Optional[str] = ""
+    years: Optional[list] = []
+    tables: Optional[dict] = {}
+    mufettisAdi: Optional[str] = ""
+    mufettisUnvani: Optional[str] = ""
+    scope: Optional[str] = "reports"
+    path: Optional[str] = ""
+
+
+@router.post("/generate-docx-ozet-tablolar")
+async def generate_docx_ozet_tablolar_endpoint(
+    req: OzetTablolarDocxRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        base_dir = BASE_OTHER_DIR if req.scope == "other" else BASE_REPORTS_DIR
+        output_dir = base_dir
+        if req.path:
+            safe_path = os.path.normpath(req.path).replace("..", "").lstrip(os.sep)
+            output_dir = os.path.join(base_dir, safe_path)
+            
+        await asyncio.to_thread(os.makedirs, output_dir, exist_ok=True)
+        filename = f"Ozet_Bilgiler_Tablolari_{int(datetime.now().timestamp())}.docx"
+        output_path = os.path.join(output_dir, filename)
+        
+        await asyncio.to_thread(generate_ozet_tablolar_docx, output_path, req.dict())
+        
+        if IS_DESKTOP and os.name == 'nt':
+            await asyncio.to_thread(os.startfile, output_path)
+            
+        rel_path = os.path.relpath(output_path, base_dir).replace("\\", "/")
+        return {"status": "success", "filename": filename, "path": rel_path}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+

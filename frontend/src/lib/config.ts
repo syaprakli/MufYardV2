@@ -1,5 +1,9 @@
 export const IS_PROD = import.meta.env.PROD;
-export const IS_ELECTRON = typeof window !== 'undefined' && /Electron/.test(navigator.userAgent);
+export const IS_ELECTRON = typeof window !== 'undefined' && (
+    /Electron/i.test(navigator.userAgent) || 
+    Boolean((window as any).electronAPI) || 
+    Boolean((window as any).electron)
+);
 const VITE_API_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_PUBLIC_API_URL) as string | undefined;
 const API_URL_OVERRIDE = VITE_API_URL?.trim();
 const HOSTNAME = typeof window !== 'undefined' ? window.location.hostname : '';

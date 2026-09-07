@@ -89,8 +89,14 @@ function App() {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [showIntro, setShowIntro] = useState(false);
-  const { data } = useGlobalData();
+  const { data, refreshAll } = useGlobalData();
   const profile = data?.profile;
+
+  useEffect(() => {
+    if (user?.uid) {
+      refreshAll(user.uid, user.email || undefined, user.displayName || undefined);
+    }
+  }, [user?.uid, user?.email, user?.displayName, refreshAll]);
 
   useEffect(() => {
     // Sadece giriş yapmış kullanıcılar için intro göster

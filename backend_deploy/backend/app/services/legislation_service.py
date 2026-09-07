@@ -48,17 +48,48 @@ class LegislationService:
         doc_type: str = "",
         user_id: Optional[str] = None,
         is_public: bool = True
-    ) -> str:
+    ) -> tuple[str, str]:
         """
-        PUBLIC  → Firebase Storage (accessible from every computer, no server needed)
-        PRIVATE → Local disk under Mevzuat/Kisisel/{uid}/
+        Saves the file to the local disk in MEVZUAT_DIR so it can be viewed in Windows Explorer.
+        If is_public is True, also uploads a copy to Firebase Storage if available.
+        Returns: (file_url, local_path)
         """
         filename = file.filename.replace(" ", "_")
         name, ext = os.path.splitext(filename)
 
-        # ── PUBLIC: Upload to Firebase Storage ─────────────────────────────────
+        # 1. Determine local directory
+        if not is_public and user_id:
+            target_dir = os.path.join(MEVZUAT_DIR, "Kisisel", user_id, category)
+        elif doc_type:
+            target_dir = os.path.join(MEVZUAT_DIR, category, doc_type)
+        else:
+            target_dir = os.path.join(MEVZUAT_DIR, category)
+
+        os.makedirs(target_dir, exist_ok=True)
+
+        file_path = os.path.join(target_dir, filename)
+        if os.path.exists(file_path):
+            filename = f"{name}_{int(datetime.utcnow().timestamp())}{ext}"
+            file_path = os.path.join(target_dir, filename)
+
+        # Always write to local disk
+        def _write():
+            file.file.seek(0)
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            file.file.seek(0)
+
+        await asyncio.to_thread(_write)
+
+        if not is_public and user_id:
+            local_rel_url = f"/Mevzuat/Kisisel/{user_id}/{category}/{filename}"
+        elif doc_type:
+            local_rel_url = f"/Mevzuat/{category}/{doc_type}/{filename}"
+        else:
+            local_rel_url = f"/Mevzuat/{category}/{filename}"
+
+        # 2. If public, also attempt to upload to Firebase Storage
         if is_public:
-            # Build a unique blob path inside the bucket
             timestamp = int(datetime.utcnow().timestamp())
             if doc_type:
                 blob_path = f"mevzuat/{category}/{doc_type}/{name}_{timestamp}{ext}"
@@ -76,44 +107,15 @@ class LegislationService:
                     blob.make_public()
                     return blob.public_url
                 except Exception as e:
-                    err = str(e).lower()
-                    if "does not exist" in err or "404" in err or "bucket" in err:
-                        raise Exception(
-                            "Firebase Storage bucket erişilemiyor. Storage aktif olsa bile bucket adı yanlış olabilir. "
-                            "Backend ortam değişkeninde FIREBASE_STORAGE_BUCKET değerini kontrol edin (örnek: proje-id.appspot.com)."
-                        )
-                    raise e
+                    # If Firebase Storage fails or is unavailable, use local URL
+                    return None
 
             public_url = await asyncio.to_thread(_upload)
-            return public_url  # e.g. https://storage.googleapis.com/mufyardv2.appspot.com/mevzuat/...
+            if public_url:
+                return public_url, local_rel_url
+            return local_rel_url, local_rel_url
 
-        # ── PRIVATE: Save to local disk ─────────────────────────────────────────
-        if not is_public and user_id:
-            target_dir = os.path.join(MEVZUAT_DIR, "Kisisel", user_id, category)
-        elif doc_type:
-            target_dir = os.path.join(MEVZUAT_DIR, category, doc_type)
-        else:
-            target_dir = os.path.join(MEVZUAT_DIR, category)
-
-        os.makedirs(target_dir, exist_ok=True)
-
-        file_path = os.path.join(target_dir, filename)
-        if os.path.exists(file_path):
-            filename = f"{name}_{int(datetime.utcnow().timestamp())}{ext}"
-            file_path = os.path.join(target_dir, filename)
-
-        def _write():
-            file.file.seek(0)
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-
-        await asyncio.to_thread(_write)
-
-        if not is_public and user_id:
-            return f"/Mevzuat/Kisisel/{user_id}/{category}/{filename}"
-        if doc_type:
-            return f"/Mevzuat/{category}/{doc_type}/{filename}"
-        return f"/Mevzuat/{category}/{filename}"
+        return local_rel_url, local_rel_url
 
 
     @staticmethod
@@ -162,6 +164,16 @@ class LegislationService:
         
         await asyncio.to_thread(doc_ref.delete)
         return True
+
+    @staticmethod
+    async def get_legislation_by_id(legislation_id: str) -> Optional[Dict[str, Any]]:
+        doc_ref = db.collection('legislations').document(legislation_id)
+        doc = await asyncio.to_thread(doc_ref.get)
+        if not doc.exists:
+            return None
+        data = doc.to_dict()
+        data['id'] = legislation_id
+        return data
 
     @staticmethod
     async def update_legislation(legislation_id: str, leg_update: LegislationUpdate) -> Optional[Dict[str, Any]]:

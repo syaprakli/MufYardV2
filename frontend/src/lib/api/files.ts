@@ -195,3 +195,19 @@ export const generateDegerlendirmeDocx = async (data: any): Promise<any> => {
     if (!response.ok) throw new Error("Değerlendirme Formu Word belgesi oluşturulamadı.");
     return response.json();
 };
+
+export const generateOzetTablolarDocx = async (data: any): Promise<any> => {
+    const url = `${CURRENT_FILES_API}/files/generate-docx-ozet-tablolar`;
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
+    const response = await fetchWithTimeout(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({ detail: "Özet Tablolar Word belgesi oluşturulamadı." }));
+        throw new Error(err.detail || "Özet Tablolar Word belgesi oluşturulamadı.");
+    }
+    return response.json();
+};
+

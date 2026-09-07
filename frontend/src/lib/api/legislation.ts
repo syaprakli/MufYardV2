@@ -1,5 +1,7 @@
-import { API_URL as API_BASE_URL } from "../config";
+import { API_URL as API_BASE_URL, LOCAL_API_URL, IS_ELECTRON } from "../config";
 import { fetchWithTimeout, getAuthHeaders } from "./utils";
+
+const CURRENT_LEGISLATION_API = IS_ELECTRON ? LOCAL_API_URL : API_BASE_URL;
 
 export interface Legislation {
     id: string;
@@ -70,7 +72,7 @@ export async function uploadLegislationFile(
     doc_type: string = "", 
     uid?: string, 
     is_public: boolean = true
-): Promise<{file_url: string}> {
+): Promise<{file_url: string; local_path?: string}> {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("category", category);
@@ -127,7 +129,7 @@ export async function rejectLegislation(id: string): Promise<void> {
     if (!response.ok) throw new Error("Reddedilemedi.");
 }
 
-export async function updateLegislation(id: string, update: Partial<LegislationCreate>): Promise<Legislation> {
+export async function updateLegislation(id: string, update: Partial<Legislation>): Promise<Legislation> {
     const headers = await getAuthHeaders({
         "Content-Type": "application/json",
     });
@@ -136,14 +138,11 @@ export async function updateLegislation(id: string, update: Partial<LegislationC
         headers,
         body: JSON.stringify(update),
     });
-    if (!pop_response_ok(response)) {
-        throw new Error("Mevzuat güncellenemedi.");
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || "Mevzuat güncellenemedi.");
     }
     return response.json();
-}
-
-function pop_response_ok(response: Response) {
-    return response.ok;
 }
 
 export async function deleteLegislation(id: string): Promise<{status: string, message: string}> {
@@ -159,15 +158,126 @@ export async function deleteLegislation(id: string): Promise<{status: string, me
 }
 
 export async function openLegislationFolder(category?: string, doc_type?: string): Promise<{status: string, path: string}> {
-    const params = new URLSearchParams();
-    if (category && category !== 'Tümü') {
-        params.append("category", category);
-    }
-    if (doc_type) {
-        params.append("doc_type", doc_type);
-    }
+    console.log("[Mevzuat] openLegislationFolder called with category:", category, "doc_type:", doc_type);
     
-    const url = `${API_BASE_URL}/legislation/open-folder${params.toString() ? '?' + params.toString() : ''}`;
+    // 1. Local backend API (same as files.ts)
+    try {
+        const params = new URLSearchParams();
+        if (category && category !== 'Tümü') {
+            params.append("category", category);
+        }
+        if (doc_type) {
+            params.append("doc_type", doc_type);
+        }
+        
+        const url = `${CURRENT_LEGISLATION_API}/legislation/open-folder${params.toString() ? '?' + params.toString() : ''}`;
+        console.log("[Mevzuat] Backend HTTP open-folder requested:", url);
+        const headers = await getAuthHeaders();
+        
+        const response = await fetchWithTimeout(url, {
+            method: "POST",
+            headers
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log("[Mevzuat] Backend HTTP open-folder success:", data);
+            return data;
+        } else {
+            console.warn("[Mevzuat] Backend HTTP open-folder non-ok response, status:", response.status);
+        }
+    } catch (e) {
+        console.warn("[Mevzuat] Backend HTTP open-folder failed, trying electronAPI fallback:", e);
+    }
+
+    // 2. Electron Native Shell fallback
+    if (typeof window !== 'undefined') {
+        const electronAPI = (window as any)?.electronAPI;
+        if (electronAPI?.openFolder) {
+            let rel = "Mevzuat";
+            if (category && category !== 'Tümü') {
+                rel = doc_type ? `Mevzuat/${category}/${doc_type}` : `Mevzuat/${category}`;
+            }
+            try {
+                console.log("[Mevzuat] Electron IPC openFolder sending:", rel);
+                const res = await electronAPI.openFolder(rel);
+                console.log("[Mevzuat] Electron IPC openFolder response:", res);
+                if (res?.ok) {
+                    return { status: "success", path: res.path };
+                }
+            } catch (e) {
+                console.error("[Mevzuat] Electron openFolder fallback failed:", e);
+            }
+        }
+    }
+
+    throw new Error("Klasör açılamadı.");
+}
+
+export async function openLegislationFileLocation(filePath?: string, category?: string, docType?: string): Promise<{status: string, type: 'file' | 'folder', path: string, message?: string}> {
+    console.log("[Mevzuat] openLegislationFileLocation called with:", { filePath, category, docType });
+    const isWebUrl = typeof filePath === 'string' && (filePath.startsWith('http://') || filePath.startsWith('https://'));
+    const cleanFilePath = isWebUrl ? undefined : filePath;
+
+    // 1. Local backend API (same as files.ts)
+    try {
+        const params = new URLSearchParams();
+        if (cleanFilePath) params.append("file_path", cleanFilePath);
+        if (category && category !== 'Tümü') params.append("category", category);
+        if (docType) params.append("doc_type", docType);
+
+        const url = `${CURRENT_LEGISLATION_API}/legislation/open-file-location?${params.toString()}`;
+        console.log("[Mevzuat] Backend HTTP open-file-location requested:", url);
+        const headers = await getAuthHeaders();
+
+        const response = await fetchWithTimeout(url, {
+            method: "POST",
+            headers
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            console.log("[Mevzuat] Backend HTTP open-file-location success:", data);
+            return data;
+        } else {
+            console.warn("[Mevzuat] Backend HTTP open-file-location non-ok status:", response.status);
+        }
+    } catch (e) {
+        console.warn("[Mevzuat] Backend HTTP open-file-location failed, trying electronAPI fallback:", e);
+    }
+
+    // 2. Electron Native Shell fallback
+    if (typeof window !== 'undefined') {
+        const electronAPI = (window as any)?.electronAPI;
+        if (electronAPI?.showItemInFolder) {
+            let target = cleanFilePath || "";
+            if (!target && category && category !== 'Tümü') {
+                target = docType ? `Mevzuat/${category}/${docType}` : `Mevzuat/${category}`;
+            }
+            try {
+                console.log("[Mevzuat] Electron IPC showItemInFolder sending:", target);
+                const res = await electronAPI.showItemInFolder(target);
+                console.log("[Mevzuat] Electron IPC showItemInFolder response:", res);
+                if (res?.ok) {
+                    return { 
+                        status: "success", 
+                        type: res.type || 'file', 
+                        path: res.path, 
+                        message: isWebUrl ? "Bu mevzuat web üzerinden eklenmiş; ilgili mevzuat klasörü açıldı." : res.message 
+                    };
+                }
+            } catch (e) {
+                console.error("[Mevzuat] Electron showItemInFolder fallback failed:", e);
+            }
+        }
+    }
+
+    throw new Error("Dosya konumu açılamadı.");
+}
+
+export async function syncLegislationFolder(): Promise<{status: string, imported_count: number, total_files: number, folder_path: string, message: string}> {
+    const backendUrl = LOCAL_API_URL || API_BASE_URL;
+    const url = `${backendUrl}/legislation/sync-folder`;
     const headers = await getAuthHeaders();
     
     const response = await fetchWithTimeout(url, {
@@ -176,7 +286,8 @@ export async function openLegislationFolder(category?: string, doc_type?: string
     });
     
     if (!response.ok) {
-        throw new Error("Klasör açılamadı.");
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || "Klasör senkronize edilemedi.");
     }
     
     return response.json();

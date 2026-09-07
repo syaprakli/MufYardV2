@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Özel Beden Eğitimi ve Spor Tesisleri Denetim Formu</title>
+    
+    <!-- React & ReactDOM (Production) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Babel for In-Browser JSX Compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- XLSX for Excel Export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <!-- Google Fonts: Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Print styles */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #print-area, #print-area * {
+                visibility: visible;
+            }
+            #print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                background: white !important;
+                color: black !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-850 dark:text-slate-100 min-h-screen p-3 md:p-6 flex flex-col items-center">
+
+    <!-- React App Root Container -->
+    <div id="root" class="w-full max-w-6xl"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback } = React;
+
+        // ---------------------------------------------------------------------------
+        // MEVZUAT VE EXCEL SABİTLERİ
+        // ---------------------------------------------------------------------------
+
+        const GERCEK_KISI_EVRAKLARI = [
+            { id: "g1", no: "1-", madde: "Tesisin adı ve adresi ile uygulanacak spor dallarını belirtir dilekçe", ref: "Yön. Md. 6/a" },
+            { id: "g2", no: "2-", madde: "Tesis işletmecisinin T.C. kimlik fotokopisi", ref: "Yön. Md. 6/b" },
+            { id: "g3", no: "3-", madde: "Tesis sahibi veya vekâlet edecek tesis sorumlusunun açık adresi ile adli sicil beyanı", ref: "Yön. Md. 6/c" },
+            { id: "g4", no: "4-", madde: "Tesis sorumlusu/sahibinin ikametgâh/yerleşim yeri beyanı", ref: "Yön. Md. 6/d" },
+            { id: "g6", no: "6-", madde: "Faaliyette bulunulacak her spor dalının çalıştırıcısına ait antrenör, masör veya diğer eğiticilerle yapılan bir yıllık sözleşmenin ilgili federasyon veya il müdürlüğünden tasdikli sureti", ref: "Yön. Md. 6/e" },
+            { id: "g7", no: "7-", madde: "Tesisin yetkili mimar veya mühendisce onaylı 1/100 ölçekli yerleşim planı", ref: "Yön. Md. 6/f" },
+            { id: "g8", no: "8-", madde: "Belediyelerce verilecek İşyeri Açma ve Çalışma Ruhsatı", ref: "Yön. Md. 6/g" },
+            { id: "g9", no: "9-", madde: "İtfaiye yangın güvenlik uygunluk raporu", ref: "Yön. Md. 6/h" },
+            { id: "g10", no: "10-", madde: "İllerde İl Sağlık Müdürlüğü, ilçelerde İlçe Sağlık Müdürlüğü uygunluk raporu", ref: "Yön. Md. 6/ı" },
+            { id: "g11", no: "11-", madde: "Mahallin güvenlik teşkilatından alınacak genel güvenlik ve asayiş açısından kolluk kuvveti görüşü", ref: "Yön. Md. 6/i" },
+            { id: "g12", no: "12-", madde: "Faaliyette bulunulacak spor dalları federasyonlarınca düzenlenecek Yeterlilik Belgesi", ref: "Yön. Md. 10" },
+            { id: "g13", no: "13-", madde: "Adli sicil kaydı sorgusu (İl Müdürlüğünce resmi yazışması yapılmış mı?)", ref: "Yön. Md. 6/c" },
+            { id: "g14", no: "14-", madde: "İl Müdürlüğünce yerinde yapılan tetkik tutanağı ve verilen Yeterlilik Belgesi (8. ve 9. maddelerdeki şartların taşındığına dair)", ref: "Yön. Md. 11" }
+        ];
+
+        const TUZEL_KISI_EVRAKLARI = [
+            { id: "t1", no: "1-", madde: "Kuruluşun, tesisin adı ve adresi ile uygulanacak spor dallarını belirtir dilekçe", ref: "Yön. Md. 7/a" },
+            { id: "t2", no: "2-", madde: "Tesis sorumlusu veya vekâlet edecek tesis amirinin açık adresi ve adli sicil beyanları", ref: "Yön. Md. 7/b" },
+            { id: "t3", no: "3-", madde: "Faaliyette bulunulacak her spor dalının çalıştırıcısına ait antrenör, masör veya diğer eğiticilerle yapılan bir yıllık sözleşmenin ilgili federasyon veya il müdürlüğünden tasdikli sureti", ref: "Yön. Md. 7/c" },
+            { id: "t4", no: "4-", madde: "Tesisin onaylı 1/100 ölçekli yerleşim planı", ref: "Yön. Md. 7/d" },
+            { id: "t5", no: "5-", madde: "Belediyelerce verilecek İşyeri Açma ve Çalışma Ruhsatı", ref: "Yön. Md. 7/e" },
+            { id: "t6", no: "6-", madde: "İtfaiye yangın güvenlik uygunluk raporu", ref: "Yön. Md. 7/f" },
+            { id: "t7", no: "7-", madde: "İllerde İl Sağlık Müdürlüğü, ilçelerde İlçe Sağlık Müdürlüğü uygunluk raporu", ref: "Yön. Md. 7/g" },
+            { id: "t8", no: "8-", madde: "Kolluk kuvvetlerinden alınacak genel güvenlik ve asayiş açısından kolluk görüşü", ref: "Yön. Md. 7/h" },
+            { id: "t9", no: "9-", madde: "Faaliyette bulunulacak spor dalları federasyonlarınca düzenlenecek Yeterlilik Belgesi", ref: "Yön. Md. 10" },
+            { id: "t10", no: "10-", madde: "Tüzel kişilik şirket ise unvanı ve Ticaret Sicil Gazetesi; dernek ise tüzük, vakıf ise vakıf senedinin yayınlandığı gazete nüshası ve imza sirküleri", ref: "Yön. Md. 7/ı" },
+            { id: "t11", no: "11-", madde: "Federasyon tarafından spor çalışmaları yapılacak tesislerin boyutları ve nitelikleri onay belgesi", ref: "Yön. Md. 7/i" },
+            { id: "t14", no: "14-", madde: "8. ve 9. maddelerde belirtilen şartları taşıdığına dair İl Müdürlüğünce düzenlenen yerinde tetkik tutanağı ve onay", ref: "Yön. Md. 11" }
+        ];
+
+        const FIZIKI_SARTLAR_LISTESI = [
+            { id: "f1", no: "8-a", madde: "Dinlenme ve bekleme salonunun bulunması", ref: "Yön. Md. 8/a" },
+            { id: "f2", no: "8-b", madde: "Bay ve bayan için ayrı soyunma odaları, sıcak-soğuk sulu duşlar ve tuvaletlerin hijyenik olması", ref: "Yön. Md. 8/b" },
+            { id: "f3", no: "8-c", madde: "Spor yapılan alanın sıcaklığının en az 18°C olması ve yeterli havalandırma (koku ve nem tahliyesi) kapasitesi", ref: "Yön. Md. 8/c" },
+            { id: "f4", no: "8-d", madde: "Zeminin yapılan spor dalına uygun tahta, parke, sunta, halıfleks, sentetik veya açık alan federasyon şartlarına uygun kaplama olması", ref: "Yön. Md. 8/d" },
+            { id: "f5", no: "8-e", madde: "Yangın ve afetlere karşı yangın söndürme cihazlarının dolu, periyodik bakımlı ve acil çıkış yollarının açık bulunması", ref: "Yön. Md. 8/e" },
+            { id: "f6", no: "8-f", madde: "Fiziki çarpmaları önleyici tedbirler (kolon, sütun, keskin kenar ve sivri köşelerin darbe hafifletici yumuşak malzemeyle kaplanmış olması; maniaların bulunmaması)", ref: "Yön. Md. 8/f" },
+            { id: "f7", no: "8-g", madde: "Sporcu sayısına yeterli spor aleti, kondisyon ekipmanı ve yardımcı aletlerin sağlam bulunması", ref: "Yön. Md. 8/g" },
+            { id: "f8", no: "8-h", madde: "Tesisin tüm ünitelerinin genel sağlık, hijyen ve sanitasyon kurallarına uygunluğu", ref: "Yön. Md. 8/h" },
+            { id: "f9", no: "8-ı", madde: "Gürültü, kirlilik ve ses yalıtımı ile çevrenin rahatsız edilmesini önleyici tedbirlerin alınmış olması", ref: "Yön. Md. 8/ı" },
+            { id: "f10", no: "8-i", madde: "Engelli bireylerin erişilebilirliğine (rampa, wc vb.) ve sporcuların can güvenliğine yönelik düzenlemelerin mevcudiyeti", ref: "Yön. Md. 8/i" }
+        ];
+
+        const ANTRENOR_PERSONEL_LISTESI = [
+            { id: "a1", no: "22-a", madde: "Faaliyette bulunulan her spor branşı için en az 2. Kademe (veya federasyonca yetkili 1. Kademe) antrenörlük belgesi / masaj için masör-masöz belgesi", ref: "Yön. Md. 22/1" },
+            { id: "a2", no: "22-b", madde: "Antrenörlerin aynı il/ilçede ikiden fazla tesisle sözleşme yapmamış olması ve başka ilde çalışmaması kuralına uyum", ref: "Yön. Md. 22/2" },
+            { id: "a3", no: "22-c", madde: "Sözleşmelerin 1 yıllık düzenlenip il müdürlüğü/federasyonca onaylanması ve her yıl sonunda yenilenmesi", ref: "Yön. Md. 22/3" },
+            { id: "a4", no: "22-d", madde: "Antrenörlerin sözleşmede belirlenen çalışma saatlerinde tesiste bizzat bulunması", ref: "Yön. Md. 22/3" },
+            { id: "a5", no: "22-e", madde: "Antrenör ve çalıştırıcı belgelerinin salonda herkesin görebileceği uygun bir yere asılması", ref: "Yön. Md. 22/3" },
+            { id: "a6", no: "23-a", madde: "İl Müdürlüğünce onaylanıp tasdik edilmiş resmi ücret tarifesinin görünür yere asılmış olması", ref: "Yön. Md. 23/1" },
+            { id: "a7", no: "23-b", madde: "Tesiste çalışan personelin SGK sigorta girişleri, primleri ve vergi ödemelerinin tam yapılması", ref: "Yön. Md. 23/2" }
+        ];
+
+        const SAGLIK_SPORCU_LISTESI = [
+            { id: "s1", no: "24-a", madde: "İlk yardım için gereken ilaç ve tıbbi malzemelerin eksiksiz ilk yardım dolabında hazır ve görünür yerde asılı olması", ref: "Yön. Md. 24/1" },
+            { id: "s2", no: "24-b", madde: "Tesisin anlaşmalı/bağlantılı çalıştığı resmi veya özel sağlık kuruluşuna ait bilgilendirme levhasının asılı bulunması", ref: "Yön. Md. 24/3" },
+            { id: "s3", no: "24-c", madde: "Sporcuların tesise kabulünde tek doktor muayene raporunun alınması ve her sporcu için Sağlık Dosyası açılması", ref: "Yön. Md. 24/2" },
+            { id: "s4", no: "24-d", madde: "En az 3'er aylık aralıklarla spor yapanların periyodik sağlık muayenelerinin yaptırılıp dosyalanması", ref: "Yön. Md. 24/2" },
+            { id: "s5", no: "16-a", madde: "Tesis kayıt defterinin tutulması (tesiste görevli personelin kimlik, adres ve fotoğraflarını içerir defter)", ref: "Yön. Md. 16/1" },
+            { id: "s6", no: "16-b", madde: "Düzenli çalışan sporculara İl Müdürlüğünce tasdik edilmiş Sporcu Kartı düzenlenmesi", ref: "Yön. Md. 16/2" },
+            { id: "s7", no: "19-a", madde: "Sporcu Lisans, Tescil, Vize Yönetmeliği asgari spora başlama ve lisans yaş sınırlarına uyulması", ref: "Yön. Md. 19" },
+            { id: "s8", no: "25-a", madde: "Sporculardan başvuru formu, TC kimlik beyanı, veli izin belgesi (reşit olmayanlar için), sağlık raporu ve fotoğrafların tam alınması", ref: "Yön. Md. 25" },
+            { id: "s9", no: "17-a", madde: "Tesisin çalışma izninde belirtilen spor dalları ve amacı dışında kesinlikle kullanılmaması", ref: "Yön. Md. 17" },
+            { id: "s10", no: "18-a", madde: "İl Müdürlüğünce belirlenen açık bulunma ve sportif çalışma saatlerine riayet edilmesi", ref: "Yön. Md. 18" }
+        ];
+
+        function getInitialState() {
+            try {
+                const saved = localStorage.getItem("mufyard_ozel_beden_egitimi_data");
+                if (saved) {
+                    return JSON.parse(saved);
+                }
+            } catch (e) {
+                console.error("Storage error:", e);
+            }
+            return {
+                tesisAdi: "Örnek Özel Beden Eğitimi ve Spor Tesisi",
+                tur: "gercek",
+                ilAdi: "VAN",
+                startYear: 2024,
+                endYear: 2025,
+                isleticiSahip: "",
+                tcVkn: "",
+                telefon: "",
+                adres: "",
+                ilce: "",
+                branslar: "Fitness, Vücut Geliştirme, Pilates",
+                acilisTarihi: "",
+                sonVizeTarihi: "",
+                tescilNo: "",
+                genelSonuc: "incelemede",
+                evraklar: {},
+                komisyon: {
+                    valiOnayi: "",
+                    komisyonKararTarihi: "",
+                    komisyonKararNo: "",
+                    ilMudurBaskan: "",
+                    sporSbMd: "",
+                    tesislerSbMd: "",
+                    fedTemsilcisi: "",
+                    saglikTemsilcisi: "",
+                    tescilUcretiTahsilat: "",
+                    tescilUcretiTutar: "",
+                    genelMudurPayiYatırıldı: "",
+                    ilMudurPayiYatırıldı: "",
+                    cokluBransHarci: "",
+                    dosyaDagitimiTam: "",
+                    aciklama: ""
+                },
+                fizikiSartlar: {},
+                antrenorPersonel: {},
+                saglikSporcu: {},
+                vizeYaptirim: {
+                    yillikVizeYapildiMi: "",
+                    vizeOnayTarihi: "",
+                    oncekiIpcDurumu: "",
+                    verilenSureVarMi: "",
+                    tespitAykiriliklar: "",
+                    sonucKarari: "Denetim devam ediyor."
+                }
+            };
+        }
+
+        // ---------------------------------------------------------------------------
+        // MAIN APP COMPONENT
+        // ---------------------------------------------------------------------------
+
+        function App() {
+            const [formData, setFormData] = useState(getInitialState);
+            const [subTab, setSubTab] = useState("evrak");
+            const [searchQuery, setSearchQuery] = useState("");
+            const [filterOnlyMissing, setFilterOnlyMissing] = useState(false);
+            const [toastMsg, setToastMsg] = useState("");
+            const [confirmModal, setConfirmModal] = useState({
+                isOpen: false,
+                title: "",
+                message: "",
+                confirmText: "Onayla",
+                cancelText: "Vazgeç",
+                variant: "danger",
+                onConfirm: null
+            });
+
+            const showToast = (msg) => {
+                setToastMsg(msg);
+                setTimeout(() => setToastMsg(""), 3000);
+            };
+
+            const openConfirm = ({ title, message, confirmText = "Onayla", cancelText = "Vazgeç", variant = "danger", onConfirm }) => {
+                setConfirmModal({
+                    isOpen: true,
+                    title,
+                    message,
+                    confirmText,
+                    cancelText,
+                    variant,
+                    onConfirm: () => {
+                        if (typeof onConfirm === "function") onConfirm();
+                        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                    }
+                });
+            };
+
+            const closeConfirm = () => {
+                setConfirmModal(prev => ({ ...prev, isOpen: false }));
+            };
+
+            const handleSave = () => {
+                try {
+                    localStorage.setItem("mufyard_ozel_beden_egitimi_data", JSON.stringify(formData));
+                    showToast("Denetim verileri başarıyla kaydedildi.");
+                } catch (e) {
+                    showToast("Kaydetme hatası: " + e.message);
+                }
+            };
+
+            const handleReset = () => {
+                openConfirm({
+                    title: "Denetimi Sıfırla",
+                    message: "Özel beden eğitimi tesisleri denetim formundaki tüm verileri sıfırlamak istediğinize emin misiniz? Doldurulan tüm evrak ve kontrol bilgileri temizlenecektir. Bu işlem geri alınamaz.",
+                    confirmText: "Evet, Formu Sıfırla",
+                    cancelText: "Vazgeç",
+                    variant: "danger",
+                    onConfirm: () => {
+                        localStorage.removeItem("mufyard_ozel_beden_egitimi_data");
+                        const fresh = getInitialState();
+                        fresh.tesisAdi = "Özel Beden Eğitimi ve Spor Tesisi";
+                        fresh.evraklar = {};
+                        fresh.fizikiSartlar = {};
+                        fresh.antrenorPersonel = {};
+                        fresh.saglikSporcu = {};
+                        setFormData(fresh);
+                        showToast("Denetim formu sıfırlandı.");
+                    }
+                });
+            };
+
+            const handleInfoChange = (field, val) => {
+                setFormData(prev => ({ ...prev, [field]: val }));
+            };
+
+            const handleItemChange = (section, itemId, status, note) => {
+                setFormData(prev => {
+                    const sec = { ...(prev[section] || {}) };
+                    const cur = sec[itemId] || { status: "", note: "" };
+                    sec[itemId] = {
+                        status: status !== undefined ? status : cur.status,
+                        note: note !== undefined ? note : cur.note
+                    };
+                    return { ...prev, [section]: sec };
+                });
+            };
+
+            const handleKomisyonChange = (field, val) => {
+                setFormData(prev => ({
+                    ...prev,
+                    komisyon: { ...prev.komisyon, [field]: val }
+                }));
+            };
+
+            const handleVizeChange = (field, val) => {
+                setFormData(prev => ({
+                    ...prev,
+                    vizeYaptirim: { ...prev.vizeYaptirim, [field]: val }
+                }));
+            };
+
+            const handleMarkAllValid = () => {
+                openConfirm({
+                    title: "Tümünü Uygun İşaretle",
+                    message: "Bu sekmedeki tüm maddeler 'Var / Uygun' olarak işaretlenecektir. Onaylıyor musunuz?",
+                    confirmText: "Tümünü Uygun Yap",
+                    cancelText: "Vazgeç",
+                    variant: "info",
+                    onConfirm: () => {
+                        setFormData(prev => {
+                            const updated = { ...prev };
+                            if (subTab === "evrak") {
+                                const list = prev.tur === "gercek" ? GERCEK_KISI_EVRAKLARI : TUZEL_KISI_EVRAKLARI;
+                                const map = { ...(prev.evraklar || {}) };
+                                list.forEach(item => { map[item.id] = { status: "var", note: map[item.id]?.note || "" }; });
+                                updated.evraklar = map;
+                            } else if (subTab === "fiziki") {
+                                const map = { ...(prev.fizikiSartlar || {}) };
+                                FIZIKI_SARTLAR_LISTESI.forEach(item => { map[item.id] = { status: "var", note: map[item.id]?.note || "" }; });
+                                updated.fizikiSartlar = map;
+                            } else if (subTab === "antrenor") {
+                                const map = { ...(prev.antrenorPersonel || {}) };
+                                ANTRENOR_PERSONEL_LISTESI.forEach(item => { map[item.id] = { status: "var", note: map[item.id]?.note || "" }; });
+                                updated.antrenorPersonel = map;
+                            } else if (subTab === "saglik") {
+                                const map = { ...(prev.saglikSporcu || {}) };
+                                SAGLIK_SPORCU_LISTESI.forEach(item => { map[item.id] = { status: "var", note: map[item.id]?.note || "" }; });
+                                updated.saglikSporcu = map;
+                            }
+                            return updated;
+                        });
+                        showToast("Tüm maddeler uygun olarak işaretlendi.");
+                    }
+                });
+            };
+
+            // İstatistikler
+            const stats = useMemo(() => {
+                const evrakList = formData.tur === "gercek" ? GERCEK_KISI_EVRAKLARI : TUZEL_KISI_EVRAKLARI;
+                const totalItems = evrakList.length + FIZIKI_SARTLAR_LISTESI.length + ANTRENOR_PERSONEL_LISTESI.length + SAGLIK_SPORCU_LISTESI.length;
+
+                let varCount = 0, yokCount = 0, muafCount = 0;
+
+                const checkSection = (list, section) => {
+                    list.forEach(it => {
+                        const st = formData[section]?.[it.id]?.status;
+                        if (st === "var") varCount++;
+                        else if (st === "yok") yokCount++;
+                        else if (st === "muaf") muafCount++;
+                    });
+                };
+
+                checkSection(evrakList, "evraklar");
+                checkSection(FIZIKI_SARTLAR_LISTESI, "fizikiSartlar");
+                checkSection(ANTRENOR_PERSONEL_LISTESI, "antrenorPersonel");
+                checkSection(SAGLIK_SPORCU_LISTESI, "saglikSporcu");
+
+                const netBase = totalItems - muafCount;
+                const uyumYuzdesi = netBase > 0 ? Math.round((varCount / netBase) * 100) : 0;
+
+                return { totalItems, varCount, yokCount, muafCount, uyumYuzdesi };
+            }, [formData]);
+
+            // Excel İndirme
+            const handleExportExcel = () => {
+                try {
+                    const wb = XLSX.utils.book_new();
+                    const reportData = [
+                        ["T.C. GENÇLİK VE SPOR BAKANLIĞI"],
+                        ["REHBERLİK VE DENETİM BAŞKANLIĞI / İL MÜDÜRLÜĞÜ TEFTİŞİ"],
+                        ["ÖZEL BEDEN EĞİTİMİ VE SPOR TESİSLERİ DENETİM ÇİZELGESİ"],
+                        [],
+                        ["TESİS BİLGİLERİ"],
+                        ["Tesis Adı:", formData.tesisAdi, "Tesis Türü:", formData.tur === "gercek" ? "Gerçek Kişi" : "Tüzel Kişi (Şirket/Kulüp)"],
+                        ["İşletici / Sorumlu:", formData.isleticiSahip, "T.C. / VKN:", formData.tcVkn],
+                        ["Faaliyet Branşları:", formData.branslar, "İlçe / Adres:", `${formData.ilce} - ${formData.adres}`],
+                        ["Açılış Tarihi:", formData.acilisTarihi, "Son Vize Tarihi:", formData.sonVizeTarihi],
+                        ["Genel Denetim Sonucu:", formData.genelSonuc.toUpperCase(), "Uyum Oranı:", `%${stats.uyumYuzdesi}`],
+                        [],
+                        ["1. AÇILIŞ VE RUHSAT EVRAK KONTROLÜ (" + (formData.tur === "gercek" ? "Gerçek Kişi" : "Tüzel Kişi") + ")"],
+                        ["No", "Mevzuat Maddesi / İstenen Belge", "Yönetmelik Dayanağı", "Durum", "Müfettiş Notu"]
+                    ];
+
+                    const evrakList = formData.tur === "gercek" ? GERCEK_KISI_EVRAKLARI : TUZEL_KISI_EVRAKLARI;
+                    evrakList.forEach(it => {
+                        const d = formData.evraklar?.[it.id] || { status: "", note: "" };
+                        reportData.push([it.no, it.madde, it.ref, d.status === "var" ? "VAR" : d.status === "yok" ? "YOK" : d.status === "muaf" ? "MUAF" : "DEĞERLENDİRİLMEDİ", d.note || ""]);
+                    });
+
+                    reportData.push([]);
+                    reportData.push(["2. AÇILIŞ İZNİ KOMİSYONU VE HARÇ KONTROLÜ"]);
+                    reportData.push(["Vali Onayı", formData.komisyon.valiOnayi === "var" ? "VAR" : "YOK"]);
+                    reportData.push(["Karar Tarih / No", `${formData.komisyon.komisyonKararTarihi} / ${formData.komisyon.komisyonKararNo}`]);
+                    reportData.push(["Komisyon Başkanı", formData.komisyon.ilMudurBaskan]);
+                    reportData.push(["Spor Şb. Md.", formData.komisyon.sporSbMd]);
+                    reportData.push(["Tesisler Şb. Md.", formData.komisyon.tesislerSbMd]);
+                    reportData.push(["Federasyon Temsilcisi", formData.komisyon.fedTemsilcisi]);
+                    reportData.push(["İl Sağlık Müd. Temsilcisi", formData.komisyon.saglikTemsilcisi]);
+                    reportData.push(["Tescil Harcı Tahsilatı", formData.komisyon.tescilUcretiTahsilat === "var" ? "TAHSİL EDİLDİ" : "EDİLMEDİ", formData.komisyon.tescilUcretiTutar ? `${formData.komisyon.tescilUcretiTutar} TL` : ""]);
+                    reportData.push(["Genel Müd. Payı (%50)", formData.komisyon.genelMudurPayiYatırıldı === "var" ? "YATIRILDI" : "YATIRILMADI"]);
+                    reportData.push(["İl Müd. Payı (%50)", formData.komisyon.ilMudurPayiYatırıldı === "var" ? "YATIRILDI" : "YATIRILMADI"]);
+
+                    reportData.push([]);
+                    reportData.push(["3. FİZİKİ VE TEKNİK ŞARTLAR (Md. 8 - 9)"]);
+                    FIZIKI_SARTLAR_LISTESI.forEach(it => {
+                        const d = formData.fizikiSartlar?.[it.id] || { status: "", note: "" };
+                        reportData.push([it.no, it.madde, it.ref, d.status === "var" ? "UYGUN" : d.status === "yok" ? "UYGUN DEĞİL" : d.status === "muaf" ? "MUAF" : "-", d.note || ""]);
+                    });
+
+                    reportData.push([]);
+                    reportData.push(["4. ANTRENÖR VE PERSONEL ŞARTLARI (Md. 22 - 23)"]);
+                    ANTRENOR_PERSONEL_LISTESI.forEach(it => {
+                        const d = formData.antrenorPersonel?.[it.id] || { status: "", note: "" };
+                        reportData.push([it.no, it.madde, it.ref, d.status === "var" ? "UYGUN" : d.status === "yok" ? "UYGUN DEĞİL" : d.status === "muaf" ? "MUAF" : "-", d.note || ""]);
+                    });
+
+                    reportData.push([]);
+                    reportData.push(["5. SAĞLIK, İLK YARDIM VE SPORCU KAYITLARI (Md. 16, 24, 25)"]);
+                    SAGLIK_SPORCU_LISTESI.forEach(it => {
+                        const d = formData.saglikSporcu?.[it.id] || { status: "", note: "" };
+                        reportData.push([it.no, it.madde, it.ref, d.status === "var" ? "UYGUN" : d.status === "yok" ? "UYGUN DEĞİL" : d.status === "muaf" ? "MUAF" : "-", d.note || ""]);
+                    });
+
+                    reportData.push([]);
+                    reportData.push(["6. NİHAİ MÜFETTİŞ KANAATİ"]);
+                    reportData.push(["Müfettiş Notu:", formData.vizeYaptirim.sonucKarari || ""]);
+
+                    const ws = XLSX.utils.aoa_to_sheet(reportData);
+                    XLSX.utils.book_append_sheet(wb, ws, "Denetim Formu");
+                    XLSX.writeFile(wb, `Ozel_Beden_Egitimi_Denetim_${formData.tesisAdi.replace(/\s+/g, "_")}.xlsx`);
+                    showToast("Excel raporu indirildi.");
+                } catch (e) {
+                    showToast("Excel hatası: " + e.message);
+                }
+            };
+
+            const handlePrint = () => {
+                window.print();
+            };
+
+            const renderRow = (section, item) => {
+                const cur = formData[section]?.[item.id] || { status: "", note: "" };
+                if (filterOnlyMissing && cur.status !== "yok") return null;
+                if (searchQuery.trim()) {
+                    const q = searchQuery.toLowerCase();
+                    const text = `${item.no} ${item.madde} ${item.ref} ${cur.note}`.toLowerCase();
+                    if (!text.includes(q)) return null;
+                }
+
+                return (
+                    <div key={item.id} className={`p-3 rounded-xl border transition-all ${
+                        cur.status === "var" ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300" :
+                        cur.status === "yok" ? "bg-rose-50 dark:bg-rose-950/20 border-rose-300" :
+                        cur.status === "muaf" ? "bg-slate-100 dark:bg-slate-800 border-slate-300" :
+                        "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                    } flex flex-col md:flex-row md:items-center justify-between gap-3 mb-2`}>
+                        <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-black text-blue-600 dark:text-blue-400 min-w-[28px]">{item.no}</span>
+                                <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">{item.madde}</p>
+                            </div>
+                            {item.ref && (
+                                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded ml-7 inline-block">
+                                    {item.ref}
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+                            <div className="grid grid-cols-3 sm:flex items-center rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700 w-full sm:w-auto">
+                                <button
+                                    onClick={() => handleItemChange(section, item.id, cur.status === "var" ? "" : "var")}
+                                    className={`px-2.5 py-1.5 rounded-md text-xs font-bold transition-all text-center ${cur.status === "var" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-300"}`}
+                                >
+                                    Uygun
+                                </button>
+                                <button
+                                    onClick={() => handleItemChange(section, item.id, cur.status === "yok" ? "" : "yok")}
+                                    className={`px-2.5 py-1.5 rounded-md text-xs font-bold transition-all text-center ${cur.status === "yok" ? "bg-rose-600 text-white shadow-sm" : "text-slate-600 dark:text-slate-300"}`}
+                                >
+                                    Eksik
+                                </button>
+                                <button
+                                    onClick={() => handleItemChange(section, item.id, cur.status === "muaf" ? "" : "muaf")}
+                                    className={`px-2.5 py-1.5 rounded-md text-xs font-bold transition-all text-center ${cur.status === "muaf" ? "bg-slate-500 text-white shadow-sm" : "text-slate-400"}`}
+                                >
+                                    Muaf
+                                </button>
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Tespit notu..."
+                                value={cur.note || ""}
+                                onChange={e => handleItemChange(section, item.id, cur.status, e.target.value)}
+                                className="w-full sm:w-48 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="space-y-4">
+                    {/* Toast Bildirimi */}
+                    {toastMsg && (
+                        <div className="fixed top-4 right-4 z-50 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg animate-bounce">
+                            {toastMsg}
+                        </div>
+                    )}
+
+                    {/* Modern Onay Modalı */}
+                    {confirmModal.isOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in no-print">
+                            <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6 space-y-4 transform transition-all animate-in fade-in zoom-in duration-150">
+                                <div className="flex items-start gap-3.5">
+                                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${
+                                        confirmModal.variant === "danger"
+                                            ? "bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50"
+                                            : "bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50"
+                                    }`}>
+                                        {confirmModal.variant === "danger" ? (
+                                            <span className="text-xl">⚠️</span>
+                                        ) : (
+                                            <span className="text-xl">ℹ️</span>
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                                            {confirmModal.title}
+                                        </h3>
+                                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 leading-relaxed font-medium">
+                                            {confirmModal.message}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                    <button
+                                        type="button"
+                                        onClick={closeConfirm}
+                                        className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                        {confirmModal.cancelText}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={confirmModal.onConfirm}
+                                        className={`px-4 py-2 rounded-xl text-xs font-black text-white shadow-md transition-all ${
+                                            confirmModal.variant === "danger"
+                                                ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/20 active:scale-95"
+                                                : "bg-blue-600 hover:bg-blue-700 shadow-blue-600/20 active:scale-95"
+                                        }`}
+                                    >
+                                        {confirmModal.confirmText}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ÜST BAŞLIK VE AKSİYONLAR */}
+                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm no-print">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded border border-blue-200/50">
+                                    İl Müdürlüğü Teftiş Formu
+                                </span>
+                                <span className="text-[10px] font-bold text-slate-400">
+                                    3289 Sayılı Kanun & Yönetmelik
+                                </span>
+                            </div>
+                            <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
+                                Özel Beden Eğitimi ve Spor Tesisleri Denetimi
+                            </h1>
+                            <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                                {(formData.ilAdi || "VAN").toUpperCase()} Gençlik ve Spor İl Müdürlüğü Teftişi Bilgi & Denetim Çizelgesi
+                            </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            {/* Meta Alanlar: İl & Yıl (Büyütülmüş & Düzenlenmiş) */}
+                            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                                {/* İl Seçici */}
+                                <div className="flex items-center gap-2 h-9 sm:h-10 bg-slate-50 dark:bg-slate-800/90 px-3 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-sm">
+                                    <span className="text-blue-600 text-sm">📍</span>
+                                    <span className="text-xs font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">İl:</span>
+                                    <input
+                                        type="text"
+                                        value={formData.ilAdi || "VAN"}
+                                        onChange={e => handleInfoChange("ilAdi", e.target.value.toUpperCase())}
+                                        placeholder="ÖRN: VAN"
+                                        className="h-7 sm:h-8 w-28 sm:w-36 px-2.5 text-xs sm:text-sm font-black uppercase bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-300 rounded-lg border border-slate-200 dark:border-slate-700 shadow-inner text-center tracking-wide outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
+                                        title="Denetlenen il adı"
+                                    />
+                                </div>
+
+                                {/* Dönem Yıl Seçici */}
+                                <div className="flex items-center gap-2 h-9 sm:h-10 bg-slate-50 dark:bg-slate-800/90 px-3 rounded-xl border border-slate-200/90 dark:border-slate-700 shadow-sm">
+                                    <span className="text-indigo-600 text-sm">📅</span>
+                                    <span className="text-xs font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">Dönem:</span>
+                                    <div className="flex items-center gap-1">
+                                        <input
+                                            type="number"
+                                            value={formData.startYear || 2024}
+                                            onChange={e => handleInfoChange("startYear", parseInt(e.target.value) || 2024)}
+                                            className="h-7 sm:h-8 w-16 sm:w-20 px-1 text-xs sm:text-sm font-black text-center bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg border border-slate-200 dark:border-slate-700 shadow-inner outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            min={2000}
+                                            max={2040}
+                                            title="Başlangıç Yılı"
+                                        />
+                                        <span className="font-black text-slate-400 text-xs px-0.5">-</span>
+                                        <input
+                                            type="number"
+                                            value={formData.endYear || 2025}
+                                            onChange={e => handleInfoChange("endYear", parseInt(e.target.value) || 2025)}
+                                            className="h-7 sm:h-8 w-16 sm:w-20 px-1 text-xs sm:text-sm font-black text-center bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg border border-slate-200 dark:border-slate-700 shadow-inner outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            min={2000}
+                                            max={2040}
+                                            title="Bitiş Yılı"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={handleExportExcel}
+                                className="h-9 sm:h-10 px-3 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 text-xs font-bold transition-all"
+                            >
+                                📊 Excel İndir (.xlsx)
+                            </button>
+                            <button
+                                onClick={handlePrint}
+                                className="h-9 sm:h-10 px-3 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 text-xs font-bold transition-all"
+                            >
+                                🖨️ Tutanak Yazdır
+                            </button>
+                            <button
+                                onClick={handleReset}
+                                className="h-9 sm:h-10 px-3 rounded-xl border border-rose-300 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-all"
+                            >
+                                🔄 Denetimi Sıfırla
+                            </button>
+                            <button
+                                onClick={handleSave}
+                                className="h-9 sm:h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md shadow-blue-500/20 transition-all"
+                            >
+                                💾 Denetimi Kaydet
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* KÜNYE VE UYUM BARI */}
+                    <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 no-print">
+                        <div className="xl:col-span-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                                <h2 className="text-sm font-black text-slate-800 dark:text-slate-100">
+                                    🏢 Tesis Künyesi ve İdari Bilgileri
+                                </h2>
+                                <div className="flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700">
+                                    <button
+                                        onClick={() => handleInfoChange("tur", "gercek")}
+                                        className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${formData.tur === "gercek" ? "bg-amber-600 text-white" : "text-slate-500"}`}
+                                    >
+                                        Gerçek Kişi Tesisi
+                                    </button>
+                                    <button
+                                        onClick={() => handleInfoChange("tur", "tuzel")}
+                                        className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${formData.tur === "tuzel" ? "bg-indigo-600 text-white" : "text-slate-500"}`}
+                                    >
+                                        Tüzel Kişi (Şirket/Kulüp)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Tesis Adı</label>
+                                    <input
+                                        type="text"
+                                        value={formData.tesisAdi}
+                                        onChange={e => handleInfoChange("tesisAdi", e.target.value)}
+                                        className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 font-bold"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">İşletici / Sorumlu</label>
+                                    <input
+                                        type="text"
+                                        value={formData.isleticiSahip}
+                                        onChange={e => handleInfoChange("isleticiSahip", e.target.value)}
+                                        className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 font-semibold"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">T.C. / Vergi No</label>
+                                    <input
+                                        type="text"
+                                        value={formData.tcVkn}
+                                        onChange={e => handleInfoChange("tcVkn", e.target.value)}
+                                        className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 font-semibold"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">Spor Dalları</label>
+                                    <input
+                                        type="text"
+                                        value={formData.branslar}
+                                        onChange={e => handleInfoChange("branslar", e.target.value)}
+                                        className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 font-semibold"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">İlçe ve Adres</label>
+                                    <input
+                                        type="text"
+                                        value={formData.adres}
+                                        onChange={e => handleInfoChange("adres", e.target.value)}
+                                        className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 font-semibold"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Açılış Tarihi</label>
+                                        <input
+                                            type="date"
+                                            value={formData.acilisTarihi}
+                                            onChange={e => handleInfoChange("acilisTarihi", e.target.value)}
+                                            className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Son Vize Tarihi</label>
+                                        <input
+                                            type="date"
+                                            value={formData.sonVizeTarihi}
+                                            onChange={e => handleInfoChange("sonVizeTarihi", e.target.value)}
+                                            className="w-full h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-xs"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* UYUM BARI */}
+                        <div className="bg-slate-900 text-white rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-black uppercase text-slate-400">Mevzuat Uyum Skoru</span>
+                                    <span className="text-xl font-black text-emerald-400">%{stats.uyumYuzdesi}</span>
+                                </div>
+                                <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden mb-4">
+                                    <div className={`h-full ${stats.uyumYuzdesi >= 80 ? 'bg-emerald-500' : stats.uyumYuzdesi >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${stats.uyumYuzdesi}%` }}></div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                                    <div className="p-2 rounded-xl bg-slate-800">
+                                        <span className="text-[10px] text-emerald-400 block font-bold">Uygun</span>
+                                        <span className="text-sm font-black">{stats.varCount}</span>
+                                    </div>
+                                    <div className="p-2 rounded-xl bg-slate-800">
+                                        <span className="text-[10px] text-rose-400 block font-bold">Eksik</span>
+                                        <span className="text-sm font-black">{stats.yokCount}</span>
+                                    </div>
+                                    <div className="p-2 rounded-xl bg-slate-800">
+                                        <span className="text-[10px] text-slate-400 block font-bold">Muaf</span>
+                                        <span className="text-sm font-black">{stats.muafCount}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-3 border-t border-slate-800 mt-3 flex items-center justify-between text-xs">
+                                <span className="text-slate-400">Karar:</span>
+                                <select
+                                    value={formData.genelSonuc}
+                                    onChange={e => handleInfoChange("genelSonuc", e.target.value)}
+                                    className="bg-slate-800 text-white font-bold text-xs px-2 py-1 rounded-lg border border-slate-700 outline-none"
+                                >
+                                    <option value="incelemede">İncelemede</option>
+                                    <option value="uygun">Mevzuata Uygun</option>
+                                    <option value="eksik">Süre Verildi</option>
+                                    <option value="ipc">İdari Para Cezası (İPC)</option>
+                                    <option value="kapatma">Faaliyetten Men / İptal</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* SEKME MENÜSÜ */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 no-print">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {[
+                                { id: "evrak", label: `1. Açılış Evrakı (${formData.tur === "gercek" ? "Gerçek" : "Tüzel"})` },
+                                { id: "komisyon", label: "2. Komisyon & Harç" },
+                                { id: "fiziki", label: "3. Fiziki Şartlar (Md. 8-9)" },
+                                { id: "antrenor", label: "4. Antrenör & Ücret (Md. 22-23)" },
+                                { id: "saglik", label: "5. Sağlık & Sporcu Kayıt (Md. 24-25)" },
+                                { id: "vize", label: "6. Vize & Nihai Karar" }
+                            ].map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setSubTab(tab.id)}
+                                    className={`px-3 py-2 rounded-xl text-xs font-black transition-all ${
+                                        subTab === tab.id
+                                            ? "bg-blue-600 text-white shadow-sm"
+                                            : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200"
+                                    }`}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                placeholder="Maddelerde ara..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs w-36 sm:w-48"
+                            />
+                            <button
+                                onClick={() => setFilterOnlyMissing(!filterOnlyMissing)}
+                                className={`h-8 px-2.5 rounded-lg text-xs font-bold border transition-all ${
+                                    filterOnlyMissing ? "bg-rose-50 border-rose-300 text-rose-600" : "bg-white border-slate-200"
+                                }`}
+                            >
+                                ⚠️ Sadece Eksikler
+                            </button>
+                            {["evrak", "fiziki", "antrenor", "saglik"].includes(subTab) && (
+                                <button
+                                    onClick={handleMarkAllValid}
+                                    className="h-8 px-2.5 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-600 text-xs font-bold"
+                                >
+                                    ✓ Tümünü Uygun Yap
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* SEKME İÇERİKLERİ */}
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm no-print">
+                        {subTab === "evrak" && (
+                            <div>
+                                <h3 className="text-sm font-black mb-3">
+                                    {formData.tur === "gercek" ? "Gerçek Kişilerden İstenecek Belgeler (Excel Sayfa 1)" : "Tüzel Kişilerden İstenecek Belgeler (Excel Sayfa 2)"}
+                                </h3>
+                                {(formData.tur === "gercek" ? GERCEK_KISI_EVRAKLARI : TUZEL_KISI_EVRAKLARI).map(it => renderRow("evraklar", it))}
+                            </div>
+                        )}
+
+                        {subTab === "komisyon" && (
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-black border-b pb-2">Açılış İzin Komisyonu ve Tescil Harcı Paylaşımı</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                    <div className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-800/40 space-y-2">
+                                        <h4 className="font-bold">1. Açılış Komisyonu Üyeleri & Vali Onayı (Md. 12)</h4>
+                                        <div className="flex items-center justify-between">
+                                            <span>Vali Onayı Var mı?</span>
+                                            <div className="flex gap-1">
+                                                <button onClick={() => handleKomisyonChange("valiOnayi", "var")} className={`px-2 py-1 rounded font-bold ${formData.komisyon.valiOnayi === "var" ? "bg-emerald-600 text-white" : "bg-slate-200"}`}>Evet</button>
+                                                <button onClick={() => handleKomisyonChange("valiOnayi", "yok")} className={`px-2 py-1 rounded font-bold ${formData.komisyon.valiOnayi === "yok" ? "bg-rose-600 text-white" : "bg-slate-200"}`}>Hayır</button>
+                                            </div>
+                                        </div>
+                                        <input type="text" placeholder="Komisyon Başkanı (İl Müdürü / Şb. Md.)" value={formData.komisyon.ilMudurBaskan} onChange={e => handleKomisyonChange("ilMudurBaskan", e.target.value)} className="w-full h-8 px-2 border rounded" />
+                                        <input type="text" placeholder="Spor Şube Müdürü" value={formData.komisyon.sporSbMd} onChange={e => handleKomisyonChange("sporSbMd", e.target.value)} className="w-full h-8 px-2 border rounded" />
+                                        <input type="text" placeholder="Tesisler Şube Müdürü" value={formData.komisyon.tesislerSbMd} onChange={e => handleKomisyonChange("tesislerSbMd", e.target.value)} className="w-full h-8 px-2 border rounded" />
+                                        <input type="text" placeholder="Federasyon Temsilcisi" value={formData.komisyon.fedTemsilcisi} onChange={e => handleKomisyonChange("fedTemsilcisi", e.target.value)} className="w-full h-8 px-2 border rounded" />
+                                        <input type="text" placeholder="İl Sağlık Müdürlüğü Temsilcisi (1 Kişi)" value={formData.komisyon.saglikTemsilcisi} onChange={e => handleKomisyonChange("saglikTemsilcisi", e.target.value)} className="w-full h-8 px-2 border rounded" />
+                                    </div>
+
+                                    <div className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-800/40 space-y-2">
+                                        <h4 className="font-bold">2. Tescil Harcı Tahakkuku ve Paylaşım (Md. 11)</h4>
+                                        <div className="flex gap-2">
+                                            <select value={formData.komisyon.tescilUcretiTahsilat} onChange={e => handleKomisyonChange("tescilUcretiTahsilat", e.target.value)} className="h-8 px-2 border rounded font-bold">
+                                                <option value="">Seçiniz</option>
+                                                <option value="var">Tahsil Edildi</option>
+                                                <option value="yok">Edilmedi</option>
+                                            </select>
+                                            <input type="text" placeholder="Tutar TL" value={formData.komisyon.tescilUcretiTutar} onChange={e => handleKomisyonChange("tescilUcretiTutar", e.target.value)} className="h-8 px-2 border rounded flex-1" />
+                                        </div>
+                                        <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded border space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span>%50 Genel Müdürlük Hesabına Yatırıldı mı?</span>
+                                                <button onClick={() => handleKomisyonChange("genelMudurPayiYatırıldı", formData.komisyon.genelMudurPayiYatırıldı === "var" ? "yok" : "var")} className={`px-2 py-0.5 rounded font-bold ${formData.komisyon.genelMudurPayiYatırıldı === "var" ? "bg-emerald-600 text-white" : "bg-slate-200"}`}>{formData.komisyon.genelMudurPayiYatırıldı === "var" ? "Evet" : "Hayır"}</button>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span>%50 İl Müdürlüğü Hesabına Yatırıldı mı?</span>
+                                                <button onClick={() => handleKomisyonChange("ilMudurPayiYatırıldı", formData.komisyon.ilMudurPayiYatırıldı === "var" ? "yok" : "var")} className={`px-2 py-0.5 rounded font-bold ${formData.komisyon.ilMudurPayiYatırıldı === "var" ? "bg-emerald-600 text-white" : "bg-slate-200"}`}>{formData.komisyon.ilMudurPayiYatırıldı === "var" ? "Evet" : "Hayır"}</button>
+                                            </div>
+                                        </div>
+                                        <textarea rows={2} placeholder="Komisyon Notları..." value={formData.komisyon.aciklama} onChange={e => handleKomisyonChange("aciklama", e.target.value)} className="w-full p-2 border rounded" />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {subTab === "fiziki" && (
+                            <div>
+                                <h3 className="text-sm font-black mb-3">Tesisin Fiziki ve Teknik Standartları (Md. 8 - 9)</h3>
+                                {FIZIKI_SARTLAR_LISTESI.map(it => renderRow("fizikiSartlar", it))}
+                            </div>
+                        )}
+
+                        {subTab === "antrenor" && (
+                            <div>
+                                <h3 className="text-sm font-black mb-3">Antrenör, Eğitici ve Personel Şartları (Md. 22 - 23)</h3>
+                                {ANTRENOR_PERSONEL_LISTESI.map(it => renderRow("antrenorPersonel", it))}
+                            </div>
+                        )}
+
+                        {subTab === "saglik" && (
+                            <div>
+                                <h3 className="text-sm font-black mb-3">Sağlık, İlk Yardım & Sporcu Kayıtları (Md. 16, 24, 25)</h3>
+                                {SAGLIK_SPORCU_LISTESI.map(it => renderRow("saglikSporcu", it))}
+                            </div>
+                        )}
+
+                        {subTab === "vize" && (
+                            <div className="space-y-4 text-xs">
+                                <h3 className="text-sm font-black border-b pb-2">Yıllık Vize Takibi, İPC ve Müfettiş Kararı (Md. 13, 26)</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="p-4 rounded-xl border bg-slate-50 space-y-2">
+                                        <h4 className="font-bold">Yıllık Vize Kontrolü</h4>
+                                        <div className="flex items-center justify-between">
+                                            <span>Yıllık Vizesi Komisyonca Yapılmış mı?</span>
+                                            <button onClick={() => handleVizeChange("yillikVizeYapildiMi", formData.vizeYaptirim.yillikVizeYapildiMi === "var" ? "yok" : "var")} className={`px-2 py-1 rounded font-bold ${formData.vizeYaptirim.yillikVizeYapildiMi === "var" ? "bg-emerald-600 text-white" : "bg-slate-200"}`}>{formData.vizeYaptirim.yillikVizeYapildiMi === "var" ? "Evet" : "Hayır"}</button>
+                                        </div>
+                                        <input type="date" value={formData.vizeYaptirim.vizeOnayTarihi} onChange={e => handleVizeChange("vizeOnayTarihi", e.target.value)} className="w-full h-8 px-2 border rounded" />
+                                    </div>
+                                    <div className="p-4 rounded-xl border bg-slate-50 space-y-2">
+                                        <h4 className="font-bold">Müfettiş Nihai Kanaat ve Tutanak Notu</h4>
+                                        <textarea rows={3} value={formData.vizeYaptirim.sonucKarari} onChange={e => handleVizeChange("sonucKarari", e.target.value)} className="w-full p-2 border rounded font-medium" />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* YAZDIRMA ALANI (PRINT VIEW) */}
+                    <div id="print-area" className="hidden print:block p-8">
+                        <div className="text-center border-b-2 border-blue-600 pb-3 mb-4">
+                            <h1 className="text-lg font-black">T.C. GENÇLİK VE SPOR BAKANLIĞI</h1>
+                            <h2 className="text-sm font-bold text-slate-600">REHBERLİK VE DENETİM BAŞKANLIĞI / İL MÜDÜRLÜĞÜ TEFTİŞİ</h2>
+                            <h2 className="text-base font-black text-blue-700 mt-1">ÖZEL BEDEN EĞİTİMİ VE SPOR TESİSİ DENETİM TUTANAĞI</h2>
+                        </div>
+
+                        <div className="mb-4">
+                            <h3 className="font-black text-xs bg-slate-100 p-1 border-l-4 border-blue-600 mb-2">I. TESİS BİLGİLERİ</h3>
+                            <table className="w-full text-xs border border-slate-300">
+                                <tbody>
+                                    <tr className="border-b">
+                                        <td className="p-1 font-bold w-1/4">Tesis Adı:</td>
+                                        <td className="p-1 w-1/4">{formData.tesisAdi}</td>
+                                        <td className="p-1 font-bold w-1/4">Tesis Türü:</td>
+                                        <td className="p-1 w-1/4">{formData.tur === "gercek" ? "Gerçek Kişi" : "Tüzel Kişi"}</td>
+                                    </tr>
+                                    <tr className="border-b">
+                                        <td className="p-1 font-bold">İşletici / Sorumlu:</td>
+                                        <td className="p-1">{formData.isleticiSahip}</td>
+                                        <td className="p-1 font-bold">T.C. / VKN:</td>
+                                        <td className="p-1">{formData.tcVkn}</td>
+                                    </tr>
+                                    <tr className="border-b">
+                                        <td className="p-1 font-bold">Spor Dalları:</td>
+                                        <td className="p-1">{formData.branslar}</td>
+                                        <td className="p-1 font-bold">İlçe / Adres:</td>
+                                        <td className="p-1">{formData.adres}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="mb-4">
+                            <h3 className="font-black text-xs bg-slate-100 p-1 border-l-4 border-blue-600 mb-2">II. AÇILIŞ VE MEVZUAT EVRAKLARI</h3>
+                            <table className="w-full text-[10px] border border-slate-300">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b">
+                                        <th className="p-1 text-left w-8">No</th>
+                                        <th className="p-1 text-left">İstenen Belge</th>
+                                        <th className="p-1 text-left w-24">Ref</th>
+                                        <th className="p-1 text-left w-24">Durum</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(formData.tur === "gercek" ? GERCEK_KISI_EVRAKLARI : TUZEL_KISI_EVRAKLARI).map(it => {
+                                        const d = formData.evraklar?.[it.id] || { status: "", note: "" };
+                                        return (
+                                            <tr key={it.id} className="border-b">
+                                                <td className="p-1">{it.no}</td>
+                                                <td className="p-1">{it.madde}</td>
+                                                <td className="p-1">{it.ref}</td>
+                                                <td className="p-1 font-bold">{d.status === "var" ? "VAR" : d.status === "yok" ? "YOK" : d.status === "muaf" ? "MUAF" : "-"}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="mb-6">
+                            <h3 className="font-black text-xs bg-slate-100 p-1 border-l-4 border-blue-600 mb-2">III. MÜFETTİŞ KANAATİ VE İMZA</h3>
+                            <p className="text-xs mb-8"><b>Nihai Kanaat:</b> {formData.vizeYaptirim.sonucKarari || "Mevzuat hükümleri doğrultusunda denetim tamamlanmıştır."}</p>
+                            <div className="flex justify-around text-center text-xs">
+                                <div>
+                                    <p className="font-bold">Tesis Yetkilisi / Sahibi</p>
+                                    <p className="mt-10">İmza</p>
+                                </div>
+                                <div>
+                                    <p className="font-bold">Denetim Görevlisi / Müfettiş</p>
+                                    <p className="mt-10">İmza</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById("root"));
+        root.render(<App />);
+    </script>
+</body>
+</html>

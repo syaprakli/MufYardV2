@@ -5,10 +5,10 @@ import {
     BookOpen, ClipboardCheck, Bot, Plus, Edit2, Trash2, Search,
     Tag, ChevronRight, X, Check, Loader2, Database, Sparkles, FileText,
     ArrowRight, Info, AlertCircle, Save, ExternalLink, Play, ArrowLeft,
-    Copy, Printer, Download
+    Copy, Printer, Download, Table, Dumbbell, Building2
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
-import { API_URL } from "../lib/config";
+import { API_URL, LOCAL_API_URL, IS_ELECTRON } from "../lib/config";
 import { toast } from "react-hot-toast";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
 import { useConfirm } from "../lib/context/ConfirmContext";
@@ -17,6 +17,10 @@ import { useGlobalData } from "../lib/context/GlobalDataContext";
 import { createAudit, updateAudit, deleteAudit, fetchAuditById } from "../lib/api/audit";
 import { updateTask } from "../lib/api/tasks";
 import { generateEvrakTalebiDocx } from "../lib/api/files";
+import { DenetimOzetTablolar } from "../components/audit/DenetimOzetTablolar";
+import { OzelBedenEgitimiDenetim } from "../components/audit/OzelBedenEgitimiDenetim";
+import { IlTesisleriDenetim, getSafeImageUrl } from "../components/audit/IlTesisleriDenetim";
+
 
 interface KnowledgeItem {
     id: string;
@@ -53,7 +57,8 @@ const EVRAK_TALEP_MADDELERI = [
     "2016 yılından 2019 yılına kadar olan dönem için Esas Defter ve Emanet Fark; 2019 yılı ve sonrası için ise mizan, yevmiye ve yardımcı defterlerin dijital ortamdaki Excel dökümleri.",
     "{yillar} yılları arasındaki aylık bazda hizmet binası, yurt binaları ve spor tesislerinin elektrik, su ve doğalgaz fatura dökümleri.",
     "Özel barınma hizmeti veren yükseköğrenim yurtlarının denetimlerinin yapılıp yapılmadığı, yapıldıysa denetim formlarının/raporlarının ve dosyalarının hazır halde bulundurulması.",
-    "Denetim Dönemini kapsayan yıllara ({yillar}) ait ücret tahsis cetvellerinin hazır hale getirilmesi."
+    "Denetim Dönemini kapsayan yıllara ({yillar}) ait ücret tahsis cetvellerinin hazır hale getirilmesi.",
+    "Spor Dalı Temsilcilerinin yönetmeliğe uygun atanıp atanmadığına dair onaylar ile yıllık faaliyet programlarının ilgili federasyonlarca tasdik edildiğine ilişkin belgelerin hazır edilmesi."
 ];
 
 const emptyForm = {
@@ -163,7 +168,14 @@ export default function DenetimIl() {
     const confirm = useConfirm();
     const navigate = useNavigate();
     const { user, profile } = useAuth();
-    const { data: cachedData, refreshAudits, refreshTasks } = useGlobalData();
+    const { data: cachedData, refreshAll, refreshAudits, refreshTasks } = useGlobalData();
+
+    // Sayfa doğrudan F5 ile yenilendiğinde verilerin hafızaya anında yüklenmesi
+    useEffect(() => {
+        if (user?.uid) {
+            refreshAll(user.uid, user.email || undefined, user.displayName || undefined);
+        }
+    }, [user?.uid, user?.email, user?.displayName, refreshAll]);
 
     // 1. Sidebar / Category Navigation
     const activeTab = "il" as string;
@@ -175,15 +187,17 @@ export default function DenetimIl() {
 
     // 2. Active Task / Selection States
     const queryParams = new URLSearchParams(window.location.search);
-    const initialTaskId = queryParams.get("task_id");
+    const initialTaskId = queryParams.get("task_id") || localStorage.getItem("mufyard_last_task_il");
     const [selectedTaskId, setSelectedTaskIdState] = useState<string | null>(initialTaskId);
 
     const setSelectedTaskId = useCallback((id: string | null) => {
         setSelectedTaskIdState(id);
         setActiveDetailTab("hub");
         if (id) {
+            localStorage.setItem("mufyard_last_task_il", id);
             navigate(`/denetim/${activeTab}?task_id=${id}`, { replace: true });
         } else {
+            localStorage.removeItem("mufyard_last_task_il");
             navigate(`/denetim/${activeTab}`, { replace: true });
         }
     }, [navigate, activeTab]);
@@ -242,13 +256,15 @@ export default function DenetimIl() {
 
     // 6. Detailed Tab States
     const [customItemText, setCustomItemText] = useState("");
-    const [activeDetailTab, setActiveDetailTab] = useState<"hub" | "info" | "notes" | "photos" | "checklist" | "editor" | "evrak_talebi">("hub");
+    const [activeDetailTab, setActiveDetailTab] = useState<"hub" | "info" | "notes" | "photos" | "tesisler" | "checklist" | "editor" | "evrak_talebi" | "ozet_tablolar" | "ozel_beden_egitimi">("hub");
     const [localAuditData, setLocalAuditData] = useState<any>({
         info: {},
         generalNotes: "",
         photos: [],
         photo_descriptions: {},
-        form: {}
+        tesisler: [],
+        form: {},
+        ozelBedenEgitimi: {}
     });
     const [activeQuestionForTenkit, setActiveQuestionForTenkit] = useState<string | null>(null);
     const [isSavingAuditData, setIsSavingAuditData] = useState(false);
@@ -314,6 +330,18 @@ export default function DenetimIl() {
         return accessibleTasks.filter((t: any) => t.rapor_turu === currentRaporTuru);
     }, [accessibleTasks, currentRaporTuru]);
 
+    // Sayfa yenilendiğinde görev boş kalmasın: en son çalışılan veya ilk görevi otomatik seç
+    useEffect(() => {
+        if (!selectedTaskId && filteredTasks.length > 0) {
+            const saved = localStorage.getItem("mufyard_last_task_il");
+            const match = saved && filteredTasks.some((t: any) => t.id === saved);
+            const targetId = match ? saved : filteredTasks[0].id;
+            setSelectedTaskIdState(targetId);
+            localStorage.setItem("mufyard_last_task_il", targetId);
+            navigate(`/denetim/${activeTab}?task_id=${targetId}`, { replace: true });
+        }
+    }, [selectedTaskId, filteredTasks, activeTab, navigate]);
+
     // Selected Task Details
     const selectedTask = useMemo(() => {
         if (!selectedTaskId || !cachedData?.tasks) return null;
@@ -377,6 +405,21 @@ export default function DenetimIl() {
                 .then(fullAudit => {
                     if (fullAudit) {
                         setReportContent(fullAudit.report_content || "");
+                        if (fullAudit.audit_data) {
+                            const fad = fullAudit.audit_data;
+                            setLocalAuditData((prev: any) => ({
+                                ...prev,
+                                ...fad,
+                                info: fad.info || {},
+                                generalNotes: fad.generalNotes || "",
+                                photos: fad.photos || [],
+                                photo_descriptions: fad.photo_descriptions || {},
+                                form: fad.form || {},
+                                evrakTalep: fad.evrakTalep || null,
+                                istenecekTablolar: fad.istenecekTablolar || prev?.istenecekTablolar || {},
+                                ozelBedenEgitimi: fad.ozelBedenEgitimi || prev?.ozelBedenEgitimi || {}
+                            }));
+                        }
                     }
                 })
                 .catch(err => {
@@ -386,12 +429,16 @@ export default function DenetimIl() {
 
             const ad = selectedReport.audit_data || {};
             setLocalAuditData({
+                ...ad,
                 info: ad.info || {},
                 generalNotes: ad.generalNotes || "",
                 photos: ad.photos || [],
                 photo_descriptions: ad.photo_descriptions || {},
+                tesisler: Array.isArray(ad.tesisler) ? ad.tesisler : [],
                 form: ad.form || {},
-                evrakTalep: ad.evrakTalep || null
+                evrakTalep: ad.evrakTalep || null,
+                istenecekTablolar: ad.istenecekTablolar || {},
+                ozelBedenEgitimi: ad.ozelBedenEgitimi || {}
             });
         } else {
             setReportContent("");
@@ -400,8 +447,11 @@ export default function DenetimIl() {
                 generalNotes: "",
                 photos: [],
                 photo_descriptions: {},
+                tesisler: [],
                 form: {},
-                evrakTalep: null
+                evrakTalep: null,
+                istenecekTablolar: {},
+                ozelBedenEgitimi: {}
             });
         }
         setReportEditing(false);
@@ -487,44 +537,116 @@ export default function DenetimIl() {
     };
 
     const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files || e.target.files.length === 0 || !selectedReport) return;
-        const file = e.target.files[0];
+        if (!e.target.files || e.target.files.length === 0) return;
+        const files = Array.from(e.target.files);
+        // Reset file input value immediately so selecting the same file triggers onChange
+        e.target.value = "";
         
         setUploadingPhoto(true);
         try {
-            const formData = new FormData();
-            formData.append("file", file);
-            
-            let url = `${API_URL}/files/upload`;
-            const params = new URLSearchParams();
-            params.append("path", `denetim_fotograflari/${selectedReport.id}`);
-            if (user?.uid) params.append("uid", user.uid);
-            url += `?${params.toString()}`;
-            
-            const authHeaders = await getAuthHeaders();
-            const res = await fetch(url, {
-                method: "POST",
-                headers: {
-                    ...authHeaders
-                },
-                body: formData
-            });
-            
-            if (!res.ok) {
-                throw new Error("Fotoğraf yüklenemedi");
+            // Auto-initialize audit report draft if it doesn't exist yet for selectedTask
+            let activeAudit = selectedReport;
+            if (!activeAudit && selectedTask) {
+                try {
+                    const newAuditPayload = {
+                        task_id: selectedTask.id,
+                        title: selectedTask.rapor_adi || "İl Denetimi Raporu",
+                        location: "",
+                        date: new Date().toLocaleDateString("tr-TR"),
+                        inspector: profile?.full_name || user?.displayName || user?.email?.split('@')[0] || "Müfettiş",
+                        status: "Devam Ediyor",
+                        report_content: "",
+                        owner_id: user?.uid,
+                        assigned_to: [user?.uid].filter(Boolean) as string[],
+                        report_seq: 1,
+                        report_created: false,
+                        audit_data: {
+                            ...localAuditData
+                        }
+                    };
+                    activeAudit = await createAudit(newAuditPayload);
+                    if (user?.uid) {
+                        await refreshAudits(user.uid, user.email || undefined);
+                    }
+                } catch (createErr) {
+                    console.warn("Auto audit draft creation failed:", createErr);
+                }
+            }
+
+            const targetAuditId = activeAudit?.id || selectedTask?.id || "temp_audit";
+            const targetApi = IS_ELECTRON ? LOCAL_API_URL : API_URL;
+            const uploadedUrls: string[] = [];
+
+            for (const file of files) {
+                try {
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    
+                    let url = `${targetApi}/files/upload`;
+                    const params = new URLSearchParams();
+                    params.append("path", `denetim_fotograflari/${targetAuditId}`);
+                    if (user?.uid) params.append("uid", user.uid);
+                    url += `?${params.toString()}`;
+                    
+                    const authHeaders = await getAuthHeaders();
+                    const res = await fetch(url, {
+                        method: "POST",
+                        headers: {
+                            ...authHeaders
+                        },
+                        body: formData
+                    });
+                    
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data?.url) {
+                            uploadedUrls.push(data.url);
+                        }
+                    } else {
+                        // Fallback: Convert to Base64 so photo is NEVER lost!
+                        const base64Url = await new Promise<string>((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result as string);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        });
+                        uploadedUrls.push(base64Url);
+                    }
+                } catch (singleErr) {
+                    console.warn("Upload failed for file, using base64 fallback:", singleErr);
+                    try {
+                        const base64Url = await new Promise<string>((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result as string);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        });
+                        uploadedUrls.push(base64Url);
+                    } catch {
+                        // ignore
+                    }
+                }
+            }
+
+            if (uploadedUrls.length === 0) {
+                throw new Error("Fotoğraflar yüklenemedi");
             }
             
-            const data = await res.json();
-            const newPhotoUrl = data.url;
-            
-            const updatedPhotos = [...(localAuditData.photos || []), newPhotoUrl];
+            const updatedPhotos = [...(localAuditData.photos || []), ...uploadedUrls];
             const updatedData = {
                 ...localAuditData,
                 photos: updatedPhotos
             };
             setLocalAuditData(updatedData);
-            await handleSaveAuditData(updatedData);
-            toast.success("Fotoğraf yüklendi.");
+            if (activeAudit) {
+                await updateAudit(activeAudit.id, {
+                    audit_data: updatedData
+                });
+                if (user?.uid) {
+                    refreshAudits(user.uid, user.email || undefined);
+                }
+            }
+            toast.success(`${uploadedUrls.length} adet fotoğraf yüklendi.`);
         } catch (error) {
             console.error("Photo upload error:", error);
             toast.error("Fotoğraf yüklenirken bir hata oluştu.");
@@ -1178,6 +1300,32 @@ export default function DenetimIl() {
         );
     };
 
+    const renderOzetTablolarTab = () => {
+        return (
+            <DenetimOzetTablolar
+                localAuditData={localAuditData}
+                setLocalAuditData={setLocalAuditData}
+                onSave={handleSaveAuditData}
+                isSaving={isSavingAuditData}
+                selectedReport={selectedReport}
+                profile={profile}
+            />
+        );
+    };
+
+    const renderOzelBedenEgitimiTab = () => {
+        return (
+            <OzelBedenEgitimiDenetim
+                localAuditData={localAuditData}
+                setLocalAuditData={setLocalAuditData}
+                onSave={handleSaveAuditData}
+                isSaving={isSavingAuditData}
+                selectedReport={selectedReport}
+                profile={profile}
+            />
+        );
+    };
+
     const renderInfoTab = () => {
         const info = localAuditData.info || {};
         const fields: Record<string, { label: string, key: string, type: string, placeholder?: string }[]> = {
@@ -1360,6 +1508,7 @@ export default function DenetimIl() {
                             <input
                                 type="file"
                                 accept="image/*"
+                                multiple
                                 className="hidden"
                                 onChange={handlePhotoUpload}
                                 disabled={uploadingPhoto}
@@ -1377,57 +1526,118 @@ export default function DenetimIl() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {photos.map((url: string, index: number) => (
-                            <div
-                                key={index}
-                                className="group flex flex-col bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow transition-all"
-                            >
-                                <div className="relative aspect-video sm:aspect-square overflow-hidden bg-slate-100 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
-                                    <img
-                                        src={`${API_URL.replace("/api", "")}${url}`}
-                                        alt={`Denetim Görseli ${index + 1}`}
-                                        className="w-full h-full object-cover cursor-pointer hover:scale-[1.02] transition-transform duration-200"
-                                        onClick={() => {
-                                            const overlay = document.createElement('div');
-                                            overlay.id = `photo-modal-${index}`;
-                                            overlay.className = 'fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-200';
-                                            overlay.addEventListener('click', () => overlay.remove());
-                                            const img = document.createElement('img');
-                                            img.src = `${API_URL.replace("/api", "")}${url}`;
-                                            img.className = 'max-w-full max-h-full rounded-lg object-contain shadow-2xl';
-                                            overlay.appendChild(img);
-                                            document.body.appendChild(overlay);
-                                        }}
-                                    />
-                                    <button
-                                        onClick={() => handleDeletePhoto(index)}
-                                        className="absolute top-2 right-2 w-7 h-7 bg-black/75 hover:bg-red-600 text-white rounded-lg flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 shadow"
-                                        title="Görseli Kaldır"
-                                    >
-                                        <X size={14} />
-                                    </button>
+                        {photos.map((url: string, index: number) => {
+                            const safeUrl = getSafeImageUrl(url);
+                            return (
+                                <div
+                                    key={index}
+                                    className="group flex flex-col bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow transition-all"
+                                >
+                                    <div className="relative aspect-video sm:aspect-square overflow-hidden bg-slate-100 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
+                                        <img
+                                            src={safeUrl}
+                                            alt={`Denetim Görseli ${index + 1}`}
+                                            className="w-full h-full object-cover cursor-pointer hover:scale-[1.02] transition-transform duration-200"
+                                            onClick={() => {
+                                                const overlay = document.createElement('div');
+                                                overlay.id = `photo-modal-${index}`;
+                                                overlay.className = 'fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-200';
+                                                overlay.addEventListener('click', () => overlay.remove());
+                                                const img = document.createElement('img');
+                                                img.src = safeUrl;
+                                                img.className = 'max-w-full max-h-full rounded-lg object-contain shadow-2xl';
+                                                overlay.appendChild(img);
+                                                document.body.appendChild(overlay);
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => handleDeletePhoto(index)}
+                                            className="absolute top-2 right-2 w-7 h-7 bg-black/75 hover:bg-red-600 text-white rounded-lg flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 shadow"
+                                            title="Görseli Kaldır"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                    <div className="p-2 bg-white dark:bg-slate-900">
+                                        <input
+                                            type="text"
+                                            value={localAuditData.photo_descriptions?.[url] || ""}
+                                            onChange={e => handlePhotoDescriptionChange(url, e.target.value)}
+                                            onBlur={() => handleSaveAuditData(localAuditData)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    (e.target as HTMLInputElement).blur();
+                                                }
+                                            }}
+                                            placeholder="Görsel açıklaması ekleyin..."
+                                            className="w-full bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800/80 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="p-2 bg-white dark:bg-slate-900">
-                                    <input
-                                        type="text"
-                                        value={localAuditData.photo_descriptions?.[url] || ""}
-                                        onChange={e => handlePhotoDescriptionChange(url, e.target.value)}
-                                        onBlur={() => handleSaveAuditData(localAuditData)}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                (e.target as HTMLInputElement).blur();
-                                            }
-                                        }}
-                                        placeholder="Görsel açıklaması ekleyin..."
-                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20"
-                                    />
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
+        );
+    };
+
+    const renderTesislerTab = () => {
+        return (
+            <IlTesisleriDenetim
+                localAuditData={localAuditData}
+                setLocalAuditData={setLocalAuditData}
+                onSaveAuditData={handleSaveAuditData}
+                selectedReport={selectedReport}
+                selectedTask={selectedTask}
+                user={user}
+                onTransferToReport={async (facilitiesHtml: string) => {
+                    let targetReport = selectedReport;
+                    if (!targetReport && selectedTask) {
+                        try {
+                            const newAuditPayload = {
+                                task_id: selectedTask.id,
+                                title: selectedTask.rapor_adi || "İl Denetimi Raporu",
+                                location: "",
+                                date: new Date().toLocaleDateString("tr-TR"),
+                                inspector: profile?.full_name || user?.displayName || user?.email?.split('@')[0] || "Müfettiş",
+                                status: "Devam Ediyor",
+                                report_content: `<h1>${selectedTask.rapor_adi || "İl Denetimi Raporu"}</h1><p>Denetim bulguları buraya kaydedilecektir.</p>`,
+                                owner_id: user?.uid,
+                                assigned_to: [user?.uid].filter(Boolean) as string[],
+                                report_seq: 1,
+                                report_created: true
+                            };
+                            targetReport = await createAudit(newAuditPayload);
+                        } catch (err) {
+                            console.error(err);
+                        }
+                    }
+
+                    if (!targetReport) {
+                        toast.error("Rapor bulunamadı.");
+                        return;
+                    }
+
+                    const currentContent = targetReport.report_content || "";
+                    const updatedContent = currentContent ? `${currentContent}<br/>${facilitiesHtml}` : facilitiesHtml;
+                    try {
+                        await updateAudit(targetReport.id, {
+                            report_content: updatedContent,
+                            report_created: true
+                        });
+                        setReportContent(updatedContent);
+                        toast.success("Tesis tespitleri ve eksiklikler rapora başarıyla aktarıldı.");
+                        if (user?.uid) {
+                            refreshAudits(user.uid, user.email || undefined);
+                        }
+                        setActiveDetailTab("editor");
+                    } catch {
+                        toast.error("Rapor güncellenemedi.");
+                    }
+                }}
+            />
         );
     };
 
@@ -1919,6 +2129,30 @@ export default function DenetimIl() {
             findingsHtml += `</ul>`;
         } else {
             findingsHtml += `<p>Yapılan denetim neticesinde herhangi bir tenkit veya eksikliğe rastlanılmamıştır.</p>`;
+        }
+
+        const facilities = Array.isArray(localAuditData.tesisler) ? localAuditData.tesisler : [];
+        if (facilities.length > 0) {
+            findingsHtml += `<br/><h3><strong>İL MÜDÜRLÜĞÜ SPOR TESİSLERİ VE SAHA TESPİTLERİ</strong></h3>`;
+            findingsHtml += `<table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; font-size: 13px; margin: 12px 0;">`;
+            findingsHtml += `<thead style="background-color: #f1f5f9;"><tr>
+                <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">No</th>
+                <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: left;">Tesis Adı ve Türü</th>
+                <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: left;">İlçe / Mevki</th>
+                <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">Durumu</th>
+                <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: left;">Tespit Edilen Eksiklik ve Notlar</th>
+            </tr></thead><tbody>`;
+            facilities.forEach((fac: any, idx: number) => {
+                const statusText = fac.durum === "faal" ? "Faal" : fac.durum === "bakimda" ? "Bakımda" : fac.durum === "kismen_faal" ? "Kısmen Faal" : "Atıl";
+                findingsHtml += `<tr>
+                    <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${idx + 1}</td>
+                    <td style="border: 1px solid #cbd5e1; padding: 6px;"><strong>${fac.ad}</strong><br/><span style="font-size: 11px; color: #64748b;">${fac.tur}</span></td>
+                    <td style="border: 1px solid #cbd5e1; padding: 6px;">${fac.ilce || "-"}</td>
+                    <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${statusText}</td>
+                    <td style="border: 1px solid #cbd5e1; padding: 6px;">${fac.bilgiNotu ? fac.bilgiNotu.replace(/\n/g, "<br/>") : "<em>Eksiklik veya arıza belirtilmemiştir.</em>"}</td>
+                </tr>`;
+            });
+            findingsHtml += `</tbody></table>`;
         }
 
         let writeMode: "append" | "replace" = "replace";
@@ -2501,6 +2735,9 @@ export default function DenetimIl() {
                                             const answeredQuestions = Object.keys(localAuditData.form || {}).filter(k => !!(localAuditData.form || {})[k]).length;
                                             const percent = totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0;
                                             const photoCount = (localAuditData.photos || []).length;
+                                            const tesislerList = Array.isArray(localAuditData.tesisler) ? localAuditData.tesisler : [];
+                                            const tesisCount = tesislerList.length;
+                                            const tesisPhotoCount = tesislerList.reduce((acc: number, f: any) => acc + (f.photos || []).length, 0);
                                             const hasNotes = !!localAuditData.generalNotes;
                                             const isReportCreated = selectedReport && selectedReport.report_created !== false;
 
@@ -2533,6 +2770,15 @@ export default function DenetimIl() {
                                                     highlight: false
                                                 },
                                                 {
+                                                    id: "tesisler",
+                                                    title: "Tesisler",
+                                                    subtitle: "İl spor tesisleri saha denetimi, fotoğraflar ve eksiklik bilgi notları",
+                                                    icon: Building2,
+                                                    badge: `${tesisCount} Tesis / ${tesisPhotoCount} Fotoğraf`,
+                                                    badgeColor: tesisCount > 0 ? "bg-blue-500/10 text-blue-600 border-blue-500/20" : "bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700",
+                                                    highlight: true
+                                                },
+                                                {
                                                     id: "checklist",
                                                     title: "Kontrol Listesi",
                                                     subtitle: "Mevzuat ve fiziki denetim soru maddeleri uygunluk tespiti",
@@ -2549,6 +2795,24 @@ export default function DenetimIl() {
                                                     icon: Edit2,
                                                     badge: isReportCreated ? "Rapor Hazır" : "Taslak",
                                                     badgeColor: isReportCreated ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-amber-500/10 text-amber-600 border-amber-500/20",
+                                                    highlight: false
+                                                },
+                                                {
+                                                    id: "ozet_tablolar",
+                                                    title: "İstenecek Tablo ve Bilgiler",
+                                                    subtitle: "İl Müdürlüğü teftişinde talep edilen 16 ana başlık ve istatistik özet tabloları",
+                                                    icon: Table,
+                                                    badge: "16 Konu / 19 Tablo",
+                                                    badgeColor: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
+                                                    highlight: false
+                                                },
+                                                {
+                                                    id: "ozel_beden_egitimi",
+                                                    title: "Özel Beden Eğitimi Tesisleri",
+                                                    subtitle: "Gerçek ve tüzel kişi spor tesisleri açılış evrakı, komisyon, fiziki şartlar ve vize denetimi",
+                                                    icon: Dumbbell,
+                                                    badge: localAuditData?.ozelBedenEgitimi?.tesisAdi ? "Dolduruldu" : "Denetime Hazır",
+                                                    badgeColor: localAuditData?.ozelBedenEgitimi?.tesisAdi ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-teal-500/10 text-teal-600 border-teal-500/20",
                                                     highlight: false
                                                 },
                                                 {
@@ -2597,22 +2861,25 @@ export default function DenetimIl() {
                                                                     </p>
                                                                 </div>
 
-                                                                {card.progress !== undefined && (
-                                                                    <div className="space-y-1.5 pt-1">
-                                                                        <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
-                                                                            <span>İlerleme</span>
+                                                                {card.progress !== undefined ? (
+                                                                    <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                                                                        <div className="flex justify-between text-[11px] font-black">
+                                                                            <span className="text-slate-400">İlerleme</span>
                                                                             <span className="text-blue-600 dark:text-blue-400">%{card.progress}</span>
                                                                         </div>
-                                                                        <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                                            <div className="h-full bg-blue-600 rounded-full transition-all duration-300" style={{ width: `${card.progress}%` }} />
+                                                                        <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                                                            <div
+                                                                                className="bg-blue-600 h-full rounded-full transition-all duration-500"
+                                                                                style={{ width: `${card.progress}%` }}
+                                                                            />
                                                                         </div>
                                                                     </div>
+                                                                ) : (
+                                                                    <div className="flex items-center text-xs font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform">
+                                                                        <span>Modülü Aç</span>
+                                                                        <ArrowRight size={14} className="ml-1" />
+                                                                    </div>
                                                                 )}
-
-                                                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs font-black text-blue-600 dark:text-blue-400">
-                                                                    <span>{card.highlight ? "Tam Ekran Çalış →" : "Modülü Aç →"}</span>
-                                                                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                                                                </div>
                                                             </div>
                                                         );
                                                     })}
@@ -2626,8 +2893,8 @@ export default function DenetimIl() {
                                     /* ========================================================================= */
                                     <div className="flex-1 flex flex-col min-h-0 overflow-hidden animate-in fade-in duration-200">
                                         {/* Sleek Focus Navigation Bar */}
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 p-3.5 rounded-2xl mb-4 flex-shrink-0 shadow-sm">
-                                            <div className="flex items-center gap-3">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 p-2.5 sm:p-3.5 rounded-2xl mb-3 sm:mb-4 flex-shrink-0 shadow-sm">
+                                            <div className="flex items-center justify-between sm:justify-start gap-2.5 sm:gap-3 w-full sm:w-auto">
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
@@ -2635,21 +2902,24 @@ export default function DenetimIl() {
                                                         handleSaveAuditData(localAuditData);
                                                         setActiveDetailTab("hub");
                                                     }}
-                                                    className="rounded-xl h-9 px-4 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-black text-xs flex items-center gap-2 shadow-sm"
+                                                    className="rounded-xl h-8.5 sm:h-9 px-3 sm:px-4 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 font-black text-xs flex items-center gap-1.5 sm:gap-2 shadow-sm shrink-0"
                                                 >
-                                                    <ArrowLeft size={15} />
+                                                    <ArrowLeft size={14} />
                                                     <span>Kartlara Dön</span>
                                                 </Button>
 
                                                 <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block" />
 
-                                                <div className="flex items-center gap-2 text-xs font-black text-slate-850 dark:text-white">
-                                                    <span className="text-slate-400 font-bold hidden md:inline">{selectedTask.rapor_adi} &gt;</span>
-                                                    <span className="text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                                                <div className="flex items-center gap-1.5 sm:gap-2 text-xs font-black text-slate-850 dark:text-white min-w-0 truncate">
+                                                    <span className="text-slate-400 font-bold hidden xl:inline truncate max-w-[200px]">{selectedTask.rapor_adi} &gt;</span>
+                                                    <span className="text-blue-600 dark:text-blue-400 uppercase tracking-wide truncate">
                                                         {activeDetailTab === "info" && "Genel Bilgiler"}
                                                         {activeDetailTab === "notes" && "Notlar & Tespitler"}
                                                         {activeDetailTab === "photos" && "Fotoğraflar"}
+                                                        {activeDetailTab === "tesisler" && "Tesisler"}
                                                         {activeDetailTab === "checklist" && "Kontrol Listesi"}
+                                                        {activeDetailTab === "ozet_tablolar" && "İstenecek Tablolar"}
+                                                        {activeDetailTab === "ozel_beden_egitimi" && "Özel Spor Tesisleri"}
                                                         {activeDetailTab === "editor" && "Rapor Editörü"}
                                                         {activeDetailTab === "evrak_talebi" && "Evrak Talebi"}
                                                     </span>
@@ -2657,12 +2927,15 @@ export default function DenetimIl() {
                                             </div>
 
                                             {/* Quick Switcher Pills */}
-                                            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto shrink-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto shrink-0 scroll-smooth touch-pan-x flex-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                                                 {[
                                                     { id: "info", label: "Genel Bilgi" },
                                                     { id: "notes", label: "Notlar" },
                                                     { id: "photos", label: "Fotoğraflar" },
+                                                    { id: "tesisler", label: "Tesisler" },
                                                     { id: "checklist", label: "Kontrol Listesi" },
+                                                    { id: "ozet_tablolar", label: "İstenecek Tablolar" },
+                                                    { id: "ozel_beden_egitimi", label: "Özel Spor Tesisleri" },
                                                     { id: "editor", label: "Rapor" },
                                                     { id: "evrak_talebi", label: "Evrak" }
                                                 ].map(tab => (
@@ -2672,10 +2945,10 @@ export default function DenetimIl() {
                                                             handleSaveAuditData(localAuditData);
                                                             setActiveDetailTab(tab.id as any);
                                                         }}
-                                                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
+                                                        className={`px-3 py-1.5 rounded-xl text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap shrink-0 ${
                                                             activeDetailTab === tab.id
                                                                 ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20"
-                                                                : "text-slate-500 hover:bg-slate-200/60 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400"
+                                                                : "bg-white/70 dark:bg-slate-800/70 text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 border border-slate-200/60 dark:border-slate-700/50"
                                                         }`}
                                                     >
                                                         {tab.label}
@@ -2689,7 +2962,10 @@ export default function DenetimIl() {
                                             {activeDetailTab === "info" && renderInfoTab()}
                                             {activeDetailTab === "notes" && renderNotesTab()}
                                             {activeDetailTab === "photos" && renderPhotosTab()}
+                                            {activeDetailTab === "tesisler" && renderTesislerTab()}
                                             {activeDetailTab === "checklist" && renderChecklistTab()}
+                                            {activeDetailTab === "ozet_tablolar" && renderOzetTablolarTab()}
+                                            {activeDetailTab === "ozel_beden_egitimi" && renderOzelBedenEgitimiTab()}
                                             {activeDetailTab === "evrak_talebi" && renderEvrakTalebiTab()}
                                             {activeDetailTab === "editor" && (
                                                 selectedReport.report_created === false ? (
