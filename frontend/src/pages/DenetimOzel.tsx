@@ -297,18 +297,15 @@ export default function DenetimOzel() {
         return cachedData.tasks.find(t => t.id === selectedTaskId) || null;
     }, [selectedTaskId, cachedData?.tasks]);
 
-    // Resolve the correct tab ID for the selected task (may differ from activeTab)
-    const taskTabId = useMemo(() => {
-        if (!selectedTask) return activeTab;
-        return reverseCategoryMap[selectedTask.rapor_turu] || activeTab;
-    }, [selectedTask, activeTab, reverseCategoryMap]);
+    // Bu sayfa YALNIZCA Özel Yurt Denetimi sayfasi oldugu icin soru seti daima ozel'dir!
+    const taskTabId = "ozel";
 
     // Questions answered by the user for preview modal
     const previewQuestions = useMemo(() => {
-        const questions = AUDIT_TEMPLATES[taskTabId] || AUDIT_TEMPLATES[activeTab] || [];
+        const questions = AUDIT_TEMPLATES.ozel || [];
         const form = localAuditData.form || {};
         return questions.filter((q: any) => form[q.id] === "yes" || form[q.id] === "no");
-    }, [taskTabId, activeTab, localAuditData.form]);
+    }, [localAuditData.form]);
 
     const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
 

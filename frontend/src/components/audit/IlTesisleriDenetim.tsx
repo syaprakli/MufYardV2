@@ -125,6 +125,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
 
     // Add / Edit Modal
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSavingFacilityModal, setIsSavingFacilityModal] = useState(false);
     const [editingFacilityId, setEditingFacilityId] = useState<string | null>(null);
     const [formData, setFormData] = useState<Partial<DenetimFacility>>({
         ad: "",
@@ -182,6 +183,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
 
     // Open Modal for Create
     const handleOpenCreateModal = () => {
+        setIsSavingFacilityModal(false);
         setEditingFacilityId(null);
         setFormData({
             ad: "",
@@ -199,6 +201,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
 
     // Open Modal for Edit
     const handleOpenEditModal = (facility: DenetimFacility) => {
+        setIsSavingFacilityModal(false);
         setEditingFacilityId(facility.id);
         setFormData({
             ad: facility.ad,
@@ -217,10 +220,16 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
     // Save Facility from Modal
     const handleSaveFacilityModal = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSavingFacilityModal) return;
+
         if (!formData.ad?.trim()) {
             toast.error("Lütfen tesis adını giriniz.");
             return;
         }
+
+        setIsSavingFacilityModal(true);
+        // Modalı anında kapatarak mükerrer tıklamayı önlüyoruz
+        setIsModalOpen(false);
 
         let updatedFacilities: DenetimFacility[] = [];
         if (editingFacilityId) {
@@ -267,8 +276,15 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
             tesisler: updatedFacilities
         };
         setLocalAuditData(updatedData);
-        await onSaveAuditData(updatedData);
-        setIsModalOpen(false);
+
+        try {
+            await onSaveAuditData(updatedData);
+        } catch (error) {
+            console.error("Tesis kaydedilirken hata oluştu:", error);
+            toast.error("Tesis kaydedilirken hata oluştu.");
+        } finally {
+            setIsSavingFacilityModal(false);
+        }
     };
 
     // Delete Facility
@@ -1195,8 +1211,9 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                 </h4>
                             </div>
                             <button
-                                onClick={() => setIsModalOpen(false)}
-                                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
+                                onClick={() => !isSavingFacilityModal && setIsModalOpen(false)}
+                                disabled={isSavingFacilityModal}
+                                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg disabled:opacity-50"
                             >
                                 <X size={16} />
                             </button>
@@ -1294,6 +1311,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                 <Button
                                     type="button"
                                     variant="outline"
+                                    disabled={isSavingFacilityModal}
                                     onClick={() => setIsModalOpen(false)}
                                     className="h-9.5 px-4 rounded-xl text-xs font-bold"
                                 >
@@ -1301,9 +1319,17 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                 </Button>
                                 <Button
                                     type="submit"
-                                    className="h-9.5 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20"
+                                    disabled={isSavingFacilityModal}
+                                    className="h-9.5 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 disabled:opacity-50"
                                 >
-                                    {editingFacilityId ? "Güncelle" : "Tesisi Kaydet"}
+                                    {isSavingFacilityModal ? (
+                                        <span className="flex items-center gap-2">
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            Kaydediliyor...
+                                        </span>
+                                    ) : (
+                                        editingFacilityId ? "Güncelle" : "Tesisi Kaydet"
+                                    )}
                                 </Button>
                             </div>
                         </form>

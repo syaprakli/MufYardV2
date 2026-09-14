@@ -1,11 +1,11 @@
 // @ts-nocheck
 import { 
-    Folder, File as FileIcon, Plus, Search, ChevronRight, ChevronDown, 
+    Folder, File as FileIcon, Plus, Search, ChevronRight, ChevronLeft, ChevronDown, 
     Download, Trash2, Shield, FolderOpen,
     FileText, Image as ImageIcon, Video, Music, 
     Upload, X, Grid, List as ListIcon, RefreshCw, Share2, ExternalLink, HelpCircle,
     Briefcase, FileSpreadsheet, Users, Check, Calendar, AlertTriangle, ArrowLeft, Calculator, Settings
-, Building, Coins, Info, Dumbbell } from "lucide-react";
+, Building, Coins, Info, Dumbbell, TrendingUp, Radio } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { toast } from "react-hot-toast";
@@ -15,6 +15,20 @@ import { useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
+
+const saveExcelWorkbook = async (wb: ExcelJS.Workbook, filename: string) => {
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+};
 import { fetchFileTree, uploadFile, createFolder, deleteItem, openFolder, openFile, shareFileToUser, generateKapakDocx, generateDiziDocx, generateDegerlendirmeDocx, type FileItem } from "../lib/api/files";
 import { aiSearch } from "../lib/api/ai";
 import { cn } from "../lib/utils";
@@ -27,6 +41,25 @@ import { LOJMAN_RATES, CITY_DISCOUNT_GROUPS } from "../lib/lojmanRates";
 import { YOLLUK_H_RATES, YOLLUK_COEFFICIENTS } from "../lib/yollukRates";
 import { OzelBedenEgitimiDenetim } from "../components/audit/OzelBedenEgitimiDenetim";
 
+const DEFAULT_BAZ_RATES: Record<string, { ydo: string; maktu: number; buyuksehirTavan: number; digerIlTavan: number }> = {
+    "2026": { ydo: "%25,49 (VUK 585)", maktu: 18471.21, buyuksehirTavan: 92356.05, digerIlTavan: 55413.63 },
+    "2025": { ydo: "%43,93 (VUK 574)", maktu: 14719.27, buyuksehirTavan: 73596.35, digerIlTavan: 44157.81 },
+    "2024": { ydo: "%58,46 (VUK 554)", maktu: 10226.69, buyuksehirTavan: 51133.45, digerIlTavan: 30680.07 },
+    "2023": { ydo: "%19,30 (Bakanlık maktu tarife)", maktu: 6453.80, buyuksehirTavan: 32269.00, digerIlTavan: 19361.40 },
+    "2022": { ydo: "%36,20 (VUK 533)", maktu: 5409.36, buyuksehirTavan: 27046.80, digerIlTavan: 16228.08 },
+    "2021": { ydo: "%9,11 (VUK 521)", maktu: 3971.65, buyuksehirTavan: 19858.25, digerIlTavan: 11914.95 },
+    "2020": { ydo: "%22,58 (VUK 512)", maktu: 3640.04, buyuksehirTavan: 18200.20, digerIlTavan: 10920.12 },
+    "2019": { ydo: "%23,73 (VUK 503)", maktu: 2969.52, buyuksehirTavan: 14847.60, digerIlTavan: 8908.56 },
+    "2018": { ydo: "(Yönetmelik başlangıç tutarı)", maktu: 2400.00, buyuksehirTavan: 12000.00, digerIlTavan: 7200.00 }
+};
+
+const BAZ_DAMGA_SECENEKLERI = [
+    { id: "kira", label: "Kira Sözleşmeleri (Mukavelenameleri)", binde: 1.89, aciklama: "Yer tahsisi & kiralama işlemi (Varsayılan)" },
+    { id: "sozlesme", label: "Sözleşmeler, Taahhütnameler, Mukavelenameler", binde: 9.48, aciklama: "Genel mukavele ve taahhütler" },
+    { id: "ihale", label: "Resmi Dairelere Verilen İhale Kararları", binde: 5.69, aciklama: "İhale kanununa tabi kararlar" },
+    { id: "maas", label: "Maaş, Ücret, Prim Ödemeleri / Bordrolar", binde: 7.59, aciklama: "Personel ve ücret bordroları" },
+    { id: "ozel", label: "Özel / Manuel Binde Oranı Girişi", binde: 0, aciklama: "Manuel oran girişi" }
+];
 
 export default function Files() {
 
@@ -86,6 +119,7 @@ export default function Files() {
     const [tahsisEkstralarOpen, setTahsisEkstralarOpen] = useState<boolean>(false);
     const [tahsisKdvRate, setTahsisKdvRate] = useState<number>(20);
     const [tahsisIsKdvDahil, setTahsisIsKdvDahil] = useState<boolean>(false);
+    const [tahsisIsKdvMuaf, setTahsisIsKdvMuaf] = useState<boolean>(false);
     const [tahsisIsGencSpor, setTahsisIsGencSpor] = useState<boolean>(false);
     const [tahsisIhaleVar, setTahsisIhaleVar] = useState<boolean>(false);
     const [isMadde18Open, setIsMadde18Open] = useState<boolean>(false);
@@ -123,6 +157,33 @@ export default function Files() {
     const [stadyumDocProtokol, setStadyumDocProtokol] = useState<boolean>(false);
     const [stadyumDocOnay, setStadyumDocOnay] = useState<boolean>(false);
     const [stadyumDocTutanak, setStadyumDocTutanak] = useState<boolean>(false);
+
+    // Baz İstasyonu States
+    const [isBazModalOpen, setIsBazModalOpen] = useState<boolean>(false);
+    const [bazYil, setBazYil] = useState<string>("2026");
+    const [bazIlTuru, setBazIlTuru] = useState<"buyuksehir" | "diger">("buyuksehir");
+    const [bazSozlesmeBedeliStr, setBazSozlesmeBedeliStr] = useState<string>("");
+    const [bazIsKdvDahil, setBazIsKdvDahil] = useState<boolean>(false);
+    const [bazRatesData, setBazRatesData] = useState<any>(null);
+    const [bazDocYerSecim, setBazDocYerSecim] = useState<boolean>(false);
+    const [bazDocRuhsat, setBazDocRuhsat] = useState<boolean>(false);
+    const [bazDocProtokol, setBazDocProtokol] = useState<boolean>(false);
+    const [bazDocTahsilat, setBazDocTahsilat] = useState<boolean>(false);
+    const [bazDamgaTuru, setBazDamgaTuru] = useState<string>("kira"); // default: Kira Sözleşmeleri (1.89)
+    const [bazDamgaManuelBinde, setBazDamgaManuelBinde] = useState<string>("1,89");
+    const [bazHasIhaleKarari, setBazHasIhaleKarari] = useState<boolean>(true); // GSB Hukuk Mütalaası: Yeni pazarlık ihale kararı varsa binde 5.69
+    const [isHukukYazisiModalOpen, setIsHukukYazisiModalOpen] = useState<boolean>(false);
+    const [hukukYaziActivePage, setHukukYaziActivePage] = useState<number>(1);
+    const [hukukYaziTab, setHukukYaziTab] = useState<"belge" | "ozet">("belge");
+
+    const getBazDamgaBinde = () => {
+        if (bazDamgaTuru === "ozel") {
+            const val = parseTRNumber(bazDamgaManuelBinde);
+            return isNaN(val) ? 0 : val;
+        }
+        const opt = BAZ_DAMGA_SECENEKLERI.find(o => o.id === bazDamgaTuru);
+        return opt ? opt.binde : 1.89;
+    };
 
 
     // Dizi Pusulası verileri
@@ -795,6 +856,7 @@ const calculateYollukValues = () => {
                 setIsStadyumModalOpen(false);
                 setIsMadde18Open(false);
                 setIsTarifeCetveliOpen(false);
+                setIsBazModalOpen(false);
             }
         };
         window.addEventListener("keydown", handleKeyDown);
@@ -5525,23 +5587,66 @@ const renderPratikModal = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 font-outfit">
                         
                         {/* 1. Damga Vergisi Oranları */}
-                        <div className="flex flex-col p-6 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 justify-between gap-4">
-                            <div>
-                                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2">
+                        <div className="flex flex-col p-6 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 gap-3">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                                     <FileText size={16} className="text-amber-500" />
                                     Damga Vergisi Oranları
                                 </h4>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                                    Sözleşmeler, kararlar, beyannameler ve diğer kağıtlar için geçerli resmi damga vergisi oranlarına ulaşın.
-                                </p>
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                                    488 s. Kanun
+                                </span>
                             </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                                488 sayılı Damga Vergisi Kanunu (1) Sayılı Tablo uyarınca geçerli resmi nispi oranlar.
+                            </p>
+                            
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-[10px] text-left border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 font-black uppercase">
+                                            <th className="py-1">Belge / İşlem Türü</th>
+                                            <th className="py-1 text-right">Oran</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="font-medium text-slate-700 dark:text-slate-300">
+                                        <tr className="border-b border-slate-100 dark:border-slate-800/40">
+                                            <td className="py-1.5">Sözleşmeler, Taahhütnameler, Mukavelenameler</td>
+                                            <td className="py-1.5 text-right font-mono font-semibold">Binde 9,48</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-100 dark:border-slate-800/40">
+                                            <td className="py-1.5">Maaş, Ücret, Prim Ödemeleri / Bordrolar</td>
+                                            <td className="py-1.5 text-right font-mono font-semibold">Binde 7,59</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-100 dark:border-slate-800/40">
+                                            <td className="py-1.5">Resmi Dairelere Verilen İhale Kararları</td>
+                                            <td className="py-1.5 text-right font-mono font-semibold">Binde 5,69</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-100 dark:border-slate-800/40 bg-amber-500/10 font-bold">
+                                            <td className="py-1.5 text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                                                <span>Kira Sözleşmeleri (Mukavelenameleri)</span>
+                                                <span className="text-[8px] px-1 py-0.5 bg-amber-500/20 text-amber-800 dark:text-amber-300 rounded font-black">BAZ İST.</span>
+                                            </td>
+                                            <td className="py-1.5 text-right font-mono text-amber-700 dark:text-amber-400 font-bold">Binde 1,89</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="p-2 rounded-xl bg-amber-500/5 border border-amber-500/20 text-[9px] text-slate-600 dark:text-slate-400 leading-snug flex items-start gap-1.5">
+                                <Info size={13} className="text-amber-500 shrink-0 mt-0.5" />
+                                <span>
+                                    <b>Baz İstasyonu Notu:</b> Kamu taşınmazlarında baz istasyonu yer tahsisleri kiralama niteliğinde olduğundan <b>Binde 1,89</b> üzerinden tahakkuk ettirilir.
+                                </span>
+                            </div>
+
                             <a
                                 href="https://www.verginet.net/dtt/1/Damga-Vergisi-Oranlari.aspx"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="w-full text-center inline-block bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl transition-all"
+                                className="w-full text-center inline-block bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-[10px] font-black uppercase tracking-widest py-2 rounded-xl transition-all mt-auto"
                             >
-                                Detayları Göster <ExternalLink size={10} className="inline-block ml-1" />
+                                Tüm Detayları Göster <ExternalLink size={10} className="inline-block ml-1" />
                             </a>
                         </div>
 
@@ -5737,6 +5842,106 @@ const renderPratikModal = () => {
                             </p>
                         </div>
 
+                        {/* 7. Yeniden Değerleme Oranları */}
+                        <div className="flex flex-col p-6 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 gap-3">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                    <TrendingUp size={16} className="text-amber-500" />
+                                    Son Yılların Yeniden Değerleme Oranları
+                                </h4>
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                    2026: %25,49
+                                </span>
+                            </div>
+                            <div className="overflow-y-auto max-h-[170px] pr-1 custom-scrollbar">
+                                <table className="w-full text-[10px] text-left border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 font-black uppercase sticky top-0 bg-slate-50 dark:bg-slate-800 z-10">
+                                            <th className="py-1">Uygulama Yılı (Vergilere Esas)</th>
+                                            <th className="py-1 text-center">Belirlendiği Yıl</th>
+                                            <th className="py-1 text-right">Yeniden Değerleme Oranı (%)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="font-medium text-slate-700 dark:text-slate-300">
+                                        {[
+                                            { uyg: '2026', bel: '2025', r: '%25,49', active: true },
+                                            { uyg: '2025', bel: '2024', r: '%43,93' },
+                                            { uyg: '2024', bel: '2023', r: '%58,46' },
+                                            { uyg: '2023', bel: '2022', r: '%122,93' },
+                                            { uyg: '2022', bel: '2021', r: '%36,20' },
+                                            { uyg: '2021', bel: '2020', r: '%9,11' },
+                                            { uyg: '2020', bel: '2019', r: '%22,58' },
+                                            { uyg: '2019', bel: '2018', r: '%23,73' },
+                                            { uyg: '2018', bel: '2017', r: '%14,47' },
+                                            { uyg: '2017', bel: '2016', r: '%3,83' },
+                                        ].map((row, idx) => (
+                                            <tr key={idx} className={cn("border-b border-slate-100 dark:border-slate-800/40", row.active && "bg-amber-500/5 font-bold")}>
+                                                <td className={cn("py-1", row.active && "text-amber-500")}>{row.uyg}</td>
+                                                <td className="py-1 text-center text-slate-500 dark:text-slate-400 font-mono">{row.bel}</td>
+                                                <td className={cn("py-1 text-right font-mono", row.active ? "text-amber-600 dark:text-amber-400 font-bold" : "")}>{row.r}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p className="text-[9px] text-slate-400 dark:text-slate-500 leading-tight">
+                                Vergi Usul Kanunu genel tebliğleri ile Resmi Gazete'de ilan edilen resmi oranlar.
+                            </p>
+                        </div>
+
+                        {/* 8. Baz İstasyonu Yer Seçim & Yasal Kira Tavanları */}
+                        <div className="flex flex-col p-6 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 gap-3 md:col-span-2 lg:col-span-2">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                    <Radio size={16} className="text-amber-500" />
+                                    Baz İstasyonu Yer Seçim & Yasal Kira Tavanları
+                                </h4>
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                                    3194 s. İmar K. Ek 9. Md
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                                3194 sayılı İmar Kanunu Ek 9. maddesi ve 27.01.2018 tarihli Yönetmelik uyarınca kamu taşınmazlarında baz istasyonları için azami yıllık yer kullanım bedeli tavanları.
+                            </p>
+                            <div className="overflow-x-auto max-h-[200px] pr-1 custom-scrollbar">
+                                <table className="w-full text-[10px] text-left border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-400 font-black uppercase sticky top-0 bg-slate-50 dark:bg-slate-800 z-10">
+                                            <th className="py-1.5 px-2">Yıl</th>
+                                            <th className="py-1.5 px-2">Uygulanan YDO / Dayanak</th>
+                                            <th className="py-1.5 px-2 text-right">Maktu Taban (1 Kat)</th>
+                                            <th className="py-1.5 px-2 text-right text-rose-600 dark:text-rose-400 font-bold">Büyükşehir Tavan (5 Katı)</th>
+                                            <th className="py-1.5 px-2 text-right text-blue-600 dark:text-blue-400 font-bold">Diğer İller Tavan (3 Katı)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="font-medium text-slate-700 dark:text-slate-300">
+                                        {[
+                                            { y: '2026', ydo: '%25,49 (VUK 585)', maktu: '18.471,21 TL', bs: '92.356,05 TL', diger: '55.413,63 TL', active: true },
+                                            { y: '2025', ydo: '%43,93 (VUK 574)', maktu: '14.719,27 TL', bs: '73.596,35 TL', diger: '44.157,81 TL' },
+                                            { y: '2024', ydo: '%58,46 (VUK 554)', maktu: '10.226,69 TL', bs: '51.133,45 TL', diger: '30.680,07 TL' },
+                                            { y: '2023', ydo: '%19,30 (Bakanlık maktu tarife)', maktu: '6.453,80 TL', bs: '32.269,00 TL', diger: '19.361,40 TL' },
+                                            { y: '2022', ydo: '%36,20 (VUK 533)', maktu: '5.409,36 TL', bs: '27.046,80 TL', diger: '16.228,08 TL' },
+                                            { y: '2021', ydo: '%9,11 (VUK 521)', maktu: '3.971,65 TL', bs: '19.858,25 TL', diger: '11.914,95 TL' },
+                                            { y: '2020', ydo: '%22,58 (VUK 512)', maktu: '3.640,04 TL', bs: '18.200,20 TL', diger: '10.920,12 TL' },
+                                            { y: '2019', ydo: '%23,73 (VUK 503)', maktu: '2.969,52 TL', bs: '14.847,60 TL', diger: '8.908,56 TL' },
+                                            { y: '2018', ydo: '(Yönetmelik başlangıç tutarı)', maktu: '2.400,00 TL', bs: '12.000,00 TL', diger: '7.200,00 TL' },
+                                        ].map((row, idx) => (
+                                            <tr key={idx} className={cn("border-b border-slate-100 dark:border-slate-800/40", row.active && "bg-amber-500/5 font-bold")}>
+                                                <td className={cn("py-1.5 px-2", row.active && "text-amber-500")}>{row.y}</td>
+                                                <td className="py-1.5 px-2 text-slate-500 dark:text-slate-400">{row.ydo}</td>
+                                                <td className="py-1.5 px-2 text-right font-mono">{row.maktu}</td>
+                                                <td className="py-1.5 px-2 text-right font-mono font-bold text-rose-600 dark:text-rose-400">{row.bs}</td>
+                                                <td className="py-1.5 px-2 text-right font-mono font-bold text-blue-600 dark:text-blue-400">{row.diger}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p className="text-[9px] text-slate-400 dark:text-slate-500 leading-relaxed">
+                                Kamu kurumları tarafından baz istasyonları için tahsil edilecek yıllık yer kullanım bedeli; Büyükşehirlerde Ulaştırma Bakanlığı maktu ücretinin azami 5 katı, diğer illerde ise azami 3 katı olabilir. Maktu taban ücret her yıl YDO oranında güncellenir.
+                            </p>
+                        </div>
+
                     </div>
                 </Card>
             </div>,
@@ -5777,57 +5982,57 @@ const renderPratikModal = () => {
                     </div>
                 </div>
 
-                {/* Sub-grid with three items */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* Sub-grid: 4-column responsive layout */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {/* Sub-card 1: Müfettiş Yardımcısı Değerlendirme Formu */}
-                    <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                        <div className="p-4 rounded-2xl bg-indigo-500/10 text-indigo-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
-                            <Shield size={24} />
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
+                            <Shield size={20} />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Değerlendirme Formu</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Değerlendirme Formu</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
                             Müfettiş yardımcılarının teftiş ve soruşturma aşamalarındaki resmi değerlendirme formunu düzenleyin ve yazdırın.
                         </p>
                         <Button 
                             onClick={() => setIsFormModalOpen(true)}
-                            className="mt-6 w-full rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest py-3 border-none"
+                            className="mt-3.5 w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
                         >
                             Uygulamayı Aç
                         </Button>
                     </Card>
 
                     {/* Sub-card 2: Dizi Pusulası Taslağı */}
-                    <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                        <div className="p-4 rounded-2xl bg-emerald-500/10 text-emerald-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
-                            <ListIcon size={24} />
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
+                            <ListIcon size={20} />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Dizi Pusulası Taslağı</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Dizi Pusulası Taslağı</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
                             Teftiş raporu eklerinin listelendiği resmi Dizi Pusulası belgesini (.docx) hazırlayın ve çıktı alın.
                         </p>
                         <Button 
                             onClick={() => setIsDiziModalOpen(true)}
-                            className="mt-6 w-full rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest py-3 border-none"
+                            className="mt-3.5 w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
                         >
                             Uygulamayı Aç
                         </Button>
                     </Card>
 
                     {/* Sub-card 3: Teftiş Rapor Kapağı Taslağı */}
-                    <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                        <div className="p-4 rounded-2xl bg-blue-500/10 text-blue-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
-                            <FileText size={24} />
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
+                            <FileText size={20} />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Teftiş Rapor Kapağı Taslağı</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Teftiş Rapor Kapağı</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
                             Bakanlık onayları, görev emirleri ve müfettiş imza bloklarını içeren resmi rapor kapak belgesini oluşturup indirin.
                         </p>
                         <Button 
                             onClick={() => setIsKapakModalOpen(true)}
-                            className="mt-6 w-full rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest py-3 border-none"
+                            className="mt-3.5 w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
                         >
                             Uygulamayı Aç
                         </Button>
@@ -5868,81 +6073,81 @@ const renderPratikModal = () => {
                     </div>
                 </div>
 
-                {/* Sub-grid with four items */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Sub-grid: 4-column responsive layout */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {/* Card 1: İhale Kontrol (2025 Limitleri) */}
-                    <Card className="flex flex-col p-5 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-indigo-500/10 to-blue-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
-                        <div className="p-3.5 rounded-xl bg-indigo-500/10 text-indigo-500 w-fit mb-5 group-hover:scale-110 transition-transform duration-500">
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-500/10 to-blue-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
                             <Shield size={20} />
                         </div>
-                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1.5">İhale Kontrol (2025 Limitleri)</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1">
-                            4734 ve 4735 Sayılı Kanun kapsamındaki 2025 limitlerine göre mal, hizmet ve yapım işleri alım süreçlerini adım adım takip edin.
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">İhale Kontrol (2025 Limitleri)</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
+                            4734 ve 4735 Sayılı Kanun kapsamındaki 2025 limitlerine göre alım süreçlerini adım adım takip edin.
                         </p>
                         <Button 
                             onClick={() => {
                                 resetIhale();
                                 setIsIhaleModalOpen(true);
                             }}
-                            className="mt-5 w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[9px] tracking-wider py-2.5 border-none"
+                            className="mt-3.5 w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
                         >
                             Uygulamayı Aç
                         </Button>
                     </Card>
 
                     {/* Card 2: İhale Kontrol 2 (2026-2027 Limitleri) */}
-                    <Card className="flex flex-col p-5 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-500/10 to-indigo-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
-                        <div className="p-3.5 rounded-xl bg-emerald-500/10 text-emerald-500 w-fit mb-5 group-hover:scale-110 transition-transform duration-500">
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-emerald-500/10 to-indigo-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
                             <Shield size={20} />
                         </div>
-                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1.5">İhale Kontrol 2 (2026-2027 Limitleri)</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1">
-                            2026-2027 Kamu İhale parasal limitlerine göre bütçe, komisyon, aşırı düşük ve stand-still kurallarını adım adım denetleyin.
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">İhale Kontrol 2 (2026-2027)</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
+                            2026-2027 Kamu İhale parasal limitlerine göre bütçe, komisyon, aşırı düşük kurallarını denetleyin.
                         </p>
                         <Button 
                             onClick={() => {
                                 resetIhale2();
                                 setIsIhale2ModalOpen(true);
                             }}
-                            className="mt-5 w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[9px] tracking-wider py-2.5 border-none"
+                            className="mt-3.5 w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
                         >
                             Uygulamayı Aç
                         </Button>
                     </Card>
 
                     {/* Card 3: Hakediş ve Kesinti Hesaplama */}
-                    <Card className="flex flex-col p-5 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
-                        <div className="p-3.5 rounded-xl bg-orange-500/10 text-orange-500 w-fit mb-5 group-hover:scale-110 transition-transform duration-500">
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
                             <FileSpreadsheet size={20} />
                         </div>
-                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1.5">Hakediş ve Kesinti</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Hakediş ve Kesinti</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
                             İmalat kalemleri tablosu üzerinden stopaj, damga, SGK borç kesintili hakediş raporu ve Excel tablosu hazırlayın.
                         </p>
                         <Button 
                             onClick={() => setIsHakedisModalOpen(true)}
-                            className="mt-5 w-full rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black uppercase text-[9px] tracking-wider py-2.5 border-none"
+                            className="mt-3.5 w-full rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
                         >
                             Uygulamayı Aç
                         </Button>
                     </Card>
 
                     {/* Card 4: İnşaat Birim Poz Fiyatları */}
-                    <Card className="flex flex-col p-5 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-sky-500/10 to-blue-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
-                        <div className="p-3.5 rounded-xl bg-sky-500/10 text-sky-500 w-fit mb-5 group-hover:scale-110 transition-transform duration-500">
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-sky-500/10 to-blue-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-sky-500/10 text-sky-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
                             <ExternalLink size={20} />
                         </div>
-                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-1.5">İnşaat Birim Poz Fiyatları</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1">
-                            Çevre, Şehircilik ve İklim Değişikliği Bakanlığı Yüksek Fen Kurulu inşaat birim poz fiyatları resmi sayfasına erişin.
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">İnşaat Birim Poz Fiyatları</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
+                            Çevre, Şehircilik ve İklim Değişikliği Bakanlığı Yüksek Fen Kurulu inşaat birim poz fiyatları sayfasına erişin.
                         </p>
                         <Button 
                             onClick={() => window.open("https://yfk.csb.gov.tr/birim-fiyatlar-100468", "_blank")}
-                            className="mt-5 w-full rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black uppercase text-[9px] tracking-wider py-2.5 border-none"
+                            className="mt-3.5 w-full rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
                         >
                             Uygulamayı Aç
                         </Button>
@@ -5969,6 +6174,7 @@ const renderPratikModal = () => {
                   {renderStadyumModal()}
                   {renderMadde18Modal()}
                   {renderTarifeCetveliModal()}
+                  {renderBazModal()}
                   </div>
                         
                         <div className="flex items-center gap-4">
@@ -5989,120 +6195,133 @@ const renderPratikModal = () => {
                     </div>
                 </div>
 
-                {/* Sub-grid with three items */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* Sub-grid: 4-column responsive layout */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {/* Sub-card 1: Lojman Kira Hesaplama */}
-                    <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                        <div className="p-4 rounded-2xl bg-indigo-500/10 text-indigo-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
-                            <FileSpreadsheet size={24} />
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
+                            <FileSpreadsheet size={20} />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Lojman Kira Hesaplama</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
-                            Kamu konutlarının (lojmanların) aylık kira bedelini, yakıt, kapıcı, elektrik ve su gibi ek bedeller dahil ederek resmi genelge kurallarına göre hesaplayın.
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Lojman Kira Hesaplama</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
+                            Kamu konutlarının aylık kira bedelini, yakıt, kapıcı, elektrik ve su ek bedelleri dahil genelgeye göre hesaplayın.
                         </p>
                         <Button 
                             onClick={() => setIsLojmanModalOpen(true)}
-                            className="mt-6 w-full rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest py-3 animate-pulse hover:animate-none"
+                            className="mt-3.5 w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
                         >
                             Uygulamayı Aç
                         </Button>
                     </Card>
 
                     {/* Sub-card 2: Sürekli Görev Yolluğu Hesaplama */}
-                    <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                        <div className="p-4 rounded-2xl bg-emerald-500/10 text-emerald-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
-                            <Users size={24} />
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
+                            <Users size={20} />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Sürekli Görev Yolluğu Hesaplama</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
-                            Nakil veya emeklilik nedeniyle ödenecek sürekli görev yolluğu (tayin bedeli) ve yolluk tazminatı tutarını aile fertleri dahil resmi kurallara göre hesaplayın.
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Sürekli Görev Yolluğu</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
+                            Nakil ve emeklilik nedeniyle ödenecek tayin bedeli ve yolluk tazminatı tutarını aile fertleri dahil hesaplayın.
                         </p>
                         <Button 
                             onClick={() => setIsYollukModalOpen(true)}
-                            className="mt-6 w-full rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest py-3 animate-pulse hover:animate-none"
+                            className="mt-3.5 w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
                         >
                             Uygulamayı Aç
                         </Button>
                     </Card>
 
                     {/* Sub-card 3: Görevlendirme Ücreti Hesaplama */}
-                    <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                        <div className="p-4 rounded-2xl bg-blue-500/10 text-blue-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
-                            <Briefcase size={24} />
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
+                            <Briefcase size={20} />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Görevlendirme Ücreti Hesaplama</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
-                            Bakanlık görevlendirmeleri, hakemlikler, jüri ve sınav komisyonu üyeliklerinde resmi gösterge tabloları üzerinden Gelir/Damga vergisi kesintili net görev ücreti hesaplayın.
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Görevlendirme Ücreti</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
+                            Bakanlık görevlendirmeleri, hakemlik ve sınav komisyon üyeliklerinde vergi kesintili net görev ücreti hesaplayın.
                         </p>
                         <Button 
                             onClick={() => setIsGorevModalOpen(true)}
-                            className="mt-6 w-full rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest py-3 animate-pulse hover:animate-none"
+                            className="mt-3.5 w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
                         >
                             Uygulamayı Aç
                         </Button>
                     </Card>
+
                     {/* Sub-card 4: Salon Tahsis */}
-                      <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                          <div className="p-4 rounded-2xl bg-amber-500/10 text-amber-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
-                              <Coins size={24} />
-                          </div>
-                          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Spor Tesisleri Tahsis Ücreti</h3>
-                          <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
-                              Salon, semt sahası ve diğer spor tesisleri tahsis hesaplamaları.
-                          </p>
-                          <div className="mt-6 flex gap-2 w-full">
-                              <Button 
-                                  onClick={() => setIsTahsisModalOpen(true)}
-                                  className="flex-1 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black uppercase text-[10px] tracking-widest py-3"
-                              >
-                                  Uygulamayı Aç
-                              </Button>
-                          </div>
-                      </Card>
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
+                            <Coins size={20} />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Spor Tesisleri Tahsis</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
+                            Spor salonu, semt sahası ve tesis tahsis, GM payı, KDV ve ek personel gider hesaplamaları.
+                        </p>
+                        <Button 
+                            onClick={() => setIsTahsisModalOpen(true)}
+                            className="mt-3.5 w-full rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
+                        >
+                            Uygulamayı Aç
+                        </Button>
+                    </Card>
 
-                      {/* Sub-card 5: Stadyum Tahsis */}
-                      <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-rose-500/10 to-pink-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                          <div className="p-4 rounded-2xl bg-rose-500/10 text-rose-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
-                              <Building size={24} />
-                          </div>
-                          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Stadyum Tahsis Ücreti</h3>
-                          <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
-                              Süper Lig, 1. Lig, 2. Lig ve 3. Lig stadyum kiralama ve tahsis bedeli hesaplamaları.
-                          </p>
-                          <div className="mt-6 flex gap-2 w-full">
-                              <Button 
-                                  onClick={() => setIsStadyumModalOpen(true)}
-                                  className="flex-1 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest py-3"
-                              >
-                                  Uygulamayı Aç
-                              </Button>
-                          </div>
-                      </Card>
+                    {/* Sub-card 5: Stadyum Tahsis */}
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-rose-500/10 to-pink-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
+                            <Building size={20} />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Stadyum Tahsis Ücreti</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
+                            Süper Lig, 1. Lig, 2. Lig ve 3. Lig stadyum kiralama ve tahsis bedeli resmi cetvelleri ve hesaplamaları.
+                        </p>
+                        <Button 
+                            onClick={() => setIsStadyumModalOpen(true)}
+                            className="mt-3.5 w-full rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
+                        >
+                            Uygulamayı Aç
+                        </Button>
+                    </Card>
 
-                      {/* Sub-card 6: Özel Beden Eğitimi Tesisleri Denetimi */}
-                      <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-teal-500/10 to-cyan-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                          <div className="p-4 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
-                              <Dumbbell size={24} />
-                          </div>
-                          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Özel Spor Tesisleri Denetimi</h3>
-                          <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
-                              Gerçek ve tüzel kişi özel beden eğitimi ve spor tesisleri açılış evrakı, komisyon kararları, fiziki şartlar ve denetim formu.
-                          </p>
-                          <div className="mt-6 flex gap-2 w-full">
-                              <Button 
-                                  onClick={() => setIsOzelBedenEgitimiModalOpen(true)}
-                                  className="flex-1 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-black uppercase text-[10px] tracking-widest py-3 animate-pulse hover:animate-none"
-                              >
-                                  Uygulamayı Aç
-                              </Button>
-                          </div>
-                      </Card>
+                    {/* Sub-card 6: Özel Beden Eğitimi Tesisleri Denetimi */}
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-teal-500/10 to-cyan-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
+                            <Dumbbell size={20} />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Özel Spor Tesisleri</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
+                            Gerçek ve tüzel kişi özel beden eğitimi tesisleri açılış evrakı, fiziki şartlar ve teftiş formu.
+                        </p>
+                        <Button 
+                            onClick={() => setIsOzelBedenEgitimiModalOpen(true)}
+                            className="mt-3.5 w-full rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
+                        >
+                            Uygulamayı Aç
+                        </Button>
+                    </Card>
+
+                    {/* Sub-card 7: Baz İstasyonu Kira Tavanı */}
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-500/10 to-blue-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
+                            <Radio size={20} />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Baz İstasyonu Tavanı</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
+                            3194 s. İmar Kanunu Ek 9. maddesi uyarınca kamu taşınmazlarında baz istasyonu azami kira tavanı denetimi.
+                        </p>
+                        <Button 
+                            onClick={() => setIsBazModalOpen(true)}
+                            className="mt-3.5 w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
+                        >
+                            Uygulamayı Aç
+                        </Button>
+                    </Card>
 
                 </div>
 
@@ -6139,16 +6358,16 @@ const renderPratikModal = () => {
                     </div>
                 </div>
 
-                {/* Main Grid - 4 Columns */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                {/* Main Grid: 4-column responsive layout */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {/* Card 1: Rapor İşlemleri */}
-                    <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                        <div className="p-4 rounded-2xl bg-emerald-500/10 text-emerald-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
-                            <FileText size={24} />
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
+                            <FileText size={20} />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Rapor İşlemleri</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Rapor İşlemleri</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
                             Dizi Pusulası, teftiş kapak belgesi ve müfettiş yardımcısı değerlendirme form şablonlarına erişin.
                         </p>
                         <Button 
@@ -6157,21 +6376,21 @@ const renderPratikModal = () => {
                                 setIsIhaleSubActive(false);
                                 setIsHesaplamaSubActive(false);
                             }}
-                            className="mt-6 w-full rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest py-3 border-none"
+                            className="mt-3.5 w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
                         >
                             Uygulamayı Aç
                         </Button>
                     </Card>
 
                     {/* Card 2: İhale İşlemleri */}
-                    <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                        <div className="p-4 rounded-2xl bg-blue-500/10 text-blue-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
-                            <Settings size={24} />
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
+                            <Settings size={20} />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">İhale İşlemleri</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
-                            İhale kontrol sihirbazı, KİK limit kontrolleri, hakediş kesinti hesap cetveli ve inşaat birim poz fiyatlarına erişin.
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">İhale İşlemleri</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
+                            İhale kontrol sihirbazı, KİK limit kontrolleri, hakediş kesinti hesap cetveli ve inşaat birim poz fiyatları.
                         </p>
                         <Button 
                             onClick={() => {
@@ -6179,21 +6398,21 @@ const renderPratikModal = () => {
                                 setIsRaporSubActive(false);
                                 setIsHesaplamaSubActive(false);
                             }}
-                            className="mt-6 w-full rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest py-3 border-none"
+                            className="mt-3.5 w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
                         >
                             Uygulamayı Aç
                         </Button>
                     </Card>
 
                     {/* Card 3: Hesaplama Araçları */}
-                    <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-500/10 to-indigo-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                        <div className="p-4 rounded-2xl bg-purple-500/10 text-purple-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
-                            <Calculator size={24} />
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-purple-500/10 to-indigo-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
+                            <Calculator size={20} />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Hesaplama Araçları</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
-                            Lojman kira bedeli hesaplama, sürekli görev yolluğu tayin bedeli hesabı ve görevlendirme ek ders/sınav ücreti hesaplama araçları.
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Hesaplama Araçları</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
+                            Lojman, sürekli görev yolluğu, görevlendirme, spor salonu, stadyum ve baz istasyonu kira tavan hesapları.
                         </p>
                         <Button 
                             onClick={() => {
@@ -6201,25 +6420,25 @@ const renderPratikModal = () => {
                                 setIsIhaleSubActive(false);
                                 setIsRaporSubActive(false);
                             }}
-                            className="mt-6 w-full rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-black uppercase text-[10px] tracking-widest py-3 border-none"
+                            className="mt-3.5 w-full rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
                         >
                             Uygulamayı Aç
                         </Button>
                     </Card>
 
                     {/* Card 4: Pratik Bilgiler */}
-                    <Card className="flex flex-col p-6 rounded-3xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-amber-500/10 to-yellow-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
-                        <div className="p-4 rounded-2xl bg-amber-500/10 text-amber-500 w-fit mb-6 group-hover:scale-110 transition-transform duration-500">
-                            <HelpCircle size={24} />
+                    <Card className="flex flex-col p-4 rounded-2xl border-white/60 dark:border-slate-800 bg-card/40 dark:bg-slate-900/40 backdrop-blur-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-amber-500/10 to-yellow-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                        <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500 w-fit mb-3 group-hover:scale-105 transition-transform duration-300">
+                            <HelpCircle size={20} />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Pratik Bilgiler</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed flex-1">
-                            Müfettişler ve denetim personeli için sıkça sorulan sorular, memur katsayıları, harcırah tutarları ve doğrudan temin limit özetleri.
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Pratik Bilgiler</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
+                            Yeniden değerleme oranları, memur katsayıları, aile yardımları, doğrudan temin ve baz istasyonu tavanları.
                         </p>
                         <Button 
                             onClick={() => setIsPratikModalOpen(true)}
-                            className="mt-6 w-full rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[10px] tracking-widest py-3 border-none"
+                            className="mt-3.5 w-full rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[10px] tracking-widest py-2 border-none"
                         >
                             Uygulamayı Aç
                         </Button>
@@ -6228,12 +6447,12 @@ const renderPratikModal = () => {
             </div>
         );
     };    
-    const handleExportTahsisExcel = () => {
+    const handleExportTahsisExcel = async () => {
         const gunSayisi = parseTRNumber(tahsisGunSayisiStr) || 1;
         const baseDaily = parseTRNumber(tahsisBaseFeeStr);
         const baseInput = baseDaily * gunSayisi;
-        const kdvRate = tahsisKdvRate / 100;
-        const baseNet = tahsisIsKdvDahil ? baseInput / (1 + kdvRate) : baseInput;
+        const kdvRate = tahsisIsKdvMuaf ? 0 : (tahsisKdvRate / 100);
+        const baseNet = (!tahsisIsKdvMuaf && tahsisIsKdvDahil) ? baseInput / (1 + kdvRate) : baseInput;
         
         const staff = parseTRNumber(tahsisStaffFeeStr);
         const ses = parseTRNumber(tahsisSesDuzeniFeeStr);
@@ -6242,45 +6461,218 @@ const renderPratikModal = () => {
         const sandalye = parseTRNumber(tahsisSandalyeFeeStr);
         const ekstraToplam = staff + ses + ring + ortu + sandalye;
 
-        const kdv = baseNet * kdvRate;
+        const kdv = tahsisIsKdvMuaf ? 0 : (baseNet * kdvRate);
         const damga = baseNet * 0.00948;
         const karar = tahsisIhaleVar ? baseNet * 0.00569 : 0;
         
-        const gmPayBase = baseNet + kdv + damga + karar;
+        const gmPayBase = baseNet;
         const gmPay = tahsisIsGencSpor ? 0 : (gmPayBase * 0.05);
-        const teminat = baseNet * 0.06;
         
-        const total = baseNet + kdv + gmPay + damga + karar + ekstraToplam + teminat;
+        const toplamTahsisUcreti = baseNet + kdv + gmPay + damga + karar + ekstraToplam;
+        const teminat = toplamTahsisUcreti * 0.06;
+        const total = toplamTahsisUcreti + teminat;
 
-        const wb = XLSX.utils.book_new();
-        const data: any[][] = [
-            ["SPOR TESİSLERİ TAHSİS ÜCRETİ HESAPLAMA RAPORU"],
-            ["Tarih", new Date().toLocaleDateString("tr-TR")],
-            [],
-            ["Hesaplama Kalemleri", "Açıklama", "Tutar (TL)"],
-            ["Tahsis Ücreti (Taban Bedel)", "", { t: "n", v: baseNet, z: "#,##0.00" }],
-            [`KDV Ücreti (%${tahsisKdvRate})`, "", { t: "n", v: kdv, z: "#,##0.00" }],
-            ["Genel Müdürlük Payı (%5)", tahsisIsGencSpor ? "Madde 12 İstisnası (0 TL)" : "KDV, Damga ve Karar Pulu Dahil Brüt Üzerinden", { t: "n", v: gmPay, z: "#,##0.00" }],
-            ["Damga Vergisi (Binde 9.48)", "Tahsis Bedeli Üzerinden", { t: "n", v: damga, z: "#,##0.00" }],
-            ["Karar Pulu (Binde 5.69)", tahsisIhaleVar ? "İhale Kararı - Tahsis Bedeli Üzerinden" : "İhale Yok (0 TL)", { t: "n", v: karar, z: "#,##0.00" }],
-            ["Ekstra Giderler Toplamı", "Personel, Ses, Ring vs.", { t: "n", v: ekstraToplam, z: "#,##0.00" }],
-            ["Teminat (%6 - İade Edilecek)", "Madde 13 - Tahsis Bedeli Üzerinden", { t: "n", v: teminat, z: "#,##0.00" }],
-            [],
-            ["TOPLAM ÖDEME BEDELİ", "Teminat Dahildir", { t: "n", v: total, z: "#,##0.00" }],
-            ["ÖDENECEK TEMİNAT", "İade Edilebilir Teminat Tutarı", { t: "n", v: teminat, z: "#,##0.00" }],
-            [],
-            ["Belge Kontrol Listesi", "Durum"],
-            ["Kiralama Talep Yazısı", tahsisDocTalep ? "Mevcut" : "Eksik"],
-            ["Teminat Dekontu / Mektubu", tahsisDocDekont ? "Mevcut" : "Eksik"],
-            ["Tahsis Sözleşmesi / Protokolü", tahsisDocProtokol ? "Mevcut" : "Eksik"],
-            ["Olur / Onay", tahsisDocOnay ? "Mevcut" : "Eksik"],
-            ["Eksiksiz Alındığına Dair Tutanak", tahsisDocTutanak ? "Mevcut" : "Eksik"],
+        const wb = new ExcelJS.Workbook();
+        wb.creator = "MufYARD V-2.0";
+        wb.created = new Date();
+        const ws = wb.addWorksheet("Tahsis Hesaplama", {
+            views: [{ showGridLines: true }]
+        });
+
+        ws.columns = [
+            { width: 8 },  // A: No
+            { width: 44 }, // B: Kalem Adı
+            { width: 36 }, // C: Açıklama
+            { width: 24 }  // D: Tutar (TL)
         ];
 
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, "Tahsis Raporu");
-        XLSX.writeFile(wb, "Tahsis_Ucreti_Raporu.xlsx");
-        toast.success("Excel belgesi indirildi.");
+        const borderThin: Partial<ExcelJS.Borders> = {
+            top: { style: "thin", color: { argb: "FFCBD5E1" } },
+            left: { style: "thin", color: { argb: "FFCBD5E1" } },
+            bottom: { style: "thin", color: { argb: "FFCBD5E1" } },
+            right: { style: "thin", color: { argb: "FFCBD5E1" } }
+        };
+
+        // 1. ÜST BAŞLIK
+        ws.mergeCells("A1:D1");
+        const titleRow = ws.getCell("A1");
+        titleRow.value = "T.C. GENÇLİK VE SPOR BAKANLIĞI";
+        titleRow.font = { name: "Calibri", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+        titleRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F172A" } };
+        titleRow.alignment = { vertical: "middle", horizontal: "center" };
+        ws.getRow(1).height = 24;
+
+        ws.mergeCells("A2:D2");
+        const subTitleRow = ws.getCell("A2");
+        subTitleRow.value = "SPOR TESİSLERİ TAHSİS ÜCRETİ HESAPLAMA CETVELİ";
+        subTitleRow.font = { name: "Calibri", size: 13, bold: true, color: { argb: "FFFFFFFF" } };
+        subTitleRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB45309" } };
+        subTitleRow.alignment = { vertical: "middle", horizontal: "center" };
+        ws.getRow(2).height = 28;
+
+        ws.mergeCells("A3:D3");
+        const dateRow = ws.getCell("A3");
+        dateRow.value = `Hesaplama Tarihi: ${new Date().toLocaleDateString("tr-TR")} | Süre: ${gunSayisi} Gün`;
+        dateRow.font = { name: "Calibri", size: 9, italic: true, color: { argb: "FF64748B" } };
+        dateRow.alignment = { vertical: "middle", horizontal: "center" };
+        ws.getRow(3).height = 20;
+
+        // 2. PARAMETRELER KARTI
+        ws.mergeCells("A5:D5");
+        const cardHeader = ws.getCell("A5");
+        cardHeader.value = "TAHSİS VE TARİFE PARAMETRELERİ";
+        cardHeader.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFB45309" } };
+        cardHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEF3C7" } };
+        cardHeader.border = borderThin;
+        ws.getRow(5).height = 22;
+
+        const infoRows = [
+            ["Günlük Birim Bedel", baseDaily, "Tahsis Süresi", `${gunSayisi} Gün`],
+            ["KDV Durumu", tahsisIsKdvMuaf ? "İstisna (%0 KDV)" : `%${tahsisKdvRate} KDV ${tahsisIsKdvDahil ? "(Dahil)" : "(Hariç)"}`, "Gençlik/Spor Faaliyeti", tahsisIsGencSpor ? "Evet (%5 Pay Muaf)" : "Hayır (Pay Alınır)"]
+        ];
+
+        infoRows.forEach((r, idx) => {
+            const rowNum = 6 + idx;
+            ws.getRow(rowNum).height = 20;
+            const cA = ws.getCell(`A${rowNum}`);
+            const cB = ws.getCell(`B${rowNum}`);
+            const cC = ws.getCell(`C${rowNum}`);
+            const cD = ws.getCell(`D${rowNum}`);
+
+            cA.value = r[0]; cA.font = { name: "Calibri", size: 9, color: { argb: "FF64748B" } }; cA.border = borderThin; cA.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+            cB.value = r[1]; cB.font = { name: "Calibri", size: 9, bold: true }; cB.border = borderThin; cB.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } };
+            if (typeof r[1] === "number") { cB.numFmt = '#,##0.00 "TL"'; cB.alignment = { horizontal: "right" }; }
+
+            cC.value = r[2]; cC.font = { name: "Calibri", size: 9, color: { argb: "FF64748B" } }; cC.border = borderThin; cC.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+            cD.value = r[3]; cD.font = { name: "Calibri", size: 9, bold: true }; cD.border = borderThin; cD.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } };
+            if (typeof r[3] === "number") { cD.numFmt = '#,##0.00 "TL"'; cD.alignment = { horizontal: "right" }; }
+        });
+
+        // 3. TABLO BAŞLIK SATIRI
+        const thRow = ws.getRow(9);
+        thRow.height = 26;
+        const headers = ["NO", "HESAPLAMA KALEMİ", "AÇIKLAMA", "TUTAR (TL)"];
+        headers.forEach((h, i) => {
+            const colLetter = String.fromCharCode(65 + i);
+            const cell = ws.getCell(`${colLetter}9`);
+            cell.value = h;
+            cell.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB45309" } };
+            cell.alignment = { vertical: "middle", horizontal: i === 3 ? "right" : (i === 0 ? "center" : "left") };
+            cell.border = borderThin;
+        });
+
+        // 4. TABLO SATIRLARI (SADECE HESAPLAMALAR)
+        const tableRows = [
+            { no: "1", name: "Tahsis Ücreti (Taban Bedel)", desc: `${gunSayisi} gün x ${baseDaily.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL`, amount: baseNet, isSubtotal: true },
+            { no: "2", name: tahsisIsKdvMuaf ? "KDV Ücreti (%0 - İstisna)" : `KDV Ücreti (%${tahsisKdvRate})`, desc: tahsisIsKdvMuaf ? "KDV Kanunu Md. 17/4-d gereği istisnadır" : "Tahsis bedeli üzerinden", amount: kdv },
+            { no: "3", name: "Genel Müdürlük Payı (%5)", desc: tahsisIsGencSpor ? "Madde 12 İstisnası (0 TL)" : "Tahsis bedeli üzerinden", amount: gmPay },
+            { no: "4", name: "Damga Vergisi (Binde 9.48)", desc: "Tahsis bedeli üzerinden mukavele pulu", amount: damga }
+        ];
+
+        if (tahsisIhaleVar) {
+            tableRows.push({ no: "5", name: "Karar Pulu (Binde 5.69)", desc: "İhale kararı pulu", amount: karar });
+        }
+        if (ekstraToplam > 0) {
+            tableRows.push({ no: "6", name: "Ekstra Giderler Toplamı", desc: "Personel, Ses, Ring, Örtü vb.", amount: ekstraToplam });
+        }
+
+        tableRows.push(
+            { no: "=", name: "Toplam Tahsis Bedeli (Teminat Hariç)", desc: "Tüm Hizmet ve Vergi Kalemleri Toplamı", amount: toplamTahsisUcreti, isAccent: true },
+            { no: "7", name: "Teminat (%6 - İade Edilecek)", desc: "Madde 13 - Toplam tahsis bedeli üzerinden", amount: teminat, isAccent: true }
+        );
+
+        let curRow = 10;
+        tableRows.forEach(item => {
+            const r = ws.getRow(curRow);
+            r.height = item.isSubtotal || item.isAccent ? 24 : 20;
+
+            const cNo = ws.getCell(`A${curRow}`);
+            const cName = ws.getCell(`B${curRow}`);
+            const cDesc = ws.getCell(`C${curRow}`);
+            const cAmt = ws.getCell(`D${curRow}`);
+
+            cNo.value = item.no;
+            cName.value = item.name;
+            cDesc.value = item.desc;
+            cAmt.value = item.amount;
+
+            cNo.alignment = { vertical: "middle", horizontal: "center" };
+            cName.alignment = { vertical: "middle", horizontal: "left" };
+            cDesc.alignment = { vertical: "middle", horizontal: "left" };
+            cAmt.alignment = { vertical: "middle", horizontal: "right" };
+            cAmt.numFmt = '#,##0.00 "TL"';
+
+            if (item.isSubtotal) {
+                const bg = "FFF1F5F9";
+                [cNo, cName, cDesc, cAmt].forEach(c => {
+                    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+                    c.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FF0F172A" } };
+                    c.border = borderThin;
+                });
+            } else if (item.isAccent) {
+                const bg = "FFFEF3C7"; // Amber 100
+                [cNo, cName, cDesc, cAmt].forEach(c => {
+                    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+                    c.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFB45309" } };
+                    c.border = borderThin;
+                });
+            } else {
+                const isEven = curRow % 2 === 0;
+                const bg = isEven ? "FFFFFFFF" : "FFF8FAFC";
+                [cNo, cName, cDesc, cAmt].forEach(c => {
+                    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+                    c.font = { name: "Calibri", size: 9.5, color: { argb: "FF1E293B" } };
+                    c.border = borderThin;
+                });
+                cDesc.font = { name: "Calibri", size: 8.5, italic: true, color: { argb: "FF64748B" } };
+            }
+
+            curRow++;
+        });
+
+        curRow++; // 1 satır boşluk
+
+        // 5. GENEL TOPLAM VE TEMİNAT KARTLARI
+        const totRow = curRow;
+        ws.getRow(totRow).height = 28;
+        ws.mergeCells(`A${totRow}:C${totRow}`);
+        const totLabel = ws.getCell(`A${totRow}`);
+        totLabel.value = "TOPLAM TAHSİS BEDELİ (Teminat Dahil)";
+        totLabel.font = { name: "Calibri", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+        totLabel.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F172A" } };
+        totLabel.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+        totLabel.border = borderThin;
+
+        const totVal = ws.getCell(`D${totRow}`);
+        totVal.value = total;
+        totVal.font = { name: "Calibri", size: 13, bold: true, color: { argb: "FFFFFFFF" } };
+        totVal.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F172A" } };
+        totVal.alignment = { vertical: "middle", horizontal: "right" };
+        totVal.numFmt = '#,##0.00 "TL"';
+        totVal.border = borderThin;
+
+        curRow++;
+        const temRow = curRow;
+        ws.getRow(temRow).height = 26;
+        ws.mergeCells(`A${temRow}:C${temRow}`);
+        const temLabel = ws.getCell(`A${temRow}`);
+        temLabel.value = "ÖDENECEK TEMİNAT TUTARI (İade Edilebilir)";
+        temLabel.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFB45309" } };
+        temLabel.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEF3C7" } };
+        temLabel.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+        temLabel.border = borderThin;
+
+        const temVal = ws.getCell(`D${temRow}`);
+        temVal.value = teminat;
+        temVal.font = { name: "Calibri", size: 12, bold: true, color: { argb: "FFB45309" } };
+        temVal.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEF3C7" } };
+        temVal.alignment = { vertical: "middle", horizontal: "right" };
+        temVal.numFmt = '#,##0.00 "TL"';
+        temVal.border = borderThin;
+
+        await saveExcelWorkbook(wb, `Spor_Tesisi_Tahsis_Hesaplama_${gunSayisi}gun.xlsx`);
+        toast.success("Excel tablosu profesyonel biçimlendirmeyle indirildi.");
     };
 
     const renderMadde18Modal = () => {
@@ -6352,10 +6744,9 @@ const renderPratikModal = () => {
                             onChange={(e) => setStadyumSezon(e.target.value)} 
                             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 focus:ring-2 focus:ring-rose-500 outline-none text-sm font-bold w-64 shadow-sm text-slate-800 dark:text-slate-200 cursor-pointer"
                         >
-                            <option value="2026-2027">2026 - 2027 Sezonu</option>
-                            <option value="2024-2025">2024 - 2025 Sezonu</option>
-                            <option value="2023-2024">2023 - 2024 Sezonu</option>
-                            <option value="2022-2023">2022 - 2023 Sezonu</option>
+                            {Object.keys(stadyumRatesData).map(season => (
+                                <option key={season} value={season}>{season.replace("-", " - ")} Sezonu</option>
+                            ))}
                         </select>
                         <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-auto">Fiyatlar ₺ cinsindendir.</p>
                     </div>
@@ -6419,8 +6810,8 @@ const renderPratikModal = () => {
         const gunSayisi = parseTRNumber(tahsisGunSayisiStr) || 1;
         const baseDaily = parseTRNumber(tahsisBaseFeeStr);
         const baseInput = baseDaily * gunSayisi;
-        const kdvRate = tahsisKdvRate / 100;
-        const baseNet = tahsisIsKdvDahil ? baseInput / (1 + kdvRate) : baseInput;
+        const kdvRate = tahsisIsKdvMuaf ? 0 : (tahsisKdvRate / 100);
+        const baseNet = (!tahsisIsKdvMuaf && tahsisIsKdvDahil) ? baseInput / (1 + kdvRate) : baseInput;
         
         const staff = parseTRNumber(tahsisStaffFeeStr);
         const ses = parseTRNumber(tahsisSesDuzeniFeeStr);
@@ -6429,15 +6820,30 @@ const renderPratikModal = () => {
         const sandalye = parseTRNumber(tahsisSandalyeFeeStr);
         const ekstraToplam = staff + ses + ring + ortu + sandalye;
 
-        const kdv = baseNet * kdvRate;
+        const kdv = tahsisIsKdvMuaf ? 0 : (baseNet * kdvRate);
         const damga = baseNet * 0.00948;
         const karar = tahsisIhaleVar ? baseNet * 0.00569 : 0;
         
-        const gmPayBase = baseNet + kdv + damga + karar;
+        const gmPayBase = baseNet;
         const gmPay = tahsisIsGencSpor ? 0 : (gmPayBase * 0.05);
-        const teminat = baseNet * 0.06;
+        const toplamTahsisUcreti = baseNet + kdv + gmPay + damga + karar + ekstraToplam;
+        const teminat = toplamTahsisUcreti * 0.06;
         
-        const total = baseNet + kdv + gmPay + damga + karar + ekstraToplam + teminat;
+        const total = toplamTahsisUcreti + teminat;
+
+        const tahsisCalcTooltip = [
+            `• Net Tahsis Bedeli: ${fmtTR(baseNet)} TL`,
+            `• KDV (${tahsisIsKdvMuaf ? "%0 Muaf" : `%${tahsisKdvRate}`}): +${fmtTR(kdv)} TL`,
+            `• GM Payı (%5): +${fmtTR(gmPay)} TL`,
+            `• Damga Vergisi (Binde 9.48): +${fmtTR(damga)} TL`,
+            karar > 0 ? `• Karar Pulu (Binde 5.69): +${fmtTR(karar)} TL` : null,
+            ekstraToplam > 0 ? `• Ekstra Giderler: +${fmtTR(ekstraToplam)} TL` : null,
+            `────────────────────────────`,
+            `• Teminat Hariç Toplam: ${fmtTR(toplamTahsisUcreti)} TL`,
+            `• Teminat (%6 - İade Edilecek): +${fmtTR(teminat)} TL`,
+            `════════════════════════════`,
+            `TOPLAM TAHSİS BEDELİ: ${fmtTR(total)} TL`
+        ].filter(Boolean).join("\n");
 
         const docsCount = [tahsisDocTalep, tahsisDocDekont, tahsisDocProtokol, tahsisDocTutanak, tahsisDocOnay].filter(Boolean).length;
         const isComplete = docsCount === 5;
@@ -6508,25 +6914,49 @@ const renderPratikModal = () => {
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">KDV Oranı (%)</label>
+                                        <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">
+                                            KDV Oranı (%) {tahsisIsKdvMuaf && <span className="text-amber-500 font-bold lowercase">(istisna)</span>}
+                                        </label>
                                         <input 
                                             type="number" 
-                                            value={tahsisKdvRate} 
+                                            disabled={tahsisIsKdvMuaf}
+                                            value={tahsisIsKdvMuaf ? 0 : tahsisKdvRate} 
                                             onChange={(e) => setTahsisKdvRate(Number(e.target.value))}
-                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-amber-500 outline-none text-xs font-bold text-slate-800 dark:text-slate-200" 
+                                            className={`w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-amber-500 outline-none text-xs font-bold text-slate-800 dark:text-slate-200 ${tahsisIsKdvMuaf ? "opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-800" : ""}`} 
                                         />
                                     </div>
                                 </div>
                                 <div className="space-y-2 mt-2">
-                                    <label className="flex items-center gap-2 text-[10px] font-semibold text-slate-600 dark:text-slate-350 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={tahsisIsKdvDahil} 
-                                            onChange={(e) => setTahsisIsKdvDahil(e.target.checked)}
-                                            className="rounded border-slate-300 text-amber-500 focus:ring-amber-500"
-                                        />
-                                        <span>Girdiğim Fiyat KDV {tahsisIsKdvDahil ? "Dahildir" : "Hariçtir"}</span>
-                                    </label>
+                                    <div className="flex flex-wrap items-center gap-4">
+                                        <label className={`flex items-center gap-2 text-[10px] font-semibold text-slate-600 dark:text-slate-350 ${tahsisIsKdvMuaf ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+                                            <input 
+                                                type="checkbox" 
+                                                disabled={tahsisIsKdvMuaf}
+                                                checked={!tahsisIsKdvMuaf && tahsisIsKdvDahil} 
+                                                onChange={(e) => setTahsisIsKdvDahil(e.target.checked)}
+                                                className="rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                                            />
+                                            <span>Girdiğim Fiyat KDV {tahsisIsKdvDahil ? "Dahildir" : "Hariçtir"}</span>
+                                        </label>
+                                        <label className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-600 dark:text-slate-350 cursor-pointer select-none">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={tahsisIsKdvMuaf} 
+                                                onChange={(e) => setTahsisIsKdvMuaf(e.target.checked)}
+                                                className="rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+                                            />
+                                            <span className={tahsisIsKdvMuaf ? "text-amber-600 dark:text-amber-400 font-bold" : ""}>KDV Hesaplanmasın</span>
+                                            <div className="relative inline-flex items-center group/kdvinfo">
+                                                <Info size={13} className="text-slate-400 group-hover/kdvinfo:text-amber-600 transition-colors cursor-help" />
+                                                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover/kdvinfo:flex flex-col items-center z-50 pointer-events-none w-64">
+                                                    <div className="bg-slate-900 text-white text-[10px] font-medium leading-tight py-1.5 px-2.5 rounded-lg shadow-xl border border-slate-700 text-center">
+                                                        KDV Kanunu'nun 17/4-d maddesi gereğince istisnadır.
+                                                    </div>
+                                                    <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 border-r border-b border-slate-700"></div>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
                                     <label className="flex items-center gap-2 text-[10px] font-semibold text-slate-600 dark:text-slate-350 cursor-pointer">
                                         <input 
                                             type="checkbox" 
@@ -6656,10 +7086,17 @@ const renderPratikModal = () => {
                                         <span className="font-medium text-slate-500">A) Tahsis Ücreti (Taban Bedel)</span>
                                         <span className="font-bold text-slate-800 dark:text-slate-200">{fmtTR(baseNet)} TL</span>
                                     </div>
-                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${fmtTR(baseNet)} TL x %${tahsisKdvRate} = ${fmtTR(kdv)} TL`}>
-                                        <span className="font-medium text-slate-500">B) KDV Ücreti (%{tahsisKdvRate})</span>
-                                        <span className="font-bold text-slate-800 dark:text-slate-200">+{fmtTR(kdv)} TL</span>
-                                    </div>
+                                    {tahsisIsKdvMuaf ? (
+                                        <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 bg-amber-500/5 px-2 rounded-lg" title="KDV Kanunu'nun 17/4-d maddesi gereğince istisnadır">
+                                            <span className="font-medium text-amber-600 dark:text-amber-400">B) KDV Ücreti (İstisna: Md. 17/4-d)</span>
+                                            <span className="font-bold text-amber-600 dark:text-amber-400">0,00 TL</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${fmtTR(baseNet)} TL x %${tahsisKdvRate} = ${fmtTR(kdv)} TL`}>
+                                            <span className="font-medium text-slate-500">B) KDV Ücreti (%{tahsisKdvRate})</span>
+                                            <span className="font-bold text-slate-800 dark:text-slate-200">+{fmtTR(kdv)} TL</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${fmtTR(gmPayBase)} TL x %5 = ${fmtTR(gmPay)} TL`}>
                                         <span className="font-medium text-slate-500">C) %5 Genel Müdürlük Payı</span>
                                         <span className="font-bold text-slate-800 dark:text-slate-200">+{fmtTR(gmPay)} TL</span>
@@ -6678,19 +7115,35 @@ const renderPratikModal = () => {
                                         <span className="font-medium text-slate-500">E) Ekstra Giderler Toplamı</span>
                                         <span className="font-bold text-slate-800 dark:text-slate-200">+{fmtTR(ekstraToplam)} TL</span>
                                     </div>
-                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 text-amber-600 dark:text-amber-400" title={`${fmtTR(baseNet)} TL x %6 = ${fmtTR(teminat)} TL`}>
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 bg-amber-500/5 px-2 rounded-lg" title="Teminat hariç toplam tahsis bedeli">
+                                        <span className="font-semibold text-slate-700 dark:text-slate-200">Toplam Tahsis Bedeli (Teminat Hariç)</span>
+                                        <span className="font-bold text-slate-900 dark:text-slate-100">{fmtTR(toplamTahsisUcreti)} TL</span>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 text-amber-600 dark:text-amber-400" title={`${fmtTR(toplamTahsisUcreti)} TL x %6 = ${fmtTR(teminat)} TL`}>
                                         <span className="font-semibold">F) %6 Teminat Gideri (İade Edilecek)</span>
                                         <span className="font-bold">{fmtTR(teminat)} TL</span>
                                     </div>
                                 </div>
 
                                 <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-3">
-                                    <div className="bg-slate-100/50 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-200/50 dark:border-slate-800">
-                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">Toplam Ödeme Bedeli</span>
+                                    <div 
+                                        className="bg-slate-100/50 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-200/50 dark:border-slate-800 cursor-help transition-all hover:bg-slate-100 dark:hover:bg-slate-900/80 group"
+                                        title={tahsisCalcTooltip}
+                                    >
+                                        <div className="flex items-center justify-between mb-0.5">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 group-hover:text-amber-600 transition-colors">Toplam Tahsis Bedeli</span>
+                                            <Info size={12} className="text-slate-400 group-hover:text-amber-500 transition-colors" />
+                                        </div>
                                         <span className="text-xl font-black text-slate-900 dark:text-slate-100">{fmtTR(total)} TL</span>
                                     </div>
-                                    <div className="bg-amber-500/5 p-3 rounded-2xl border border-amber-500/10">
-                                        <span className="text-[10px] font-black uppercase tracking-wider text-amber-500 block mb-0.5">Ödenecek Teminat</span>
+                                    <div 
+                                        className="bg-amber-500/5 p-3 rounded-2xl border border-amber-500/10 cursor-help transition-all hover:bg-amber-500/10 group"
+                                        title={`Teminat Hesabı:\nToplam Tahsis Bedeli: ${fmtTR(toplamTahsisUcreti)} TL x %6 = ${fmtTR(teminat)} TL\n(Tesis tesliminde hasarsızlık halinde iade edilir)`}
+                                    >
+                                        <div className="flex items-center justify-between mb-0.5">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-amber-500">Ödenecek Teminat</span>
+                                            <Info size={12} className="text-amber-500/70" />
+                                        </div>
                                         <span className="text-xl font-black text-amber-600 dark:text-amber-400">{fmtTR(teminat)} TL</span>
                                     </div>
                                 </div>
@@ -6713,13 +7166,13 @@ const renderPratikModal = () => {
         , document.body);
     };
 
-    const handleExportStadyumExcel = () => {
+    const handleExportStadyumExcel = async () => {
         if (!stadyumRatesData) return;
         const seasonData = stadyumRatesData[stadyumSezon];
         if (!seasonData) return;
         const ligData = seasonData[stadyumLig];
         if (!ligData) return;
-        const tier = ligData.tiers.find((t: any) => t.code === stadyumKapasiteTier);
+        const tier = ligData.tiers.find((t: any) => t.code === stadyumKapasiteTier) || ligData.tiers[0];
         if (!tier) return;
 
         const birimFiyat = stadyumKiralamaTuru === "sezonluk" ? tier.sezonluk : tier.tekMac;
@@ -6741,55 +7194,225 @@ const renderPratikModal = () => {
         const damga = baseNet * 0.00948;
         const karar = stadyumIhaleVar ? baseNet * 0.00569 : 0;
         
-        const gmPayBase = baseNet + kdv + damga + karar;
+        const gmPayBase = baseNet;
         const gmPay = stadyumIsGencSpor ? 0 : (gmPayBase * 0.05);
         
-        const teminat = baseNet * 0.06;
-        const total = baseNet + kdv + gmPay + damga + karar + teminat;
-    
+        const toplamTahsisUcreti = baseNet + kdv + gmPay + damga + karar;
+        const teminat = toplamTahsisUcreti * 0.06;
+        const total = toplamTahsisUcreti + teminat;
 
-        const wb = XLSX.utils.book_new();
-        const data: any[][] = [
-            ["STADYUM TAHSİS ÜCRETİ HESAPLAMA RAPORU"],
-            ["Tarih", new Date().toLocaleDateString("tr-TR")],
-            [],
-            ["Sezon", stadyumSezon],
-            ["Lig", ligData.label],
-            ["Seyirci Kapasitesi", `${tier.code} - ${tier.label}`],
-            ["Kiralama Türü", stadyumKiralamaTuru === "sezonluk" ? "Sezonluk Kiralama" : "Tek Maç / Belirli Müsabakalar"],
-            ["Müsabaka Sayısı", stadyumMacSayisi],
-            [],
-            ["Hesaplama Kalemleri", "Açıklama", "Tutar (TL)"],
-            ["Birim Kira Bedeli (Müsabaka Başı)", stadyumKiralamaTuru === "sezonluk" ? "Sezonluk Tarife" : "Tek Maç Tarife", { t: "n", v: birimFiyat, z: "#,##0.00" }],
-            ["Toplam Kira Bedeli", `${stadyumMacSayisi} müsabaka`, { t: "n", v: birimFiyat * stadyumMacSayisi, z: "#,##0.00" }],
+        const wb = new ExcelJS.Workbook();
+        wb.creator = "MufYARD V-2.0";
+        wb.created = new Date();
+        const ws = wb.addWorksheet("Stadyum Tahsis", {
+            views: [{ showGridLines: true }]
+        });
+
+        ws.columns = [
+            { width: 8 },  // A: No
+            { width: 44 }, // B: Hesaplama Kalemi
+            { width: 40 }, // C: Açıklama / Mevzuat Dayanağı
+            { width: 24 }  // D: Tutar (TL)
         ];
-        if (stadyumOzelMusabaka) data.push(["Özel Müsabaka Farkı (+%50)", "Madde 15", { t: "n", v: ozelFark, z: "#,##0.00" }]);
-        if (stadyumKalkinmaIl) data.push(["Kalkınmada Öncelikli İl İndirimi (-%50)", "Madde 18", { t: "n", v: -kalkinmaIndirim, z: "#,##0.00" }]);
-        data.push(
-            ["Net Kira Bedeli", "", { t: "n", v: kiraBedeli, z: "#,##0.00" }],
-            ["Genel Müdürlük Payı (%5)", "Madde 2 - Kira Bedeli Üzerinden", { t: "n", v: gmPay, z: "#,##0.00" }],
-            ["Teminat (%6 - İade Edilebilir)", "Madde 13 - Kira Bedeli Üzerinden", { t: "n", v: teminat, z: "#,##0.00" }],
-            [],
-            ["TOPLAM ÖDEME (Teminat Dahil)", "", { t: "n", v: total, z: "#,##0.00" }],
-            [],
-            ["Belge Kontrol Listesi", "Durum", ""],
-            ["Kiralama Talep Yazısı", stadyumDocTalep ? "Mevcut" : "Eksik", ""],
-            ["Teminat Dekontu / Mektubu", stadyumDocDekont ? "Mevcut" : "Eksik", ""],
-            ["Stadyum Kiralama Sözleşmesi", stadyumDocSozlesme ? "Mevcut" : "Eksik", ""],
-            ["Güvenlik ve Emniyet Protokolü", stadyumDocProtokol ? "Mevcut" : "Eksik", ""],
-            ["Valilik / Kaymakamlık Oluru", stadyumDocOnay ? "Mevcut" : "Eksik", ""],
-            ["Eksiksiz Teslim ve Hasar Tespit Tutanağı", stadyumDocTutanak ? "Mevcut" : "Eksik", ""],
-            [],
-            ["ÖNEMLİ NOTLAR"],
-            ["Madde 1: Müsabaka net hasılatının %7'si Bakanlığa ayrıca yatırılacaktır."],
-            ["Madde 7: Yapısal olmayan bakım/onarımlar kulüp tarafından yapılacaktır."],
-            ["Madde 14: Kira ücretleri lig ve kupa müsabakaları için geçerlidir."],
+
+        const borderThin: Partial<ExcelJS.Borders> = {
+            top: { style: "thin", color: { argb: "FFCBD5E1" } },
+            left: { style: "thin", color: { argb: "FFCBD5E1" } },
+            bottom: { style: "thin", color: { argb: "FFCBD5E1" } },
+            right: { style: "thin", color: { argb: "FFCBD5E1" } }
+        };
+
+        // 1. ÜST BAŞLIK (Rose & Slate Theme)
+        ws.mergeCells("A1:D1");
+        const titleRow = ws.getCell("A1");
+        titleRow.value = "T.C. GENÇLİK VE SPOR BAKANLIĞI";
+        titleRow.font = { name: "Calibri", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+        titleRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F172A" } };
+        titleRow.alignment = { vertical: "middle", horizontal: "center" };
+        ws.getRow(1).height = 24;
+
+        ws.mergeCells("A2:D2");
+        const subTitleRow = ws.getCell("A2");
+        subTitleRow.value = "STADYUM TAHSİS ÜCRETİ HESAPLAMA CETVELİ";
+        subTitleRow.font = { name: "Calibri", size: 13, bold: true, color: { argb: "FFFFFFFF" } };
+        subTitleRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE11D48" } }; // Rose 600
+        subTitleRow.alignment = { vertical: "middle", horizontal: "center" };
+        ws.getRow(2).height = 28;
+
+        ws.mergeCells("A3:D3");
+        const dateRow = ws.getCell("A3");
+        dateRow.value = `Hesaplama Tarihi: ${new Date().toLocaleDateString("tr-TR")} | Sezon: ${stadyumSezon} | Lig: ${ligData.label}`;
+        dateRow.font = { name: "Calibri", size: 9, italic: true, color: { argb: "FF64748B" } };
+        dateRow.alignment = { vertical: "middle", horizontal: "center" };
+        ws.getRow(3).height = 20;
+
+        // 2. PARAMETRELER KARTI
+        ws.mergeCells("A5:D5");
+        const cardHeader = ws.getCell("A5");
+        cardHeader.value = "STADYUM VE TAHSİS PARAMETRELERİ";
+        cardHeader.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFE11D48" } };
+        cardHeader.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE4E6" } }; // Rose 100
+        cardHeader.border = borderThin;
+        ws.getRow(5).height = 22;
+
+        const infoRows = [
+            ["Futbol Sezonu", `${stadyumSezon} Sezonu`, "Lig Kategorisi", ligData.label],
+            ["Seyirci Kapasitesi", `${tier.code} - ${tier.label}`, "Tahsis Türü", stadyumKiralamaTuru === "sezonluk" ? "Sezonluk Tahsis" : "Tek Maç / Belirli Müsabaka"],
+            ["Müsabaka Sayısı", `${stadyumMacSayisi} Müsabaka`, "Birim Tarife Bedeli", birimFiyat],
+            ["KDV Uygulaması", stadyumIsKdvDahil ? `KDV Dahil (%${stadyumKdvRate})` : `KDV Hariç (%${stadyumKdvRate})`, "Gençlik/Spor Faaliyeti", stadyumIsGencSpor ? "Evet (%5 Pay Muaf)" : "Hayır (Pay Alınır)"]
+        ];
+
+        infoRows.forEach((r, idx) => {
+            const rowNum = 6 + idx;
+            ws.getRow(rowNum).height = 20;
+            const cA = ws.getCell(`A${rowNum}`);
+            const cB = ws.getCell(`B${rowNum}`);
+            const cC = ws.getCell(`C${rowNum}`);
+            const cD = ws.getCell(`D${rowNum}`);
+
+            cA.value = r[0]; cA.font = { name: "Calibri", size: 9, color: { argb: "FF64748B" } }; cA.border = borderThin; cA.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+            cB.value = r[1]; cB.font = { name: "Calibri", size: 9, bold: true }; cB.border = borderThin; cB.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } };
+            if (typeof r[1] === "number") { cB.numFmt = '#,##0.00 "TL"'; cB.alignment = { horizontal: "right" }; }
+
+            cC.value = r[2]; cC.font = { name: "Calibri", size: 9, color: { argb: "FF64748B" } }; cC.border = borderThin; cC.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+            cD.value = r[3]; cD.font = { name: "Calibri", size: 9, bold: true }; cD.border = borderThin; cD.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } };
+            if (typeof r[3] === "number") { cD.numFmt = '#,##0.00 "TL"'; cD.alignment = { horizontal: "right" }; }
+        });
+
+        // 3. TABLO BAŞLIK SATIRI
+        const thRow = ws.getRow(11);
+        thRow.height = 26;
+        const headers = ["NO", "HESAPLAMA KALEMİ", "AÇIKLAMA / MEVZUAT DAYANAĞI", "TUTAR (TL)"];
+        headers.forEach((h, i) => {
+            const colLetter = String.fromCharCode(65 + i);
+            const cell = ws.getCell(`${colLetter}11`);
+            cell.value = h;
+            cell.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE11D48" } };
+            cell.alignment = { vertical: "middle", horizontal: i === 3 ? "right" : (i === 0 ? "center" : "left") };
+            cell.border = borderThin;
+        });
+
+        // 4. TABLO SATIRLARI (SADECE HESAPLAMALAR)
+        const tableRows: { no: string; name: string; desc: string; amount: number; isSubtotal?: boolean; isAccent?: boolean }[] = [
+            { no: "1", name: "Birim Tahsis Bedeli x Müsabaka Sayısı", desc: `${stadyumMacSayisi} müsabaka x ${birimFiyat.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL`, amount: birimFiyat * stadyumMacSayisi }
+        ];
+
+        let lineNo = 2;
+        if (stadyumOzelMusabaka) {
+            tableRows.push({ no: String(lineNo++), name: "Özel Müsabaka Farkı (+%50)", desc: "İşletme Yönetmeliği Madde 15 (+%50)", amount: ozelFark });
+        }
+        if (stadyumKalkinmaIl) {
+            tableRows.push({ no: String(lineNo++), name: "Kalkınmada Öncelikli İl İndirimi (-%50)", desc: "İşletme Yönetmeliği Madde 18 (-%50)", amount: -kalkinmaIndirim });
+        }
+
+        tableRows.push(
+            { no: "•", name: "Net Tahsis Bedeli (KDV Matrahı)", desc: "İndirim ve zamlar sonrası net tahsis", amount: baseNet, isSubtotal: true },
+            { no: String(lineNo++), name: `KDV Ücreti (%${stadyumKdvRate})`, desc: "Net tahsis bedeli üzerinden hesaplanan vergi", amount: kdv },
+            { no: String(lineNo++), name: "Genel Müdürlük Payı (%5)", desc: stadyumIsGencSpor ? "Madde 12 İstisnası (0 TL)" : "İşletme Yönetmeliği Madde 12 gereği (Net Tahsis üzerinden)", amount: gmPay },
+            { no: String(lineNo++), name: "Damga Vergisi (Binde 9.48)", desc: "Tahsis sözleşmesi mukavele damga pulu", amount: damga }
         );
 
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, "Stadyum Tahsis Raporu");
-        XLSX.writeFile(wb, "Stadyum_Tahsis_Ucreti_Raporu.xlsx");
-        toast.success("Excel belgesi indirildi.");
+        if (stadyumIhaleVar) {
+            tableRows.push({ no: String(lineNo++), name: "Karar Pulu (Binde 5.69)", desc: "İhale kararı pulu", amount: karar });
+        }
+
+        tableRows.push(
+            { no: "=", name: "Toplam Tahsis Bedeli (Teminat Hariç)", desc: "Tüm Hizmet ve Vergi Kalemleri Toplamı", amount: toplamTahsisUcreti, isAccent: true },
+            { no: String(lineNo++), name: "Teminat (%6 - İade Edilecek)", desc: "İşletme Yönetmeliği Madde 13 - Toplam tahsis bedeli üzerinden", amount: teminat, isAccent: true }
+        );
+
+        let curRow = 12;
+        tableRows.forEach(item => {
+            const r = ws.getRow(curRow);
+            r.height = item.isSubtotal || item.isAccent ? 24 : 20;
+
+            const cNo = ws.getCell(`A${curRow}`);
+            const cName = ws.getCell(`B${curRow}`);
+            const cDesc = ws.getCell(`C${curRow}`);
+            const cAmt = ws.getCell(`D${curRow}`);
+
+            cNo.value = item.no;
+            cName.value = item.name;
+            cDesc.value = item.desc;
+            cAmt.value = item.amount;
+
+            cNo.alignment = { vertical: "middle", horizontal: "center" };
+            cName.alignment = { vertical: "middle", horizontal: "left" };
+            cDesc.alignment = { vertical: "middle", horizontal: "left" };
+            cAmt.alignment = { vertical: "middle", horizontal: "right" };
+            cAmt.numFmt = '#,##0.00 "TL"';
+
+            if (item.isSubtotal) {
+                const bg = "FFF1F5F9";
+                [cNo, cName, cDesc, cAmt].forEach(c => {
+                    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+                    c.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FF0F172A" } };
+                    c.border = borderThin;
+                });
+            } else if (item.isAccent) {
+                const bg = "FFFFE4E6"; // Rose 100
+                [cNo, cName, cDesc, cAmt].forEach(c => {
+                    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+                    c.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFE11D48" } };
+                    c.border = borderThin;
+                });
+            } else {
+                const isEven = curRow % 2 === 0;
+                const bg = isEven ? "FFFFFFFF" : "FFF8FAFC";
+                [cNo, cName, cDesc, cAmt].forEach(c => {
+                    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+                    c.font = { name: "Calibri", size: 9.5, color: { argb: "FF1E293B" } };
+                    c.border = borderThin;
+                });
+                cDesc.font = { name: "Calibri", size: 8.5, italic: true, color: { argb: "FF64748B" } };
+            }
+
+            curRow++;
+        });
+
+        curRow++; // 1 satır boşluk
+
+        // 5. GENEL TOPLAM VE TEMİNAT KARTLARI
+        const totRow = curRow;
+        ws.getRow(totRow).height = 28;
+        ws.mergeCells(`A${totRow}:C${totRow}`);
+        const totLabel = ws.getCell(`A${totRow}`);
+        totLabel.value = "TOPLAM TAHSİS BEDELİ (Teminat Dahil)";
+        totLabel.font = { name: "Calibri", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+        totLabel.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F172A" } };
+        totLabel.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+        totLabel.border = borderThin;
+
+        const totVal = ws.getCell(`D${totRow}`);
+        totVal.value = total;
+        totVal.font = { name: "Calibri", size: 13, bold: true, color: { argb: "FFFFFFFF" } };
+        totVal.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F172A" } };
+        totVal.alignment = { vertical: "middle", horizontal: "right" };
+        totVal.numFmt = '#,##0.00 "TL"';
+        totVal.border = borderThin;
+
+        curRow++;
+        const temRow = curRow;
+        ws.getRow(temRow).height = 26;
+        ws.mergeCells(`A${temRow}:C${temRow}`);
+        const temLabel = ws.getCell(`A${temRow}`);
+        temLabel.value = "ÖDENECEK TEMİNAT TUTARI (İade Edilebilir - %6)";
+        temLabel.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFE11D48" } };
+        temLabel.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE4E6" } };
+        temLabel.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+        temLabel.border = borderThin;
+
+        const temVal = ws.getCell(`D${temRow}`);
+        temVal.value = teminat;
+        temVal.font = { name: "Calibri", size: 12, bold: true, color: { argb: "FFE11D48" } };
+        temVal.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE4E6" } };
+        temVal.alignment = { vertical: "middle", horizontal: "right" };
+        temVal.numFmt = '#,##0.00 "TL"';
+        temVal.border = borderThin;
+
+        await saveExcelWorkbook(wb, `Stadyum_Tahsis_Hesaplama_${stadyumSezon}_${tier.code}.xlsx`);
+        toast.success("Stadyum tahsis Excel tablosu profesyonel biçimlendirmeyle indirildi.");
     };
     const renderStadyumModal = () => {
         if (!isStadyumModalOpen) return null;
@@ -6831,12 +7454,28 @@ const renderPratikModal = () => {
         const damga = baseNet * 0.00948;
         const karar = stadyumIhaleVar ? baseNet * 0.00569 : 0;
         
-        const gmPayBase = baseNet + kdv + damga + karar;
+        const gmPayBase = baseNet;
         const gmPay = stadyumIsGencSpor ? 0 : (gmPayBase * 0.05);
         
-        const teminat = baseNet * 0.06;
-        const total = baseNet + kdv + gmPay + damga + karar + teminat;
+        const toplamTahsisUcreti = baseNet + kdv + gmPay + damga + karar;
+        const teminat = toplamTahsisUcreti * 0.06;
+        const total = toplamTahsisUcreti + teminat;
     
+        const stadyumCalcTooltip = [
+            `• Taban Bedel (${stadyumMacSayisi} x ${fmtTR(birimFiyat)} TL): ${fmtTR(birimFiyat * stadyumMacSayisi)} TL`,
+            ozelFark > 0 ? `• Özel Müsabaka Farkı (+%50): +${fmtTR(ozelFark)} TL` : null,
+            kalkinmaIndirim > 0 ? `• Kalkınmada Öncelikli İl (-%50): -${fmtTR(kalkinmaIndirim)} TL` : null,
+            `• Net Tahsis Bedeli: ${fmtTR(baseNet)} TL`,
+            `• KDV (%${stadyumKdvRate}): +${fmtTR(kdv)} TL`,
+            `• GM Payı (%5): +${fmtTR(gmPay)} TL`,
+            `• Damga Vergisi (Binde 9.48): +${fmtTR(damga)} TL`,
+            stadyumIhaleVar ? `• Karar Pulu (Binde 5.69): +${fmtTR(karar)} TL` : null,
+            `────────────────────────────`,
+            `• Teminat Hariç Toplam: ${fmtTR(toplamTahsisUcreti)} TL`,
+            `• Teminat (%6 - İade Edilecek): +${fmtTR(teminat)} TL`,
+            `════════════════════════════`,
+            `TOPLAM TAHSİS BEDELİ: ${fmtTR(total)} TL`
+        ].filter(Boolean).join("\n");
 
         const docsCount = [stadyumDocTalep, stadyumDocDekont, stadyumDocSozlesme, stadyumDocProtokol, stadyumDocOnay, stadyumDocTutanak].filter(Boolean).length;
         const isComplete = docsCount === 6;
@@ -6914,10 +7553,9 @@ const renderPratikModal = () => {
                                     <div>
                                         <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Futbol Sezonu</label>
                                         <select value={stadyumSezon} onChange={(e) => { setStadyumSezon(e.target.value); setStadyumKapasiteTier("A"); }} className={selectClass}>
-                                            <option value="2026-2027">2026 - 2027 Sezonu</option>
-                                            <option value="2024-2025">2024 - 2025 Sezonu</option>
-                                            <option value="2023-2024">2023 - 2024 Sezonu</option>
-                                            <option value="2022-2023">2022 - 2023 Sezonu</option>
+                                            {Object.keys(stadyumRatesData).map(season => (
+                                                <option key={season} value={season}>{season.replace("-", " - ")} Sezonu</option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div>
@@ -6940,7 +7578,7 @@ const renderPratikModal = () => {
                                 </div>
 
                                 <div>
-                                    <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Kiralama Türü</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Tahsis Türü</label>
                                     <div className="grid grid-cols-2 gap-2">
                                         <button 
                                             onClick={() => setStadyumKiralamaTuru("sezonluk")} 
@@ -7025,7 +7663,7 @@ const renderPratikModal = () => {
                                 <div className="space-y-1.5 mt-2">
                                     <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
                                         <input type="checkbox" checked={stadyumDocTalep} onChange={(e) => setStadyumDocTalep(e.target.checked)} className="rounded border-slate-350 text-rose-600 focus:ring-rose-500 h-3.5 w-3.5" />
-                                        <span>Kiralama Talep Yazısı</span>
+                                        <span>Tahsis Talep Yazısı</span>
                                     </label>
                                     <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
                                         <input type="checkbox" checked={stadyumDocDekont} onChange={(e) => setStadyumDocDekont(e.target.checked)} className="rounded border-slate-350 text-rose-600 focus:ring-rose-500 h-3.5 w-3.5" />
@@ -7033,7 +7671,7 @@ const renderPratikModal = () => {
                                     </label>
                                     <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
                                         <input type="checkbox" checked={stadyumDocSozlesme} onChange={(e) => setStadyumDocSozlesme(e.target.checked)} className="rounded border-slate-350 text-rose-600 focus:ring-rose-500 h-3.5 w-3.5" />
-                                        <span>Stadyum Kiralama Sözleşmesi</span>
+                                        <span>Stadyum Tahsis Sözleşmesi</span>
                                     </label>
                                     <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
                                         <input type="checkbox" checked={stadyumDocProtokol} onChange={(e) => setStadyumDocProtokol(e.target.checked)} className="rounded border-slate-350 text-rose-600 focus:ring-rose-500 h-3.5 w-3.5" />
@@ -7079,7 +7717,7 @@ const renderPratikModal = () => {
 
                                 <div className="space-y-2.5 text-xs">
                                     <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${stadyumKiralamaTuru === "sezonluk" ? "Sezonluk" : "Tek Maç"} tarife tablosundan`}>
-                                        <span className="font-medium text-slate-500">Birim Kira Bedeli ({stadyumKiralamaTuru === "sezonluk" ? "Sezonluk" : "Tek Maç"} Tarife)</span>
+                                        <span className="font-medium text-slate-500">Birim Tahsis Bedeli ({stadyumKiralamaTuru === "sezonluk" ? "Sezonluk" : "Tek Maç"} Tarife)</span>
                                         <span className="font-bold text-slate-800 dark:text-slate-200 cursor-help">{fmtTR(birimFiyat)} TL</span>
                                     </div>
                                     <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800" title={`${fmtTR(birimFiyat)} TL x ${stadyumMacSayisi} Müsabaka = ${fmtTR(birimFiyat * stadyumMacSayisi)} TL`}>
@@ -7099,7 +7737,7 @@ const renderPratikModal = () => {
                                         </div>
                                     )}
                                     <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 bg-slate-100/30 dark:bg-slate-900/40 px-1 rounded" title="İndirim ve zamlar uygulandıktan sonraki tutar">
-                                        <span className="font-semibold text-slate-600 dark:text-slate-350">Net Kira Bedeli</span>
+                                        <span className="font-semibold text-slate-600 dark:text-slate-350">Net Tahsis Bedeli</span>
                                         <span className="font-bold text-slate-800 dark:text-slate-200 cursor-help">{fmtTR(kiraBedeli)} TL</span>
                                     </div>
 
@@ -7129,19 +7767,37 @@ const renderPratikModal = () => {
                                     </div>
                                     )}
 
+                                    {/* Toplam Tahsis Bedeli (Teminat Hariç) */}
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 bg-rose-500/5 px-2 rounded-lg" title="Teminat hariç toplam tahsis bedeli">
+                                        <span className="font-semibold text-slate-700 dark:text-slate-200">Toplam Tahsis Bedeli (Teminat Hariç)</span>
+                                        <span className="font-bold text-slate-900 dark:text-slate-100">{fmtTR(toplamTahsisUcreti)} TL</span>
+                                    </div>
+
                                     {/* Teminat */}
-                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 text-rose-600 dark:text-rose-400" title={`${fmtTR(baseNet)} TL x %6 = ${fmtTR(teminat)} TL`}>
+                                    <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 text-rose-600 dark:text-rose-400" title={`${fmtTR(toplamTahsisUcreti)} TL x %6 = ${fmtTR(teminat)} TL`}>
                                         <span className="font-semibold">Teminat (%6 - İade Edilecek - Madde 13)</span>
                                         <span className="font-bold cursor-help">{fmtTR(teminat)} TL</span>
                                     </div></div>
 
                                 <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-3">
-                                    <div className="bg-slate-100/50 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-200/50 dark:border-slate-800">
-                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">Toplam Ödeme Bedeli</span>
+                                    <div 
+                                        className="bg-slate-100/50 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-200/50 dark:border-slate-800 cursor-help transition-all hover:bg-slate-100 dark:hover:bg-slate-900/80 group"
+                                        title={stadyumCalcTooltip}
+                                    >
+                                        <div className="flex items-center justify-between mb-0.5">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 group-hover:text-rose-600 transition-colors">Toplam Tahsis Bedeli</span>
+                                            <Info size={12} className="text-slate-400 group-hover:text-rose-500 transition-colors" />
+                                        </div>
                                         <span className="text-xl font-black text-slate-900 dark:text-slate-100">{fmtTR(total)} TL</span>
                                     </div>
-                                    <div className="bg-rose-500/5 p-3 rounded-2xl border border-rose-500/10">
-                                        <span className="text-[10px] font-black uppercase tracking-wider text-rose-500 block mb-0.5">Ödenecek Teminat</span>
+                                    <div 
+                                        className="bg-rose-500/5 p-3 rounded-2xl border border-rose-500/10 cursor-help transition-all hover:bg-rose-500/10 group"
+                                        title={`Teminat Hesabı:\nToplam Tahsis Bedeli: ${fmtTR(toplamTahsisUcreti)} TL x %6 = ${fmtTR(teminat)} TL\n(Müsabaka bitiminde stadyum hasarsız teslim edildiğinde iade edilir)`}
+                                    >
+                                        <div className="flex items-center justify-between mb-0.5">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-rose-500">Ödenecek Teminat</span>
+                                            <Info size={12} className="text-rose-500/70" />
+                                        </div>
                                         <span className="text-xl font-black text-rose-600 dark:text-rose-400">{fmtTR(teminat)} TL</span>
                                     </div>
                                 </div>
@@ -7192,6 +7848,818 @@ const renderPratikModal = () => {
         , document.body);
     };
 
+    const handleExportBazExcel = () => {
+        const rates = bazRatesData || DEFAULT_BAZ_RATES;
+        const rateInfo = rates[bazYil] || DEFAULT_BAZ_RATES[bazYil] || DEFAULT_BAZ_RATES["2026"] || DEFAULT_BAZ_RATES["2025"];
+        const maktu = rateInfo.maktu;
+        const kat = bazIlTuru === "buyuksehir" ? 5 : 3;
+        const tavan = bazIlTuru === "buyuksehir" ? rateInfo.buyuksehirTavan : rateInfo.digerIlTavan;
+        
+        const sozlesmeBedeli = parseTRNumber(bazSozlesmeBedeliStr);
+        const gmPay = sozlesmeBedeli * 0.05;
+        const effectiveDamgaBinde = getBazDamgaBinde();
+        const sozlesmeDamga = sozlesmeBedeli * (effectiveDamgaBinde / 1000);
+        const kararPulu = bazHasIhaleKarari ? sozlesmeBedeli * 0.00569 : 0;
+        const teminat = sozlesmeBedeli * 0.06;
+        const toplamTahsilat = sozlesmeBedeli + gmPay + sozlesmeDamga + kararPulu;
+        const genelToplam = sozlesmeBedeli + gmPay + sozlesmeDamga + kararPulu + teminat;
+        
+        const kiyasBedeli = sozlesmeBedeli;
+        const asimVar = sozlesmeBedeli > 0 && kiyasBedeli > tavan;
+        const fark = asimVar ? kiyasBedeli - tavan : 0;
+        
+        const selectedDamgaOpt = BAZ_DAMGA_SECENEKLERI.find(o => o.id === bazDamgaTuru);
+        const damgaTuruAdi = bazDamgaTuru === "ozel" 
+            ? `Özel Binde ${effectiveDamgaBinde.toFixed(2).replace('.', ',')}` 
+            : (selectedDamgaOpt ? selectedDamgaOpt.label : "Kira Sözleşmeleri");
+
+        const wb = XLSX.utils.book_new();
+        const data: any[][] = [
+            ["BAZ İSTASYONU YER KULLANIM BEDELİ & YASAL TAVAN DENETİM RAPORU"],
+            ["Tarih", new Date().toLocaleDateString("tr-TR")],
+            [],
+            ["İnceleme Parametreleri", "Değer"],
+            ["İncelenen Yıl", `${bazYil} Yılı`],
+            ["Yıllık YDO / Dayanak", rateInfo.ydo],
+            ["İl Statüsü", bazIlTuru === "buyuksehir" ? "Büyükşehir Belediyesi (Azami 5 Katı)" : "Diğer İller (Azami 3 Katı)"],
+            ["Bakanlık Maktu Taban Ücreti (1 Kat)", { t: "n", v: maktu, z: "#,##0.00" }],
+            ["Uygulanan Yasal Katsayı", `${kat} Katı`],
+            ["AZAMİ YASAL KİRA TAVANI", { t: "n", v: tavan, z: "#,##0.00" }],
+            [],
+            ["Sözleşme ve Mali Yükümlülük Kalemleri", "Açıklama / Oran", "Tutar (TL)"],
+            ["A) Yıllık Kira Bedeli (Yer Kullanım)", "Sözleşme Tutarı", { t: "n", v: sozlesmeBedeli, z: "#,##0.00" }],
+            ["B) KDV Tutarı (%0 - Muaf)", "KDV Kanunu Md. 17/4-d İstisnası", { t: "n", v: 0, z: "#,##0.00" }],
+            ["C) Genel Müdürlük / Kurum Payı (%5)", "Kira Bedeli Üzerinden %5", { t: "n", v: gmPay, z: "#,##0.00" }],
+            [`Ç) Kira Sözleşmesi Damga Vergisi (Binde ${effectiveDamgaBinde.toFixed(2).replace('.', ',')})`, `${damgaTuruAdi} (Tek Nüsha)`, { t: "n", v: sozlesmeDamga, z: "#,##0.00" }],
+            [`D) Pazarlık / İhale Karar Pulu (Binde 5,69)`, bazHasIhaleKarari ? "Yeni Pazarlık/İhale Kararı Alındı" : "Alınmaz (Otomatik Süre Uzatımı)", { t: "n", v: kararPulu, z: "#,##0.00" }],
+            ["E) Kesin Teminat (%6 - İade Edilecek)", "Kira Bedeli Üzerinden %6", { t: "n", v: teminat, z: "#,##0.00" }],
+            [],
+            ["TOPLAM TAHSİLAT (Kira + Pay + Damga + Karar Pulu)", "İdare Gelir Kalemleri", { t: "n", v: toplamTahsilat, z: "#,##0.00" }],
+            ["GENEL TOPLAM YATIRILACAK TUTAR", "Teminat Dahildir", { t: "n", v: genelToplam, z: "#,##0.00" }],
+            ["ÖDENECEK KESİN TEMİNAT", "İade Edilebilir Teminat Tutarı", { t: "n", v: teminat, z: "#,##0.00" }],
+            [],
+            ["Yasal Tavan Karşılaştırması", asimVar ? "YASAL TAVAN AŞIMI TESPİT EDİLDİ" : "Yasal Tavan Sınırları İçinde (Uygun)"],
+            ["Yasal Tavanı Aşan / Fazla Tahsil Edilen Tutar", { t: "n", v: fark, z: "#,##0.00" }],
+            [],
+            ["Belge Kontrol Listesi", "Durum"],
+            ["Yer Seçim Belgesi", bazDocYerSecim ? "Mevcut / Uygun" : "Eksik / İncelenmeli"],
+            ["İmar Planı ve Ruhsat Uygunluğu", bazDocRuhsat ? "Mevcut / Uygun" : "Eksik / İncelenmeli"],
+            ["Yetkili Organ Kararı ve Kira Protokolü", bazDocProtokol ? "Mevcut / Uygun" : "Eksik / İncelenmeli"],
+            ["Gelir Tahakkuk ve Tahsilat Dekontları", bazDocTahsilat ? "Mevcut / Uygun" : "Eksik / İncelenmeli"],
+            [],
+            ["MEVZUAT DAYANAĞI VE ÖNEMLİ HUSUSLAR"],
+            ["1. 3194 sayılı İmar Kanunu Ek 9. Maddesi:"],
+            ["   'Kamu kurum ve kuruluşları tarafından elektronik haberleşme istasyonları için yer tahsisi yapıldığında"],
+            ["    tahsil edilecek yıllık yer kullanım bedeli; büyükşehir belediyesi sınırları içinde Bakanlığın belirlediği"],
+            ["    maktu ücretin en fazla 5 katı, diğer illerde ise en fazla 3 katı olabilir.'"],
+            ["2. 27 Ocak 2018 tarihli ve 30314 sayılı Resmî Gazete Yönetmeliği Md. 6:"],
+            ["   'Maktu taban ücret her yıl Hazine ve Maliye Bakanlığınca ilan edilen Yeniden Değerleme Oranında artırılır.'"],
+            ["3. 3065 sayılı KDV Kanunu Md. 17/4-d:"],
+            ["   'İktisadi işletmelere dahil olmayan gayrimenkullerin kiralanması işlemleri KDV'den istisnadır.'"],
+            ["4. 488 sayılı Damga Vergisi Kanunu (1) Sayılı Tablo & 5. Madde:"],
+            ["   'Kira mukavelenamesi damga vergisi nispi olup binde 1,89'dur. Sözleşme kaç nüsha düzenlenirse düzenlensin"],
+            ["    kanunun 5. maddesi uyarınca sadece bir nüshası damga vergisine tabidir.'"],
+            ["5. GSB Hukuk Hizmetleri Genel Müdürlüğü (E-37381016-045.02-1979351 sayılı mütalaası):"],
+            ["   'Yıllık kira sözleşmelerinde her yıl Yönetmeliğin 77. maddesi gereği yeni pazarlık/ihale kararı alınıyorsa"],
+            ["    bedel içeren her karar için Binde 5,69 karar pulu ödenir. Otomatik uzayan sözleşmelerde ise yeni karar pulu doğmaz.'"]
+        ];
+        
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb, ws, "Baz İstasyonu Tavan Raporu");
+        XLSX.writeFile(wb, `Baz_Istasyonu_Tavan_Denetim_Raporu_${bazYil}.xlsx`);
+        toast.success("Excel raporu indirildi.");
+    };
+
+    const renderBazModal = () => {
+        if (!isBazModalOpen) return null;
+
+        if (!bazRatesData) {
+            fetch("/mufyard_rates.json")
+                .then(r => r.json())
+                .then(d => {
+                    if (d.bazIstasyonuRates) setBazRatesData(d.bazIstasyonuRates);
+                })
+                .catch(() => {
+                    setBazRatesData(DEFAULT_BAZ_RATES);
+                });
+        }
+
+        const rates = bazRatesData || DEFAULT_BAZ_RATES;
+        const rateInfo = rates[bazYil] || DEFAULT_BAZ_RATES[bazYil] || DEFAULT_BAZ_RATES["2026"] || DEFAULT_BAZ_RATES["2025"];
+        const maktu = rateInfo.maktu;
+        const kat = bazIlTuru === "buyuksehir" ? 5 : 3;
+        const tavan = bazIlTuru === "buyuksehir" ? rateInfo.buyuksehirTavan : rateInfo.digerIlTavan;
+        
+        const sozlesmeBedeli = parseTRNumber(bazSozlesmeBedeliStr);
+        const gmPay = sozlesmeBedeli * 0.05;
+        const effectiveDamgaBinde = getBazDamgaBinde();
+        const sozlesmeDamga = sozlesmeBedeli * (effectiveDamgaBinde / 1000);
+        const kararPulu = bazHasIhaleKarari ? sozlesmeBedeli * 0.00569 : 0;
+        const teminat = sozlesmeBedeli * 0.06;
+        const toplamTahsilat = sozlesmeBedeli + gmPay + sozlesmeDamga + kararPulu;
+        const genelToplam = sozlesmeBedeli + gmPay + sozlesmeDamga + kararPulu + teminat;
+        
+        const hasSozlesme = sozlesmeBedeli > 0;
+        const kiyasBedeli = sozlesmeBedeli;
+        const asimVar = hasSozlesme && kiyasBedeli > tavan;
+        const fark = asimVar ? kiyasBedeli - tavan : 0;
+        const kalanLimit = (!asimVar && hasSozlesme) ? tavan - kiyasBedeli : 0;
+
+        const docsCount = [bazDocYerSecim, bazDocRuhsat, bazDocProtokol, bazDocTahsilat].filter(Boolean).length;
+        const isComplete = docsCount === 4;
+
+        const selectClass = "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer";
+
+        return createPortal(
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+                <Card className="w-full max-w-5xl p-5 rounded-[32px] bg-white dark:bg-slate-900 border-white/60 dark:border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-300 font-outfit">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl">
+                                <Radio size={22} />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-base font-black text-slate-900 dark:text-slate-100">Baz İstasyonu Kira & Yasal Tavan Hesaplama</h3>
+                                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                                        İmar K. Ek 9. Md
+                                    </span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 font-medium">Elektronik haberleşme istasyonları için kamu taşınmazlarında azami yasal kira tavanı ve fazla tahsilat tespiti.</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button 
+                                type="button"
+                                onClick={() => setIsHukukYazisiModalOpen(true)}
+                                variant="outline"
+                                className="h-8 px-3 rounded-xl border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-300 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+                            >
+                                <FileText size={14} className="text-amber-600 dark:text-amber-400" />
+                                <span>GSB Hukuk Görüşü (E-1979351)</span>
+                            </Button>
+                            <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                onClick={() => setIsBazModalOpen(false)} 
+                                className="rounded-xl h-8 w-8 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                                <X size={16} />
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Main Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden flex-1">
+                        {/* Parameters - Left */}
+                        <div className="lg:col-span-5 space-y-3 overflow-y-auto custom-scrollbar pr-1">
+                            <div className="bg-slate-50/50 dark:bg-slate-900/20 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/80 space-y-2.5">
+                                <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Hesaplama Parametreleri</h4>
+                                
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">İncelenen Yıl</label>
+                                        <select value={bazYil} onChange={(e) => setBazYil(e.target.value)} className={selectClass}>
+                                            {Object.keys(rates).map(y => (
+                                                <option key={y} value={y}>{y} Yılı</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Uygulanan YDO</label>
+                                        <div className="w-full bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 truncate" title={rateInfo.ydo}>
+                                            {rateInfo.ydo}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">İl Statüsü (Yasal Katsayı)</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setBazIlTuru("buyuksehir")}
+                                            className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center ${
+                                                bazIlTuru === "buyuksehir"
+                                                    ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                                                    : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-indigo-300"
+                                            }`}
+                                        >
+                                            <div>Büyükşehir</div>
+                                            <div className="text-[9px] opacity-80">Azami 5 Katı</div>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setBazIlTuru("diger")}
+                                            className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center ${
+                                                bazIlTuru === "diger"
+                                                    ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                                                    : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-indigo-300"
+                                            }`}
+                                        >
+                                            <div>Diğer İller</div>
+                                            <div className="text-[9px] opacity-80">Azami 3 Katı</div>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-wide text-slate-400 block mb-1">Sözleşmedeki Yıllık Kira Tutarı (TL)</label>
+                                    <input 
+                                        type="text" 
+                                        value={bazSozlesmeBedeliStr} 
+                                        onChange={(e) => setBazSozlesmeBedeliStr(e.target.value)} 
+                                        onBlur={(e) => setBazSozlesmeBedeliStr(fmtTR(parseTRNumber(e.target.value)))}
+                                        placeholder="Örn: 80.000"
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold text-slate-800 dark:text-slate-200" 
+                                    />
+                                    <p className="text-[9px] text-slate-400 mt-1">İdarenin sözleşmede belirlediği veya tahsil ettiği yıllık yer kullanım bedeli.</p>
+                                </div>
+
+                                {/* Damga Vergisi Türü & Oranı Seçimi */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <div className="flex items-center gap-1.5">
+                                            <label className="text-[10px] font-black uppercase tracking-wide text-slate-400">
+                                                Damga Vergisi Türü & Oranı
+                                            </label>
+                                            {/* Tooltip trigger with exclamation / info icon */}
+                                            <div className="relative group cursor-pointer inline-flex items-center">
+                                                <span className="flex items-center justify-center w-4 h-4 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-black hover:bg-amber-500 hover:text-white transition-colors" title="Detaylı bilgi için fareyi üzerine getirin">
+                                                    !
+                                                </span>
+                                                {/* Tooltip Popover */}
+                                                <div className="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 bottom-full mb-2 hidden group-hover:flex flex-col w-64 sm:w-72 p-2.5 bg-slate-900 text-white text-[10px] rounded-xl shadow-2xl z-50 pointer-events-none border border-slate-700 animate-in fade-in duration-200">
+                                                    <div className="font-bold text-amber-400 mb-1 flex items-center gap-1">
+                                                        <AlertTriangle size={12} />
+                                                        Damga Vergisi Mevzuat Notu
+                                                    </div>
+                                                    <p className="text-slate-200 leading-relaxed font-normal">
+                                                        Baz istasyonları kamu taşınmazı yer tahsisi/kiralama niteliğinde olduğundan 488 sayılı Kanun (1) Sayılı Tablo gereği esasen <b>Kira Sözleşmeleri (Binde 1,89)</b> oranına tabidir.
+                                                    </p>
+                                                    <p className="text-slate-400 mt-1 leading-normal font-normal">
+                                                        İhale kararı (Binde 5,69) veya genel mukavele (Binde 9,48) söz konusu olduğunda listeden seçim yapabilirsiniz.
+                                                    </p>
+                                                    <div className="absolute top-full left-4 sm:left-1/2 sm:-translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <span className="text-[9px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded font-mono">
+                                            Binde {effectiveDamgaBinde.toFixed(2).replace('.', ',')}
+                                        </span>
+                                    </div>
+                                    <select 
+                                        value={bazDamgaTuru} 
+                                        onChange={(e) => setBazDamgaTuru(e.target.value)} 
+                                        className={selectClass}
+                                    >
+                                        {BAZ_DAMGA_SECENEKLERI.map((opt) => (
+                                            <option key={opt.id} value={opt.id}>
+                                                {opt.label} {opt.binde > 0 ? `(Binde ${opt.binde.toFixed(2).replace('.', ',')})` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {bazDamgaTuru === "ozel" && (
+                                        <div className="mt-1.5 flex items-center gap-2">
+                                            <label className="text-[9px] font-bold text-slate-500 shrink-0">Manuel Binde:</label>
+                                            <input 
+                                                type="text" 
+                                                value={bazDamgaManuelBinde} 
+                                                onChange={(e) => setBazDamgaManuelBinde(e.target.value)}
+                                                placeholder="Örn: 1,89"
+                                                className="w-24 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-bold outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-200" 
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* İhale / Pazarlık Karar Pulu (Binde 5,69) Seçimi */}
+                                <div className="p-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] font-black uppercase tracking-wide text-slate-700 dark:text-slate-300">
+                                                İhale / Pazarlık Karar Pulu
+                                            </span>
+                                            <div className="relative group cursor-pointer inline-flex items-center">
+                                                <span className="flex items-center justify-center w-4 h-4 rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-black" title="Bilgi için üzerine gelin">
+                                                    ?
+                                                </span>
+                                                <div className="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 bottom-full mb-2 hidden group-hover:flex flex-col w-72 p-2.5 bg-slate-900 text-white text-[10px] rounded-xl shadow-2xl z-50 pointer-events-none border border-slate-700 animate-in fade-in duration-200">
+                                                    <div className="font-bold text-amber-400 mb-1 flex items-center gap-1">
+                                                        <Info size={12} />
+                                                        GSB Hukuk Mütalaası (E-1979351):
+                                                    </div>
+                                                    <p className="text-slate-200 leading-relaxed font-normal">
+                                                        Yıllık kira bitiminde Yönetmelik 77. md. uyarınca <b>yeni pazarlık ihale kararı alınıyorsa</b> Binde 5,69 karar pulu ödenir. Fesih bildirimi yapılmaksızın kendiliğinden uzayan sözleşmelerde ise yeni karar pulu doğmaz.
+                                                    </p>
+                                                    <div className="absolute top-full left-4 sm:left-1/2 sm:-translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded font-mono ${bazHasIhaleKarari ? "bg-amber-500/20 text-amber-700 dark:text-amber-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"}`}>
+                                            {bazHasIhaleKarari ? "Binde 5,69 Alınır" : "Karar Yok (0 TL)"}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setBazHasIhaleKarari(true)}
+                                            className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all text-center ${
+                                                bazHasIhaleKarari
+                                                    ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                                                    : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-amber-300"
+                                            }`}
+                                        >
+                                            <div>Yeni İhale Kararı Var</div>
+                                            <div className="text-[8px] opacity-80">+ Binde 5,69 Karar Pulu</div>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setBazHasIhaleKarari(false)}
+                                            className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all text-center ${
+                                                !bazHasIhaleKarari
+                                                    ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                                                    : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-emerald-300"
+                                            }`}
+                                        >
+                                            <div>Süre Uzatımı (Temdit)</div>
+                                            <div className="text-[8px] opacity-80">Yeni Karar Yok (0 TL)</div>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Damga Vergisi & Hukuk Mütalaası Bilgilendirme Notu */}
+                                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[10px] text-slate-600 dark:text-slate-300 space-y-2">
+                                    <div className="flex items-start gap-2 leading-snug">
+                                        <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                                        <div>
+                                            <span className="font-bold text-amber-700 dark:text-amber-400 block mb-0.5">
+                                                GSB Hukuk Hizmetleri GM Mütalaası (E-1979351):
+                                            </span>
+                                            Baz istasyonlarında <b>Binde 1,89 Kira Damga Vergisi</b> (tek nüsha) esas alınır. Yeni pazarlık kararı varsa ayrıca <b>Binde 5,69 Karar Pulu</b> tahakkuk ettirilir.
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsHukukYazisiModalOpen(true)}
+                                        className="w-full py-1.5 px-3 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 font-bold text-[9px] flex items-center justify-center gap-1.5 transition-colors border border-amber-500/20"
+                                    >
+                                        <FileText size={12} />
+                                        <span>Resmi Görüş Yazısının Tam Metnini ve Orijinal Sayfalarını Görüntüle</span>
+                                    </button>
+                                </div>
+
+                                {/* KDV Muafiyeti Bilgisi */}
+                                <div className="p-2.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40 flex items-start gap-2">
+                                    <Check size={14} className="text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
+                                    <div className="text-[10px] text-slate-600 dark:text-slate-300 leading-snug">
+                                        <span className="font-bold text-emerald-700 dark:text-emerald-400">KDV'den Muaftır:</span> KDV Kanunu'nun 17/4-d maddesi gereğince kamu taşınmazı kiralamaları KDV'den istisnadır (%0 KDV).
+                                    </div>
+                                </div>
+
+                                {/* Ek Yasal Yükümlülükler Bilgisi */}
+                                <div className="p-2.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40 text-[10px] text-slate-600 dark:text-slate-300 space-y-1">
+                                    <div className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                                        <Info size={13} />
+                                        <span>Alınacak Ek Mali Yükümlülükler:</span>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-1 pt-0.5 text-center">
+                                        <div className="bg-white/80 dark:bg-slate-900/50 p-1 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                                            <span className="text-amber-700 dark:text-amber-400 font-bold block text-[10px]">%5 Pay</span>
+                                            <span className="text-[8px] text-slate-500 truncate block">Kurum Payı</span>
+                                        </div>
+                                        <div className="bg-white/80 dark:bg-slate-900/50 p-1 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                                            <span className="text-amber-700 dark:text-amber-400 font-bold block text-[10px]">%6 Teminat</span>
+                                            <span className="text-[8px] text-slate-500 truncate block">Kesin Teminat</span>
+                                        </div>
+                                        <div className="bg-white/80 dark:bg-slate-900/50 p-1 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                                            <span className="text-amber-700 dark:text-amber-400 font-bold block text-[10px]">
+                                                %{ (effectiveDamgaBinde / 10).toFixed(3).replace('.', ',') }
+                                            </span>
+                                            <span className="text-[8px] text-slate-500 truncate block">Kira Damgası</span>
+                                        </div>
+                                        <div className="bg-white/80 dark:bg-slate-900/50 p-1 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                                            <span className={`font-bold block text-[10px] ${bazHasIhaleKarari ? "text-amber-700 dark:text-amber-400" : "text-slate-400"}`}>
+                                                {bazHasIhaleKarari ? "Binde 5,69" : "0 TL"}
+                                            </span>
+                                            <span className="text-[8px] text-slate-500 truncate block">Karar Pulu</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Checklist */}
+                            <div className="bg-slate-50/50 dark:bg-slate-900/20 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/80">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Denetim Belge Kontrol Listesi</h4>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isComplete ? "bg-emerald-500/10 text-emerald-600" : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-350"}`}>
+                                        {docsCount} / 4 Tamam
+                                    </span>
+                                </div>
+                                <div className="space-y-1.5">
+                                    {[
+                                        { id: 'yerSecim', label: 'Yer Seçim Belgesi Düzenlenmiş mi?', checked: bazDocYerSecim, setter: setBazDocYerSecim },
+                                        { id: 'ruhsat', label: 'İmar Planı ve Ruhsat Uygunluğu Var mı?', checked: bazDocRuhsat, setter: setBazDocRuhsat },
+                                        { id: 'protokol', label: 'Yetkili Organ Kararı ve Kira Protokolü Var mı?', checked: bazDocProtokol, setter: setBazDocProtokol },
+                                        { id: 'tahsilat', label: 'Gelir Tahakkuk ve Tahsilat Dekontları Mevcut mu?', checked: bazDocTahsilat, setter: setBazDocTahsilat },
+                                    ].map((doc) => (
+                                        <label key={doc.id} className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={doc.checked} 
+                                                onChange={(e) => doc.setter(e.target.checked)}
+                                                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                            <span>{doc.label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Mevzuat Alıntısı */}
+                            <div className="p-3 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl border border-indigo-100 dark:border-indigo-900/30 text-[10px] text-slate-600 dark:text-slate-400 space-y-1">
+                                <div className="font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1">
+                                    <Info size={12} /> 3194 Sayılı İmar Kanunu Ek 9. Madde:
+                                </div>
+                                <p className="leading-relaxed">
+                                    "Kamu kurum ve kuruluşları tarafından elektronik haberleşme istasyonları için yer tahsisi yapıldığında tahsil edilecek yıllık yer kullanım bedeli; büyükşehir belediyesi sınırları içinde Bakanlığın belirlediği maktu ücretin <b>en fazla 5 katı</b>, diğer illerde ise <b>en fazla 3 katı</b> olabilir."
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Results - Right */}
+                        <div className="lg:col-span-7 flex flex-col justify-between overflow-y-auto custom-scrollbar pr-1 space-y-3">
+                            {/* Hero Card: Yasal Tavan */}
+                            <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">
+                                        {bazYil} Yılı Yasal Sınırı
+                                    </span>
+                                    <span className="text-xs bg-white/20 px-2.5 py-0.5 rounded-full font-bold">
+                                        {bazIlTuru === "buyuksehir" ? "Büyükşehir (5x)" : "Diğer İl (3x)"}
+                                    </span>
+                                </div>
+                                <div className="text-2xl font-black tracking-tight">
+                                    {tavan.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                                </div>
+                                <p className="text-[11px] text-indigo-100 mt-1">
+                                    Maktu Taban: {maktu.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL × {kat} Kat = Azami Yasal Kira Tavanı
+                                </p>
+                            </div>
+
+                            {/* Detay Tablosu */}
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-3 space-y-2">
+                                <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Hesaplama Kalemleri</h4>
+                                <div className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                                    <div className="py-1.5 flex justify-between">
+                                        <span className="text-slate-600 dark:text-slate-400">Ulaştırma Bakanlığı Maktu Taban Ücreti (1 Kat)</span>
+                                        <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{maktu.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL</span>
+                                    </div>
+                                    <div className="py-1.5 flex justify-between">
+                                        <span className="text-slate-600 dark:text-slate-400">Yasal Tavan Çarpanı</span>
+                                        <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{kat} Katı ({bazIlTuru === "buyuksehir" ? "Büyükşehir" : "Diğer İller"})</span>
+                                    </div>
+                                    <div className="py-1.5 flex justify-between bg-indigo-50/50 dark:bg-indigo-950/20 px-2 rounded-lg font-bold">
+                                        <span className="text-indigo-900 dark:text-indigo-200">Azami Yasal Yıllık Kira Tavanı</span>
+                                        <span className="font-mono text-indigo-600 dark:text-indigo-400">{tavan.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL</span>
+                                    </div>
+                                    {hasSozlesme && (
+                                        <>
+                                            <div className="py-1.5 flex justify-between">
+                                                <span className="text-slate-600 dark:text-slate-400">A) Yıllık Kira Bedeli (Yer Kullanım)</span>
+                                                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{sozlesmeBedeli.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL</span>
+                                            </div>
+                                            <div className="flex justify-between py-1.5 bg-emerald-500/5 px-2 rounded-lg" title="KDV Kanunu Md. 17/4-d gereğince istisnadır">
+                                                <span className="font-medium text-emerald-600 dark:text-emerald-400">B) KDV Tutarı (İstisna: Md. 17/4-d)</span>
+                                                <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">0,00 TL</span>
+                                            </div>
+                                            <div className="py-1.5 flex justify-between" title={`${sozlesmeBedeli.toLocaleString("tr-TR")} TL × %5 = ${gmPay.toLocaleString("tr-TR")} TL`}>
+                                                <span className="text-slate-600 dark:text-slate-400">C) %5 Genel Müdürlük / Kurum Payı</span>
+                                                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">+{gmPay.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL</span>
+                                            </div>
+                                            <div className="py-1.5 flex justify-between items-center" title={`${sozlesmeBedeli.toLocaleString("tr-TR")} TL × Binde ${effectiveDamgaBinde.toFixed(2).replace('.', ',')} = ${sozlesmeDamga.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL`}>
+                                                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                                                    <span>Ç) Kira Sözleşmesi Damga Vergisi (Binde {effectiveDamgaBinde.toFixed(2).replace('.', ',')})</span>
+                                                    <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-amber-500/20 text-amber-600 text-[9px] font-black cursor-help" title="Baz istasyonu yer tahsisi kiralama mahiyetinde olduğundan Kira Sözleşmesi (Binde 1,89, tek nüsha) uygulanır.">
+                                                        !
+                                                    </span>
+                                                </span>
+                                                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">+{sozlesmeDamga.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL</span>
+                                            </div>
+                                            <div className="py-1.5 flex justify-between items-center" title={bazHasIhaleKarari ? `${sozlesmeBedeli.toLocaleString("tr-TR")} TL × Binde 5,69 = ${kararPulu.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL` : "Süre uzatımı olduğundan karar pulu doğmaz"}>
+                                                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                                                    <span>D) İhale / Pazarlık Karar Pulu (Binde 5,69)</span>
+                                                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${bazHasIhaleKarari ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"}`}>
+                                                        {bazHasIhaleKarari ? "Yeni Karar" : "Uzatma (0 TL)"}
+                                                    </span>
+                                                </span>
+                                                <span className={`font-mono font-bold ${bazHasIhaleKarari ? "text-slate-800 dark:text-slate-200" : "text-slate-400"}`}>
+                                                    {bazHasIhaleKarari ? `+${kararPulu.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL` : "0,00 TL"}
+                                                </span>
+                                            </div>
+                                            <div className="py-1.5 flex justify-between text-amber-600 dark:text-amber-400" title={`${sozlesmeBedeli.toLocaleString("tr-TR")} TL × %6 = ${teminat.toLocaleString("tr-TR")} TL`}>
+                                                <span className="font-semibold">E) %6 Kesin Teminat (İade Edilecek)</span>
+                                                <span className="font-mono font-bold">+{teminat.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL</span>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Toplam Özet Kartları */}
+                            {hasSozlesme && (
+                                <div className="grid grid-cols-2 gap-2.5">
+                                    <div className="bg-slate-100/70 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">Toplam Tahsilat (Kira + Pay + Damga + Karar)</span>
+                                        <span className="text-sm font-black text-slate-900 dark:text-slate-100 font-mono">{toplamTahsilat.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL</span>
+                                    </div>
+                                    <div className="bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
+                                        <span className="text-[9px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 block mb-0.5">Ödenecek Kesin Teminat (%6)</span>
+                                        <span className="text-sm font-black text-amber-600 dark:text-amber-400 font-mono">{teminat.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Denetim Bulgusu & Sonuç Bildirimi */}
+                            {hasSozlesme ? (
+                                asimVar ? (
+                                    <div className="p-3.5 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-2xl space-y-1.5">
+                                        <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-black text-xs">
+                                            <AlertTriangle size={16} />
+                                            <span>YASAL TAVAN AŞIMI TESPİT EDİLDİ!</span>
+                                        </div>
+                                        <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                                            Kira bedeli, 3194 sayılı Kanunun Ek 9. maddesinde öngörülen kanuni azami tavanı <b className="text-rose-600 font-mono font-bold">{fark.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL</b> aşmaktadır.
+                                        </p>
+                                        <div className="text-[10px] font-semibold text-rose-600/90 dark:text-rose-400/90">
+                                            Öneri: Kira sözleşmesi tavan sınırına ({tavan.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL) çekilmeli veya fazla tahakkuk düzeltilmelidir.
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl space-y-1">
+                                        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-black text-xs">
+                                            <Check size={16} />
+                                            <span>YASAL TAVAN SINIRLARI İÇİNDE (UYGUN)</span>
+                                        </div>
+                                        <p className="text-xs text-slate-700 dark:text-slate-300">
+                                            Belirlenen kira bedeli kanuni tavanın altındadır. Yasal tavan sınırına kalan limit marjı: <b className="text-emerald-600 font-mono font-bold">{kalanLimit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL</b>.
+                                        </p>
+                                    </div>
+                                )
+                            ) : (
+                                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 rounded-2xl text-xs text-slate-500 text-center">
+                                    Sözleşmedeki yıllık kira bedelini girerek tavan aşımı ve mevzuat uygunluk denetimi yapabilirsiniz.
+                                </div>
+                            )}
+
+                            {/* Export Button */}
+                            <div className="pt-1">
+                                <Button 
+                                    onClick={handleExportBazExcel} 
+                                    className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 rounded-xl py-2.5 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm"
+                                >
+                                    <Download size={14} />
+                                    <span>Denetim Raporunu Excel Olarak İndir</span>
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+            </div>,
+            document.body
+        );
+    };
+
+    const renderHukukYazisiModal = () => {
+        if (!isHukukYazisiModalOpen) return null;
+
+        const totalPages = 4;
+
+        return createPortal(
+            <div className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-5 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-300">
+                <Card className="w-full max-w-5xl h-[92vh] bg-white dark:bg-slate-900 border-white/60 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden rounded-[28px] animate-in zoom-in-95 duration-300 font-outfit">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-5 py-3.5 shrink-0 bg-slate-50/50 dark:bg-slate-900/50">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-2xl shrink-0">
+                                <FileText size={22} />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100">
+                                        GSB Hukuk Hizmetleri Genel Müdürlüğü Görüşü
+                                    </h3>
+                                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-300/40 dark:border-amber-700/40">
+                                        Sayı: E-1979351
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 font-medium">
+                                    Baz İstasyonu Kira Sözleşmelerinde Vergi ve Karar Pulu Uygulamaları Mütalaası
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {/* Tab Switcher */}
+                            <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold">
+                                <button
+                                    type="button"
+                                    onClick={() => setHukukYaziTab("belge")}
+                                    className={`px-3 py-1 rounded-lg transition-all ${
+                                        hukukYaziTab === "belge"
+                                            ? "bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm"
+                                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                    }`}
+                                >
+                                    Resmi Belge (4 Sayfa)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setHukukYaziTab("ozet")}
+                                    className={`px-3 py-1 rounded-lg transition-all ${
+                                        hukukYaziTab === "ozet"
+                                            ? "bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm"
+                                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                    }`}
+                                >
+                                    Mevzuat Özeti
+                                </button>
+                            </div>
+
+                            <a
+                                href={`/docs/baz_istasyonu/sayfa_${hukukYaziActivePage}.jpg`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all border border-slate-200 dark:border-slate-700"
+                                title="Mevcut sayfayı yeni sekmede tam boy aç"
+                            >
+                                <ExternalLink size={13} />
+                                <span>Yeni Sekmede Aç</span>
+                            </a>
+
+                            <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                onClick={() => setIsHukukYazisiModalOpen(false)} 
+                                className="rounded-xl h-8 w-8 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                                <X size={16} />
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Content Area */}
+                    {hukukYaziTab === "belge" ? (
+                        <div className="flex-1 flex flex-col overflow-hidden bg-slate-950/5 dark:bg-slate-950/40">
+                            {/* Page Navigation Toolbar */}
+                            <div className="flex items-center justify-between px-5 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 text-xs">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[11px] font-bold text-slate-500 mr-1">Sayfa:</span>
+                                    {[1, 2, 3, 4].map(pg => (
+                                        <button
+                                            key={pg}
+                                            type="button"
+                                            onClick={() => setHukukYaziActivePage(pg)}
+                                            className={`px-3 py-1 rounded-lg font-black text-xs transition-all ${
+                                                hukukYaziActivePage === pg
+                                                    ? "bg-amber-500 text-white shadow-sm"
+                                                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                            }`}
+                                        >
+                                            {pg} / 4
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={hukukYaziActivePage <= 1}
+                                        onClick={() => setHukukYaziActivePage(p => Math.max(1, p - 1))}
+                                        className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-1 font-bold text-xs transition-all"
+                                    >
+                                        <ChevronLeft size={14} />
+                                        <span>Önceki</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={hukukYaziActivePage >= totalPages}
+                                        onClick={() => setHukukYaziActivePage(p => Math.min(totalPages, p + 1))}
+                                        className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-1 font-bold text-xs transition-all"
+                                    >
+                                        <span>Sonraki</span>
+                                        <ChevronRight size={14} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Document Viewer Scroll Container */}
+                            <div className="flex-1 overflow-auto p-4 sm:p-6 flex justify-center items-start custom-scrollbar">
+                                <div className="max-w-3xl w-full bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200/80 dark:border-slate-800 p-2 sm:p-3 overflow-hidden">
+                                    <img
+                                        src={`/docs/baz_istasyonu/sayfa_${hukukYaziActivePage}.jpg`}
+                                        alt={`GSB Hukuk Görüşü Sayfa ${hukukYaziActivePage}`}
+                                        className="w-full h-auto object-contain rounded-xl select-none"
+                                        loading="eager"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 custom-scrollbar bg-slate-50/40 dark:bg-slate-950/20">
+                            {/* Summary Cards */}
+                            <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent p-4 rounded-2xl border border-amber-200/60 dark:border-amber-900/40">
+                                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold text-sm mb-1">
+                                    <Shield size={16} />
+                                    <span>Resmi Belge Künyesi</span>
+                                </div>
+                                <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                                    <b>T.C. Gençlik ve Spor Bakanlığı Hukuk Hizmetleri Genel Müdürlüğü</b>'nün <b>E-37381016-045.02-1979351</b> sayılı resmi mütalaası. 
+                                    Ahmet Can ACAROĞLU (Genel Müdür) imzalı olup baz istasyonu kira sözleşmelerinde uygulanan KDV, Damga Vergisi ve İhale Karar Pulu mevzuat esaslarını belirlemektedir.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* 1. KDV İstisnası */}
+                                <div className="bg-white dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-2">
+                                    <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wide">
+                                        <div className="w-5 h-5 rounded-full bg-indigo-500/10 flex items-center justify-center font-mono text-[10px]">1</div>
+                                        <span>KDV İstisnası (%0)</span>
+                                    </div>
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                                        <b>3065 sayılı KDV Kanunu Madde 17/4-d</b> uyarınca; iktisadi işletmeye dahil olmayan gayrimenkullerin kiralanması KDV'den müstesnadır. Gençlik ve Spor İl Müdürlüklerine ait taşınmazların kiralanması ticari/iktisadi mahiyette olmadığından <b>kira bedeline KDV eklenmez, KDV tahakkuk ettirilmez (%0 KDV).</b>
+                                    </p>
+                                </div>
+
+                                {/* 2. Damga Vergisi Binde 1,89 */}
+                                <div className="bg-white dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-2">
+                                    <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wide">
+                                        <div className="w-5 h-5 rounded-full bg-indigo-500/10 flex items-center justify-center font-mono text-[10px]">2</div>
+                                        <span>Damga Vergisi Oranı (Binde 1,89)</span>
+                                    </div>
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                                        <b>488 sayılı Damga Vergisi Kanunu (1) Sayılı Tablo A/2</b> uyarınca; baz istasyonu yer tahsis ve kullanımı hukuken bir kira ilişkisi olduğundan <b>Kira Mukavelenameleri</b> kapsamında <b>Binde 1,89</b> nispi damga vergisine tabidir. Binde 9,48 oranındaki genel mukavele damga vergisi tatbik edilmez.
+                                    </p>
+                                </div>
+
+                                {/* 3. Nüsha Kuralı */}
+                                <div className="bg-white dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-2">
+                                    <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wide">
+                                        <div className="w-5 h-5 rounded-full bg-indigo-500/10 flex items-center justify-center font-mono text-[10px]">3</div>
+                                        <span>Nüsha Kuralı (Yalnızca 1 Nüsha)</span>
+                                    </div>
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                                        <b>488 sayılı Kanun 5. maddesi</b> (6728 sayılı Kanun ile değişik) gereğince; nispi damga vergisine tabi kâğıtlar kaç nüsha düzenlenirse düzenlensin <b>yalnızca tek bir nüsha üzerinden</b> vergilendirilir. 2 veya daha fazla nüsha için mükerrer damga vergisi tahsil edilemez.
+                                    </p>
+                                </div>
+
+                                {/* 4. İhale / Pazarlık Karar Pulu */}
+                                <div className="bg-white dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-2">
+                                    <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wide">
+                                        <div className="w-5 h-5 rounded-full bg-indigo-500/10 flex items-center justify-center font-mono text-[10px]">4</div>
+                                        <span>İhale Karar Pulu (Binde 5,69) vs Uzama</span>
+                                    </div>
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                                        GSB Taşınmaz Yönetmeliği Md. 77 uyarınca her kira yılı sonunda <b>yeni bir pazarlık ihale kararı alınıyorsa</b> 488 s.K. (1) Sayılı Tablo II/2 uyarınca <b>Binde 5,69 karar pulu</b> alınır. Ancak sözleşmede süre kendiliğinden (fesih bildirimi yapılmaksızın) uzuyorsa yeni bir ihale kararı bulunmadığından karar pulu kesilmez.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Uyarı Kutusu */}
+                            <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 p-4 rounded-2xl">
+                                <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 font-bold text-xs mb-1">
+                                    <AlertTriangle size={15} />
+                                    <span>Müfettiş İnceleme Notu (Müteselsil Kefalet & En Yüksek Vergi Kuralı)</span>
+                                </div>
+                                <p className="text-xs text-rose-900 dark:text-rose-200 leading-relaxed">
+                                    Damga Vergisi Kanunu 6. maddesi gereği; bir kâğıtta birden fazla akit ve işlem bulunursa her biri ayrı vergiye tabidir, ancak birbirine bağlı ve asıl akitten doğma işlemlerde en yüksek vergi gerektiren işlem esas alınır. Sözleşme taslaklarında kefalet hükmü bulunması halinde gereksiz vergi artışlarının önüne geçmek için idari incelemelerde mukavele hükümleri titizlikle kontrol edilmelidir.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Footer */}
+                    <div className="border-t border-slate-100 dark:border-slate-800 px-5 py-3 bg-slate-50/80 dark:bg-slate-900/80 flex items-center justify-between shrink-0">
+                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                            <Check size={14} className="text-emerald-500" />
+                            <span>Doğrulama Kodu: <b className="font-mono text-slate-700 dark:text-slate-300">C970A40D-47A4-4AD6-9745-1726CD1178F3</b></span>
+                        </div>
+                        <Button
+                            type="button"
+                            onClick={() => setIsHukukYazisiModalOpen(false)}
+                            className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 rounded-xl px-4 py-1.5 text-xs font-black"
+                        >
+                            Kapat
+                        </Button>
+                    </div>
+                </Card>
+            </div>,
+            document.body
+        );
+    };
+
     if (scope === "other") {
         return (
             <>
@@ -7217,6 +8685,8 @@ const renderPratikModal = () => {
                 {renderMadde18Modal()}
                 {renderTarifeCetveliModal()}
                 {renderOzelBedenEgitimiModal()}
+                {renderBazModal()}
+                {renderHukukYazisiModal()}
             </>
         );
     }

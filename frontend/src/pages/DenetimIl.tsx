@@ -347,18 +347,15 @@ export default function DenetimIl() {
         return cachedData.tasks.find(t => t.id === selectedTaskId) || null;
     }, [selectedTaskId, cachedData?.tasks]);
 
-    // Resolve the correct tab ID for the selected task (may differ from activeTab)
-    const taskTabId = useMemo(() => {
-        if (!selectedTask) return activeTab;
-        return reverseCategoryMap[selectedTask.rapor_turu] || activeTab;
-    }, [selectedTask, activeTab, reverseCategoryMap]);
+    // Bu sayfa YALNIZCA İl Denetimi sayfasi oldugu icin soru seti daima il'dir (80 soru)!
+    const taskTabId = "il";
 
     // Questions answered by the user for preview modal
     const previewQuestions = useMemo(() => {
-        const questions = AUDIT_TEMPLATES[taskTabId] || AUDIT_TEMPLATES[activeTab] || [];
+        const questions = AUDIT_TEMPLATES.il || [];
         const form = localAuditData.form || {};
         return questions.filter((q: any) => form[q.id] === "yes" || form[q.id] === "no");
-    }, [taskTabId, activeTab, localAuditData.form]);
+    }, [localAuditData.form]);
 
     const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
 
@@ -392,7 +389,10 @@ export default function DenetimIl() {
     // Child Kyk Yurt Denetimleri (if selected is İl Denetimi)
     const childKykTasks = useMemo(() => {
         if (!selectedTaskId || activeTab !== "il" || !cachedData?.tasks) return [];
-        return cachedData.tasks.filter(t => t.rapor_turu === "Kyk Yurt Denetimi" && t.parent_task_id === selectedTaskId);
+        return cachedData.tasks.filter(t => {
+            const rt = (t.rapor_turu || "").toLowerCase().trim();
+            return (rt === "kyk yurt denetimi" || rt === "yurt denetimi") && t.parent_task_id === selectedTaskId;
+        });
     }, [selectedTaskId, activeTab, cachedData?.tasks]);
 
 // parentIlTask removed
@@ -2689,17 +2689,40 @@ export default function DenetimIl() {
                                         {/* Relationships (KYK Yurt <-> İl) */}
                                         {activeTab === "il" && (
                                             <div className="bg-blue-50/40 dark:bg-blue-950/10 border border-blue-100/50 dark:border-blue-900/20 rounded-xl p-4">
-                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-2">Bu İle Bağlı KYK Yurt Denetimleri</h4>
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div>
+                                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-500">Bu İle Bağlı KYK Yurt Denetimleri</h4>
+                                                        <p className="text-xs text-slate-400 font-medium">Bu il bünyesindeki öğrenci yurtlarının denetim formları</p>
+                                                    </div>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-8 px-3 text-xs font-bold text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50 hover:bg-blue-50 hover:border-blue-400 rounded-xl flex items-center gap-1.5 transition-all shadow-sm"
+                                                        onClick={() => {
+                                                            navigate(`/denetim/kyk?task_id=${selectedTaskId}`);
+                                                        }}
+                                                    >
+                                                        <Plus size={13} />
+                                                        <span>KYK Yurt Denetimi Aç / Ekle</span>
+                                                    </Button>
+                                                </div>
                                                 {childKykTasks.length === 0 ? (
-                                                    <p className="text-xs text-slate-400 font-medium">Bu il genel denetimine henüz bağlı bir KYK yurt denetimi atanmamış.</p>
+                                                    <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-dashed border-blue-200 dark:border-blue-900 text-center">
+                                                        <p className="text-xs text-slate-400 font-medium">Bu il genel denetimine henüz bağlı bir KYK yurt denetimi atanmamış.</p>
+                                                        <button
+                                                            onClick={() => navigate(`/denetim/kyk?task_id=${selectedTaskId}`)}
+                                                            className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline mt-1 inline-block"
+                                                        >
+                                                            KYK Yurt Denetimi Başlatmak için tıklayınız →
+                                                        </button>
+                                                    </div>
                                                 ) : (
                                                     <div className="flex flex-col gap-1.5">
                                                         {childKykTasks.map(child => (
                                                             <button
                                                                 key={child.id}
                                                                 onClick={() => {
-                                                                    setActiveTab("kyk");
-                                                                    setSelectedTaskId(child.id);
+                                                                    navigate(`/denetim/kyk?task_id=${child.id}`);
                                                                 }}
                                                                 className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-2.5 rounded-lg hover:border-blue-500 transition-colors text-left"
                                                             >

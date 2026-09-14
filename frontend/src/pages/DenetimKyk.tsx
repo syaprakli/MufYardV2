@@ -253,9 +253,20 @@ export default function DenetimKyk() {
     };
 
     // Reverse lookup: rapor_turu -> tab id
-    const reverseCategoryMap: Record<string, string> = Object.fromEntries(
-        Object.entries(categoryMap).map(([k, v]) => [v, k])
-    );
+    const reverseCategoryMap: Record<string, string> = {
+        "İl Denetimi": "il",
+        "Federasyon Denetimi": "federasyon",
+        "Kyk Yurt Denetimi": "kyk",
+        "KYK Yurt Denetimi": "kyk",
+        "Yurt Denetimi": "kyk",
+        "Özel Yurt Denetimi": "ozel",
+        "Spor Kulüpleri Denetimi": "spor"
+    };
+
+    const isKykTask = (t: any) => {
+        const rt = (t?.rapor_turu || "").toLowerCase().trim();
+        return rt === "kyk yurt denetimi" || rt === "yurt denetimi";
+    };
 
     const currentRaporTuru = categoryMap[activeTab];
 
@@ -281,19 +292,19 @@ export default function DenetimKyk() {
     }, [cachedData?.tasks, userKeys]);
 
     const pickerTasks = useMemo(() => {
-        if (!accessibleTasks.length || !currentRaporTuru) return [];
+        if (!accessibleTasks.length) return [];
         return accessibleTasks.filter((task: any) => 
-            task.rapor_turu === currentRaporTuru || task.rapor_turu === "İl Denetimi"
+            isKykTask(task) || task.rapor_turu === "İl Denetimi"
         );
-    }, [accessibleTasks, currentRaporTuru]);
+    }, [accessibleTasks]);
 
     // Get tasks from global context
     const filteredTasks = useMemo(() => {
-        if (!accessibleTasks.length || !currentRaporTuru) return [];
+        if (!accessibleTasks.length) return [];
         return accessibleTasks.filter((t: any) => 
-            t.rapor_turu === currentRaporTuru || t.rapor_turu === "İl Denetimi"
+            isKykTask(t) || t.rapor_turu === "İl Denetimi"
         );
-    }, [accessibleTasks, currentRaporTuru]);
+    }, [accessibleTasks]);
 
     // Selected Task Details
     const selectedTask = useMemo(() => {
@@ -307,7 +318,7 @@ export default function DenetimKyk() {
             const task = cachedData.tasks.find(t => t.id === selectedTaskId);
             if (task && task.rapor_turu === "İl Denetimi") {
                 const childKyk = cachedData.tasks.find(
-                    t => t.rapor_turu === "Kyk Yurt Denetimi" && t.parent_task_id === selectedTaskId
+                    t => isKykTask(t) && t.parent_task_id === selectedTaskId
                 );
                 if (childKyk) {
                     setSelectedTaskId(childKyk.id);
@@ -316,30 +327,31 @@ export default function DenetimKyk() {
         }
     }, [selectedTaskId, cachedData?.tasks, setSelectedTaskId]);
 
-    // Resolve the correct tab ID for the selected task (may differ from activeTab)
-    const taskTabId = useMemo(() => {
-        if (!selectedTask) return activeTab;
-        return reverseCategoryMap[selectedTask.rapor_turu] || activeTab;
-    }, [selectedTask, activeTab, reverseCategoryMap]);
+    // Bu sayfa YALNIZCA KYK Yurt Denetimi sayfasi oldugu icin soru seti ve formlar daima kyk'dir!
+    const taskTabId = "kyk";
 
     // Questions answered by the user for preview modal
     const previewQuestions = useMemo(() => {
-        const questions = AUDIT_TEMPLATES[taskTabId] || AUDIT_TEMPLATES[activeTab] || [];
+        const questions = AUDIT_TEMPLATES.kyk || [];
         const form = localAuditData.form || {};
         return questions.filter((q: any) => form[q.id] === "yes" || form[q.id] === "no");
-    }, [taskTabId, activeTab, localAuditData.form]);
+    }, [localAuditData.form]);
 
     const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
 
     // Audit (Report) for selected task
     const selectedReport = useMemo(() => {
         if (!selectedTaskId || !cachedData?.audits) return null;
+        // İl Denetimi görevi seçiliyse, İl Denetimi'nin kendi raporunu KYK formuna yükleme!
+        if (selectedTask && selectedTask.rapor_turu === "İl Denetimi") {
+            return null;
+        }
         if (selectedAuditId) {
             const match = cachedData.audits.find((a: any) => a.id === selectedAuditId && a.task_id === selectedTaskId);
             if (match) return match;
         }
         return cachedData.audits.find(a => a.task_id === selectedTaskId) || null;
-    }, [selectedTaskId, selectedAuditId, cachedData?.audits]);
+    }, [selectedTaskId, selectedAuditId, cachedData?.audits, selectedTask]);
 
     // Keep selectedAuditId in sync when selectedTaskId or audits list changes
     useEffect(() => {
@@ -360,9 +372,9 @@ export default function DenetimKyk() {
 
     // Child Kyk Yurt Denetimleri (if selected is İl Denetimi)
     const childKykTasks = useMemo(() => {
-        if (!selectedTaskId || activeTab !== "il" || !cachedData?.tasks) return [];
-        return cachedData.tasks.filter(t => t.rapor_turu === "Kyk Yurt Denetimi" && t.parent_task_id === selectedTaskId);
-    }, [selectedTaskId, activeTab, cachedData?.tasks]);
+        if (!selectedTaskId || !cachedData?.tasks) return [];
+        return cachedData.tasks.filter(t => isKykTask(t) && t.parent_task_id === selectedTaskId);
+    }, [selectedTaskId, cachedData?.tasks]);
 
     // Parent İl Denetimi (if selected is Kyk Yurt Denetimi)
     // const parentIlTask = null;
@@ -1815,12 +1827,25 @@ export default function DenetimKyk() {
                         ) : (
                             <div className="flex flex-col gap-2">
                                 {filteredTasks.map(task => {
-                                    const isSelected = selectedTaskId === task.id;
-                                    const taskAudits = (cachedData?.audits || []).filter((a: any) => a.task_id === task.id);
+                                    const isIlTask = task.rapor_turu === "İl Denetimi";
+                                    const childYurts = isIlTask 
+                                        ? (cachedData?.tasks || []).filter((t: any) => isKykTask(t) && t.parent_task_id === task.id)
+                                        : [];
+                                    const isDirectSelected = selectedTaskId === task.id;
+                                    const isChildSelected = childYurts.some((c: any) => c.id === selectedTaskId);
+                                    const isSelected = isDirectSelected || isChildSelected;
+                                    const taskAudits = !isIlTask ? (cachedData?.audits || []).filter((a: any) => a.task_id === task.id) : [];
+
                                     return (
                                         <div key={task.id} className="flex flex-col gap-1.5">
                                             <button
-                                                onClick={() => setSelectedTaskId(task.id)}
+                                                onClick={() => {
+                                                    if (isIlTask && childYurts.length > 0) {
+                                                        setSelectedTaskId(childYurts[0].id);
+                                                    } else {
+                                                        setSelectedTaskId(task.id);
+                                                    }
+                                                }}
                                                 className={`p-3.5 rounded-xl border text-left transition-all duration-200 w-full ${
                                                     isSelected
                                                         ? "bg-blue-600/10 border-blue-500 shadow-sm shadow-blue-500/5"
@@ -1837,7 +1862,11 @@ export default function DenetimKyk() {
                                                     }`}>
                                                         {task.rapor_durumu}
                                                     </span>
-
+                                                    {isIlTask && (
+                                                        <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                                                            İl ({childYurts.length} Yurt)
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <h4 className="font-bold text-xs text-slate-800 dark:text-slate-200 line-clamp-2 leading-tight">{task.rapor_adi}</h4>
                                                 <div className="flex items-center gap-2 mt-2 text-[9px] text-slate-400 font-semibold">
@@ -1847,8 +1876,40 @@ export default function DenetimKyk() {
                                                 </div>
                                             </button>
                                             
-                                            {/* Sub-menu of child audits/forms */}
-                                            {isSelected && taskAudits.length > 0 && (
+                                            {/* Sub-menu of child yurts under İl task */}
+                                            {isSelected && isIlTask && (
+                                                <div className="pl-3 pr-1 py-1 flex flex-col gap-1 border-l-2 border-blue-500/30 ml-4 mb-2">
+                                                    <div className="flex items-center justify-between px-1 py-0.5">
+                                                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Bağlı Yurtlar ({childYurts.length})</span>
+                                                    </div>
+                                                    {childYurts.map((child: any) => {
+                                                        const isChildActive = selectedTaskId === child.id;
+                                                        return (
+                                                            <button
+                                                                key={child.id}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedTaskId(child.id);
+                                                                }}
+                                                                className={`text-[11px] text-left p-2 rounded-lg font-bold transition-all duration-150 flex items-center justify-between ${
+                                                                    isChildActive
+                                                                        ? "bg-blue-600 text-white shadow-sm"
+                                                                        : "bg-slate-50 dark:bg-slate-900/50 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-800"
+                                                                }`}
+                                                            >
+                                                                <span className="truncate max-w-[140px]">{child.rapor_adi}</span>
+                                                                <ArrowRight size={10} className={isChildActive ? "text-white" : "text-blue-500 shrink-0"} />
+                                                            </button>
+                                                        );
+                                                    })}
+                                                    {childYurts.length === 0 && (
+                                                        <span className="text-[10px] text-slate-400 italic px-1">Henüz bağlı yurt yok</span>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Sub-menu of child audits/forms for direct KYK task */}
+                                            {isSelected && !isIlTask && taskAudits.length > 0 && (
                                                 <div className="pl-3 pr-1 py-1 flex flex-col gap-1 border-l-2 border-blue-500/30 ml-4 mb-2">
                                                     {taskAudits.map((a: any, idx: number) => {
                                                         const isAuditSelected = selectedAuditId === a.id;
@@ -1884,68 +1945,67 @@ export default function DenetimKyk() {
                         )}
                     </div>
 
-                    {/* 3. Detail Pane */}
-                    <div className={`flex-1 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-6 flex-col overflow-y-auto ${selectedTaskId ? "flex" : "hidden xl:flex"}`}>
+                    {/* Main pane */}
+                    <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 md:p-6 overflow-y-auto">
                         {!selectedTask ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-center gap-3">
-                                <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-950/20 flex items-center justify-center">
-                                    <Info className="text-slate-400" size={20} />
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-slate-800 dark:text-slate-200">Denetim Detayları</h4>
-                                    <p className="text-xs text-slate-400 mt-0.5 max-w-[280px]">
-                                        İçerik, bağlı yurt/il ilişkileri ve tenkit ekleme panelini görmek için soldan bir görev seçin.
-                                    </p>
-                                </div>
+                            <div className="flex-1 flex flex-col items-center justify-center py-20 text-center gap-3">
+                                <ClipboardCheck size={36} className="text-slate-300 dark:text-slate-700" />
+                                <h3 className="text-sm font-bold text-slate-600 dark:text-slate-300">Bir Görev Seçiniz</h3>
+                                <p className="text-xs text-slate-400 max-w-sm">Sol menüden bir denetim görevi seçerek form ve kontrol listelerine erişebilirsiniz.</p>
                             </div>
                         ) : (
-                            <div className="flex-1 flex flex-col gap-6 xl:overflow-y-auto pr-1">
+                            <div className="flex flex-col gap-6">
+                                {/* Navigation Header inside selected task */}
+                                {activeDetailTab !== "hub" && (
+                                    <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+                                        <button
+                                            onClick={() => setActiveDetailTab("hub")}
+                                            className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                                        >
+                                            <ArrowRight size={14} className="rotate-180" />
+                                            <span>Ana Panele Dön</span>
+                                        </button>
+                                        <div className="text-right">
+                                            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">{selectedTask.rapor_adi}</h4>
+                                            <span className="text-[10px] text-slate-400">{selectedReport?.title || "Taslak Form"}</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Main Detail Views */}
                                 {activeDetailTab === "hub" ? (
-                                    /* ========================================================================= */
-                                    /* 1. HUB VIEW: TASK HEADER + KYK BANNER + 6 LARGE MODULE CARDS              */
-                                    /* ========================================================================= */
-                                    <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-1 animate-in fade-in duration-300">
-                                        {/* Task Header */}
-                                        <div className="flex flex-col border-b border-slate-100 dark:border-slate-800/50 pb-4 gap-4">
-                                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                                                <div className="space-y-1">
-                                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                                        {currentRaporTuru}
-                                                    </span>
-                                                    <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                                                        {selectedTask.rapor_adi}
-                                                    </h2>
-                                                </div>
-                                                <div className="flex flex-wrap items-center gap-3">
-                                                    {(cachedData?.audits || []).filter((a: any) => a.task_id === selectedTask.id).length > 1 && (
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aktif Form:</span>
-                                                            <select
-                                                                value={selectedReport?.id || ""}
-                                                                onChange={e => setSelectedAuditId(e.target.value)}
-                                                                className="h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                            >
-                                                                {(cachedData?.audits || [])
-                                                                    .filter((a: any) => a.task_id === selectedTask.id)
-                                                                    .map((a: any) => (
-                                                                        <option key={a.id} value={a.id}>
-                                                                            {a.title} {a.report_created === false ? "(Taslak)" : "(Editörde)"}
-                                                                        </option>
-                                                                    ))}
-                                                            </select>
-                                                        </div>
-                                                    )}
-                                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                                        <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-lg ${
-                                                            selectedTask.rapor_durumu === "Tamamlandı"
-                                                                ? "bg-green-500/10 text-green-500"
-                                                                : selectedTask.rapor_durumu === "Devam Ediyor"
-                                                                ? "bg-amber-500/10 text-amber-500"
-                                                                : "bg-slate-500/10 text-slate-400"
-                                                        }`}>
-                                                            Durum: {selectedTask.rapor_durumu}
+                                    <div className="flex flex-col gap-5">
+                                        {/* Task overview card */}
+                                        <div className="bg-slate-50 dark:bg-slate-950/20 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5">
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
+                                                            {selectedTask.rapor_turu}
                                                         </span>
-                                                        {selectedReport && (
+                                                        <span className="text-[10px] text-slate-400 font-semibold">• Kod: {selectedTask.rapor_kodu}</span>
+                                                    </div>
+                                                    <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white tracking-tight">{selectedTask.rapor_adi}</h2>
+                                                    <p className="text-xs text-slate-400 font-medium mt-0.5">Müfettiş: {selectedTask.inspector || "Belirtilmedi"} | Başlama: {selectedTask.baslama_tarihi}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2 self-start md:self-center">
+                                                    <div className="flex items-center gap-1.5">
+                                                        {!selectedReport ? (
+                                                            <Button
+                                                                size="sm"
+                                                                className="h-8 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/10 flex items-center gap-1.5"
+                                                                onClick={() => {
+                                                                    setPickerTaskForAudit(selectedTask);
+                                                                    setPrepAuditName(`${selectedTask.rapor_adi} Denetim Formu`);
+                                                                    setShowTaskPicker(false);
+                                                                    handleCreateReport(`${selectedTask.rapor_adi} Denetim Formu`, selectedTask);
+                                                                }}
+                                                                disabled={isCreatingReport}
+                                                            >
+                                                                {isCreatingReport ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                                                                <span>Denetime Başla</span>
+                                                            </Button>
+                                                        ) : (
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"
@@ -1963,25 +2023,46 @@ export default function DenetimKyk() {
                                         </div>
 
                                         {/* Relationships (KYK Yurt <-> İl) */}
-                                        {activeTab === "il" && (
+                                        {selectedTask?.rapor_turu === "İl Denetimi" && (
                                             <div className="bg-blue-50/40 dark:bg-blue-950/10 border border-blue-100/50 dark:border-blue-900/20 rounded-xl p-4">
-                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-2">Bu İle Bağlı KYK Yurt Denetimleri</h4>
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div>
+                                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-500">Bu İle Bağlı KYK Yurt Denetimleri</h4>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Bu il teftişi altındaki yurt denetimlerini seçebilir veya yeni yurt denetimi başlatabilirsiniz.</p>
+                                                    </div>
+                                                    <Button
+                                                        size="sm"
+                                                        className="h-8 px-3 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm"
+                                                        onClick={() => {
+                                                            setPickerTaskForAudit(selectedTask);
+                                                            setPrepAuditName(`${selectedTask.rapor_adi} - KYK Yurt Denetimi`);
+                                                            setShowTaskPicker(false);
+                                                            handleCreateReport(`${selectedTask.rapor_adi} - KYK Yurt Denetimi`, selectedTask);
+                                                        }}
+                                                    >
+                                                        + Yeni Yurt Denetimi Başlat
+                                                    </Button>
+                                                </div>
                                                 {childKykTasks.length === 0 ? (
-                                                    <p className="text-xs text-slate-400 font-medium">Bu il genel denetimine henüz bağlı bir KYK yurt denetimi atanmamış.</p>
+                                                    <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-dashed border-blue-200 dark:border-blue-900 text-center">
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Bu il genel denetimine henüz bağlı bir KYK yurt denetimi bulunmamaktadır.</p>
+                                                        <p className="text-[11px] text-blue-500 font-bold mt-1">Yukarıdaki butondan bu ile bağlı bir KYK yurt denetimi başlatabilirsiniz.</p>
+                                                    </div>
                                                 ) : (
-                                                    <div className="flex flex-col gap-1.5">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                                         {childKykTasks.map(child => (
                                                             <button
                                                                 key={child.id}
-                                                                onClick={() => {
-                                                                    setActiveTab("kyk");
-                                                                    setSelectedTaskId(child.id);
-                                                                }}
-                                                                className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-2.5 rounded-lg hover:border-blue-500 transition-colors text-left"
+                                                                onClick={() => setSelectedTaskId(child.id)}
+                                                                className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl hover:border-blue-500 hover:shadow-md transition-all text-left group"
                                                             >
-                                                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{child.rapor_adi}</span>
-                                                                <div className="flex items-center gap-2">
-                                                                    <ArrowRight size={12} className="text-blue-500" />
+                                                                <div>
+                                                                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-500 transition-colors block">{child.rapor_adi}</span>
+                                                                    <span className="text-[10px] text-slate-400 font-semibold">{child.rapor_durumu || "Devam Ediyor"}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1.5 text-blue-500 text-xs font-bold">
+                                                                    <span>Denetime Git</span>
+                                                                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                                                                 </div>
                                                             </button>
                                                         ))}
@@ -1992,7 +2073,7 @@ export default function DenetimKyk() {
 
                                         {/* 6 Large Module Cards Grid */}
                                         {(() => {
-                                            const questions = AUDIT_TEMPLATES[taskTabId] || [];
+                                            const questions = AUDIT_TEMPLATES.kyk || [];
                                             const totalQuestions = questions.length;
                                             const answeredQuestions = Object.keys(localAuditData.form || {}).filter(k => !!(localAuditData.form || {})[k]).length;
                                             const percent = totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0;
@@ -2004,7 +2085,7 @@ export default function DenetimKyk() {
                                                 {
                                                     id: "info",
                                                     title: "Genel Bilgiler",
-                                                    subtitle: "İl Müdürlüğü kurumsal, tesis ve personel temel verileri",
+                                                    subtitle: "Yurt Müdürlüğü kurumsal, kapasite ve personel temel verileri",
                                                     icon: Info,
                                                     badge: localAuditData.info?.mudur_adi ? "Dolduruldu" : "Bekliyor",
                                                     badgeColor: localAuditData.info?.mudur_adi ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700",
@@ -2050,7 +2131,7 @@ export default function DenetimKyk() {
                                                 {
                                                     id: "evrak_talebi",
                                                     title: "Evrak Talebi",
-                                                    subtitle: "İl Müdürlüğünden istenecek resmi evrak talep yazısı",
+                                                    subtitle: "Yurt Müdürlüğünden istenecek resmi evrak talep yazısı",
                                                     icon: BookOpen,
                                                     badge: "Resmi Yazı",
                                                     badgeColor: "bg-purple-500/10 text-purple-600 border-purple-500/20",

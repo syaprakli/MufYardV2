@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification: NativeNotification, Menu, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification: NativeNotification, Menu, dialog, shell, Tray } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -8,6 +8,10 @@ const https = require('https');
 const { spawn } = require('child_process');
 
 let backendProcess = null;
+let mainWindow = null;
+let tray = null;
+let isQuitting = false;
+let hasShownTrayBalloon = false;
 
 // Yetki hatalarını ve GPU cache hatalarını engellemek için ayarlar
 const userDataPath = path.join(os.homedir(), 'AppData', 'Local', 'MufYardV2');
@@ -185,13 +189,87 @@ function stopBackend() {
     backendProcess.kill();
 }
 
+function getTrayIconPath() {
+    const candidates = [
+        path.join(__dirname, 'icon.ico'),
+        path.join(__dirname, 'public', 'favicon.ico'),
+        path.join(__dirname, 'dist', 'favicon.ico'),
+        path.join(process.resourcesPath, 'icon.ico'),
+        path.join(process.resourcesPath, 'app', 'icon.ico')
+    ];
+    for (const p of candidates) {
+        if (fs.existsSync(p)) return p;
+    }
+    return path.join(__dirname, 'public', 'favicon.ico');
+}
+
+function createTray() {
+    if (tray) return;
+
+    try {
+        const iconPath = getTrayIconPath();
+        tray = new Tray(iconPath);
+        tray.setToolTip('MufYARD V-2.0');
+
+        const contextMenu = Menu.buildFromTemplate([
+            {
+                label: "MufYARD'ı Göster",
+                click: () => {
+                    if (mainWindow) {
+                        if (mainWindow.isMinimized()) mainWindow.restore();
+                        mainWindow.show();
+                        mainWindow.focus();
+                    }
+                }
+            },
+            { type: 'separator' },
+            {
+                label: 'Çıkış',
+                click: () => {
+                    isQuitting = true;
+                    stopBackend();
+                    app.quit();
+                }
+            }
+        ]);
+
+        tray.setContextMenu(contextMenu);
+
+        tray.on('click', () => {
+            if (!mainWindow) return;
+            if (mainWindow.isVisible()) {
+                if (mainWindow.isMinimized()) {
+                    mainWindow.restore();
+                    mainWindow.focus();
+                } else if (!mainWindow.isFocused()) {
+                    mainWindow.focus();
+                } else {
+                    mainWindow.hide();
+                }
+            } else {
+                mainWindow.show();
+                mainWindow.focus();
+            }
+        });
+
+        tray.on('double-click', () => {
+            if (!mainWindow) return;
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.show();
+            mainWindow.focus();
+        });
+    } catch (err) {
+        console.error('Tray simgesi oluşturulamadı:', err);
+    }
+}
+
 function createWindow() {
     app.setAppUserModelId('com.gsb.mufyardv2');
     const win = new BrowserWindow({
         width: 1280,
         height: 800,
         title: "MufYARD",
-        icon: path.join(__dirname, 'public/favicon.ico'),
+        icon: getTrayIconPath(),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -201,6 +279,8 @@ function createWindow() {
             allowRunningInsecureContent: false,
         }
     });
+
+    mainWindow = win;
 
     // Pencereyi ekranı kaplayacak şekilde aç (başlık çubuğu görünür kalır)
     win.maximize();
@@ -213,14 +293,40 @@ function createWindow() {
         require('electron').shell.openExternal(url);
         return { action: 'deny' };
     });
+
+    // Kapatma (X) butonuna basıldığında uygulamayı tamamen kapatmak yerine sistem tepsisine (saatin yanına) gizle
+    win.on('close', (event) => {
+        if (!isQuitting) {
+            event.preventDefault();
+            win.hide();
+
+            if (!hasShownTrayBalloon) {
+                hasShownTrayBalloon = true;
+                try {
+                    if (tray && process.platform === 'win32') {
+                        tray.displayBalloon({
+                            title: 'MufYARD Arka Planda',
+                            content: 'Uygulama bildirim alanında çalışmaya devam ediyor. Tamamen kapatmak için simgeye sağ tıklayıp "Çıkış"ı seçin.',
+                            iconType: 'info'
+                        });
+                    } else if (NativeNotification.isSupported()) {
+                        new NativeNotification({
+                            title: 'MufYARD Arka Planda',
+                            body: 'Uygulama bildirim alanında çalışmaya devam ediyor. Tamamen kapatmak için sistem tepsisindeki simgeden çıkış yapabilirsiniz.'
+                        }).show();
+                    }
+                } catch {
+                    // Bildirim gösterilemezse sessizce devam et
+                }
+            }
+            return false;
+        }
+    });
     
     if (app.isPackaged) {
         win.loadFile(path.join(__dirname, 'dist', 'index.html'));
         return;
     }
-
-    // Geliştirici araçlarını aç (Sorunu anlamak için geçici olarak aktif)
-    // win.webContents.openDevTools();
 
     // Vite sunucusuna hem localhost hem 127.0.0.1 üzerinden erişimi dene
     win.loadURL('http://localhost:5173').catch(() => {
@@ -230,35 +336,60 @@ function createWindow() {
     });
 }
 
-app.whenReady().then(async () => {
-    await startBackend();
-    
-    if (!app.isPackaged) {
-        // Dev modda backend'in hazır olmasını bekle
-        console.log('[DEV] Backend hazır olması bekleniyor...');
-        try {
-            await waitForPort(8000, 15, 1500); // 15 deneme, 1.5s aralık = max ~22s
-            console.log('[DEV] Backend hazır! Pencere açılıyor.');
-        } catch (e) {
-            console.error('[DEV] Backend başlatılamadı, pencere yine de açılacak.');
+// Tekil çalışma kontrolü (Single Instance Lock)
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+    app.quit();
+} else {
+    app.on('second-instance', () => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.show();
+            mainWindow.focus();
         }
-    }
-    
-    createWindow();
-});
+    });
 
-app.on('window-all-closed', () => {
-    stopBackend();
-    if (process.platform !== 'darwin') app.quit();
-});
+    app.whenReady().then(async () => {
+        await startBackend();
+        
+        if (!app.isPackaged) {
+            // Dev modda backend'in hazır olmasını bekle
+            console.log('[DEV] Backend hazır olması bekleniyor...');
+            try {
+                await waitForPort(8000, 15, 1500); // 15 deneme, 1.5s aralık = max ~22s
+                console.log('[DEV] Backend hazır! Pencere açılıyor.');
+            } catch (e) {
+                console.error('[DEV] Backend başlatılamadı, pencere yine de açılacak.');
+            }
+        }
+        
+        createWindow();
+        createTray();
+    });
 
-app.on('before-quit', () => {
-    stopBackend();
-});
+    app.on('window-all-closed', () => {
+        if (isQuitting) {
+            stopBackend();
+            if (process.platform !== 'darwin') app.quit();
+        }
+    });
 
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-});
+    app.on('before-quit', () => {
+        isQuitting = true;
+        stopBackend();
+    });
+
+    app.on('activate', () => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.show();
+            mainWindow.focus();
+        } else if (BrowserWindow.getAllWindows().length === 0) {
+            createWindow();
+        }
+    });
+}
 
 // Bildirim Köprüsü: Renderer sürecinden gelen talepleri dinle
 ipcMain.on('show-notification', (event, { title, body }) => {
