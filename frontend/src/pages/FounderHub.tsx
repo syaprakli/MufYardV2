@@ -62,80 +62,80 @@ export default function FounderHub() {
     }, [isFounder, user, loading, navigate]);
 
     return (
-        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-6xl mx-auto pb-20">
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto pb-16 px-2 sm:px-4">
             {/* Header */}
-            <div className="flex flex-col gap-2 px-1">
-                <div className="flex items-center gap-2 text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-amber-600 mb-2 bg-amber-50 w-fit px-3 py-1.5 rounded-full border border-amber-100">
+            <div className="flex flex-col gap-1.5 px-1">
+                <div className="flex items-center gap-2 text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-amber-600 mb-1 bg-amber-50 w-fit px-2.5 py-1 rounded-full border border-amber-100">
                     <Shield size={12} />
                     <span>Sistem Yönetimi</span>
                     <ChevronRight size={12} />
                     <span className="text-amber-700">Kurucu Paneli</span>
                 </div>
-                <h1 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+                <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
                     Kurucu Kontrol Merkezi
                 </h1>
-                <p className="text-slate-500 text-sm md:text-lg font-medium max-w-2xl leading-relaxed">
-                    Yönetimsel süreçleri buradan kontrol edin.
+                <p className="text-slate-500 text-xs md:text-sm font-medium max-w-xl leading-normal">
+                    Yönetimsel süreçleri ve yetkilendirmeleri buradan kontrol edin.
                 </p>
             </div>
 
-            {/* Hub Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            {/* Hub Grid - 4 items in compact responsive layout */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 md:gap-4">
                 {HUB_ITEMS.map((item) => (
                     <Card 
                         key={item.id}
                         onClick={() => navigate(item.href)}
-                        className="group relative p-6 md:p-8 border-2 border-slate-100 hover:border-primary/20 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 cursor-pointer overflow-hidden rounded-[2rem] md:rounded-[2.5rem] bg-white"
+                        className="group relative p-4 md:p-5 border border-slate-200/80 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 cursor-pointer overflow-hidden rounded-2xl bg-white flex flex-col justify-between"
                     >
-                        <div className="flex items-start justify-between relative z-10">
-                            <div className="space-y-4">
-                                <div className={`w-14 h-14 md:w-16 md:h-16 ${item.bgColor} ${item.color} rounded-2xl md:rounded-3xl flex items-center justify-center transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3 shadow-sm`}>
-                                    <item.icon size={28} className="md:w-8 md:h-8" />
+                        <div>
+                            <div className="flex items-center justify-between mb-3">
+                                <div className={`w-10 h-10 md:w-11 md:h-11 ${item.bgColor} ${item.color} rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shadow-xs`}>
+                                    <item.icon size={20} />
                                 </div>
-                                <div className="space-y-1">
-                                    <h3 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">{item.title}</h3>
-                                    <p className="text-slate-500 text-sm md:text-base font-medium leading-relaxed max-w-[280px]">
-                                        {item.description}
-                                    </p>
+                                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all duration-300 shrink-0">
+                                    <ChevronRight size={15} />
                                 </div>
                             </div>
-                            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all duration-500 shadow-inner shrink-0">
-                                <ChevronRight size={20} className="md:w-6 md:h-6" />
-                            </div>
+                            <h3 className="text-base font-bold text-slate-800 tracking-tight group-hover:text-primary transition-colors">
+                                {item.title}
+                            </h3>
+                            <p className="text-slate-500 text-xs md:text-sm font-normal leading-relaxed mt-1 line-clamp-2">
+                                {item.description}
+                            </p>
                         </div>
 
-                        {/* Background Decoration */}
-                        <div className={`absolute -right-4 -bottom-4 w-32 h-32 ${item.bgColor} opacity-0 group-hover:opacity-10 rounded-full blur-3xl transition-opacity duration-500`} />
+                        {/* Background subtle decoration */}
+                        <div className={`absolute -right-4 -bottom-4 w-24 h-24 ${item.bgColor} opacity-0 group-hover:opacity-15 rounded-full blur-2xl transition-opacity duration-300 pointer-events-none`} />
                     </Card>
                 ))}
             </div>
 
             {/* Bottom Section: Quick Stats or Info */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-                <Card className="p-6 bg-slate-900 text-white border-none rounded-[1.5rem] md:rounded-[2rem] flex items-center gap-6 shadow-xl shadow-slate-200">
-                    <div className="w-12 h-12 md:w-14 md:h-14 bg-white/10 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0">
-                        <Activity className="text-amber-400" />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 md:gap-4">
+                <Card className="p-4 md:p-5 bg-slate-900 text-white border-none rounded-2xl flex items-center gap-4 shadow-md shadow-slate-200">
+                    <div className="w-10 h-10 md:w-11 md:h-11 bg-white/10 rounded-xl flex items-center justify-center shrink-0">
+                        <Activity size={20} className="text-amber-400" />
                     </div>
                     <div>
-                        <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest">Sistem Durumu</p>
-                        <h4 className="text-base md:text-lg font-black tracking-tight">Tüm Sistemler Aktif</h4>
+                        <p className="text-white/50 text-[10px] font-bold uppercase tracking-wider">Sistem Durumu</p>
+                        <h4 className="text-sm md:text-base font-bold tracking-tight">Tüm Sistemler Aktif</h4>
                     </div>
                 </Card>
 
-                <Card className="p-6 bg-white border-2 border-slate-100 rounded-[1.5rem] md:rounded-[2rem] lg:col-span-2 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:px-10 shadow-sm">
-                    <div className="flex items-center gap-4 md:gap-6">
-                        <div className="w-12 h-12 md:w-14 md:h-14 bg-indigo-50 text-indigo-600 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0">
-                            <Zap size={24} />
+                <Card className="p-4 md:p-5 bg-white border border-slate-200/80 rounded-2xl lg:col-span-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 md:w-11 md:h-11 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0">
+                            <Zap size={20} />
                         </div>
-                        <p className="text-slate-600 text-sm md:text-base font-bold max-w-sm">
+                        <p className="text-slate-600 text-xs md:text-sm font-semibold max-w-sm">
                             Platform performansı ve güvenlik duvarları %100 kapasiteyle çalışıyor.
                         </p>
                     </div>
                     <button 
                         onClick={() => navigate('/')}
-                        className="flex items-center gap-2 text-slate-400 hover:text-slate-900 font-bold text-sm transition-colors mt-2 md:mt-0"
+                        className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 font-semibold text-xs md:text-sm transition-colors mt-1 sm:mt-0"
                     >
-                        <ArrowLeft size={16} />
+                        <ArrowLeft size={14} />
                         Anasayfa
                     </button>
                 </Card>
