@@ -10,6 +10,7 @@ import { Button } from "../components/ui/Button";
 import { API_URL } from "../lib/config";
 import { toast } from "react-hot-toast";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
+import { getSafeImageUrl, handleImageError } from "../lib/utils";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useGlobalData } from "../lib/context/GlobalDataContext";
@@ -881,20 +882,24 @@ export default function DenetimSpor() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {photos.map((url: string, index: number) => (
-                            <div
-                                key={index}
-                                className="group flex flex-col bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow transition-all"
-                            >
-                                <div className="relative aspect-video sm:aspect-square overflow-hidden bg-slate-100 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
-                                    <img
-                                        src={`${API_URL.replace("/api", "")}${url}`}
-                                        alt={`Denetim Görseli ${index + 1}`}
-                                        className="w-full h-full object-cover cursor-pointer hover:scale-[1.02] transition-transform duration-200"
-                                        onClick={() => {
-                                            window.open(`${API_URL.replace("/api", "")}${url}`, '_blank');
-                                        }}
-                                    />
+                        {photos.map((url: string, index: number) => {
+                            const safeUrl = getSafeImageUrl(url);
+                            return (
+                                <div
+                                    key={index}
+                                    className="group flex flex-col bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow transition-all"
+                                >
+                                    <div className="relative aspect-video sm:aspect-square overflow-hidden bg-slate-100 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
+                                        <img
+                                            src={safeUrl}
+                                            alt={`Denetim Görseli ${index + 1}`}
+                                            className="w-full h-full object-cover cursor-pointer hover:scale-[1.02] transition-transform duration-200"
+                                            onError={handleImageError}
+                                            onClick={(e) => {
+                                                const activeSrc = (e.currentTarget as HTMLImageElement)?.src || safeUrl;
+                                                window.open(activeSrc, '_blank');
+                                            }}
+                                        />
                                     <button
                                         onClick={() => handleDeletePhoto(index)}
                                         className="absolute top-2 right-2 w-7 h-7 bg-black/75 hover:bg-red-600 text-white rounded-lg flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 shadow"
@@ -920,7 +925,8 @@ export default function DenetimSpor() {
                                     />
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

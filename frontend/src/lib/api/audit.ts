@@ -164,13 +164,22 @@ export async function updateAudit(
             body: JSON.stringify(update),
         });
         if (!response.ok) {
-            throw new Error("Güncelleme başarısız.");
+            throw new Error(`Güncelleme başarısız: HTTP ${response.status}`);
         }
         auditCache = {}; // Invalidate cache
         return response.json();
     } catch (error) {
-        if (!navigator.onLine || error instanceof Error && (error.message.includes("Failed to fetch") || error.message.includes("timeout"))) {
-            console.warn("Offline detected in updateAudit, queueing action.");
+        // Sunucu hatası (fatura/kota, 500, 402, 503) veya bağlantı kesintisinde kuyruğa alıp koru
+        const isNetworkOrServerError = !navigator.onLine || 
+            (error instanceof Error && (
+                error.message.includes("Failed to fetch") || 
+                error.message.includes("timeout") ||
+                error.message.includes("başarısız") ||
+                error.message.includes("NetworkError")
+            ));
+
+        if (isNetworkOrServerError) {
+            console.warn("Server/Network issue detected in updateAudit, queuing action for safe offline recovery:", error);
             addToQueue('updateAudit', [id, update, forceVersion, userIdentity], {
                 auditId: id,
                 hasReportContent: Object.prototype.hasOwnProperty.call(update, "report_content")

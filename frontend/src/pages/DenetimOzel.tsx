@@ -10,6 +10,7 @@ import { Button } from "../components/ui/Button";
 import { API_URL } from "../lib/config";
 import { toast } from "react-hot-toast";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
+import { getSafeImageUrl, handleImageError } from "../lib/utils";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useGlobalData } from "../lib/context/GlobalDataContext";
@@ -807,54 +808,59 @@ export default function DenetimOzel() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {photos.map((url: string, index: number) => (
-                            <div
-                                key={index}
-                                className="group flex flex-col bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow transition-all"
-                            >
-                                <div className="relative aspect-video sm:aspect-square overflow-hidden bg-slate-100 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
-                                    <img
-                                        src={`${API_URL.replace("/api", "")}${url}`}
-                                        alt={`Denetim Görseli ${index + 1}`}
-                                        className="w-full h-full object-cover cursor-pointer hover:scale-[1.02] transition-transform duration-200"
-                                        onClick={() => {
-                                            const overlay = document.createElement('div');
-                                            overlay.id = `photo-modal-${index}`;
-                                            overlay.className = 'fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-200';
-                                            overlay.addEventListener('click', () => overlay.remove());
-                                            const img = document.createElement('img');
-                                            img.src = `${API_URL.replace("/api", "")}${url}`;
-                                            img.className = 'max-w-full max-h-full rounded-lg object-contain shadow-2xl';
-                                            overlay.appendChild(img);
-                                            document.body.appendChild(overlay);
-                                        }}
-                                    />
-                                    <button
-                                        onClick={() => handleDeletePhoto(index)}
-                                        className="absolute top-2 right-2 w-7 h-7 bg-black/75 hover:bg-red-600 text-white rounded-lg flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 shadow"
-                                        title="Görseli Kaldır"
-                                    >
-                                        <X size={14} />
-                                    </button>
+                        {photos.map((url: string, index: number) => {
+                            const safeUrl = getSafeImageUrl(url);
+                            return (
+                                <div
+                                    key={index}
+                                    className="group flex flex-col bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm hover:shadow transition-all"
+                                >
+                                    <div className="relative aspect-video sm:aspect-square overflow-hidden bg-slate-100 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
+                                        <img
+                                            src={safeUrl}
+                                            alt={`Denetim Görseli ${index + 1}`}
+                                            className="w-full h-full object-cover cursor-pointer hover:scale-[1.02] transition-transform duration-200"
+                                            onError={handleImageError}
+                                            onClick={(e) => {
+                                                const activeSrc = (e.currentTarget as HTMLImageElement)?.src || safeUrl;
+                                                const overlay = document.createElement('div');
+                                                overlay.id = `photo-modal-${index}`;
+                                                overlay.className = 'fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-200';
+                                                overlay.addEventListener('click', () => overlay.remove());
+                                                const img = document.createElement('img');
+                                                img.src = activeSrc;
+                                                img.className = 'max-w-full max-h-full rounded-lg object-contain shadow-2xl';
+                                                overlay.appendChild(img);
+                                                document.body.appendChild(overlay);
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => handleDeletePhoto(index)}
+                                            className="absolute top-2 right-2 w-7 h-7 bg-black/75 hover:bg-red-600 text-white rounded-lg flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 shadow"
+                                            title="Görseli Kaldır"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                    <div className="p-2 bg-white dark:bg-slate-900">
+                                        <input
+                                            type="text"
+                                            value={localAuditData.photo_descriptions?.[url] || ""}
+                                            onChange={e => handlePhotoDescriptionChange(url, e.target.value)}
+                                            onBlur={() => handleSaveAuditData(localAuditData)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    (e.target as HTMLInputElement).blur();
+                                                }
+                                            }}
+                                            placeholder="Görsel açıklaması ekleyin..."
+                                            className="w-full bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800/80 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="p-2 bg-white dark:bg-slate-900">
-                                    <input
-                                        type="text"
-                                        value={localAuditData.photo_descriptions?.[url] || ""}
-                                        onChange={e => handlePhotoDescriptionChange(url, e.target.value)}
-                                        onBlur={() => handleSaveAuditData(localAuditData)}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                (e.target as HTMLInputElement).blur();
-                                            }
-                                        }}
-                                        placeholder="Görsel açıklaması ekleyin..."
-                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20"
-                                    />
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

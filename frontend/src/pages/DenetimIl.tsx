@@ -18,7 +18,7 @@ import { createAudit, updateAudit, deleteAudit, fetchAuditById } from "../lib/ap
 import { updateTask } from "../lib/api/tasks";
 import { generateEvrakTalebiDocx } from "../lib/api/files";
 import { DenetimOzetTablolar } from "../components/audit/DenetimOzetTablolar";
-import { IlTesisleriDenetim, getSafeImageUrl } from "../components/audit/IlTesisleriDenetim";
+import { IlTesisleriDenetim, getSafeImageUrl, handleImageError } from "../components/audit/IlTesisleriDenetim";
 
 
 interface KnowledgeItem {
@@ -406,18 +406,39 @@ export default function DenetimIl() {
                         setReportContent(fullAudit.report_content || "");
                         if (fullAudit.audit_data) {
                             const fad = fullAudit.audit_data;
-                            setLocalAuditData((prev: any) => ({
-                                ...prev,
-                                ...fad,
-                                info: fad.info || {},
-                                generalNotes: fad.generalNotes || "",
-                                photos: fad.photos || [],
-                                photo_descriptions: fad.photo_descriptions || {},
-                                form: fad.form || {},
-                                evrakTalep: fad.evrakTalep || null,
-                                istenecekTablolar: fad.istenecekTablolar || prev?.istenecekTablolar || {},
-                                ozelBedenEgitimi: fad.ozelBedenEgitimi || prev?.ozelBedenEgitimi || {}
-                            }));
+                            setLocalAuditData((prev: any) => {
+                                const serverTesisler = Array.isArray(fad.tesisler) ? fad.tesisler : [];
+                                let safeTesisler = serverTesisler;
+                                const prevTesisler = Array.isArray(prev?.tesisler) ? prev.tesisler : [];
+                                if (prevTesisler.length > serverTesisler.length) {
+                                    safeTesisler = prevTesisler;
+                                } else {
+                                    try {
+                                        const mirrorRaw = localStorage.getItem(`mufyard_facilities_mirror_${selectedReport.id}`);
+                                        if (mirrorRaw) {
+                                            const mirrorList = JSON.parse(mirrorRaw);
+                                            if (Array.isArray(mirrorList) && mirrorList.length > serverTesisler.length) {
+                                                safeTesisler = mirrorList;
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.warn("Mirror read error:", e);
+                                    }
+                                }
+                                return {
+                                    ...prev,
+                                    ...fad,
+                                    tesisler: safeTesisler,
+                                    info: fad.info || {},
+                                    generalNotes: fad.generalNotes || "",
+                                    photos: fad.photos || [],
+                                    photo_descriptions: fad.photo_descriptions || {},
+                                    form: fad.form || {},
+                                    evrakTalep: fad.evrakTalep || null,
+                                    istenecekTablolar: fad.istenecekTablolar || prev?.istenecekTablolar || {},
+                                    ozelBedenEgitimi: fad.ozelBedenEgitimi || prev?.ozelBedenEgitimi || {}
+                                };
+                            });
                         }
                     }
                 })
@@ -427,13 +448,26 @@ export default function DenetimIl() {
                 });
 
             const ad = selectedReport.audit_data || {};
+            let initialTesisler = Array.isArray(ad.tesisler) ? ad.tesisler : [];
+            try {
+                const mirrorRaw = localStorage.getItem(`mufyard_facilities_mirror_${selectedReport.id}`);
+                if (mirrorRaw) {
+                    const mirrorList = JSON.parse(mirrorRaw);
+                    if (Array.isArray(mirrorList) && mirrorList.length > initialTesisler.length) {
+                        initialTesisler = mirrorList;
+                    }
+                }
+            } catch (e) {
+                console.warn("Mirror read error:", e);
+            }
+
             setLocalAuditData({
                 ...ad,
                 info: ad.info || {},
                 generalNotes: ad.generalNotes || "",
                 photos: ad.photos || [],
                 photo_descriptions: ad.photo_descriptions || {},
-                tesisler: Array.isArray(ad.tesisler) ? ad.tesisler : [],
+                tesisler: initialTesisler,
                 form: ad.form || {},
                 evrakTalep: ad.evrakTalep || null,
                 istenecekTablolar: ad.istenecekTablolar || {},
@@ -1524,13 +1558,15 @@ export default function DenetimIl() {
                                             src={safeUrl}
                                             alt={`Denetim Görseli ${index + 1}`}
                                             className="w-full h-full object-cover cursor-pointer hover:scale-[1.02] transition-transform duration-200"
-                                            onClick={() => {
+                                            onError={handleImageError}
+                                            onClick={(e) => {
+                                                const activeSrc = (e.currentTarget as HTMLImageElement)?.src || safeUrl;
                                                 const overlay = document.createElement('div');
                                                 overlay.id = `photo-modal-${index}`;
                                                 overlay.className = 'fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-200';
                                                 overlay.addEventListener('click', () => overlay.remove());
                                                 const img = document.createElement('img');
-                                                img.src = safeUrl;
+                                                img.src = activeSrc;
                                                 img.className = 'max-w-full max-h-full rounded-lg object-contain shadow-2xl';
                                                 overlay.appendChild(img);
                                                 document.body.appendChild(overlay);

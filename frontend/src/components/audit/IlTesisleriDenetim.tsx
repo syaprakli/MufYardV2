@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import * as XLSX from "xlsx";
 import {
     Building2, Plus, Search, Trash2, Edit3, Image as ImageIcon,
     AlertTriangle, X, ChevronDown, ChevronUp,
@@ -8,8 +9,11 @@ import {
 import { Button } from "../ui/Button";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../../lib/context/ConfirmContext";
-import { BASE_URL, API_URL, LOCAL_API_URL, IS_ELECTRON } from "../../lib/config";
+import { API_URL, LOCAL_API_URL, IS_ELECTRON } from "../../lib/config";
 import { getAuthHeaders } from "../../lib/api/utils";
+import { getSafeImageUrl, handleImageError } from "../../lib/utils";
+
+export { getSafeImageUrl, handleImageError };
 
 export interface DenetimFacility {
     id: string;
@@ -58,40 +62,6 @@ const PRESET_PRIORITY_OPTIONS = [
     { value: "kritik", label: "Acil / Kritik Müdahale", color: "bg-rose-500/10 text-rose-600 border-rose-500/20" }
 ];
 
-export const getSafeImageUrl = (url?: string) => {
-    if (!url) return "";
-    if (url.startsWith("data:") || url.startsWith("blob:")) {
-        return url;
-    }
-
-    const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : "127.0.0.1";
-    const localHost = host === "localhost" || host === "127.0.0.1" ? host : "127.0.0.1";
-
-    // Yerel denetim ve rapor dosyaları her zaman yerel makinedeki backend üzerinden sunulur
-    const isLocalPath = url.includes("/Raporlar/") || 
-                        url.includes("/uploads/") || 
-                        url.includes("denetim_tesisleri") ||
-                        url.startsWith("/Diğer İşlem") ||
-                        url.startsWith("/Mevzuat");
-
-    if (isLocalPath) {
-        const pathPart = url.replace(/^https?:\/\/[^/]+/, "");
-        const cleanPath = pathPart.startsWith("/") ? pathPart : `/${pathPart}`;
-        if (IS_ELECTRON || host === "localhost" || host === "127.0.0.1") {
-            return `http://${localHost}:8000${cleanPath}`;
-        }
-        return `${BASE_URL}${cleanPath}`;
-    }
-
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-        return url;
-    }
-
-    const cleanUrl = url.startsWith("/") ? url : `/${url}`;
-    const base = IS_ELECTRON ? `http://${localHost}:8000` : BASE_URL;
-    return `${base}${cleanUrl}`;
-};
-
 interface IlTesisleriDenetimProps {
     localAuditData: any;
     setLocalAuditData: React.Dispatch<React.SetStateAction<any>>;
@@ -115,6 +85,112 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
     const facilities: DenetimFacility[] = useMemo(() => {
         return Array.isArray(localAuditData?.tesisler) ? localAuditData.tesisler : [];
     }, [localAuditData?.tesisler]);
+
+    const targetReportId = selectedReport?.id || selectedTask?.id || "temp_denetim";
+    const MIRROR_KEY = `mufyard_facilities_mirror_${targetReportId}`;
+
+    const [localDraftBackup, setLocalDraftBackup] = useState<DenetimFacility[] | null>(null);
+
+    // Save mirror helper (immediately persists facilities to device disk)
+    const saveToLocalMirror = (items: DenetimFacility[]) => {
+        try {
+            if (Array.isArray(items)) {
+                localStorage.setItem(MIRROR_KEY, JSON.stringify(items));
+            }
+        } catch (e) {
+            console.warn("Local facilities mirror save error:", e);
+        }
+    };
+
+    // Check for local draft on mount or report change
+    useEffect(() => {
+        try {
+            const mirrorRaw = localStorage.getItem(MIRROR_KEY);
+            if (mirrorRaw) {
+                const mirrorList: DenetimFacility[] = JSON.parse(mirrorRaw);
+                if (Array.isArray(mirrorList) && mirrorList.length > facilities.length) {
+                    setLocalDraftBackup(mirrorList);
+                } else if (Array.isArray(mirrorList) && facilities.length >= mirrorList.length && facilities.length > 0) {
+                    saveToLocalMirror(facilities);
+                }
+            } else if (facilities.length > 0) {
+                saveToLocalMirror(facilities);
+            }
+        } catch (e) {
+            console.warn("Local facilities mirror read error:", e);
+        }
+    }, [MIRROR_KEY, facilities.length]);
+
+    // Restore draft
+    const handleRestoreLocalDraft = async () => {
+        if (!localDraftBackup || localDraftBackup.length === 0) return;
+        const updatedData = {
+            ...localAuditData,
+            tesisler: localDraftBackup
+        };
+        setLocalAuditData(updatedData);
+        saveToLocalMirror(localDraftBackup);
+        setLocalDraftBackup(null);
+        try {
+            await onSaveAuditData(updatedData);
+            toast.success("Yerel taslak geri yüklendi ve sunucuya gönderildi.");
+        } catch {
+            toast.success("Yerel taslak geri yüklendi (Cihazınızda korundu).");
+        }
+    };
+
+    // Emergency Excel export
+    const handleEmergencyExportExcel = () => {
+        try {
+            if (!facilities || facilities.length === 0) {
+                toast.error("Dışa aktarılacak tesis bulunamadı.");
+                return;
+            }
+            const exportData = facilities.map((f, idx) => ({
+                "Sıra": idx + 1,
+                "Tesis Adı": f.ad || "",
+                "Tesis Türü": f.tur || "",
+                "İlçe": f.ilce || "",
+                "Adres": f.adres || "",
+                "Mülkiyet": f.mulkiyet || "",
+                "Durum": f.durum === "faal" ? "Faal / Kullanımda" :
+                         f.durum === "kismen_faal" ? "Kısmen Faal" :
+                         f.durum === "bakimda" ? "Bakım / Onarımda" : "Atıl / Gayrifaal",
+                "Öncelik": f.oncelik === "kritik" ? "Acil / Kritik" :
+                           f.oncelik === "orta" ? "Orta Düzey Sorun" : "Normal Öncelik",
+                "Denetim Tarihi": f.denetimTarihi || "",
+                "Eksiklik ve Sorunlar (Bilgi Notu)": f.bilgiNotu || "",
+                "Fotoğraf Sayısı": f.photos?.length || 0,
+                "Kayıt Zamanı": f.createdAt || ""
+            }));
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            ws['!cols'] = [
+                { wch: 6 },
+                { wch: 30 },
+                { wch: 25 },
+                { wch: 15 },
+                { wch: 25 },
+                { wch: 20 },
+                { wch: 20 },
+                { wch: 18 },
+                { wch: 15 },
+                { wch: 50 },
+                { wch: 15 },
+                { wch: 22 }
+            ];
+            XLSX.utils.book_append_sheet(wb, ws, "Tesis Denetimleri");
+            const rawTitle = selectedReport?.title || selectedTask?.rapor_adi || "Tesis_Denetim";
+            const reportTitle = rawTitle.replace(/[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ_-]/g, "_");
+            const dateStr = new Date().toISOString().split("T")[0];
+            XLSX.writeFile(wb, `${reportTitle}_Tesis_Listesi_${dateStr}.xlsx`);
+            toast.success("Tüm tesisler Excel dosyası olarak cihazınıza indirildi!", { icon: "📥" });
+        } catch (err) {
+            console.error("Excel export error:", err);
+            toast.error("Excel dışa aktarılırken hata oluştu.");
+        }
+    };
 
     // Search & Filter
     const [searchTerm, setSearchTerm] = useState("");
@@ -276,12 +352,13 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
             tesisler: updatedFacilities
         };
         setLocalAuditData(updatedData);
+        saveToLocalMirror(updatedFacilities);
 
         try {
             await onSaveAuditData(updatedData);
         } catch (error) {
             console.error("Tesis kaydedilirken hata oluştu:", error);
-            toast.error("Tesis kaydedilirken hata oluştu.");
+            toast.error("Sunucuya kaydedilemedi (Kota veya bağlantı sorunu). Ancak tesis bu cihazda güvende tutuluyor!", { duration: 6000 });
         } finally {
             setIsSavingFacilityModal(false);
         }
@@ -303,7 +380,10 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
             tesisler: updatedFacilities
         };
         setLocalAuditData(updatedData);
-        await onSaveAuditData(updatedData);
+        saveToLocalMirror(updatedFacilities);
+        try {
+            await onSaveAuditData(updatedData);
+        } catch {}
         toast.success("Tesis kaydı silindi.");
     };
 
@@ -320,7 +400,10 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
             tesisler: updatedFacilities
         };
         setLocalAuditData(updatedData);
-        await onSaveAuditData(updatedData);
+        saveToLocalMirror(updatedFacilities);
+        try {
+            await onSaveAuditData(updatedData);
+        } catch {}
     };
 
     // Update Facility Priority inline
@@ -336,7 +419,10 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
             tesisler: updatedFacilities
         };
         setLocalAuditData(updatedData);
-        await onSaveAuditData(updatedData);
+        saveToLocalMirror(updatedFacilities);
+        try {
+            await onSaveAuditData(updatedData);
+        } catch {}
         toast.success("Öncelik güncellendi.");
     };
 
@@ -423,7 +509,10 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                 tesisler: updatedFacilities
             };
             setLocalAuditData(updatedData);
-            await onSaveAuditData(updatedData);
+            saveToLocalMirror(updatedFacilities);
+            try {
+                await onSaveAuditData(updatedData);
+            } catch {}
             toast.success(`${uploadedUrls.length} adet fotoğraf başarıyla eklendi.`);
         } catch (error) {
             console.error("Facility photo upload error:", error);
@@ -456,7 +545,10 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
             tesisler: updatedFacilities
         };
         setLocalAuditData(updatedData);
-        await onSaveAuditData(updatedData);
+        saveToLocalMirror(updatedFacilities);
+        try {
+            await onSaveAuditData(updatedData);
+        } catch {}
         toast.success("Fotoğraf kaldırıldı.");
     };
 
@@ -479,7 +571,10 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
             tesisler: updatedFacilities
         };
         setLocalAuditData(updatedData);
-        await onSaveAuditData(updatedData);
+        saveToLocalMirror(updatedFacilities);
+        try {
+            await onSaveAuditData(updatedData);
+        } catch {}
     };
 
     // Export / Transfer Findings to Report
@@ -528,6 +623,48 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300 pb-12">
+            {/* Local Draft Recovery Banner */}
+            {localDraftBackup && localDraftBackup.length > facilities.length && (
+                <div className="bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-600/60 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md">
+                    <div className="flex items-start gap-3.5">
+                        <div className="w-11 h-11 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+                            <AlertTriangle size={24} />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-black text-amber-950 dark:text-amber-100 uppercase tracking-wide">
+                                    Cihazınızda Kaydedilmemiş Yerel Tesis Taslağı Bulundu!
+                                </h4>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white">
+                                    {localDraftBackup.length} Tesis
+                                </span>
+                            </div>
+                            <p className="text-xs text-amber-900/90 dark:text-amber-200/90 mt-1 font-medium">
+                                Bu cihazda sunucudaki {facilities.length} tesisten daha fazla ({localDraftBackup.length} adet) kayıt mevcut. Sunucudaki kota veya fatura kısıtlaması nedeniyle verilerinizin silinmesini önlemek için yerel taslağınız cihaz hafızasında güvenle saklanmaktadır.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setLocalDraftBackup(null)}
+                            className="h-9 px-3.5 text-xs font-bold rounded-xl border-amber-300 dark:border-amber-700/60 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                        >
+                            Yoksay
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={handleRestoreLocalDraft}
+                            className="h-9 px-4 text-xs font-black rounded-xl bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-600/20 flex items-center gap-1.5 transition-all hover:scale-105"
+                        >
+                            <Check size={15} />
+                            <span>Taslağı Geri Yükle ({localDraftBackup.length} Tesis)</span>
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             {/* Top Header & Overview Bar */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -552,14 +689,25 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
 
                     <div className="flex flex-wrap items-center gap-2.5">
                         {facilities.length > 0 && (
-                            <Button
-                                variant="outline"
-                                onClick={handleTransferFindingsToReport}
-                                className="h-9.5 px-4 rounded-xl text-xs font-bold border-slate-200 dark:border-slate-700 hover:border-blue-500 flex items-center gap-1.5"
-                            >
-                                <FileText size={14} className="text-blue-500" />
-                                <span>Rapora Aktar</span>
-                            </Button>
+                            <>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleEmergencyExportExcel}
+                                    title="Tesisleri anında Excel (.xlsx) tablosu olarak cihazınıza indirin"
+                                    className="h-9.5 px-3.5 rounded-xl text-xs font-bold border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1.5 transition-all"
+                                >
+                                    <Download size={14} className="text-emerald-500" />
+                                    <span>Yedek İndir (Excel)</span>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleTransferFindingsToReport}
+                                    className="h-9.5 px-4 rounded-xl text-xs font-bold border-slate-200 dark:border-slate-700 hover:border-blue-500 flex items-center gap-1.5"
+                                >
+                                    <FileText size={14} className="text-blue-500" />
+                                    <span>Rapora Aktar</span>
+                                </Button>
+                            </>
                         )}
                         <Button
                             onClick={handleOpenCreateModal}
@@ -856,22 +1004,16 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                                             <div
                                                                 key={`${url}_${pIdx}`}
                                                                 className="relative aspect-video rounded-xl overflow-hidden border border-slate-200/90 dark:border-slate-800 cursor-pointer group/photo shadow-xs hover:shadow-md bg-slate-100 dark:bg-slate-900 transition-all"
-                                                                onClick={() => setLightboxPhoto({ url: safeUrl, title: `${facility.ad} (${pIdx + 1}/${photoList.length})` })}
+                                                                onClick={(e) => {
+                                                                    const activeSrc = (e.currentTarget.querySelector("img") as HTMLImageElement)?.src || safeUrl;
+                                                                    setLightboxPhoto({ url: activeSrc, title: `${facility.ad} (${pIdx + 1}/${photoList.length})` });
+                                                                }}
                                                             >
                                                                 <img
                                                                     src={safeUrl}
                                                                     alt={`${facility.ad} fotoğraf ${pIdx + 1}`}
                                                                     className="w-full h-full object-cover group-hover/photo:scale-105 transition-transform duration-300"
-                                                                    onError={(e) => {
-                                                                        const target = e.currentTarget;
-                                                                        if (!target.dataset.triedLocal && !target.src.includes("127.0.0.1:8000")) {
-                                                                            target.dataset.triedLocal = "true";
-                                                                            try {
-                                                                                const urlObj = new URL(target.src);
-                                                                                target.src = `http://127.0.0.1:8000${urlObj.pathname}`;
-                                                                            } catch {}
-                                                                        }
-                                                                    }}
+                                                                    onError={handleImageError}
                                                                 />
                                                                 <div className="absolute inset-0 bg-black/0 group-hover/photo:bg-black/30 transition-colors flex items-center justify-center">
                                                                     <ZoomIn size={16} className="text-white opacity-0 group-hover/photo:opacity-100 transition-opacity" />
@@ -1142,21 +1284,19 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                                                         src={safeUrl}
                                                                         alt={`${facility.ad} - Görsel ${pIdx + 1}`}
                                                                         className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
-                                                                        onClick={() => setLightboxPhoto({ url: safeUrl, title: `${facility.ad} (${pIdx + 1}/${photoList.length})` })}
-                                                                        onError={(e) => {
-                                                                            const target = e.currentTarget;
-                                                                            if (!target.dataset.triedLocal && !target.src.includes("127.0.0.1:8000")) {
-                                                                                target.dataset.triedLocal = "true";
-                                                                                try {
-                                                                                    const urlObj = new URL(target.src);
-                                                                                    target.src = `http://127.0.0.1:8000${urlObj.pathname}`;
-                                                                                } catch {}
-                                                                            }
+                                                                        onClick={(e) => {
+                                                                            const activeSrc = (e.currentTarget as HTMLImageElement)?.src || safeUrl;
+                                                                            setLightboxPhoto({ url: activeSrc, title: `${facility.ad} (${pIdx + 1}/${photoList.length})` });
                                                                         }}
+                                                                        onError={handleImageError}
                                                                     />
-                                                                    <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 backdrop-blur-xs p-1 rounded-lg">
+                                                                    <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/opacity-100 transition-opacity bg-black/60 backdrop-blur-xs p-1 rounded-lg">
                                                                         <button
-                                                                            onClick={() => setLightboxPhoto({ url: safeUrl, title: `${facility.ad} (${pIdx + 1}/${photoList.length})` })}
+                                                                            onClick={(e) => {
+                                                                                const card = (e.currentTarget.closest(".group") as HTMLElement);
+                                                                                const activeSrc = (card?.querySelector("img") as HTMLImageElement)?.src || safeUrl;
+                                                                                setLightboxPhoto({ url: activeSrc, title: `${facility.ad} (${pIdx + 1}/${photoList.length})` });
+                                                                            }}
                                                                             className="p-1 text-white hover:text-blue-300 rounded transition-colors"
                                                                             title="Büyük Görüntüle"
                                                                         >
@@ -1373,19 +1513,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                 src={lightboxPhoto.url}
                                 alt="Denetim Fotoğrafı"
                                 className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl transition-all"
-                                onError={(e) => {
-                                    const target = e.currentTarget;
-                                    if (!target.dataset.triedLocal && !target.src.includes("127.0.0.1:8000")) {
-                                        target.dataset.triedLocal = "true";
-                                        try {
-                                            const urlObj = new URL(target.src);
-                                            target.src = `http://127.0.0.1:8000${urlObj.pathname}`;
-                                        } catch {
-                                            const clean = lightboxPhoto.url.replace(/^https?:\/\/[^/]+/, "");
-                                            target.src = `http://127.0.0.1:8000${clean.startsWith('/') ? clean : '/' + clean}`;
-                                        }
-                                    }
-                                }}
+                                onError={handleImageError}
                             />
                         </div>
                     </div>
