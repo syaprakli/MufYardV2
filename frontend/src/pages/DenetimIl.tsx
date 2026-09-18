@@ -5,7 +5,7 @@ import {
     BookOpen, ClipboardCheck, Bot, Plus, Edit2, Trash2, Search,
     Tag, ChevronRight, X, Check, Loader2, Database, Sparkles, FileText,
     ArrowRight, Info, AlertCircle, Save, ExternalLink, Play, ArrowLeft,
-    Copy, Printer, Download, Table, Building2
+    Copy, Printer, Download, Table, Building2, MapPin, ChevronDown
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { API_URL, LOCAL_API_URL, IS_ELECTRON } from "../lib/config";
@@ -19,6 +19,7 @@ import { updateTask } from "../lib/api/tasks";
 import { generateEvrakTalebiDocx } from "../lib/api/files";
 import { DenetimOzetTablolar } from "../components/audit/DenetimOzetTablolar";
 import { IlTesisleriDenetim, getSafeImageUrl, handleImageError } from "../components/audit/IlTesisleriDenetim";
+import { savePhotoToLocalDevice, exportPhotosToComputer } from "../utils/photoExportHelper";
 
 
 interface KnowledgeItem {
@@ -279,6 +280,7 @@ export default function DenetimIl() {
     // 8. Task Picker Modal (for starting audit from page-level button)
     const [showTaskPicker, setShowTaskPicker] = useState(false);
     const [pickerTaskForAudit, setPickerTaskForAudit] = useState<any>(null);
+    const [isTaskDropdownOpen, setIsTaskDropdownOpen] = useState(false);
 
 
 
@@ -386,14 +388,6 @@ export default function DenetimIl() {
         }
     }, [selectedTaskId, cachedData?.audits, selectedAuditId]);
 
-    // Child Kyk Yurt Denetimleri (if selected is İl Denetimi)
-    const childKykTasks = useMemo(() => {
-        if (!selectedTaskId || activeTab !== "il" || !cachedData?.tasks) return [];
-        return cachedData.tasks.filter(t => {
-            const rt = (t.rapor_turu || "").toLowerCase().trim();
-            return (rt === "kyk yurt denetimi" || rt === "yurt denetimi") && t.parent_task_id === selectedTaskId;
-        });
-    }, [selectedTaskId, activeTab, cachedData?.tasks]);
 
 // parentIlTask removed
 
@@ -577,6 +571,8 @@ export default function DenetimIl() {
         
         setUploadingPhoto(true);
         try {
+            savePhotoToLocalDevice(files, "Il_Denetim");
+
             // Auto-initialize audit report draft if it doesn't exist yet for selectedTask
             let activeAudit = selectedReport;
             if (!activeAudit && selectedTask) {
@@ -1512,7 +1508,18 @@ export default function DenetimIl() {
                         </h4>
                         <p className="text-[10px] text-slate-400 font-bold mt-0.5">Denetime ait görsel ve belgeler</p>
                     </div>
-                    <div>
+                    <div className="flex items-center gap-2">
+                        {photos.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => exportPhotosToComputer(photos, `${selectedReport?.title || "Il_Denetimi"}_Fotograflar`)}
+                                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/20"
+                                title="Tüm fotoğrafları bilgisayara aktar"
+                            >
+                                <Download size={14} />
+                                <span>Bilgisayara Aktar ({photos.length})</span>
+                            </button>
+                        )}
                         <label className={`flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-all duration-200 shadow-md shadow-blue-500/20 ${uploadingPhoto ? "opacity-50 pointer-events-none" : ""}`}>
                             {uploadingPhoto ? (
                                 <>
@@ -1572,6 +1579,14 @@ export default function DenetimIl() {
                                                 document.body.appendChild(overlay);
                                             }}
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => exportPhotosToComputer([url], `${selectedReport?.title || "Il_Denetimi"}_Foto_${index + 1}`)}
+                                            className="absolute top-2 left-2 w-7 h-7 bg-black/75 hover:bg-emerald-600 text-white rounded-lg flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 shadow"
+                                            title="Bilgisayara İndir / Aktar"
+                                        >
+                                            <Download size={14} />
+                                        </button>
                                         <button
                                             onClick={() => handleDeletePhoto(index)}
                                             className="absolute top-2 right-2 w-7 h-7 bg-black/75 hover:bg-red-600 text-white rounded-lg flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 shadow"
@@ -2399,13 +2414,25 @@ export default function DenetimIl() {
                     </div>
                 </div>
                 
-                <button
-                    onClick={() => setShowTaskPicker(true)}
-                    className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-px active:translate-y-0 flex-shrink-0 group w-full sm:w-auto"
-                >
-                    <Play size={11} className="group-hover:scale-110 transition-transform" />
-                    <span>Denetimi Başlat</span>
-                </button>
+                <div className="flex items-center gap-2">
+                    {selectedTaskId && (
+                        <button
+                            onClick={() => setSelectedTaskId(null)}
+                            className="xl:hidden flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                            title="Tüm İller / Görevler Listesini Aç"
+                        >
+                            <Building2 size={12} />
+                            <span>İl Değiştir ({filteredTasks.length})</span>
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setShowTaskPicker(true)}
+                        className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-px active:translate-y-0 flex-shrink-0 group w-full sm:w-auto"
+                    >
+                        <Play size={11} className="group-hover:scale-110 transition-transform" />
+                        <span>Denetimi Başlat</span>
+                    </button>
+                </div>
             </div>
 
             {/* Main content split */}
@@ -2665,16 +2692,81 @@ export default function DenetimIl() {
                                     /* 1. HUB VIEW: TASK HEADER + KYK BANNER + 6 LARGE MODULE CARDS              */
                                     /* ========================================================================= */
                                     <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-1 animate-in fade-in duration-300">
-                                        {/* Task Header */}
+                                        {/* Task Header with Quick Province / Task Selector */}
                                         <div className="flex flex-col border-b border-slate-100 dark:border-slate-800/50 pb-4 gap-4">
                                             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                                                <div className="space-y-1">
-                                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                                        {currentRaporTuru}
-                                                    </span>
-                                                    <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                                                        {selectedTask.rapor_adi}
-                                                    </h2>
+                                                <div className="space-y-1.5 flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md border border-blue-200/50 dark:border-blue-900/30">
+                                                            {currentRaporTuru}
+                                                        </span>
+                                                        <span className="text-slate-300 dark:text-slate-700">•</span>
+                                                        <span className="text-[11px] font-bold text-slate-400">
+                                                            Denetlenen İl / Görev:
+                                                        </span>
+                                                    </div>
+
+                                                    {filteredTasks.length > 1 ? (
+                                                        <div className="relative inline-block w-full max-w-xl">
+                                                            {/* Trigger Button (Basmadan Önceki Kısım) */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setIsTaskDropdownOpen(prev => !prev)}
+                                                                className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border-2 border-blue-500/30 dark:border-blue-500/40 hover:border-blue-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-bold text-sm sm:text-base shadow-sm transition-all text-left cursor-pointer group"
+                                                            >
+                                                                <div className="flex items-center gap-2.5 truncate">
+                                                                    <MapPin size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                                                                    <span className="truncate">{selectedTask?.rapor_adi}</span>
+                                                                </div>
+                                                                <ChevronDown
+                                                                    size={16}
+                                                                    className={`text-slate-400 group-hover:text-blue-500 shrink-0 transition-transform duration-200 ${isTaskDropdownOpen ? "rotate-180 text-blue-600" : ""}`}
+                                                                />
+                                                            </button>
+
+                                                            {/* Opened Menu (Basınca Açılan Kısım - Ufak ve Şık) */}
+                                                            {isTaskDropdownOpen && (
+                                                                <>
+                                                                    <div
+                                                                        className="fixed inset-0 z-40"
+                                                                        onClick={() => setIsTaskDropdownOpen(false)}
+                                                                    />
+                                                                    <div className="absolute top-full left-0 mt-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 p-1.5 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-150 space-y-0.5">
+                                                                        {filteredTasks.map(t => {
+                                                                            const isCurrent = t.id === selectedTaskId;
+                                                                            return (
+                                                                                <button
+                                                                                    key={t.id}
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        setSelectedTaskId(t.id);
+                                                                                        setIsTaskDropdownOpen(false);
+                                                                                    }}
+                                                                                    className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors flex items-center justify-between ${
+                                                                                        isCurrent
+                                                                                            ? "bg-blue-600 text-white font-bold shadow-xs"
+                                                                                            : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium"
+                                                                                    }`}
+                                                                                >
+                                                                                    <div className="flex items-center gap-2 truncate">
+                                                                                        <MapPin size={12} className={isCurrent ? "text-white" : "text-blue-500"} />
+                                                                                        <span className="truncate">{t.rapor_adi}</span>
+                                                                                    </div>
+                                                                                    {isCurrent && (
+                                                                                        <Check size={13} className="shrink-0 ml-2" />
+                                                                                    )}
+                                                                                </button>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                                                            {selectedTask.rapor_adi}
+                                                        </h2>
+                                                    )}
                                                 </div>
                                                 <div className="flex flex-wrap items-center gap-3">
                                                     {(cachedData?.audits || []).filter((a: any) => a.task_id === selectedTask.id).length > 1 && (
@@ -2721,57 +2813,6 @@ export default function DenetimIl() {
                                                 </div>
                                             </div>
                                         </div>
-
-                                        {/* Relationships (KYK Yurt <-> İl) */}
-                                        {activeTab === "il" && (
-                                            <div className="bg-blue-50/40 dark:bg-blue-950/10 border border-blue-100/50 dark:border-blue-900/20 rounded-xl p-4">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <div>
-                                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-500">Bu İle Bağlı KYK Yurt Denetimleri</h4>
-                                                        <p className="text-xs text-slate-400 font-medium">Bu il bünyesindeki öğrenci yurtlarının denetim formları</p>
-                                                    </div>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="h-8 px-3 text-xs font-bold text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50 hover:bg-blue-50 hover:border-blue-400 rounded-xl flex items-center gap-1.5 transition-all shadow-sm"
-                                                        onClick={() => {
-                                                            navigate(`/denetim/kyk?task_id=${selectedTaskId}`);
-                                                        }}
-                                                    >
-                                                        <Plus size={13} />
-                                                        <span>KYK Yurt Denetimi Aç / Ekle</span>
-                                                    </Button>
-                                                </div>
-                                                {childKykTasks.length === 0 ? (
-                                                    <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-dashed border-blue-200 dark:border-blue-900 text-center">
-                                                        <p className="text-xs text-slate-400 font-medium">Bu il genel denetimine henüz bağlı bir KYK yurt denetimi atanmamış.</p>
-                                                        <button
-                                                            onClick={() => navigate(`/denetim/kyk?task_id=${selectedTaskId}`)}
-                                                            className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline mt-1 inline-block"
-                                                        >
-                                                            KYK Yurt Denetimi Başlatmak için tıklayınız →
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex flex-col gap-1.5">
-                                                        {childKykTasks.map(child => (
-                                                            <button
-                                                                key={child.id}
-                                                                onClick={() => {
-                                                                    navigate(`/denetim/kyk?task_id=${child.id}`);
-                                                                }}
-                                                                className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-2.5 rounded-lg hover:border-blue-500 transition-colors text-left"
-                                                            >
-                                                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{child.rapor_adi}</span>
-                                                                <div className="flex items-center gap-2">
-                                                                    <ArrowRight size={12} className="text-blue-500" />
-                                                                </div>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
 
                                         {/* 6 Large Module Cards Grid */}
                                         {(() => {

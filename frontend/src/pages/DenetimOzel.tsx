@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import {
     BookOpen, ClipboardCheck, Bot, Plus, Edit2, Trash2, Search,
     Tag, ChevronRight, X, Check, Loader2, Database, Sparkles, FileText,
-    ArrowRight, Info, AlertCircle, Save, ExternalLink, Play, ArrowLeft
+    ArrowRight, Info, AlertCircle, Save, ExternalLink, Play, ArrowLeft,
+    Download
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { API_URL } from "../lib/config";
@@ -16,6 +17,7 @@ import { useAuth } from "../lib/hooks/useAuth";
 import { useGlobalData } from "../lib/context/GlobalDataContext";
 import { createAudit, updateAudit, deleteAudit, fetchAuditById } from "../lib/api/audit";
 import { updateTask } from "../lib/api/tasks";
+import { savePhotoToLocalDevice, exportPhotosToComputer } from "../utils/photoExportHelper";
 
 interface KnowledgeItem {
     id: string;
@@ -466,6 +468,8 @@ export default function DenetimOzel() {
         
         setUploadingPhoto(true);
         try {
+            savePhotoToLocalDevice(file, `Ozel_${selectedReport?.title || "Denetim"}`);
+
             const formData = new FormData();
             formData.append("file", file);
             
@@ -775,7 +779,18 @@ export default function DenetimOzel() {
                         </h4>
                         <p className="text-[10px] text-slate-400 font-bold mt-0.5">Denetime ait görsel ve belgeler</p>
                     </div>
-                    <div>
+                    <div className="flex items-center gap-2">
+                        {photos.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => exportPhotosToComputer(photos, `${selectedReport?.title || "Ozel_Denetim"}_Fotograflar`)}
+                                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/20"
+                                title="Tüm fotoğrafları bilgisayara aktar"
+                            >
+                                <Download size={14} />
+                                <span>Bilgisayara Aktar ({photos.length})</span>
+                            </button>
+                        )}
                         <label className={`flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-all duration-200 shadow-md shadow-blue-500/20 ${uploadingPhoto ? "opacity-50 pointer-events-none" : ""}`}>
                             {uploadingPhoto ? (
                                 <>
@@ -834,6 +849,14 @@ export default function DenetimOzel() {
                                                 document.body.appendChild(overlay);
                                             }}
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => exportPhotosToComputer([url], `${selectedReport?.title || "Ozel_Denetim"}_Foto_${index + 1}`)}
+                                            className="absolute top-2 left-2 w-7 h-7 bg-black/75 hover:bg-emerald-600 text-white rounded-lg flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 shadow"
+                                            title="Bilgisayara İndir / Aktar"
+                                        >
+                                            <Download size={14} />
+                                        </button>
                                         <button
                                             onClick={() => handleDeletePhoto(index)}
                                             className="absolute top-2 right-2 w-7 h-7 bg-black/75 hover:bg-red-600 text-white rounded-lg flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 shadow"

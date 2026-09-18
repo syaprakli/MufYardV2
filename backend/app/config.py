@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     # Firebase Settings
     FIREBASE_SERVICE_ACCOUNT_PATH: str = os.path.join(BASE_DIR, "firebase-credentials.json")
     FIREBASE_SERVICE_ACCOUNT_JSON: str = "" # Full JSON string for cloud deployment
-    FIREBASE_STORAGE_BUCKET: str = "" # e.g. project-id.appspot.com
+    FIREBASE_STORAGE_BUCKET: str = "mufyardv2.firebasestorage.app"
     
     # Email (SMTP) Settings
     SMTP_SERVER: str = "smtp.gmail.com"

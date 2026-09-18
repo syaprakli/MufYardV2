@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     showItemInFolder: (filePath) => {
         return ipcRenderer.invoke('show-item-in-folder', filePath);
     },
+    exportPhotosToComputer: (photos, folderName) => {
+        return ipcRenderer.invoke('export-photos-to-computer', { photos, folderName });
+    },
     // Platform bilgisi
     platform: process.platform,
     isElectron: true,

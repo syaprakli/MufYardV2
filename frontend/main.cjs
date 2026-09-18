@@ -545,3 +545,127 @@ ipcMain.handle('show-item-in-folder', async (_event, filePath) => {
         return { ok: false, error: e.message };
     }
 });
+
+function downloadUrlToFile(fileUrl, destPath, maxRedirects = 5) {
+    return new Promise((resolve, reject) => {
+        if (!fileUrl || typeof fileUrl !== 'string') {
+            return reject(new Error('Geçersiz URL'));
+        }
+
+        if (fileUrl.startsWith('data:')) {
+            try {
+                const base64Data = fileUrl.replace(/^data:image\/\w+;base64,/, '');
+                fs.writeFileSync(destPath, Buffer.from(base64Data, 'base64'));
+                return resolve();
+            } catch (err) {
+                return reject(err);
+            }
+        }
+
+        const fetchAttempt = (currentUrl, redirectsLeft) => {
+            if (redirectsLeft <= 0) {
+                return reject(new Error('Çok fazla yönlendirme (redirect limit).'));
+            }
+            try {
+                const parsed = new URL(currentUrl);
+                const client = parsed.protocol === 'https:' ? https : http;
+                const req = client.get(parsed, (res) => {
+                    if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                        const redirectUrl = new URL(res.headers.location, currentUrl).href;
+                        res.resume();
+                        return fetchAttempt(redirectUrl, redirectsLeft - 1);
+                    }
+                    if (res.statusCode >= 400) {
+                        res.resume();
+                        return reject(new Error(`İndirme hatası: HTTP ${res.statusCode}`));
+                    }
+                    const fileStream = fs.createWriteStream(destPath);
+                    res.pipe(fileStream);
+                    fileStream.on('finish', () => {
+                        fileStream.close(resolve);
+                    });
+                    fileStream.on('error', (err) => {
+                        fs.unlink(destPath, () => {});
+                        reject(err);
+                    });
+                });
+                req.on('error', reject);
+            } catch (err) {
+                reject(err);
+            }
+        };
+
+        fetchAttempt(fileUrl, maxRedirects);
+    });
+}
+
+ipcMain.handle('export-photos-to-computer', async (_event, { photos, folderName }) => {
+    try {
+        if (!photos || !Array.isArray(photos) || photos.length === 0) {
+            return { ok: false, error: 'Aktarılacak fotoğraf bulunamadı.' };
+        }
+
+        const safeFolderName = String(folderName || 'Denetim_Fotograflari')
+            .replace(/[\\/:*?"<>|]/g, '_')
+            .trim() || 'Denetim_Fotograflari';
+
+        const defaultDir = path.join(os.homedir(), 'Documents', 'MufYARD', 'Fotograflar', safeFolderName);
+        if (!fs.existsSync(defaultDir)) {
+            fs.mkdirSync(defaultDir, { recursive: true });
+        }
+
+        const browserWindow = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+        const openResult = await dialog.showOpenDialog(browserWindow, {
+            title: 'Fotoğrafların Aktarılacağı Klasörü Seçin',
+            defaultPath: defaultDir,
+            properties: ['openDirectory', 'createDirectory'],
+            buttonLabel: 'Bu Klasöre Aktar'
+        });
+
+        if (openResult.canceled || !openResult.filePaths || openResult.filePaths.length === 0) {
+            return { ok: false, canceled: true };
+        }
+
+        const targetFolder = openResult.filePaths[0];
+        if (!fs.existsSync(targetFolder)) {
+            fs.mkdirSync(targetFolder, { recursive: true });
+        }
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let i = 0; i < photos.length; i++) {
+            const item = photos[i];
+            const rawUrl = typeof item === 'string' ? item : (item && item.url ? item.url : '');
+            if (!rawUrl) continue;
+
+            const extMatch = rawUrl.match(/\.(jpg|jpeg|png|webp|gif)/i);
+            const ext = extMatch ? `.${extMatch[1].toLowerCase()}` : '.jpg';
+            const fileName = `Foto_${String(i + 1).padStart(2, '0')}${ext}`;
+            const targetFilePath = path.join(targetFolder, fileName);
+
+            try {
+                await downloadUrlToFile(rawUrl, targetFilePath);
+                successCount++;
+            } catch (err) {
+                console.error(`Fotoğraf #${i + 1} indirilemedi:`, err);
+                failCount++;
+            }
+        }
+
+        // Klasörü Windows Gezgini'nde aç
+        await shell.openPath(targetFolder);
+
+        return {
+            ok: true,
+            folderPath: targetFolder,
+            total: photos.length,
+            successCount,
+            failCount
+        };
+    } catch (err) {
+        console.error('[ELECTRON] export-photos-to-computer hatasi:', err);
+        return { ok: false, error: err && err.message ? err.message : 'Fotoğraflar aktarılamadı.' };
+    }
+});
+

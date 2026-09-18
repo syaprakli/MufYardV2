@@ -5,7 +5,7 @@ import {
     FileText, Image as ImageIcon, Video, Music, 
     Upload, X, Grid, List as ListIcon, RefreshCw, Share2, ExternalLink, HelpCircle,
     Briefcase, FileSpreadsheet, Users, Check, Calendar, AlertTriangle, ArrowLeft, Calculator, Settings
-, Building, Coins, Info, Dumbbell, TrendingUp, Radio } from "lucide-react";
+, Building, Coins, Info, Dumbbell, TrendingUp, Radio, Scale } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { toast } from "react-hot-toast";
@@ -40,6 +40,7 @@ import { sendDirectMessage } from "../lib/api/collaboration";
 import { LOJMAN_RATES, CITY_DISCOUNT_GROUPS } from "../lib/lojmanRates";
 import { YOLLUK_H_RATES, YOLLUK_COEFFICIENTS } from "../lib/yollukRates";
 import { OzelBedenEgitimiDenetim } from "../components/audit/OzelBedenEgitimiDenetim";
+import { EsikDegerlerSection } from "../components/files/EsikDegerlerSection";
 
 const DEFAULT_BAZ_RATES: Record<string, { ydo: string; maktu: number; buyuksehirTavan: number; digerIlTavan: number }> = {
     "2026": { ydo: "%25,49 (VUK 585)", maktu: 18471.21, buyuksehirTavan: 92356.05, digerIlTavan: 55413.63 },
@@ -378,6 +379,7 @@ export default function Files() {
     const [isIhaleSubActive, setIsIhaleSubActive] = useState(false);
     const [isRaporSubActive, setIsRaporSubActive] = useState(false);
     const [isPratikModalOpen, setIsPratikModalOpen] = useState(false);
+    const [pratikActiveTab, setPratikActiveTab] = useState<'genel' | 'esik'>('genel');
 
     // Travel days Tayin yolluk
     const [yollukTravelDays, setYollukTravelDays] = useState<number>(1);
@@ -5563,8 +5565,8 @@ const renderPratikModal = () => {
         if (!isPratikModalOpen) return null;
         return createPortal(
             <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
-                <Card className="w-full max-w-6xl p-8 rounded-[32px] bg-card border-white/60 dark:border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar animate-in zoom-in-95 duration-300">
-                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
+                <Card className="w-full max-w-6xl p-6 rounded-[28px] bg-card border-white/60 dark:border-slate-800 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-300">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-3.5 mb-4 shrink-0">
                         <div className="flex items-center gap-3">
                             <div className="p-3 bg-amber-500/10 text-amber-500 rounded-2xl">
                                 <HelpCircle size={24} />
@@ -5574,17 +5576,62 @@ const renderPratikModal = () => {
                                 <p className="text-xs text-slate-500 font-medium">Teftiş ve idari işlemlerinizde ihtiyaç duyabileceğiniz güncel limitler ve yasal oranlar.</p>
                             </div>
                         </div>
-                        <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            onClick={() => setIsPratikModalOpen(false)} 
-                            className="rounded-xl h-10 w-10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                        >
-                            <X size={20} />
-                        </Button>
+
+                        {/* Sayfa / Sekme Seçici */}
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                                <button
+                                    type="button"
+                                    onClick={() => setPratikActiveTab('genel')}
+                                    className={cn(
+                                        "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5",
+                                        pratikActiveTab === 'genel'
+                                            ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm font-black"
+                                            : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                                    )}
+                                >
+                                    <FileSpreadsheet size={14} className={pratikActiveTab === 'genel' ? "text-amber-500" : ""} />
+                                    <span>Genel Oranlar</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPratikActiveTab('esik')}
+                                    className={cn(
+                                        "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5",
+                                        pratikActiveTab === 'esik'
+                                            ? "bg-amber-500 text-slate-950 shadow-sm font-black"
+                                            : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                                    )}
+                                >
+                                    <Scale size={14} className={pratikActiveTab === 'esik' ? "text-slate-950" : "text-amber-500"} />
+                                    <span>4734 KİK Eşik Değerler</span>
+                                    <span className={cn(
+                                        "text-[9px] px-1 py-0.2 rounded font-mono font-black",
+                                        pratikActiveTab === 'esik' ? "bg-slate-950/20 text-slate-950" : "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                                    )}>
+                                        PDF
+                                    </span>
+                                </button>
+                            </div>
+
+                            <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                onClick={() => setIsPratikModalOpen(false)} 
+                                className="rounded-xl h-10 w-10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                                <X size={20} />
+                            </Button>
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 font-outfit">
+                    <div className="overflow-y-auto custom-scrollbar flex-1 pr-1.5 pb-1">
+                        {pratikActiveTab === 'esik' ? (
+                            /* AYRI SAYFA: 4734 KİK Eşik Değerler & PDF Arşivi */
+                            <EsikDegerlerSection />
+                    ) : (
+                        /* GENEL ORANLAR SAYFASI */
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 font-outfit">
                         
                         {/* 1. Damga Vergisi Oranları */}
                         <div className="flex flex-col p-6 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 gap-3">
@@ -5943,6 +5990,8 @@ const renderPratikModal = () => {
                         </div>
 
                     </div>
+                    )}
+                </div>
                 </Card>
             </div>,
             document.body
@@ -6434,7 +6483,7 @@ const renderPratikModal = () => {
                         </div>
                         <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5 line-clamp-1">Pratik Bilgiler</h3>
                         <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed flex-1 line-clamp-3">
-                            Yeniden değerleme oranları, memur katsayıları, aile yardımları, doğrudan temin ve baz istasyonu tavanları.
+                            4734 KİK eşik değerler & parasal limitler arşivi, resmi tebliğ PDF'leri, yeniden değerleme, memur katsayıları ve yasal tavanlar.
                         </p>
                         <Button 
                             onClick={() => setIsPratikModalOpen(true)}

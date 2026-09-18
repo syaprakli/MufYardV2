@@ -52,12 +52,15 @@ export const getSafeImageUrl = (url?: string): string => {
         return trimmed;
     }
 
+    const isLocalClient = typeof window !== 'undefined' && 
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
     // 2. Full HTTP/HTTPS URLs
     if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
         // If it points to localhost/127.0.0.1
         if (trimmed.includes("localhost:8000") || trimmed.includes("127.0.0.1:8000")) {
-            // On Web or Mobile APK, device cannot reach local PC -> route to Railway
-            if (!IS_ELECTRON) {
+            // On external Web or Mobile APK (not localhost/electron), redirect to Railway
+            if (!IS_ELECTRON && !isLocalClient) {
                 const pathPart = trimmed.split(":8000")[1] || "";
                 const clean = pathPart.startsWith("/") ? pathPart : `/${pathPart}`;
                 return `${REMOTE_STATIC_BASE}${clean}`;
@@ -73,15 +76,13 @@ export const getSafeImageUrl = (url?: string): string => {
     // 3. Relative URLs (e.g. /uploads/..., /Raporlar/..., denetim_tesisleri/...)
     const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 
-    // On Web or Mobile APK -> always use remote Railway backend
-    if (!IS_ELECTRON) {
-        return `${BASE_URL || REMOTE_STATIC_BASE}${cleanPath}`;
+    // In Electron or local dev browser -> use local backend first
+    if (IS_ELECTRON || isLocalClient) {
+        return `${LOCAL_STATIC_BASE}${cleanPath}`;
     }
 
-    // In Electron:
-    // Try local backend first (http://127.0.0.1:8000). If the photo was uploaded from Web/APK,
-    // it won't exist locally; handleImageError will immediately fall back to Railway on 404!
-    return `${LOCAL_STATIC_BASE}${cleanPath}`;
+    // On remote Web or Mobile APK -> use remote backend
+    return `${BASE_URL || REMOTE_STATIC_BASE}${cleanPath}`;
 };
 
 /**
@@ -91,6 +92,7 @@ export const getSafeImageUrl = (url?: string): string => {
  */
 export const handleImageError = (
     e: React.SyntheticEvent<HTMLImageElement, Event>,
+    onPermanentFailure?: (target: HTMLImageElement) => void,
     fallbackRemote: string = REMOTE_STATIC_BASE,
     fallbackLocal: string = LOCAL_STATIC_BASE
 ) => {
@@ -118,7 +120,13 @@ export const handleImageError = (
 
         // 3. Both failed or remote cloud asset 404 -> stop retrying
         target.dataset.failed = "true";
+        if (onPermanentFailure) {
+            onPermanentFailure(target);
+        }
     } catch {
         target.dataset.failed = "true";
+        if (onPermanentFailure) {
+            onPermanentFailure(target);
+        }
     }
 };

@@ -9,6 +9,7 @@ import { exportSystemData, importSystemData } from "../lib/api/backup";
 import { isElectron } from "../lib/firebase";
 import { API_URL } from "../lib/config";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
+import { savePhotoToLocalDevice } from "../utils/photoExportHelper";
 
 // Sub-components
 import { ProfileSection } from "../components/settings/ProfileSection";
@@ -122,6 +123,7 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
                             handleAvatarUpload={async (e) => {
                                 const file = e.target.files?.[0];
                                 if (!file || !user?.uid) return;
+                                savePhotoToLocalDevice(file, "Profil_Resmi");
                                 setUploadingAvatar(true);
                                 try {
                                     const data = await uploadAvatarApi(user.uid, file);

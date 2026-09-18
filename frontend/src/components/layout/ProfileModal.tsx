@@ -8,6 +8,7 @@ import { fetchProfile, updateProfile, uploadAvatar, type Profile } from "../../l
 import { updateProfile as firebaseUpdateProfile } from "firebase/auth";
 import { BASE_URL } from "../../lib/config";
 import { isElectron } from "../../lib/firebase";
+import { savePhotoToLocalDevice } from "../../utils/photoExportHelper";
 
 interface ProfileModalProps {
     isOpen: boolean;
@@ -99,6 +100,8 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !user) return;
+
+        savePhotoToLocalDevice(file, "Profil_Resmi");
 
         try {
             setSaving(true);

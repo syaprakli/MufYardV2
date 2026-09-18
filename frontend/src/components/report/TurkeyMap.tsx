@@ -3,6 +3,7 @@ import { TagSelector, type TagType } from "./TagSelector";
 import { Button } from "../ui/Button";
 import { Star, MapPin, Search, Plus, Home, Utensils, X, ArrowLeft, Trash2, MessageSquare, Camera } from "lucide-react";
 import { API_URL, BASE_URL } from "../../lib/config";
+import { savePhotoToLocalDevice } from "../../utils/photoExportHelper";
 
 const resolveAttachmentUrl = (url: string | null | undefined) => {
   if (!url) return '';
@@ -411,6 +412,9 @@ export function TurkeyMap({
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    savePhotoToLocalDevice(file, "Mekan_Gorsel");
+
     setUploadingReviewImage(true);
     try {
       const compressedBlob = await compressImage(file);

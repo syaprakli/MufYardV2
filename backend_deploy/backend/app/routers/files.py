@@ -113,37 +113,7 @@ async def upload_file(
         elif mime_type.startswith("audio/"): media_type = "audio"
         elif "pdf" in mime_type: media_type = "pdf"
 
-        if not IS_DESKTOP:
-            try:
-                from app.lib.firebase_admin import bucket
-                if bucket is not None:
-                    timestamp = int(datetime.utcnow().timestamp())
-                    base, ext = os.path.splitext(file.filename)
-                    blob_path = f"uploads/{base}_{timestamp}{ext}"
-                    
-                    def _upload():
-                        blob = bucket.blob(blob_path)
-                        blob.upload_from_string(
-                            file_bytes,
-                            content_type=mime_type,
-                        )
-                        try:
-                            blob.make_public()
-                        except Exception:
-                            pass
-                        return blob.public_url
-                        
-                    public_url = await asyncio.to_thread(_upload)
-                    if public_url:
-                        return {
-                            "url": public_url,
-                            "name": file.filename,
-                            "type": media_type,
-                            "path": blob_path
-                        }
-            except Exception as fb_err:
-                logger.warning(f"Firebase Storage upload failed, falling back to local file storage: {fb_err}")
-
+        # Always save local copy for offline support and folder manager
         def save_file(f, p):
             with open(p, "wb") as buffer:
                 buffer.write(file_bytes)
@@ -153,6 +123,35 @@ async def upload_file(
         from app.config import DATA_DIR
         relative_path_from_data = os.path.relpath(file_path, DATA_DIR).replace("\\", "/")
         relative_url = f"/{relative_path_from_data}"
+
+        # Try to upload to Firebase Storage for permanent cloud access across all devices
+        cloud_url = None
+        try:
+            from app.lib.firebase_admin import bucket
+            if bucket is not None and not getattr(bucket, '_is_mock', False):
+                base_name = os.path.basename(file_path)
+                clean_path = path.strip("/").replace("\\", "/") if path else "uploads"
+                blob_path = f"{clean_path}/{base_name}"
+                
+                def _upload():
+                    blob = bucket.blob(blob_path)
+                    blob.upload_from_string(
+                        file_bytes,
+                        content_type=mime_type,
+                    )
+                    try:
+                        blob.make_public()
+                    except Exception:
+                        pass
+                    return blob.public_url
+                    
+                cloud_url = await asyncio.to_thread(_upload)
+                logger.info(f"Firebase Storage upload successful: {cloud_url}")
+        except Exception as fb_err:
+            logger.warning(f"Firebase Storage upload failed, using local url: {fb_err}")
+
+        # Return cloud URL if available, otherwise relative local URL
+        final_url = cloud_url if cloud_url else relative_url
 
         # Dosya izinlerini kaydet
         rel_file_id = os.path.relpath(file_path, base_dir).replace("\\", "/")
@@ -167,7 +166,7 @@ async def upload_file(
             }
         )
         return {
-            "url": relative_url,
+            "url": final_url,
             "name": os.path.basename(file_path),
             "type": media_type,
             "path": os.path.relpath(file_path, base_dir).replace("\\", "/")

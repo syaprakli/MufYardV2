@@ -93,7 +93,7 @@ try:
                 init_kwargs["storageBucket"] = settings.FIREBASE_STORAGE_BUCKET
             elif _cred_dict.get('project_id'):
                 # Auto-derive bucket name from service account project_id
-                auto_bucket = f"{_cred_dict['project_id']}.appspot.com"
+                auto_bucket = f"{_cred_dict['project_id']}.firebasestorage.app"
                 init_kwargs["storageBucket"] = auto_bucket
                 logger.info(f"Firebase: Auto-derived storageBucket = {auto_bucket}")
             firebase_admin.initialize_app(cred, init_kwargs)
@@ -112,9 +112,9 @@ try:
                     app = firebase_admin.get_app()
                     bucket_name = settings.FIREBASE_STORAGE_BUCKET or app.options.get("storageBucket")
                     if not bucket_name:
-                        project_id = getattr(app, "project_id", None)
+                        project_id = getattr(app, "project_id", None) or _cred_dict.get('project_id')
                         if project_id:
-                            bucket_name = f"{project_id}.appspot.com"
+                            bucket_name = f"{project_id}.firebasestorage.app"
 
                     _bucket = storage.bucket(bucket_name) if bucket_name else storage.bucket()
                     logger.info(f"Firebase Storage initialized with bucket: {bucket_name or 'default'}")
