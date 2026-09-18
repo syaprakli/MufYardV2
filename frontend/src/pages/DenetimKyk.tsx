@@ -5,7 +5,7 @@ import {
     BookOpen, ClipboardCheck, Bot, Plus, Edit2, Trash2, Search,
     Tag, ChevronRight, X, Check, Loader2, Database, Sparkles, FileText,
     ArrowRight, Info, AlertCircle, Save, ExternalLink, Play, ArrowLeft,
-    Download
+    Download, Building2
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { API_URL } from "../lib/config";
@@ -1659,34 +1659,46 @@ export default function DenetimKyk() {
     const knowledgeCategories = [...new Set(knowledgeItems.map(i => i.category))].sort();
 
     return (
-        <div className="flex flex-col gap-6 h-[calc(100vh-110px)] flex flex-col gap-4 animate-in fade-in duration-300">
+        <div className="flex flex-col gap-4 sm:gap-6 min-h-full xl:h-[calc(100vh-140px)] animate-in fade-in duration-300">
             {/* Header / Back Navigation */}
-            <div className={`flex flex-col sm:flex-row sm:items-center gap-4 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-shrink-0 justify-between shadow-sm ${activeDetailTab !== "hub" ? "hidden" : "flex"}`}>
-                <div className="flex items-center gap-3.5">
+            <div className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-3 sm:p-4 flex-shrink-0 justify-between shadow-sm ${activeDetailTab !== "hub" ? "hidden" : "flex"}`}>
+                <div className="flex items-center gap-3 min-w-0">
                     <button
                         onClick={() => navigate("/denetim")}
-                        className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-350 hover:bg-slate-200 dark:hover:bg-slate-900 flex items-center justify-center transition-all duration-200"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-350 hover:bg-slate-200 dark:hover:bg-slate-900 flex items-center justify-center transition-all duration-200 shrink-0"
                         title="Denetim Kontrol Paneline Dön"
                     >
                         <ArrowLeft size={16} />
                     </button>
-                    <div>
+                    <div className="min-w-0">
                         <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
                             <span>Denetimler</span>
                             <ChevronRight size={8} />
-                            <span className="text-blue-500 font-bold">Kyk Yurt Denetimi</span>
+                            <span className="text-blue-500 font-bold truncate">Kyk Yurt Denetimi</span>
                         </div>
-                        <h1 className="text-lg font-black text-slate-900 dark:text-white tracking-tight mt-0.5">Kyk Yurt Denetimi</h1>
+                        <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight mt-0.5 truncate">Kyk Yurt Denetimi</h1>
                     </div>
                 </div>
                 
-                <button
-                    onClick={() => setShowTaskPicker(true)}
-                    className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-px active:translate-y-0 flex-shrink-0 group w-full sm:w-auto"
-                >
-                    <Play size={11} className="group-hover:scale-110 transition-transform" />
-                    <span>Denetimi Başlat</span>
-                </button>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {selectedTaskId && (
+                        <button
+                            onClick={() => setSelectedTaskId(null)}
+                            className="xl:hidden flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap min-w-0"
+                            title="Tüm Yurtlar / Görevler Listesini Aç"
+                        >
+                            <Building2 size={12} className="shrink-0" />
+                            <span className="truncate">Yurt Değiştir ({filteredTasks.length})</span>
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setShowTaskPicker(true)}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-px active:translate-y-0 whitespace-nowrap group min-w-0"
+                    >
+                        <Play size={11} className="group-hover:scale-110 transition-transform shrink-0" />
+                        <span className="truncate">Denetimi Başlat</span>
+                    </button>
+                </div>
             </div>
 
             {/* Main content split */}
@@ -1835,8 +1847,7 @@ export default function DenetimKyk() {
                     )}
                 </div>
             ) : (
-                // Standard Audit Category - Lists tasks and reports
-                <div className="flex-1 flex flex-col xl:flex-row gap-6 overflow-hidden">
+                <div className="flex-1 flex flex-col xl:flex-row gap-4 xl:gap-6 xl:overflow-hidden">
                     {/* 2. Tasks list pane */}
                     <div className={`w-full xl:w-80 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-col gap-3 flex-shrink-0 overflow-y-auto ${selectedTaskId ? (activeDetailTab !== "hub" ? "hidden" : "hidden xl:flex") : "flex"}`}>
                         <div className="px-1 flex items-start justify-between gap-2">
@@ -1975,7 +1986,7 @@ export default function DenetimKyk() {
                     </div>
 
                     {/* Main pane */}
-                    <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 md:p-6 overflow-y-auto">
+                    <div className={`flex-1 flex flex-col min-w-0 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-3.5 sm:p-5 xl:p-6 xl:overflow-y-auto ${selectedTaskId ? "flex" : "hidden xl:flex"}`}>
                         {!selectedTask ? (
                             <div className="flex-1 flex flex-col items-center justify-center py-20 text-center gap-3">
                                 <ClipboardCheck size={36} className="text-slate-300 dark:text-slate-700" />
@@ -1983,7 +1994,7 @@ export default function DenetimKyk() {
                                 <p className="text-xs text-slate-400 max-w-sm">Sol menüden bir denetim görevi seçerek form ve kontrol listelerine erişebilirsiniz.</p>
                             </div>
                         ) : (
-                            <div className="flex flex-col gap-6">
+                            <div className="flex flex-col gap-4 sm:gap-6">
                                 {/* Navigation Header inside selected task */}
                                 {activeDetailTab !== "hub" && (
                                     <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
@@ -2003,22 +2014,22 @@ export default function DenetimKyk() {
 
                                 {/* Main Detail Views */}
                                 {activeDetailTab === "hub" ? (
-                                    <div className="flex flex-col gap-5">
+                                    <div className="flex flex-col gap-4 sm:gap-5">
                                         {/* Task overview card */}
-                                        <div className="bg-slate-50 dark:bg-slate-950/20 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5">
-                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                                <div>
-                                                    <div className="flex items-center gap-2 mb-1">
+                                        <div className="bg-slate-50 dark:bg-slate-950/20 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-3.5 sm:p-5">
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                         <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
                                                             {selectedTask.rapor_turu}
                                                         </span>
                                                         <span className="text-[10px] text-slate-400 font-semibold">• Kod: {selectedTask.rapor_kodu}</span>
                                                     </div>
-                                                    <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white tracking-tight">{selectedTask.rapor_adi}</h2>
-                                                    <p className="text-xs text-slate-400 font-medium mt-0.5">Müfettiş: {selectedTask.inspector || "Belirtilmedi"} | Başlama: {selectedTask.baslama_tarihi}</p>
+                                                    <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white tracking-tight truncate">{selectedTask.rapor_adi}</h2>
+                                                    <p className="text-xs text-slate-400 font-medium mt-0.5 truncate">Müfettiş: {selectedTask.inspector || "Belirtilmedi"} | Başlama: {selectedTask.baslama_tarihi}</p>
                                                 </div>
-                                                <div className="flex items-center gap-2 self-start md:self-center">
-                                                    <div className="flex items-center gap-1.5">
+                                                <div className="flex items-center gap-2 self-stretch md:self-center justify-between md:justify-end">
+                                                    <div className="flex items-center gap-1.5 w-full md:w-auto justify-between md:justify-start">
                                                         {!selectedReport ? (
                                                             <Button
                                                                 size="sm"
@@ -2038,11 +2049,11 @@ export default function DenetimKyk() {
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"
-                                                                className="h-7 px-2.5 rounded-lg border-red-500/20 bg-red-500/5 hover:bg-red-600 hover:text-white text-red-600 dark:text-red-400 text-[10px] font-black flex items-center gap-1 transition-all"
+                                                                className="h-7.5 px-2.5 rounded-lg border-red-500/20 bg-red-500/5 hover:bg-red-600 hover:text-white text-red-600 dark:text-red-400 text-[10px] font-black flex items-center gap-1.5 transition-all shrink-0"
                                                                 onClick={handleDeleteReport}
                                                                 disabled={isSavingAuditData}
                                                             >
-                                                                <Trash2 size={12} />
+                                                                <Trash2 size={12} className="shrink-0" />
                                                                 <span>DENETİMİ SİL / SIFIRLA</span>
                                                             </Button>
                                                         )}

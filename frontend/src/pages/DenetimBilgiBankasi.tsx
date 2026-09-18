@@ -1209,7 +1209,7 @@ export default function DenetimBilgiBankasi() {
     const knowledgeCategories = [...new Set(knowledgeItems.map(i => i.category))].sort();
 
     return (
-        <div className="flex flex-col gap-6 h-[calc(100vh-110px)] overflow-hidden animate-in fade-in duration-300">
+        <div className="flex flex-col gap-4 sm:gap-6 min-h-full xl:h-[calc(100vh-140px)] animate-in fade-in duration-300">
             {/* Header / Back Navigation */}
             <div className="flex items-center gap-4 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-shrink-0 justify-between shadow-sm">
                 <div className="flex items-center gap-3.5">
@@ -1378,7 +1378,7 @@ export default function DenetimBilgiBankasi() {
                 </div>
             ) : (
                 // Standard Audit Category - Lists tasks and reports
-                <div className="flex-1 flex flex-col xl:flex-row gap-6 overflow-hidden">
+                <div className="flex-1 flex flex-col xl:flex-row gap-4 sm:gap-6 min-h-0">
                     {/* 2. Tasks list pane */}
                     <div className={`w-full xl:w-80 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-col gap-3 flex-shrink-0 overflow-y-auto ${selectedTaskId ? "hidden xl:flex" : "flex"}`}>
                         <div className="px-1 flex flex-col sm:flex-row gap-4 sm:items-center justify-between gap-2">
@@ -1475,7 +1475,7 @@ export default function DenetimBilgiBankasi() {
                     </div>
 
                     {/* 3. Detail Pane */}
-                    <div className={`flex-1 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-6 flex-col overflow-y-auto ${selectedTaskId ? "flex" : "hidden xl:flex"}`}>
+                    <div className={`flex-1 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-3.5 sm:p-5 xl:p-6 flex-col xl:overflow-y-auto ${selectedTaskId ? "flex" : "hidden xl:flex"}`}>
                         {!selectedTask ? (
                             <div className="flex-1 flex flex-col items-center justify-center text-center gap-3">
                                 <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-950/20 flex items-center justify-center">

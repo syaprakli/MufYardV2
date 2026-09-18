@@ -5,7 +5,7 @@ import {
     BookOpen, ClipboardCheck, Bot, Plus, Edit2, Trash2, Search,
     Tag, ChevronRight, X, Check, Loader2, Database, Sparkles, FileText,
     ArrowRight, Info, AlertCircle, Save, ExternalLink, Play, ArrowLeft,
-    Camera, Printer, Download, Copy
+    Camera, Printer, Download, Copy, Building2
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { API_URL } from "../lib/config";
@@ -2341,34 +2341,46 @@ export default function DenetimFederasyon() {
     const knowledgeCategories = [...new Set(knowledgeItems.map(i => i.category))].sort();
 
     return (
-        <div className="flex flex-col gap-6 h-[calc(100vh-110px)] flex flex-col gap-4 animate-in fade-in duration-300">
+        <div className="flex flex-col gap-4 sm:gap-6 min-h-full xl:h-[calc(100vh-140px)] animate-in fade-in duration-300">
             {/* Header / Back Navigation */}
-            <div className={`flex flex-col sm:flex-row sm:items-center gap-4 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-shrink-0 justify-between shadow-sm ${activeDetailTab !== "hub" ? "hidden" : "flex"}`}>
-                <div className="flex items-center gap-3.5">
+            <div className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-3 sm:p-4 flex-shrink-0 justify-between shadow-sm ${activeDetailTab !== "hub" ? "hidden" : "flex"}`}>
+                <div className="flex items-center gap-3 min-w-0">
                     <button
                         onClick={() => navigate("/denetim")}
-                        className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-350 hover:bg-slate-200 dark:hover:bg-slate-900 flex items-center justify-center transition-all duration-200"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-350 hover:bg-slate-200 dark:hover:bg-slate-900 flex items-center justify-center transition-all duration-200 shrink-0"
                         title="Denetim Kontrol Paneline Dön"
                     >
                         <ArrowLeft size={16} />
                     </button>
-                    <div>
+                    <div className="min-w-0">
                         <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
                             <span>Denetimler</span>
                             <ChevronRight size={8} />
-                            <span className="text-blue-500 font-bold">Federasyon Denetimi</span>
+                            <span className="text-blue-500 font-bold truncate">Federasyon Denetimi</span>
                         </div>
-                        <h1 className="text-lg font-black text-slate-900 dark:text-white tracking-tight mt-0.5">Federasyon Denetimi</h1>
+                        <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight mt-0.5 truncate">Federasyon Denetimi</h1>
                     </div>
                 </div>
                 
-                <button
-                    onClick={() => setShowTaskPicker(true)}
-                    className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-px active:translate-y-0 flex-shrink-0 group w-full sm:w-auto"
-                >
-                    <Play size={11} className="group-hover:scale-110 transition-transform" />
-                    <span>Denetimi Başlat</span>
-                </button>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {selectedTaskId && (
+                        <button
+                            onClick={() => setSelectedTaskId(null)}
+                            className="xl:hidden flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap min-w-0"
+                            title="Tüm Federasyonlar / Görevler Listesini Aç"
+                        >
+                            <Building2 size={12} className="shrink-0" />
+                            <span className="truncate">Federasyon Değiştir ({filteredTasks.length})</span>
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setShowTaskPicker(true)}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-px active:translate-y-0 whitespace-nowrap group min-w-0"
+                    >
+                        <Play size={11} className="group-hover:scale-110 transition-transform shrink-0" />
+                        <span className="truncate">Denetimi Başlat</span>
+                    </button>
+                </div>
             </div>
 
             {/* Main content split */}
@@ -2518,7 +2530,7 @@ export default function DenetimFederasyon() {
                 </div>
             ) : (
                 // Standard Audit Category - Lists tasks and reports
-                <div className="flex-1 flex flex-col xl:flex-row gap-6 overflow-hidden">
+                <div className="flex-1 flex flex-col xl:flex-row gap-4 xl:gap-6 xl:overflow-hidden">
                     {/* 2. Tasks list pane */}
                     <div className={`w-full xl:w-80 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-col gap-3 flex-shrink-0 overflow-y-auto ${selectedTaskId ? (activeDetailTab !== "hub" ? "hidden" : "hidden xl:flex") : "flex"}`}>
                         <div className="px-1 py-1 border-b border-slate-100 dark:border-slate-850">
@@ -2606,7 +2618,7 @@ export default function DenetimFederasyon() {
                     </div>
 
                     {/* 3. Detail Pane */}
-                    <div className={`flex-1 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-6 flex-col overflow-y-auto ${selectedTaskId ? "flex" : "hidden xl:flex"}`}>
+                    <div className={`flex-1 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-3.5 sm:p-5 xl:p-6 flex-col xl:overflow-y-auto ${selectedTaskId ? "flex" : "hidden xl:flex"}`}>
                         {!selectedTask ? (
                             <div className="flex-1 flex flex-col items-center justify-center text-center gap-3">
                                 <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-950/20 flex items-center justify-center">
@@ -2620,31 +2632,31 @@ export default function DenetimFederasyon() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex-1 flex flex-col gap-6 xl:overflow-y-auto pr-1">
+                            <div className="flex-1 flex flex-col gap-4 sm:gap-6 xl:overflow-y-auto pr-0 xl:pr-1">
                                 {activeDetailTab === "hub" ? (
                                     /* ========================================================================= */
                                     /* 1. HUB VIEW: TASK HEADER + KYK BANNER + 6 LARGE MODULE CARDS              */
                                     /* ========================================================================= */
-                                    <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-1 animate-in fade-in duration-300">
+                                    <div className="flex-1 flex flex-col gap-4 sm:gap-6 xl:overflow-y-auto pr-0 xl:pr-1 animate-in fade-in duration-300">
                                         {/* Task Header */}
-                                        <div className="flex flex-col border-b border-slate-100 dark:border-slate-800/50 pb-4 gap-4">
-                                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                                                <div className="space-y-1">
+                                        <div className="flex flex-col border-b border-slate-100 dark:border-slate-800/50 pb-4 gap-3">
+                                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                                                <div className="space-y-1 min-w-0">
                                                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                                                         {currentRaporTuru}
                                                     </span>
-                                                    <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                                                    <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight truncate">
                                                         {selectedTask.rapor_adi}
                                                     </h2>
                                                 </div>
-                                                <div className="flex flex-wrap items-center gap-3">
+                                                <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2.5 sm:gap-3 w-full lg:w-auto">
                                                     {(cachedData?.audits || []).filter((a: any) => a.task_id === selectedTask.id).length > 1 && (
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Aktif Form:</span>
+                                                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                                                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0">Aktif Form:</span>
                                                             <select
                                                                 value={selectedReport?.id || ""}
                                                                 onChange={e => setSelectedAuditId(e.target.value)}
-                                                                className="h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                                className="h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-bold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 flex-1 sm:flex-none"
                                                             >
                                                                 {(cachedData?.audits || [])
                                                                     .filter((a: any) => a.task_id === selectedTask.id)
@@ -2656,8 +2668,8 @@ export default function DenetimFederasyon() {
                                                             </select>
                                                         </div>
                                                     )}
-                                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                                        <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-lg ${
+                                                    <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
+                                                        <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg shrink-0 ${
                                                             selectedTask.rapor_durumu === "Tamamlandı"
                                                                 ? "bg-green-500/10 text-green-500"
                                                                 : selectedTask.rapor_durumu === "Devam Ediyor"
@@ -2670,11 +2682,11 @@ export default function DenetimFederasyon() {
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"
-                                                                className="h-7 px-2.5 rounded-lg border-red-500/20 bg-red-500/5 hover:bg-red-600 hover:text-white text-red-600 dark:text-red-400 text-[10px] font-black flex items-center gap-1 transition-all"
+                                                                className="h-7.5 px-2.5 rounded-lg border-red-500/20 bg-red-500/5 hover:bg-red-600 hover:text-white text-red-600 dark:text-red-400 text-[10px] font-black flex items-center gap-1.5 transition-all shrink-0"
                                                                 onClick={handleDeleteReport}
                                                                 disabled={isSavingAuditData}
                                                             >
-                                                                <Trash2 size={12} />
+                                                                <Trash2 size={12} className="shrink-0" />
                                                                 <span>DENETİMİ SİL / SIFIRLA</span>
                                                             </Button>
                                                         )}
@@ -2780,7 +2792,7 @@ export default function DenetimFederasyon() {
                                             ];
 
                                             return (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-5">
                                                     {cards.map(card => {
                                                         const IconComp = card.icon;
                                                         return (
@@ -2790,7 +2802,7 @@ export default function DenetimFederasyon() {
                                                                     handleSaveAuditData(localAuditData);
                                                                     setActiveDetailTab(card.id as any);
                                                                 }}
-                                                                className={`group cursor-pointer rounded-2xl p-6 border transition-all duration-200 flex flex-col justify-between gap-5 relative overflow-hidden ${
+                                                                className={`group cursor-pointer rounded-2xl p-4 sm:p-6 border transition-all duration-200 flex flex-col justify-between gap-4 sm:gap-5 relative overflow-hidden ${
                                                                     card.highlight
                                                                         ? "bg-gradient-to-br from-blue-50/70 to-white dark:from-blue-950/20 dark:to-slate-900/60 border-blue-300 dark:border-blue-800 shadow-md shadow-blue-500/5 hover:border-blue-500 hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-0.5"
                                                                         : "bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 shadow-sm hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md hover:-translate-y-0.5"
