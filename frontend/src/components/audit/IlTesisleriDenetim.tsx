@@ -313,6 +313,68 @@ export const isTemplateRelevantForFacility = (template: FindingTemplate, facilit
 
 const QUICK_NOTES_STORAGE_KEY = "mufyard_denetim_custom_quick_notes_v2";
 
+export const getFacilityTheme = (tur?: string) => {
+    const t = (tur || "").toLowerCase();
+    if (t.includes("havuz")) {
+        return {
+            border: "border-cyan-500 dark:border-cyan-400",
+            borderLeft: "border-l-[6px] border-l-cyan-500",
+            ring: "ring-cyan-500/25",
+            headerBg: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30",
+            badge: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300 border-cyan-300 dark:border-cyan-800",
+            shadow: "shadow-cyan-500/10"
+        };
+    }
+    if (t.includes("salon")) {
+        return {
+            border: "border-blue-500 dark:border-blue-400",
+            borderLeft: "border-l-[6px] border-l-blue-500",
+            ring: "ring-blue-500/25",
+            headerBg: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+            badge: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-300 dark:border-blue-800",
+            shadow: "shadow-blue-500/10"
+        };
+    }
+    if (t.includes("gençlik") || t.includes("genclik") || t.includes("kamp")) {
+        return {
+            border: "border-purple-500 dark:border-purple-400",
+            borderLeft: "border-l-[6px] border-l-purple-500",
+            ring: "ring-purple-500/25",
+            headerBg: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30",
+            badge: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-300 dark:border-purple-800",
+            shadow: "shadow-purple-500/10"
+        };
+    }
+    if (t.includes("saha") || t.includes("stadyum") || t.includes("stat") || t.includes("kort") || t.includes("pist")) {
+        return {
+            border: "border-emerald-500 dark:border-emerald-400",
+            borderLeft: "border-l-[6px] border-l-emerald-500",
+            ring: "ring-emerald-500/25",
+            headerBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
+            badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800",
+            shadow: "shadow-emerald-500/10"
+        };
+    }
+    if (t.includes("yurt") || t.includes("blok")) {
+        return {
+            border: "border-indigo-500 dark:border-indigo-400",
+            borderLeft: "border-l-[6px] border-l-indigo-500",
+            ring: "ring-indigo-500/25",
+            headerBg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30",
+            badge: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300 border-indigo-300 dark:border-indigo-800",
+            shadow: "shadow-indigo-500/10"
+        };
+    }
+    return {
+        border: "border-amber-500 dark:border-amber-400",
+        borderLeft: "border-l-[6px] border-l-amber-500",
+        ring: "ring-amber-500/25",
+        headerBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
+        badge: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-300 dark:border-amber-800",
+        shadow: "shadow-amber-500/10"
+    };
+};
+
 interface IlTesisleriDenetimProps {
     localAuditData: any;
     setLocalAuditData: React.Dispatch<React.SetStateAction<any>>;
@@ -1461,11 +1523,17 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                     {filteredFacilities.map((facility, index) => {
                         const statusObj = PRESET_STATUS_OPTIONS.find(s => s.value === facility.durum) || PRESET_STATUS_OPTIONS[0];
                         const photoList = facility.photos || [];
+                        const fTheme = getFacilityTheme(facility.tur);
+                        const isCardActive = noteModalFacilityId === facility.id || editingFacilityId === facility.id || photoModalFacilityId === facility.id;
 
                         return (
                             <div
                                 key={facility.id}
-                                className="group flex flex-col bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs hover:shadow-xl hover:border-blue-400/70 dark:hover:border-blue-500/50 transition-all duration-300 relative"
+                                className={`group flex flex-col bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 relative border ${fTheme.borderLeft} ${
+                                    isCardActive
+                                        ? `${fTheme.border} ring-4 ${fTheme.ring} shadow-lg scale-[1.01]`
+                                        : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                                }`}
                             >
                                 {/* Uniform Card Header */}
                                 <div className="p-5 pb-3 border-b border-slate-100 dark:border-slate-800/70">
@@ -1483,7 +1551,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                                 #{index + 1}
                                             </span>
                                             <span 
-                                                className="px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-tight bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shrink-0 truncate max-w-[140px]"
+                                                className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-tight border shrink-0 truncate max-w-[140px] ${fTheme.badge}`}
                                                 title={facility.tur}
                                             >
                                                 {facility.tur}
@@ -1733,11 +1801,17 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                         const statusObj = PRESET_STATUS_OPTIONS.find(s => s.value === facility.durum) || PRESET_STATUS_OPTIONS[0];
                         const isExpanded = expandedCards[facility.id] !== false;
                         const photoList = facility.photos || [];
+                        const fTheme = getFacilityTheme(facility.tur);
+                        const isCardActive = noteModalFacilityId === facility.id || editingFacilityId === facility.id || photoModalFacilityId === facility.id;
 
                         return (
                             <div
                                 key={facility.id}
-                                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm hover:border-blue-400/50 transition-all"
+                                className={`bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm transition-all border ${fTheme.borderLeft} ${
+                                    isCardActive
+                                        ? `${fTheme.border} ring-4 ${fTheme.ring} shadow-md`
+                                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                                }`}
                             >
                                 {/* Row Header */}
                                 <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800/60 bg-slate-50/40 dark:bg-slate-900/40">
@@ -1760,7 +1834,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                                 <h4 className="text-sm font-black text-slate-900 dark:text-white">
                                                     {facility.ad}
                                                 </h4>
-                                                <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-tight bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-tight border ${fTheme.badge}`}>
                                                     {facility.tur}
                                                 </span>
                                                 <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-tight border ${statusObj.color}`}>
@@ -2244,20 +2318,24 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                     filteredTemplates = filteredTemplates.filter(t => t.text.toLowerCase().includes(q) || t.category.toLowerCase().includes(q));
                 }
 
+                const facTheme = getFacilityTheme(fac.tur);
+
                 return (
                     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 pt-1 sm:pt-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto overscroll-contain">
-                        <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full ${isTemplateDrawerOpen ? "max-w-5xl" : "max-w-3xl"} shadow-2xl overflow-hidden h-[95vh] sm:h-auto max-h-[95vh] sm:max-h-[86vh] flex flex-col transition-all duration-200 my-0 sm:my-auto`}>
+                        <div className={`bg-white dark:bg-slate-900 border-2 ${facTheme.border} ring-4 ${facTheme.ring} rounded-2xl w-full ${isTemplateDrawerOpen ? "max-w-5xl" : "max-w-3xl"} shadow-2xl overflow-hidden h-[95vh] sm:h-auto max-h-[95vh] sm:max-h-[86vh] flex flex-col transition-all duration-200 my-0 sm:my-auto`}>
                             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold shrink-0">
+                                    <div className={`w-8 h-8 rounded-lg ${facTheme.headerBg} flex items-center justify-center font-bold shrink-0 border`}>
                                         <FileText size={16} />
                                     </div>
                                     <div className="min-w-0">
                                         <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white truncate">
                                             Tespit & Eksiklik Notları
                                         </h4>
-                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                                            {fac.ad} {fac.ilce ? `(${fac.ilce})` : ""} — <span className="font-bold text-amber-600 dark:text-amber-400">{fac.tur}</span>
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-1.5">
+                                            <span>{fac.ad} {fac.ilce ? `(${fac.ilce})` : ""}</span>
+                                            <span>—</span>
+                                            <span className={`font-bold px-1.5 py-0.2 rounded text-[10px] border ${facTheme.badge}`}>{fac.tur}</span>
                                         </p>
                                     </div>
                                 </div>
@@ -2841,21 +2919,24 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                 if (!fac) return null;
                 const photoList = fac.photos || [];
                 const isUploading = !!uploadingForFacility[fac.id];
+                const facTheme = getFacilityTheme(fac.tur);
 
                 return (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
+                        <div className={`bg-white dark:bg-slate-900 border-2 ${facTheme.border} ring-4 ${facTheme.ring} rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col`}>
                             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 shrink-0">
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0">
+                                    <div className={`w-9 h-9 rounded-xl ${facTheme.headerBg} flex items-center justify-center font-bold shrink-0 border`}>
                                         <ImageIcon size={18} />
                                     </div>
                                     <div className="min-w-0">
                                         <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white truncate">
                                             Tesis Fotoğrafları ({photoList.length})
                                         </h4>
-                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                                            {fac.ad} {fac.ilce ? `(${fac.ilce})` : ""}
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-1.5">
+                                            <span>{fac.ad} {fac.ilce ? `(${fac.ilce})` : ""}</span>
+                                            <span>—</span>
+                                            <span className={`font-bold px-1.5 py-0.2 rounded text-[10px] border ${facTheme.badge}`}>{fac.tur}</span>
                                         </p>
                                     </div>
                                 </div>

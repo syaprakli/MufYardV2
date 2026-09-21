@@ -1,5 +1,5 @@
 // MufYard Service Worker — Network-First with Cache Fallback
-const CACHE_NAME = 'mufyard-v2-cache-v8';
+const CACHE_NAME = 'mufyard-v2-cache-v9';
 const STATIC_ASSETS = [
   './',
   './index.html',
