@@ -64,17 +64,254 @@ const PRESET_PRIORITY_OPTIONS = [
     { value: "kritik", label: "Acil / Kritik Müdahale", color: "bg-rose-500/10 text-rose-600 border-rose-500/20" }
 ];
 
-const DEFAULT_QUICK_NOTES = [
-    "Bakım ve onarım ihtiyacı bulunmaktadır.",
-    "Çatı kaplamasında su sızıntısı ve izolasyon sorunu mevcut.",
-    "Soyunma odaları ve ıslak hacim armatürleri arızalı.",
-    "Spor zemininde aşınma / deformasyon gözlemlendi.",
-    "Aydınlatma armatürlerinde arıza ve yetersizlik var.",
-    "Yangın güvenliği ve acil çıkış yönlendirmeleri faal.",
-    "Tesis genel olarak temiz, düzenli ve faal durumda."
+export interface FindingTemplate {
+    id: string;
+    text: string;
+    category: "Zemin & Çatı" | "Soyunma Odası & Sıhhi" | "Aydınlatma & Tesisat" | "Yangın & İSG" | "Dış Çevre, Drenaj & İstinat" | "Havuz Özel" | "Gençlik Merkezi Özel" | "Genel / Ortak";
+    facilityTypes?: string[];
+    recommendedPriority: "normal" | "orta" | "kritik";
+}
+
+export const MASTER_FINDING_TEMPLATES: FindingTemplate[] = [
+    // 1) Zemin, Çatı & Yapısal Kusurlar
+    {
+        id: "tpl_cati_akma",
+        category: "Zemin & Çatı",
+        text: "Tesis çatı kaplamasında ve yağmur oluklarında izolasyon yetersizliği/hasar mevcut olup yağışlı havalarda salon zeminine/tribünlere su akıntısı olduğu, zemin kaplamasının ve yapı elemanlarının zarar görme riski altında bulunduğu tespit edilmiştir.",
+        recommendedPriority: "kritik",
+        facilityTypes: ["all"]
+    },
+    {
+        id: "tpl_pvc_zemin_yirtilma",
+        category: "Zemin & Çatı",
+        text: "Mevcut zemin üzerine serilen sentetik/PVC (taraflex vb.) spor zemin kaplamasında yırtılmalar, aşınmalar ve ek yeri açılmaları gözlemlenmiş olup sporcu sağlığı ve müsabaka güvenliği açısından risk oluşturduğu belirlenmiştir.",
+        recommendedPriority: "orta",
+        facilityTypes: ["Kapalı Spor Salonu", "Çok Amaçlı Spor Salonu", "Jimnastik Salonu", "Güreş Salonu", "Boks / Uzakdoğu Sporları Salonu"]
+    },
+    {
+        id: "tpl_parke_kabarma_kırılma",
+        category: "Zemin & Çatı",
+        text: "Ahşap parke spor zemininde rutubet ve su sızıntısı kaynaklı kabarma, şişme, lokal kırılmalar ve vernik aşınması meydana geldiği, zemin elastikiyetinin kaybolduğu tespit edilmiştir.",
+        recommendedPriority: "orta",
+        facilityTypes: ["Kapalı Spor Salonu", "Çok Amaçlı Spor Salonu"]
+    },
+    {
+        id: "tpl_cizgi_asinmasi",
+        category: "Zemin & Çatı",
+        text: "Saha oyun çizgilerinin (basketbol, voleybol, hentbol vb.) aşındığı, silindiği ve iç içe geçerek görünürlüğünü yitirdiği tespit edilmiştir.",
+        recommendedPriority: "normal",
+        facilityTypes: ["Kapalı Spor Salonu", "Çok Amaçlı Spor Salonu", "Tenis Kortu"]
+    },
+    {
+        id: "tpl_sentetik_cim_granul",
+        category: "Zemin & Çatı",
+        text: "Sentetik çim sahada granül dağılımının yetersiz olduğu, halı ek yerlerinde açılmalar ve kale arkası tel örgü/koruma filelerinde yırtılmalar bulunduğu tespit edilmiştir.",
+        recommendedPriority: "orta",
+        facilityTypes: ["Stadyum / Çim Saha", "Sentetik Saha"]
+    },
+    {
+        id: "tpl_pota_koruma_mindersiz",
+        category: "Zemin & Çatı",
+        text: "Basketbol potası hidrolik sabitleme mekanizmasında aşınma olduğu, pota direkleri ve duvar koruma süngerlerinin (darbe minderleri) yırtık/eksik olduğu saptanmıştır.",
+        recommendedPriority: "orta",
+        facilityTypes: ["Kapalı Spor Salonu", "Çok Amaçlı Spor Salonu"]
+    },
+
+    // 2) Soyunma Odaları, Islak Hacim & Donanım
+    {
+        id: "tpl_musluk_vana_kirik",
+        category: "Soyunma Odası & Sıhhi",
+        text: "Sporcu ve hakem soyunma odalarındaki duş bataryaları, ara vanalar ve lavabo musluklarının kırık/arızalı olduğu, su kaçakları nedeniyle su israfına ve zemin tahribatına yol açtığı belirlenmiştir.",
+        recommendedPriority: "orta",
+        facilityTypes: ["all"]
+    },
+    {
+        id: "tpl_dolap_kapak_kirik",
+        category: "Soyunma Odası & Sıhhi",
+        text: "Soyunma odalarındaki malzeme dolaplarının kapaklarında kırıklar, menteşe kopmaları ve ayarsızlıklar bulunduğu, kilit mekanizmalarının çalışmadığı saptanmıştır.",
+        recommendedPriority: "normal",
+        facilityTypes: ["all"]
+    },
+    {
+        id: "tpl_bank_askilik_yok",
+        category: "Soyunma Odası & Sıhhi",
+        text: "Soyunma odalarında sporcuların kullanımına uygun oturma banklarının bulunmadığı / yetersiz olduğu, dolap bulunmayan alanlarda ise askılık sistemlerinin noksan kaldığı görülmüştür.",
+        recommendedPriority: "normal",
+        facilityTypes: ["all"]
+    },
+    {
+        id: "tpl_sicak_su_boyler",
+        category: "Soyunma Odası & Sıhhi",
+        text: "Müsabaka ve yoğun antrenman saatlerinde boyler/sıcak su sisteminin kapasite olarak yetersiz kaldığı, duşlarda sıcak su temininde aksamalar yaşandığı tespit edilmiştir.",
+        recommendedPriority: "orta",
+        facilityTypes: ["all"]
+    },
+
+    // 3) Aydınlatma, Skorbord & Tesisat
+    {
+        id: "tpl_aydinlatma_luks",
+        category: "Aydınlatma & Tesisat",
+        text: "Spor salonu tavan aydınlatma armatürlerinde çok sayıda patlak/arızalı lamba bulunduğu, saha aydınlatma şiddetinin (lüks seviyesi) resmi müsabaka kriterlerinin altında kaldığı ve homojen ışık dağılımı sağlanamadığı belirlenmiştir.",
+        recommendedPriority: "orta",
+        facilityTypes: ["Kapalı Spor Salonu", "Çok Amaçlı Spor Salonu", "Stadyum / Çim Saha", "Sentetik Saha", "Tenis Kortu"]
+    },
+    {
+        id: "tpl_skorbord_ariza",
+        category: "Aydınlatma & Tesisat",
+        text: "Elektronik skorbord panosunda LED modül arızaları bulunduğu / kontrol konsolunun ve 24 saniye süre göstergelerinin senkronize çalışmadığı tespit edilmiştir.",
+        recommendedPriority: "orta",
+        facilityTypes: ["Kapalı Spor Salonu", "Çok Amaçlı Spor Salonu", "Stadyum / Çim Saha"]
+    },
+    {
+        id: "tpl_jenerator_acikta",
+        category: "Aydınlatma & Tesisat",
+        text: "Elektrik kesintilerine karşı yedek güç kaynağı jeneratörün bulunmadığı / mevcut jeneratörün etrafının ve üzerinin koruyucu bir kabin içine alınmaksızın dış hava şartlarına açık bırakıldığı tespit edilmiştir.",
+        recommendedPriority: "kritik",
+        facilityTypes: ["all"]
+    },
+    {
+        id: "tpl_isitma_radyan",
+        category: "Aydınlatma & Tesisat",
+        text: "Salon hacmini ısıtmakla görevli radyan ısıtıcıların / sıcak hava apareylerinin arızalı olduğu ve kış aylarında salonun sporcu sağlığını olumsuz etkileyecek seviyede soğuk kaldığı gözlemlenmiştir.",
+        recommendedPriority: "orta",
+        facilityTypes: ["Kapalı Spor Salonu", "Çok Amaçlı Spor Salonu", "Güreş Salonu", "Boks / Uzakdoğu Sporları Salonu"]
+    },
+    {
+        id: "tpl_havalandirma_yetersiz",
+        category: "Aydınlatma & Tesisat",
+        text: "Tesis mekanik havalandırma sisteminin çalışmadığı / yetersiz kaldığı, antrenman ve faaliyet esnasında içeride yoğun nem ve ağır koku birikimi oluştuğu tespit edilmiştir.",
+        recommendedPriority: "orta",
+        facilityTypes: ["all"]
+    },
+
+    // 4) Yangın Güvenliği, İSG & CCTV
+    {
+        id: "tpl_yangin_kapisi_sorunlu",
+        category: "Yangın & İSG",
+        text: "Acil çıkış ve yangın kapılarının panik barlarının arızalı olduğu / kapıların kilitli tutulduğu veya kapı önlerine malzeme yığılarak tahliye güzergahının kapatıldığı tespit edilmiştir.",
+        recommendedPriority: "kritik",
+        facilityTypes: ["all"]
+    },
+    {
+        id: "tpl_yangin_tupu_suresi",
+        category: "Yangın & İSG",
+        text: "Yangın söndürme tüplerinin ve yangın dolabı hortumlarının periyodik dolum, hidrostatik test ve kontrol tarihlerinin geçtiği belirlenmiştir.",
+        recommendedPriority: "kritik",
+        facilityTypes: ["all"]
+    },
+    {
+        id: "tpl_cctv_kamera_ariza",
+        category: "Yangın & İSG",
+        text: "Tesis güvenlik kamera sisteminde bazı kameraların arızalı/görüntü vermez durumda olduğu, tesis içi ve dış çevrede kritik kör noktaların bulunduğu ve kayıt saklama süresinin mevzuat standartlarının altında kaldığı tespit edilmiştir.",
+        recommendedPriority: "orta",
+        facilityTypes: ["all"]
+    },
+
+    // 5) Dış Çevre, Drenaj & İstinat Duvarı
+    {
+        id: "tpl_istinat_duvari_yok",
+        category: "Dış Çevre, Drenaj & İstinat",
+        text: "Tesis çevresinde eğimli araziden kaynaklanabilecek toprak kayması ve su baskını riskine karşı istinat duvarının bulunmadığı / mevcut duvarda çatlaklar olduğu ve çevre koruma ihata tel örgülerinin yetersiz kaldığı tespit edilmiştir.",
+        recommendedPriority: "kritik",
+        facilityTypes: ["all"]
+    },
+    {
+        id: "tpl_drenaj_sorunu",
+        category: "Dış Çevre, Drenaj & İstinat",
+        text: "Tesis çevresi ve açık spor alanlarında yüzey drenaj hatlarının tıkalı veya yetersiz olduğu, yoğun yağışlarda saha ve bina girişlerinde su birikintileri ve göllenmeler oluştuğu saptanmıştır.",
+        recommendedPriority: "orta",
+        facilityTypes: ["all"]
+    },
+    {
+        id: "tpl_cevre_aydinlatma_peyzaj",
+        category: "Dış Çevre, Drenaj & İstinat",
+        text: "Tesis bahçesi, otopark ve çevre yürüyüş yollarında aydınlatma armatürlerinin yetersiz/arızalı olduğu, çevre peyzaj ve temizlik düzenlemesinin bakımsız kaldığı belirlenmiştir.",
+        recommendedPriority: "normal",
+        facilityTypes: ["all"]
+    },
+
+    // 6) Yüzme Havuzu Özel Şablonları
+    {
+        id: "tpl_havuz_otomasyon_klor",
+        category: "Havuz Özel",
+        text: "Otomatik klorlama ve pH dengeleme dozaj otomasyon cihazının arızalı olduğu, kimyasalların manuel yöntemle uygulandığı ve günlük manuel ölçüm kayıt defterinin aksatıldığı belirlenmiştir.",
+        recommendedPriority: "kritik",
+        facilityTypes: ["Yarı Olimpik Yüzme Havuzu", "Olimpik Yüzme Havuzu"]
+    },
+    {
+        id: "tpl_havuz_analiz_raporu",
+        category: "Havuz Özel",
+        text: "Halk Sağlığı Laboratuvarınca yapılan aylık mikrobiyolojik ve kimyasal havuz suyu analiz sonuç raporlarının vatandaşların ve sporcuların görebileceği ilan panosuna asılmadığı tespit edilmiştir.",
+        recommendedPriority: "kritik",
+        facilityTypes: ["Yarı Olimpik Yüzme Havuzu", "Olimpik Yüzme Havuzu"]
+    },
+    {
+        id: "tpl_havuz_cankurtaran",
+        category: "Havuz Özel",
+        text: "Havuz seansları esnasında sertifikalı cankurtaranın kule başında bulunmadığı, can simidi, kurtarma sırığı ve ilk yardım ekipmanlarının noksan olduğu görülmüştür.",
+        recommendedPriority: "kritik",
+        facilityTypes: ["Yarı Olimpik Yüzme Havuzu", "Olimpik Yüzme Havuzu"]
+    },
+    {
+        id: "tpl_havuz_savak_kaymaz",
+        category: "Havuz Özel",
+        text: "Havuz savak ızgaralarında kırık ve yerinden oynamış parçaların bulunduğu (ayak yaralanması ve takılma riski), havuz çevre sahasında kaymaz zemin özelliğinin yitirildiği tespit edilmiştir.",
+        recommendedPriority: "orta",
+        facilityTypes: ["Yarı Olimpik Yüzme Havuzu", "Olimpik Yüzme Havuzu"]
+    },
+
+    // 7) Gençlik Merkezi Özel Şablonları
+    {
+        id: "tpl_genclik_donanim_akustik",
+        category: "Gençlik Merkezi Özel",
+        text: "Atölyelerde teknik donanım ve malzeme eksikliği bulunduğu; müzik odasında ses yalıtımının yetersizliği sebebiyle icra edilen faaliyetlerin diğer atölyeleri olumsuz etkilediği belirlenmiştir.",
+        recommendedPriority: "orta",
+        facilityTypes: ["Gençlik Merkezi", "Gençlik Kampı"]
+    },
+    {
+        id: "tpl_genclik_wifi_guvenlik",
+        category: "Gençlik Merkezi Özel",
+        text: "Gençlik Merkezinde gençlerin kullanımına tahsis edilen GSB internet (Wi-Fi) altyapısının yetersiz kaldığı, ana girişte ziyaretçi kayıt ve kontrol mekanizmasının düzenli işletilmediği belirlenmiştir.",
+        recommendedPriority: "normal",
+        facilityTypes: ["Gençlik Merkezi", "Gençlik Kampı"]
+    },
+
+    // 8) Genel / Olumlu Tespit
+    {
+        id: "tpl_genel_temiz_faal",
+        category: "Genel / Ortak",
+        text: "Tesisin genel olarak temiz, tertipli, sporcu ve vatandaşların kullanımına uygun ve faal durumda olduğu gözlemlenmiştir.",
+        recommendedPriority: "normal",
+        facilityTypes: ["all"]
+    }
 ];
 
-const QUICK_NOTES_STORAGE_KEY = "mufyard_denetim_quick_notes";
+export const isTemplateRelevantForFacility = (template: FindingTemplate, facilityType?: string): boolean => {
+    if (!facilityType || !template.facilityTypes || template.facilityTypes.includes("all")) {
+        return true;
+    }
+    const typeLower = facilityType.toLowerCase();
+
+    // Tam eşleşme kontrolü
+    if (template.facilityTypes.includes(facilityType)) return true;
+
+    // Semantik grup eşleşmesi
+    const hasSalon = template.facilityTypes.some(t => t.toLowerCase().includes("salon"));
+    if (hasSalon && (typeLower.includes("salon") || typeLower.includes("kort"))) return true;
+
+    const hasHavuz = template.facilityTypes.some(t => t.toLowerCase().includes("havuz"));
+    if (hasHavuz && typeLower.includes("havuz")) return true;
+
+    const hasSaha = template.facilityTypes.some(t => t.toLowerCase().includes("saha") || t.toLowerCase().includes("stad"));
+    if (hasSaha && (typeLower.includes("saha") || typeLower.includes("stad") || typeLower.includes("pist"))) return true;
+
+    const hasGenclik = template.facilityTypes.some(t => t.toLowerCase().includes("gençlik") || t.toLowerCase().includes("genclik"));
+    if (hasGenclik && (typeLower.includes("gençlik") || typeLower.includes("genclik") || typeLower.includes("kamp"))) return true;
+
+    return false;
+};
+
+const QUICK_NOTES_STORAGE_KEY = "mufyard_denetim_custom_quick_notes_v2";
 
 interface IlTesisleriDenetimProps {
     localAuditData: any;
@@ -243,6 +480,9 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
     const [noteModalText, setNoteModalText] = useState("");
     const [noteModalPriority, setNoteModalPriority] = useState<"normal" | "orta" | "kritik">("normal");
     const [isSavingNoteModal, setIsSavingNoteModal] = useState(false);
+    const [selectedTemplateCategory, setSelectedTemplateCategory] = useState<string>("relevant");
+    const [templateSearchTerm, setTemplateSearchTerm] = useState<string>("");
+    const [isTemplateDrawerOpen, setIsTemplateDrawerOpen] = useState<boolean>(false);
 
     // Custom Quick Notes Management State (Hızlı Tespit Şablonları Ekleme/Çıkarma/Düzenleme)
     const [customQuickNotes, setCustomQuickNotes] = useState<string[]>(() => {
@@ -250,10 +490,10 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
             const saved = localStorage.getItem(QUICK_NOTES_STORAGE_KEY);
             if (saved) {
                 const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                if (Array.isArray(parsed)) return parsed;
             }
         } catch {}
-        return DEFAULT_QUICK_NOTES;
+        return [];
     });
     const [isManagingQuickNotes, setIsManagingQuickNotes] = useState(false);
     const [newQuickNoteInput, setNewQuickNoteInput] = useState("");
@@ -276,19 +516,19 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
             return;
         }
         if (customQuickNotes.some(q => q.toLowerCase() === trimmed.toLowerCase())) {
-            toast.error("Bu şablon zaten listede mevcut.");
+            toast.error("Bu şablon zaten özel listenizde mevcut.");
             return;
         }
         const updated = [...customQuickNotes, trimmed];
         saveQuickNotes(updated);
         setNewQuickNoteInput("");
-        toast.success("Yeni hızlı tespit şablonu eklendi.");
+        toast.success("Yeni özel şablonunuz eklendi.");
     };
 
     const handleDeleteQuickNote = (index: number) => {
         const updated = customQuickNotes.filter((_, i) => i !== index);
         saveQuickNotes(updated);
-        toast.success("Hızlı tespit şablonu listeden kaldırıldı.");
+        toast.success("Özel şablon listeden kaldırıldı.");
     };
 
     const handleStartEditQuickNote = (index: number, text: string) => {
@@ -308,13 +548,13 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
         saveQuickNotes(updated);
         setEditingQuickNoteIndex(null);
         setEditingQuickNoteText("");
-        toast.success("Hızlı tespit şablonu güncellendi.");
+        toast.success("Özel şablon güncellendi.");
     };
 
     const handleResetQuickNotes = () => {
-        saveQuickNotes(DEFAULT_QUICK_NOTES);
+        saveQuickNotes([]);
         setEditingQuickNoteIndex(null);
-        toast.success("Hızlı tespit şablonları varsayılana döndürüldü.");
+        toast.success("Özel şablonlar temizlendi, standart teftiş şablonları aktif.");
     };
 
     // Dedicated Photo Modal State
@@ -419,6 +659,8 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
         setNoteModalFacilityId(facility.id);
         setNoteModalText(facility.bilgiNotu || "");
         setNoteModalPriority(facility.oncelik || "normal");
+        setIsTemplateDrawerOpen(false); // Varsayılan olarak sade yazma alanı açılır, şablonlar gizlidir
+        setIsManagingQuickNotes(false);
     };
 
     // Save from Dedicated Note Modal
@@ -1940,18 +2182,60 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                 const fac = facilities.find(f => f.id === noteModalFacilityId);
                 if (!fac) return null;
 
-                const addQuickNote = (text: string) => {
+                const addQuickNote = (text: string, priority?: "normal" | "orta" | "kritik") => {
                     setNoteModalText(prev => {
                         const trimmed = prev.trim();
                         if (!trimmed) return text;
                         if (trimmed.includes(text)) return trimmed;
                         return `${trimmed}\n• ${text}`;
                     });
+                    if (priority) {
+                        setNoteModalPriority(priority);
+                        const prioLabel = priority === "kritik" ? "Acil / Kritik" : priority === "orta" ? "Orta Düzey" : "Normal";
+                        toast.success(`Tespit eklendi (Öncelik: ${prioLabel})`, { duration: 2200, icon: "⚡" });
+                    } else {
+                        toast.success("Tespit nota eklendi", { duration: 2000 });
+                    }
                 };
+
+                // Tesis türüne uygun önerilen şablonlar
+                const relevantTemplates = MASTER_FINDING_TEMPLATES.filter(t => isTemplateRelevantForFacility(t, fac.tur));
+
+                // Kategori ve aramaya göre filtrelenmiş şablon listesi
+                let filteredTemplates: Array<{ id: string; text: string; category: string; recommendedPriority: "normal" | "orta" | "kritik"; isCustom?: boolean }> = [];
+                if (selectedTemplateCategory === "relevant") {
+                    filteredTemplates = relevantTemplates;
+                } else if (selectedTemplateCategory === "custom") {
+                    filteredTemplates = customQuickNotes.map((cn, idx) => ({
+                        id: `custom_${idx}`,
+                        text: cn,
+                        category: "Özel Şablon",
+                        recommendedPriority: "orta",
+                        isCustom: true
+                    }));
+                } else if (selectedTemplateCategory === "all") {
+                    filteredTemplates = [
+                        ...MASTER_FINDING_TEMPLATES,
+                        ...customQuickNotes.map((cn, idx) => ({
+                            id: `custom_${idx}`,
+                            text: cn,
+                            category: "Özel Şablon",
+                            recommendedPriority: "orta" as const,
+                            isCustom: true
+                        }))
+                    ];
+                } else {
+                    filteredTemplates = MASTER_FINDING_TEMPLATES.filter(t => t.category === selectedTemplateCategory);
+                }
+
+                if (templateSearchTerm.trim()) {
+                    const q = templateSearchTerm.toLowerCase();
+                    filteredTemplates = filteredTemplates.filter(t => t.text.toLowerCase().includes(q) || t.category.toLowerCase().includes(q));
+                }
 
                 return (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[88vh] flex flex-col">
+                        <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full ${isTemplateDrawerOpen ? "max-w-5xl" : "max-w-3xl"} shadow-2xl overflow-hidden max-h-[92vh] flex flex-col transition-all duration-200`}>
                             <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
                                 <div className="flex items-center gap-2.5 min-w-0">
                                     <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold shrink-0">
@@ -1962,7 +2246,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                             Tespit & Eksiklik Notları
                                         </h4>
                                         <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                                            {fac.ad} {fac.ilce ? `(${fac.ilce})` : ""}
+                                            {fac.ad} {fac.ilce ? `(${fac.ilce})` : ""} — <span className="font-bold text-amber-600 dark:text-amber-400">{fac.tur}</span>
                                         </p>
                                     </div>
                                 </div>
@@ -1975,224 +2259,538 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                 </button>
                             </div>
 
-                            <div className="p-3.5 sm:p-4 space-y-3 overflow-y-auto flex-1">
-                                {/* Öncelik Seçimi */}
-                                <div>
-                                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                                        Öncelik Derecesi
-                                    </label>
-                                    <div className="grid grid-cols-3 gap-1.5">
-                                        {PRESET_PRIORITY_OPTIONS.map(p => {
-                                            const isSelected = noteModalPriority === p.value;
-                                            return (
+                            {/* Şablon Paneli Kapalıyken: Sade ve Tam Genişlikte Not Alanı */}
+                            {!isTemplateDrawerOpen ? (
+                                <div className="p-4 sm:p-5 overflow-y-auto flex-1 flex flex-col space-y-3.5">
+                                    {/* Öncelik Seçimi */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
+                                                Öncelik Derecesi
+                                            </label>
+                                            <span className="text-[10px] text-slate-400">
+                                                (Tesis aksaklık risk derecesi)
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1.5">
+                                            {PRESET_PRIORITY_OPTIONS.map(p => {
+                                                const isSelected = noteModalPriority === p.value;
+                                                return (
+                                                    <button
+                                                        key={p.value}
+                                                        type="button"
+                                                        onClick={() => setNoteModalPriority(p.value as any)}
+                                                        className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1 ${
+                                                            isSelected
+                                                                ? p.value === "kritik"
+                                                                    ? "bg-rose-500 text-white border-rose-600 shadow-xs"
+                                                                    : p.value === "orta"
+                                                                    ? "bg-amber-500 text-white border-amber-600 shadow-xs"
+                                                                    : "bg-blue-600 text-white border-blue-600 shadow-xs"
+                                                                : "bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                                        }`}
+                                                    >
+                                                        {p.value === "kritik" && <AlertTriangle size={12} />}
+                                                        <span>{p.label}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Not Alanı Araç Çubuğu & Textarea */}
+                                    <div className="flex flex-col flex-1">
+                                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                            <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                                <FileText size={15} className="text-blue-500" />
+                                                <span>Ayrıntılı Tespit ve Durum Notu (Teftiş Raporu / Tenkit Metni)</span>
+                                            </label>
+
+                                            <div className="flex items-center gap-2">
+                                                {/* Şablon Kütüphanesini Aç Butonu */}
                                                 <button
-                                                    key={p.value}
                                                     type="button"
-                                                    onClick={() => setNoteModalPriority(p.value as any)}
-                                                    className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1 ${
-                                                        isSelected
-                                                            ? p.value === "kritik"
-                                                                ? "bg-rose-500 text-white border-rose-600 shadow-xs"
-                                                                : p.value === "orta"
-                                                                ? "bg-amber-500 text-white border-amber-600 shadow-xs"
-                                                                : "bg-blue-600 text-white border-blue-600 shadow-xs"
-                                                            : "bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                                    onClick={() => setIsTemplateDrawerOpen(true)}
+                                                    className="h-7 px-3 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                                                    title="Hazır teftiş şablonları panelini aç"
+                                                >
+                                                    <Sparkles size={12} className="text-amber-500" />
+                                                    <span>⚡ Şablonlardan Ekle</span>
+                                                </button>
+
+                                                {/* Pratik Dropdown Seçim */}
+                                                <select
+                                                    defaultValue=""
+                                                    onChange={e => {
+                                                        const val = e.target.value;
+                                                        if (!val) return;
+                                                        const match = MASTER_FINDING_TEMPLATES.find(t => t.id === val);
+                                                        if (match) {
+                                                            addQuickNote(match.text, match.recommendedPriority);
+                                                        } else if (val.startsWith("custom_")) {
+                                                            const idx = parseInt(val.replace("custom_", ""), 10);
+                                                            const customText = customQuickNotes[idx];
+                                                            if (customText) addQuickNote(customText, "orta");
+                                                        }
+                                                        e.target.value = "";
+                                                    }}
+                                                    className="h-7 px-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-amber-500 cursor-pointer max-w-[170px] truncate"
+                                                    title="Hızlıca bir şablon seçip ekleyebilirsiniz"
+                                                >
+                                                    <option value="" disabled>⚡ Hızlı Şablon...</option>
+                                                    <optgroup label={`⭐ ${fac.tur || "Tesis"} İçin Önerilenler`}>
+                                                        {relevantTemplates.map(t => (
+                                                            <option key={`rel_simple_${t.id}`} value={t.id}>
+                                                                [{t.recommendedPriority.toUpperCase()}] {t.category}: {t.text.substring(0, 32)}...
+                                                            </option>
+                                                        ))}
+                                                    </optgroup>
+                                                    <optgroup label="Tüm Teftiş Şablonları">
+                                                        {MASTER_FINDING_TEMPLATES.map(t => (
+                                                            <option key={`all_simple_${t.id}`} value={t.id}>
+                                                                [{t.recommendedPriority.toUpperCase()}] {t.category}: {t.text.substring(0, 32)}...
+                                                            </option>
+                                                        ))}
+                                                    </optgroup>
+                                                    {customQuickNotes.length > 0 && (
+                                                        <optgroup label="Özel Şablonlarım">
+                                                            {customQuickNotes.map((cn, cIdx) => (
+                                                                <option key={`custom_simple_${cIdx}`} value={`custom_${cIdx}`}>
+                                                                    [ÖZEL] {cn.substring(0, 32)}...
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
+                                                    )}
+                                                </select>
+
+                                                {noteModalText.trim() && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setNoteModalText("")}
+                                                        className="text-xs text-rose-500 hover:text-rose-700 font-bold hover:underline ml-1"
+                                                    >
+                                                        Temizle
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Tam Genişlikte Sade Metin Editörü */}
+                                        <textarea
+                                            value={noteModalText}
+                                            onChange={e => setNoteModalText(e.target.value)}
+                                            rows={14}
+                                            placeholder="Tesisle ilgili fiziki aksaklık, bakım-onarım ihtiyacı ve teftiş tenkidi notlarınızı buraya doğrudan serbestçe yazabilirsiniz. Dilerseniz yukarıdaki 'Şablonlardan Ekle' butonuna basarak hazır kütüphaneden tek tıkla madde ekleyebilirsiniz..."
+                                            className="w-full flex-1 min-h-[360px] lg:min-h-[420px] p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-sm font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500 leading-relaxed resize-y shadow-inner font-sans"
+                                        />
+
+                                        <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5">
+                                            <span>
+                                                {noteModalText.trim() ? `${noteModalText.trim().split('\n').filter(Boolean).length} Madde yazıldı` : 'Henüz not yazılmadı'}
+                                            </span>
+                                            <span>{noteModalText.length} Karakter</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                /* Şablon Paneli Açıkken: 2 Sütunlu Yan Yana Görünüm */
+                                <div className="p-4 sm:p-5 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 animate-in fade-in duration-200">
+                                    {/* Sol Sütun: Şablon Kütüphanesi & Hızlı Ekleme */}
+                                    <div className="lg:col-span-6 flex flex-col space-y-2.5">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-[11px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                                                <Sparkles size={13} className="text-amber-500" />
+                                                <span>Teftiş Tespit Şablonları</span>
+                                            </label>
+                                            <div className="flex items-center gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsManagingQuickNotes(!isManagingQuickNotes)}
+                                                    className={`px-2 py-0.5 text-[10px] font-bold rounded border transition-colors flex items-center gap-1 ${
+                                                        isManagingQuickNotes
+                                                            ? "bg-amber-500 text-white border-amber-600"
+                                                            : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:text-amber-600"
                                                     }`}
                                                 >
-                                                    {p.value === "kritik" && <AlertTriangle size={12} />}
-                                                    <span>{p.label}</span>
+                                                    <Settings size={10} />
+                                                    <span>{isManagingQuickNotes ? "Kapat" : "Özel Şablon"}</span>
                                                 </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {/* Hızlı Tespit Şablonları (Kompakt Tek Satır Seçici & Yatay Kaydırma) */}
-                                <div className="space-y-1.5">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1">
-                                            <Sparkles size={12} className="text-amber-500" />
-                                            Hızlı Tespit Şablonu
-                                        </label>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsManagingQuickNotes(!isManagingQuickNotes)}
-                                            className={`px-2 py-0.5 text-[10px] font-bold rounded border transition-colors flex items-center gap-1 ${
-                                                isManagingQuickNotes
-                                                    ? "bg-amber-500 text-white border-amber-600"
-                                                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:text-amber-600"
-                                            }`}
-                                        >
-                                            <Settings size={10} />
-                                            <span>{isManagingQuickNotes ? "Paneli Kapat" : "Şablonları Düzenle"}</span>
-                                        </button>
-                                    </div>
-
-                                    {/* Açılır Menü (Select) Hızlı Seçim */}
-                                    <div className="flex items-center gap-1.5">
-                                        <select
-                                            defaultValue=""
-                                            onChange={e => {
-                                                if (e.target.value) {
-                                                    addQuickNote(e.target.value);
-                                                    e.target.value = "";
-                                                }
-                                            }}
-                                            className="w-full h-8 px-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 outline-none focus:border-amber-500 cursor-pointer truncate"
-                                        >
-                                            <option value="" disabled>
-                                                ⚡ Hazır Tespit Seçin (Tıklayınca Nota Ekler)...
-                                            </option>
-                                            {customQuickNotes.map((qn, qIdx) => (
-                                                <option key={qIdx} value={qn}>
-                                                    {qn}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    {/* Yatay Tek Satır Hızlı Tıkla-Ekle Butonları (Kutuyu büyütmez) */}
-                                    {!isManagingQuickNotes && customQuickNotes.length > 0 && (
-                                        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-                                            {customQuickNotes.map((qn, qIdx) => (
                                                 <button
-                                                    key={qIdx}
                                                     type="button"
-                                                    onClick={() => addQuickNote(qn)}
-                                                    className="shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-slate-600 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 border border-slate-200/80 dark:border-slate-700/80 transition-colors whitespace-nowrap flex items-center gap-1"
-                                                    title={qn}
+                                                    onClick={() => setIsTemplateDrawerOpen(false)}
+                                                    className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1 transition-colors"
+                                                    title="Şablon panelini gizle ve sade yazma alanına dön"
                                                 >
-                                                    <span className="text-amber-500 font-bold">+</span>
-                                                    <span>{qn.length > 25 ? qn.substring(0, 25) + '...' : qn}</span>
+                                                    <X size={10} />
+                                                    <span>Şablonları Gizle</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Kategori Sekmeleri */}
+                                        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5 text-[10px]">
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedTemplateCategory("relevant")}
+                                                className={`px-2 py-1 rounded-md font-bold shrink-0 transition-all flex items-center gap-1 ${
+                                                    selectedTemplateCategory === "relevant"
+                                                        ? "bg-amber-500 text-white shadow-xs"
+                                                        : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200/80 dark:border-slate-800 hover:bg-slate-100"
+                                                }`}
+                                            >
+                                                ⭐ Bu Tesis İçin ({relevantTemplates.length})
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedTemplateCategory("all")}
+                                                className={`px-2 py-1 rounded-md font-bold shrink-0 transition-all ${
+                                                    selectedTemplateCategory === "all"
+                                                        ? "bg-blue-600 text-white shadow-xs"
+                                                        : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200/80 dark:border-slate-800 hover:bg-slate-100"
+                                                }`}
+                                            >
+                                                Tümü ({MASTER_FINDING_TEMPLATES.length})
+                                            </button>
+                                            {[
+                                                "Zemin & Çatı",
+                                                "Soyunma Odası & Sıhhi",
+                                                "Aydınlatma & Tesisat",
+                                                "Yangın & İSG",
+                                                "Dış Çevre, Drenaj & İstinat",
+                                                "Havuz Özel",
+                                                "Gençlik Merkezi Özel",
+                                                "Genel / Ortak"
+                                            ].map(cat => (
+                                                <button
+                                                    key={cat}
+                                                    type="button"
+                                                    onClick={() => setSelectedTemplateCategory(cat)}
+                                                    className={`px-2 py-1 rounded-md font-medium shrink-0 transition-all ${
+                                                        selectedTemplateCategory === cat
+                                                            ? "bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 font-bold"
+                                                            : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200/80 dark:border-slate-800 hover:bg-slate-100"
+                                                    }`}
+                                                >
+                                                    {cat}
                                                 </button>
                                             ))}
+                                            {customQuickNotes.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedTemplateCategory("custom")}
+                                                    className={`px-2 py-1 rounded-md font-bold shrink-0 transition-all ${
+                                                        selectedTemplateCategory === "custom"
+                                                            ? "bg-purple-600 text-white"
+                                                            : "bg-purple-50 dark:bg-purple-950/30 text-purple-600 border border-purple-200 dark:border-purple-800"
+                                                    }`}
+                                                >
+                                                    Özel ({customQuickNotes.length})
+                                                </button>
+                                            )}
                                         </div>
-                                    )}
 
-                                    {/* Şablon Yönetim Paneli (Açıkken) */}
-                                    {isManagingQuickNotes && (
-                                        <div className="p-2.5 bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/30 rounded-xl space-y-2">
-                                            {/* Yeni Şablon Ekleme Girişi */}
-                                            <div className="flex items-center gap-1.5">
+                                        {/* Arama & Dropdown Hızlı Seçim */}
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="relative flex-1">
+                                                <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                                                 <input
                                                     type="text"
-                                                    value={newQuickNoteInput}
-                                                    onChange={e => setNewQuickNoteInput(e.target.value)}
-                                                    onKeyDown={e => {
-                                                        if (e.key === "Enter") {
-                                                            e.preventDefault();
-                                                            handleAddQuickNote();
-                                                        }
-                                                    }}
-                                                    placeholder="Yeni hazır tespit şablonu yazın..."
-                                                    className="flex-1 h-7 px-2 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 outline-none focus:border-amber-500"
+                                                    value={templateSearchTerm}
+                                                    onChange={e => setTemplateSearchTerm(e.target.value)}
+                                                    placeholder="Şablonlarda ara (çatı, parke, vana, yangın)..."
+                                                    className="w-full h-7 pl-7 pr-6 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-800 dark:text-slate-200 placeholder:text-slate-400 outline-none focus:border-amber-500"
                                                 />
-                                                <button
-                                                    type="button"
-                                                    onClick={handleAddQuickNote}
-                                                    className="h-7 px-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-xs font-bold flex items-center gap-1 transition-colors shrink-0"
-                                                >
-                                                    <Plus size={12} />
-                                                    Ekle
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={handleResetQuickNotes}
-                                                    className="h-7 px-2 text-[10px] font-bold text-slate-500 hover:text-rose-600 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md transition-colors flex items-center gap-1"
-                                                    title="Varsayılana Sıfırla"
-                                                >
-                                                    <RotateCcw size={10} />
-                                                    Sıfırla
-                                                </button>
+                                                {templateSearchTerm && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setTemplateSearchTerm("")}
+                                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                                                    >
+                                                        <X size={10} />
+                                                    </button>
+                                                )}
                                             </div>
 
-                                            {/* Kayıtlı Şablonlar Listesi (Düzenleme / Çıkarma) */}
-                                            <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
-                                                {customQuickNotes.map((qn, qIdx) => (
-                                                    <div
-                                                        key={qIdx}
-                                                        className="flex items-center justify-between gap-2 p-1 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded text-[11px]"
-                                                    >
-                                                        {editingQuickNoteIndex === qIdx ? (
-                                                            <div className="flex items-center gap-1 flex-1">
-                                                                <input
-                                                                    type="text"
-                                                                    value={editingQuickNoteText}
-                                                                    onChange={e => setEditingQuickNoteText(e.target.value)}
-                                                                    onKeyDown={e => {
-                                                                        if (e.key === "Enter") {
-                                                                            e.preventDefault();
-                                                                            handleSaveEditQuickNote(qIdx);
-                                                                        } else if (e.key === "Escape") {
-                                                                            setEditingQuickNoteIndex(null);
-                                                                        }
-                                                                    }}
-                                                                    autoFocus
-                                                                    className="flex-1 h-6 px-1.5 text-xs rounded border border-blue-500 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 outline-none"
-                                                                />
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleSaveEditQuickNote(qIdx)}
-                                                                    className="p-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white"
-                                                                    title="Kaydet"
-                                                                >
-                                                                    <Check size={11} />
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setEditingQuickNoteIndex(null)}
-                                                                    className="p-1 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
-                                                                    title="İptal"
-                                                                >
-                                                                    <X size={11} />
-                                                                </button>
-                                                            </div>
-                                                        ) : (
-                                                            <>
-                                                                <span className="flex-1 font-medium text-slate-700 dark:text-slate-300 truncate select-none">
-                                                                    • {qn}
-                                                                </span>
-                                                                <div className="flex items-center gap-1 shrink-0">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleStartEditQuickNote(qIdx, qn)}
-                                                                        className="p-0.5 text-slate-400 hover:text-blue-600 rounded transition-colors"
-                                                                        title="Düzenle"
-                                                                    >
-                                                                        <Edit3 size={11} />
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleDeleteQuickNote(qIdx)}
-                                                                        className="p-0.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
-                                                                        title="Sil"
-                                                                    >
-                                                                        <Trash2 size={11} />
-                                                                    </button>
-                                                                </div>
-                                                            </>
-                                                        )}
+                                            <select
+                                                defaultValue=""
+                                                onChange={e => {
+                                                    const val = e.target.value;
+                                                    if (!val) return;
+                                                    const match = MASTER_FINDING_TEMPLATES.find(t => t.id === val);
+                                                    if (match) {
+                                                        addQuickNote(match.text, match.recommendedPriority);
+                                                    } else if (val.startsWith("custom_")) {
+                                                        const idx = parseInt(val.replace("custom_", ""), 10);
+                                                        const customText = customQuickNotes[idx];
+                                                        if (customText) addQuickNote(customText, "orta");
+                                                    }
+                                                    e.target.value = "";
+                                                }}
+                                                className="w-36 sm:w-40 h-7 px-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md text-[10px] font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-amber-500 cursor-pointer truncate shrink-0"
+                                            >
+                                                <option value="" disabled>⚡ Seç & Ekle...</option>
+                                                <optgroup label={`⭐ ${fac.tur || "Tesis"} İçin`}>
+                                                    {relevantTemplates.map(t => (
+                                                        <option key={`rel_drawer_${t.id}`} value={t.id}>
+                                                            [{t.recommendedPriority.toUpperCase()}] {t.category}: {t.text.substring(0, 30)}...
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                                <optgroup label="Tüm Teftiş Tespitleri">
+                                                    {MASTER_FINDING_TEMPLATES.map(t => (
+                                                        <option key={`all_drawer_${t.id}`} value={t.id}>
+                                                            [{t.recommendedPriority.toUpperCase()}] {t.category}: {t.text.substring(0, 30)}...
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                                {customQuickNotes.length > 0 && (
+                                                    <optgroup label="Özel Şablonlarım">
+                                                        {customQuickNotes.map((cn, cIdx) => (
+                                                            <option key={`custom_drawer_${cIdx}`} value={`custom_${cIdx}`}>
+                                                                [ÖZEL] {cn.substring(0, 30)}...
+                                                            </option>
+                                                        ))}
+                                                    </optgroup>
+                                                )}
+                                            </select>
+                                        </div>
+
+                                        {/* Hızlı Tıkla-Ekle Kartları Listesi */}
+                                        {!isManagingQuickNotes && (
+                                            <div className="space-y-1.5 max-h-[380px] lg:max-h-[440px] overflow-y-auto pr-1">
+                                                {filteredTemplates.length === 0 ? (
+                                                    <div className="py-6 text-center text-xs text-slate-400">
+                                                        Kritere uygun tespit şablonu bulunamadı.
                                                     </div>
-                                                ))}
+                                                ) : (
+                                                    filteredTemplates.map(item => {
+                                                        const isCrit = item.recommendedPriority === "kritik";
+                                                        const isMed = item.recommendedPriority === "orta";
+                                                        return (
+                                                            <button
+                                                                key={item.id}
+                                                                type="button"
+                                                                onClick={() => addQuickNote(item.text, item.recommendedPriority)}
+                                                                className={`w-full text-left p-2 rounded-xl border transition-all flex items-start gap-2.5 group hover:shadow-xs ${
+                                                                    isCrit
+                                                                        ? "bg-rose-50/60 dark:bg-rose-950/20 border-rose-200/80 dark:border-rose-900/40 hover:bg-rose-100/70"
+                                                                        : isMed
+                                                                        ? "bg-amber-50/60 dark:bg-amber-950/20 border-amber-200/80 dark:border-amber-900/40 hover:bg-amber-100/70"
+                                                                        : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:bg-slate-100"
+                                                                }`}
+                                                                title="Tıklayarak sağdaki alana ekleyin"
+                                                            >
+                                                                <span className={`shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded tracking-wider mt-0.5 ${
+                                                                    isCrit
+                                                                        ? "bg-rose-500 text-white"
+                                                                        : isMed
+                                                                        ? "bg-amber-500 text-white"
+                                                                        : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                                                                }`}>
+                                                                    {item.recommendedPriority}
+                                                                </span>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="text-[9px] font-bold text-slate-500 dark:text-slate-400 mb-0.5">
+                                                                        {item.category}
+                                                                    </div>
+                                                                    <div className="text-xs leading-relaxed font-medium text-slate-800 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                                                        {item.text}
+                                                                    </div>
+                                                                </div>
+                                                                <span className="shrink-0 text-[10px] font-bold text-slate-400 group-hover:text-blue-600 mt-0.5 whitespace-nowrap">+ Ekle</span>
+                                                            </button>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Özel Şablon Yönetim Paneli */}
+                                        {isManagingQuickNotes && (
+                                            <div className="p-2.5 bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/30 rounded-xl space-y-2">
+                                                <div className="flex items-center gap-1.5">
+                                                    <input
+                                                        type="text"
+                                                        value={newQuickNoteInput}
+                                                        onChange={e => setNewQuickNoteInput(e.target.value)}
+                                                        onKeyDown={e => {
+                                                            if (e.key === "Enter") {
+                                                                e.preventDefault();
+                                                                handleAddQuickNote();
+                                                            }
+                                                        }}
+                                                        placeholder="Yeni özel şablon yazın..."
+                                                        className="flex-1 h-7 px-2 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 outline-none focus:border-amber-500"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleAddQuickNote}
+                                                        className="h-7 px-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-xs font-bold flex items-center gap-1 transition-colors shrink-0"
+                                                    >
+                                                        <Plus size={12} />
+                                                        Ekle
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleResetQuickNotes}
+                                                        className="h-7 px-2 text-[10px] font-bold text-slate-500 hover:text-rose-600 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md transition-colors flex items-center gap-1"
+                                                        title="Özel şablonları sıfırla"
+                                                    >
+                                                        <RotateCcw size={10} />
+                                                        Sıfırla
+                                                    </button>
+                                                </div>
+
+                                                <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                                                    {customQuickNotes.length === 0 ? (
+                                                        <p className="text-[11px] text-slate-400 py-2 text-center">
+                                                            Henüz eklenmiş özel şablon bulunmuyor.
+                                                        </p>
+                                                    ) : (
+                                                        customQuickNotes.map((qn, qIdx) => (
+                                                            <div
+                                                                key={qIdx}
+                                                                className="flex items-center justify-between gap-2 p-1 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded text-[11px]"
+                                                            >
+                                                                {editingQuickNoteIndex === qIdx ? (
+                                                                    <div className="flex items-center gap-1 flex-1">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={editingQuickNoteText}
+                                                                            onChange={e => setEditingQuickNoteText(e.target.value)}
+                                                                            onKeyDown={e => {
+                                                                                if (e.key === "Enter") {
+                                                                                    e.preventDefault();
+                                                                                    handleSaveEditQuickNote(qIdx);
+                                                                                } else if (e.key === "Escape") {
+                                                                                    setEditingQuickNoteIndex(null);
+                                                                                }
+                                                                            }}
+                                                                            autoFocus
+                                                                            className="flex-1 h-6 px-1.5 text-xs rounded border border-blue-500 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 outline-none"
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleSaveEditQuickNote(qIdx)}
+                                                                            className="p-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                                            title="Kaydet"
+                                                                        >
+                                                                            <Check size={11} />
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setEditingQuickNoteIndex(null)}
+                                                                            className="p-1 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                                                                            title="İptal"
+                                                                        >
+                                                                            <X size={11} />
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="flex-1 font-medium text-slate-700 dark:text-slate-300 truncate select-none">
+                                                                            • {qn}
+                                                                        </span>
+                                                                        <div className="flex items-center gap-1 shrink-0">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleStartEditQuickNote(qIdx, qn)}
+                                                                                className="p-0.5 text-slate-400 hover:text-blue-600 rounded transition-colors"
+                                                                                title="Düzenle"
+                                                                            >
+                                                                                <Edit3 size={11} />
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleDeleteQuickNote(qIdx)}
+                                                                                className="p-0.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                                                                                title="Sil"
+                                                                            >
+                                                                                <Trash2 size={11} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Sağ Sütun: Öncelik ve Not Düzenleme Alanı */}
+                                    <div className="lg:col-span-6 flex flex-col space-y-3">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
+                                                    Öncelik Derecesi
+                                                </label>
+                                                <span className="text-[10px] text-slate-400">
+                                                    (Şablon seçilince otomatik önerilir)
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-1.5">
+                                                {PRESET_PRIORITY_OPTIONS.map(p => {
+                                                    const isSelected = noteModalPriority === p.value;
+                                                    return (
+                                                        <button
+                                                            key={p.value}
+                                                            type="button"
+                                                            onClick={() => setNoteModalPriority(p.value as any)}
+                                                            className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1 ${
+                                                                isSelected
+                                                                    ? p.value === "kritik"
+                                                                        ? "bg-rose-500 text-white border-rose-600 shadow-xs"
+                                                                        : p.value === "orta"
+                                                                        ? "bg-amber-500 text-white border-amber-600 shadow-xs"
+                                                                        : "bg-blue-600 text-white border-blue-600 shadow-xs"
+                                                                    : "bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                                            }`}
+                                                        >
+                                                            {p.value === "kritik" && <AlertTriangle size={12} />}
+                                                            <span>{p.label}</span>
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
-                                    )}
-                                </div>
 
-                                {/* Not Alanı */}
-                                <div>
-                                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                                        Ayrıntılı Tespit ve Durum Notu
-                                    </label>
-                                    <textarea
-                                        value={noteModalText}
-                                        onChange={e => setNoteModalText(e.target.value)}
-                                        rows={4}
-                                        placeholder="Tesisle ilgili gözlemlenen fiziki aksaklık, bakım-onarım ihtiyacı veya olumlu durumları yazınız..."
-                                        className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500 leading-relaxed resize-none"
-                                    />
+                                        <div className="flex flex-col flex-1">
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                                    <FileText size={14} className="text-blue-500" />
+                                                    <span>Ayrıntılı Tespit ve Durum Notu (Teftiş Raporu / Tenkit Metni)</span>
+                                                </label>
+                                                <div className="flex items-center gap-2.5 text-[11px]">
+                                                    <span className="text-slate-400 font-medium">
+                                                        {noteModalText.trim() ? `${noteModalText.trim().split('\n').filter(Boolean).length} Madde` : '0 Madde'}
+                                                    </span>
+                                                    {noteModalText.trim() && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setNoteModalText("")}
+                                                            className="text-rose-500 hover:text-rose-700 font-bold hover:underline"
+                                                        >
+                                                            Temizle
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <textarea
+                                                value={noteModalText}
+                                                onChange={e => setNoteModalText(e.target.value)}
+                                                placeholder="Soldaki şablonlardan tıklayarak ekleyebilir veya doğrudan buraya resmi teftiş tenkidi formatında tespitlerinizi yazabilirsiniz..."
+                                                className="w-full flex-1 min-h-[300px] lg:min-h-[390px] p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs sm:text-sm font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500 leading-relaxed resize-y shadow-inner"
+                                            />
+                                            <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5">
+                                                <span>💡 Soldan şablon seçebilir, dilediğiniz gibi düzenleyebilirsiniz.</span>
+                                                <span>{noteModalText.length} Karakter</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             <div className="flex items-center justify-end gap-2.5 p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 shrink-0">
                                 <Button
