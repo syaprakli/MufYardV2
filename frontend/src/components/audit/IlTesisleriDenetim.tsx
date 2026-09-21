@@ -2234,9 +2234,9 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                 }
 
                 return (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-                        <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full ${isTemplateDrawerOpen ? "max-w-5xl" : "max-w-3xl"} shadow-2xl overflow-hidden max-h-[92vh] flex flex-col transition-all duration-200`}>
-                            <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+                        <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full ${isTemplateDrawerOpen ? "max-w-5xl" : "max-w-3xl"} shadow-2xl overflow-hidden max-h-[88vh] sm:max-h-[85vh] flex flex-col transition-all duration-200 my-auto`}>
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
                                 <div className="flex items-center gap-2.5 min-w-0">
                                     <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold shrink-0">
                                         <FileText size={16} />
@@ -2261,7 +2261,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
 
                             {/* Şablon Paneli Kapalıyken: Sade ve Tam Genişlikte Not Alanı */}
                             {!isTemplateDrawerOpen ? (
-                                <div className="p-4 sm:p-5 overflow-y-auto flex-1 flex flex-col space-y-3.5">
+                                <div className="p-3.5 sm:p-4 overflow-y-auto flex-1 min-h-0 flex flex-col space-y-3">
                                     {/* Öncelik Seçimi */}
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
@@ -2299,7 +2299,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                     </div>
 
                                     {/* Not Alanı Araç Çubuğu & Textarea */}
-                                    <div className="flex flex-col flex-1">
+                                    <div className="flex flex-col flex-1 min-h-0">
                                         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                                             <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                                                 <FileText size={15} className="text-blue-500" />
@@ -2379,9 +2379,9 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                         <textarea
                                             value={noteModalText}
                                             onChange={e => setNoteModalText(e.target.value)}
-                                            rows={14}
+                                            rows={8}
                                             placeholder="Tesisle ilgili fiziki aksaklık, bakım-onarım ihtiyacı ve teftiş tenkidi notlarınızı buraya doğrudan serbestçe yazabilirsiniz. Dilerseniz yukarıdaki 'Şablonlardan Ekle' butonuna basarak hazır kütüphaneden tek tıkla madde ekleyebilirsiniz..."
-                                            className="w-full flex-1 min-h-[360px] lg:min-h-[420px] p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-sm font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500 leading-relaxed resize-y shadow-inner font-sans"
+                                            className="w-full flex-1 min-h-[180px] sm:min-h-[220px] max-h-[46vh] p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs sm:text-sm font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500 leading-relaxed resize-y shadow-inner font-sans"
                                         />
 
                                         <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5">
@@ -2394,7 +2394,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                 </div>
                             ) : (
                                 /* Şablon Paneli Açıkken: 2 Sütunlu Yan Yana Görünüm */
-                                <div className="p-4 sm:p-5 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 animate-in fade-in duration-200">
+                                <div className="p-3.5 sm:p-4 overflow-y-auto flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4 animate-in fade-in duration-200">
                                     {/* Sol Sütun: Şablon Kütüphanesi & Hızlı Ekleme */}
                                     <div className="lg:col-span-6 flex flex-col space-y-2.5">
                                         <div className="flex items-center justify-between">
@@ -2557,7 +2557,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
 
                                         {/* Hızlı Tıkla-Ekle Kartları Listesi */}
                                         {!isManagingQuickNotes && (
-                                            <div className="space-y-1.5 max-h-[380px] lg:max-h-[440px] overflow-y-auto pr-1">
+                                            <div className="space-y-1.5 max-h-[280px] lg:max-h-[40vh] overflow-y-auto pr-1">
                                                 {filteredTemplates.length === 0 ? (
                                                     <div className="py-6 text-center text-xs text-slate-400">
                                                         Kritere uygun tespit şablonu bulunamadı.
@@ -2756,7 +2756,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                             </div>
                                         </div>
 
-                                        <div className="flex flex-col flex-1">
+                                        <div className="flex flex-col flex-1 min-h-0">
                                             <div className="flex items-center justify-between mb-1.5">
                                                 <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                                                     <FileText size={14} className="text-blue-500" />
@@ -2780,8 +2780,9 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                             <textarea
                                                 value={noteModalText}
                                                 onChange={e => setNoteModalText(e.target.value)}
+                                                rows={8}
                                                 placeholder="Soldaki şablonlardan tıklayarak ekleyebilir veya doğrudan buraya resmi teftiş tenkidi formatında tespitlerinizi yazabilirsiniz..."
-                                                className="w-full flex-1 min-h-[300px] lg:min-h-[390px] p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs sm:text-sm font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500 leading-relaxed resize-y shadow-inner"
+                                                className="w-full flex-1 min-h-[180px] sm:min-h-[220px] max-h-[42vh] p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs sm:text-sm font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500 leading-relaxed resize-y shadow-inner"
                                             />
                                             <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5">
                                                 <span>💡 Soldan şablon seçebilir, dilediğiniz gibi düzenleyebilirsiniz.</span>
@@ -2792,13 +2793,13 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                 </div>
                             )}
 
-                            <div className="flex items-center justify-end gap-2.5 p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 shrink-0">
+                            <div className="flex items-center justify-end gap-2.5 px-4 py-2.5 sm:px-5 sm:py-3 border-t border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xs">
                                 <Button
                                     type="button"
                                     variant="outline"
                                     disabled={isSavingNoteModal}
                                     onClick={() => setNoteModalFacilityId(null)}
-                                    className="h-9 px-4 rounded-xl text-xs font-bold"
+                                    className="h-8 sm:h-9 px-4 rounded-xl text-xs font-bold"
                                 >
                                     Vazgeç
                                 </Button>
@@ -2806,7 +2807,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                     type="button"
                                     onClick={handleSaveNoteModal}
                                     disabled={isSavingNoteModal}
-                                    className="h-9 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20"
+                                    className="h-8 sm:h-9 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20"
                                 >
                                     {isSavingNoteModal ? (
                                         <span className="flex items-center gap-2">
