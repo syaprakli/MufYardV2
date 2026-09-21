@@ -484,6 +484,17 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
     const [templateSearchTerm, setTemplateSearchTerm] = useState<string>("");
     const [isTemplateDrawerOpen, setIsTemplateDrawerOpen] = useState<boolean>(false);
 
+    // Modal açıldığında arkadaki sayfa scroll'unu kilitle (mobilde ve masaüstünde kaymayı önler)
+    useEffect(() => {
+        if (noteModalFacilityId) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = "hidden";
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [noteModalFacilityId]);
+
     // Custom Quick Notes Management State (Hızlı Tespit Şablonları Ekleme/Çıkarma/Düzenleme)
     const [customQuickNotes, setCustomQuickNotes] = useState<string[]>(() => {
         try {
@@ -2234,8 +2245,8 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                 }
 
                 return (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-                        <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full ${isTemplateDrawerOpen ? "max-w-5xl" : "max-w-3xl"} shadow-2xl overflow-hidden max-h-[88vh] sm:max-h-[85vh] flex flex-col transition-all duration-200 my-auto`}>
+                    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 pt-1 sm:pt-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto overscroll-contain">
+                        <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full ${isTemplateDrawerOpen ? "max-w-5xl" : "max-w-3xl"} shadow-2xl overflow-hidden h-[95vh] sm:h-auto max-h-[95vh] sm:max-h-[86vh] flex flex-col transition-all duration-200 my-0 sm:my-auto`}>
                             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
                                 <div className="flex items-center gap-2.5 min-w-0">
                                     <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold shrink-0">
