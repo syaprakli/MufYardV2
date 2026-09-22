@@ -318,60 +318,78 @@ export const getFacilityTheme = (tur?: string) => {
     if (t.includes("havuz")) {
         return {
             border: "border-cyan-500 dark:border-cyan-400",
-            borderLeft: "border-l-[6px] border-l-cyan-500",
+            borderLeft: "border-l-[8px] border-l-cyan-500",
             ring: "ring-cyan-500/25",
-            headerBg: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30",
-            badge: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300 border-cyan-300 dark:border-cyan-800",
-            shadow: "shadow-cyan-500/10"
+            headerBg: "bg-cyan-500/10 dark:bg-cyan-950/40 border-b border-cyan-200 dark:border-cyan-800/60",
+            badge: "bg-cyan-500 text-white font-black border-cyan-600 shadow-xs",
+            numBg: "bg-cyan-500 text-white font-black",
+            cardBorder: "border-cyan-300 dark:border-cyan-700/80 shadow-xs hover:border-cyan-500 hover:shadow-cyan-500/10",
+            boxBg: "bg-cyan-50/70 dark:bg-cyan-950/40 border-cyan-200/80 dark:border-cyan-800/60",
+            iconColor: "text-cyan-600 dark:text-cyan-400"
         };
     }
     if (t.includes("salon")) {
         return {
             border: "border-blue-500 dark:border-blue-400",
-            borderLeft: "border-l-[6px] border-l-blue-500",
+            borderLeft: "border-l-[8px] border-l-blue-600",
             ring: "ring-blue-500/25",
-            headerBg: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
-            badge: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-300 dark:border-blue-800",
-            shadow: "shadow-blue-500/10"
+            headerBg: "bg-blue-500/10 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800/60",
+            badge: "bg-blue-600 text-white font-black border-blue-700 shadow-xs",
+            numBg: "bg-blue-600 text-white font-black",
+            cardBorder: "border-blue-300 dark:border-blue-700/80 shadow-xs hover:border-blue-500 hover:shadow-blue-500/10",
+            boxBg: "bg-blue-50/70 dark:bg-blue-950/40 border-blue-200/80 dark:border-blue-800/60",
+            iconColor: "text-blue-600 dark:text-blue-400"
         };
     }
     if (t.includes("gençlik") || t.includes("genclik") || t.includes("kamp")) {
         return {
             border: "border-purple-500 dark:border-purple-400",
-            borderLeft: "border-l-[6px] border-l-purple-500",
+            borderLeft: "border-l-[8px] border-l-purple-600",
             ring: "ring-purple-500/25",
-            headerBg: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30",
-            badge: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-300 dark:border-purple-800",
-            shadow: "shadow-purple-500/10"
+            headerBg: "bg-purple-500/10 dark:bg-purple-950/40 border-b border-purple-200 dark:border-purple-800/60",
+            badge: "bg-purple-600 text-white font-black border-purple-700 shadow-xs",
+            numBg: "bg-purple-600 text-white font-black",
+            cardBorder: "border-purple-300 dark:border-purple-700/80 shadow-xs hover:border-purple-500 hover:shadow-purple-500/10",
+            boxBg: "bg-purple-50/70 dark:bg-purple-950/40 border-purple-200/80 dark:border-purple-800/60",
+            iconColor: "text-purple-600 dark:text-purple-400"
         };
     }
     if (t.includes("saha") || t.includes("stadyum") || t.includes("stat") || t.includes("kort") || t.includes("pist")) {
         return {
             border: "border-emerald-500 dark:border-emerald-400",
-            borderLeft: "border-l-[6px] border-l-emerald-500",
+            borderLeft: "border-l-[8px] border-l-emerald-600",
             ring: "ring-emerald-500/25",
-            headerBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
-            badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800",
-            shadow: "shadow-emerald-500/10"
+            headerBg: "bg-emerald-500/10 dark:bg-emerald-950/40 border-b border-emerald-200 dark:border-emerald-800/60",
+            badge: "bg-emerald-600 text-white font-black border-emerald-700 shadow-xs",
+            numBg: "bg-emerald-600 text-white font-black",
+            cardBorder: "border-emerald-300 dark:border-emerald-700/80 shadow-xs hover:border-emerald-500 hover:shadow-emerald-500/10",
+            boxBg: "bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-200/80 dark:border-emerald-800/60",
+            iconColor: "text-emerald-600 dark:text-emerald-400"
         };
     }
     if (t.includes("yurt") || t.includes("blok")) {
         return {
             border: "border-indigo-500 dark:border-indigo-400",
-            borderLeft: "border-l-[6px] border-l-indigo-500",
+            borderLeft: "border-l-[8px] border-l-indigo-600",
             ring: "ring-indigo-500/25",
-            headerBg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30",
-            badge: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300 border-indigo-300 dark:border-indigo-800",
-            shadow: "shadow-indigo-500/10"
+            headerBg: "bg-indigo-500/10 dark:bg-indigo-950/40 border-b border-indigo-200 dark:border-indigo-800/60",
+            badge: "bg-indigo-600 text-white font-black border-indigo-700 shadow-xs",
+            numBg: "bg-indigo-600 text-white font-black",
+            cardBorder: "border-indigo-300 dark:border-indigo-700/80 shadow-xs hover:border-indigo-500 hover:shadow-indigo-500/10",
+            boxBg: "bg-indigo-50/70 dark:bg-indigo-950/40 border-indigo-200/80 dark:border-indigo-800/60",
+            iconColor: "text-indigo-600 dark:text-indigo-400"
         };
     }
     return {
         border: "border-amber-500 dark:border-amber-400",
-        borderLeft: "border-l-[6px] border-l-amber-500",
+        borderLeft: "border-l-[8px] border-l-amber-600",
         ring: "ring-amber-500/25",
-        headerBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
-        badge: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-300 dark:border-amber-800",
-        shadow: "shadow-amber-500/10"
+        headerBg: "bg-amber-500/10 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/60",
+        badge: "bg-amber-600 text-white font-black border-amber-700 shadow-xs",
+        numBg: "bg-amber-600 text-white font-black",
+        cardBorder: "border-amber-300 dark:border-amber-700/80 shadow-xs hover:border-amber-500 hover:shadow-amber-500/10",
+        boxBg: "bg-amber-50/70 dark:bg-amber-950/40 border-amber-200/80 dark:border-amber-800/60",
+        iconColor: "text-amber-600 dark:text-amber-400"
     };
 };
 
@@ -546,16 +564,17 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
     const [templateSearchTerm, setTemplateSearchTerm] = useState<string>("");
     const [isTemplateDrawerOpen, setIsTemplateDrawerOpen] = useState<boolean>(false);
 
-    // Modal açıldığında arkadaki sayfa scroll'unu kilitle (mobilde ve masaüstünde kaymayı önler)
+    // Herhangi bir modal (Yeni Tesis Ekle, Not Düzenle) açıldığında arkadaki sayfa scroll'unu kilitle
     useEffect(() => {
-        if (noteModalFacilityId) {
+        const isAnyModalOpen = !!(noteModalFacilityId || isModalOpen);
+        if (isAnyModalOpen) {
             const originalOverflow = document.body.style.overflow;
             document.body.style.overflow = "hidden";
             return () => {
                 document.body.style.overflow = originalOverflow;
             };
         }
-    }, [noteModalFacilityId]);
+    }, [noteModalFacilityId, isModalOpen]);
 
     // Custom Quick Notes Management State (Hızlı Tespit Şablonları Ekleme/Çıkarma/Düzenleme)
     const [customQuickNotes, setCustomQuickNotes] = useState<string[]>(() => {
@@ -1529,14 +1548,14 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                         return (
                             <div
                                 key={facility.id}
-                                className={`group flex flex-col bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 relative border ${fTheme.borderLeft} ${
+                                className={`group flex flex-col bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 relative border-2 ${fTheme.cardBorder} ${fTheme.borderLeft} ${
                                     isCardActive
                                         ? `${fTheme.border} ring-4 ${fTheme.ring} shadow-lg scale-[1.01]`
-                                        : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                                        : ""
                                 }`}
                             >
-                                {/* Uniform Card Header */}
-                                <div className="p-5 pb-3 border-b border-slate-100 dark:border-slate-800/70">
+                                {/* Uniform Card Header with Theme Background */}
+                                <div className={`p-5 pb-3.5 ${fTheme.headerBg}`}>
                                     <div className="flex items-center justify-between gap-1.5 min-w-0">
                                         <div className="flex items-center gap-1.5 min-w-0 flex-nowrap overflow-hidden">
                                             <input
@@ -1547,7 +1566,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                                 className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer shrink-0"
                                                 title="Rapora aktarmak için seç"
                                             />
-                                            <span className="w-5 h-5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-black shrink-0">
+                                            <span className={`w-5 h-5 rounded-md ${fTheme.numBg} flex items-center justify-center text-[10px] shrink-0`}>
                                                 #{index + 1}
                                             </span>
                                             <span 
@@ -1604,10 +1623,10 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                 <div className="p-5 flex-1 flex flex-col justify-between gap-4">
                                     <div className="space-y-3.5">
                                         {/* 1. GENEL BİLGİLER TABLOSU */}
-                                        <div className="bg-slate-50/90 dark:bg-slate-950/70 rounded-xl p-3.5 border border-slate-200/80 dark:border-slate-800 space-y-2.5">
+                                        <div className={`rounded-xl p-3.5 border ${fTheme.boxBg} space-y-2.5`}>
                                             <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-slate-800/60">
-                                                <span className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                                                    <Building2 size={13} className="text-blue-500" />
+                                                <span className="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <Building2 size={13} className={fTheme.iconColor} />
                                                     Tesis Genel Bilgileri
                                                 </span>
                                                 <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tight border ${statusObj.color}`}>
@@ -1807,14 +1826,14 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                         return (
                             <div
                                 key={facility.id}
-                                className={`bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm transition-all border ${fTheme.borderLeft} ${
+                                className={`bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm transition-all border-2 ${fTheme.cardBorder} ${fTheme.borderLeft} ${
                                     isCardActive
                                         ? `${fTheme.border} ring-4 ${fTheme.ring} shadow-md`
-                                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                                        : ""
                                 }`}
                             >
                                 {/* Row Header */}
-                                <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800/60 bg-slate-50/40 dark:bg-slate-900/40">
+                                <div className={`p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b ${fTheme.headerBg}`}>
                                     <div className="flex items-start gap-3.5">
                                         <div className="flex items-center gap-2 self-center shrink-0">
                                             <input
@@ -1825,7 +1844,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                                 className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer shrink-0"
                                                 title="Rapora aktarmak için seç"
                                             />
-                                            <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-black text-sm border border-blue-500/20">
+                                            <div className={`w-10 h-10 rounded-xl ${fTheme.numBg} flex items-center justify-center font-black text-sm shadow-xs`}>
                                                 {index + 1}
                                             </div>
                                         </div>
@@ -2098,26 +2117,33 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
             )}
 
             {/* Add / Edit Facility Modal (SADECE GENEL BİLGİLER) */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
-                        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 shrink-0">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
-                                    <Building2 size={18} />
+            {isModalOpen && (() => {
+                const modalTheme = getFacilityTheme(formData.tur);
+                return (
+                    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 pt-2 sm:pt-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto overscroll-contain">
+                        <div className={`bg-white dark:bg-slate-900 border-2 ${modalTheme.border} ring-4 ${modalTheme.ring} rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden h-auto max-h-[94vh] sm:max-h-[88vh] flex flex-col my-0 sm:my-auto transition-all`}>
+                            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
+                                <div className="flex items-center gap-2.5">
+                                    <div className={`w-9 h-9 rounded-xl ${modalTheme.headerBg} flex items-center justify-center font-bold border`}>
+                                        <Building2 size={18} />
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white truncate">
+                                            {editingFacilityId ? "Tesis Genel Bilgilerini Düzenle" : "Yeni Tesis Ekle (Genel Bilgiler)"}
+                                        </h4>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">
+                                            Tür: <strong className={modalTheme.iconColor}>{formData.tur}</strong>
+                                        </p>
+                                    </div>
                                 </div>
-                                <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white truncate">
-                                    {editingFacilityId ? "Tesis Genel Bilgilerini Düzenle" : "Yeni Tesis Ekle (Genel Bilgiler)"}
-                                </h4>
+                                <button
+                                    onClick={() => !isSavingFacilityModal && setIsModalOpen(false)}
+                                    disabled={isSavingFacilityModal}
+                                    className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg disabled:opacity-50"
+                                >
+                                    <X size={16} />
+                                </button>
                             </div>
-                            <button
-                                onClick={() => !isSavingFacilityModal && setIsModalOpen(false)}
-                                disabled={isSavingFacilityModal}
-                                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg disabled:opacity-50"
-                            >
-                                <X size={16} />
-                            </button>
-                        </div>
 
                         <form onSubmit={handleSaveFacilityModal} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
                             <div>
@@ -2260,7 +2286,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                         </form>
                     </div>
                 </div>
-            )}
+            ); })()}
 
             {/* Dedicated Note & Findings Modal */}
             {noteModalFacilityId && (() => {

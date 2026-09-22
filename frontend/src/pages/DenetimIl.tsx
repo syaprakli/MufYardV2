@@ -281,6 +281,7 @@ export default function DenetimIl() {
     const [showTaskPicker, setShowTaskPicker] = useState(false);
     const [pickerTaskForAudit, setPickerTaskForAudit] = useState<any>(null);
     const [isTaskDropdownOpen, setIsTaskDropdownOpen] = useState(false);
+    const [isSelectCityModalOpen, setIsSelectCityModalOpen] = useState(false);
 
 
 
@@ -331,9 +332,11 @@ export default function DenetimIl() {
         return accessibleTasks.filter((t: any) => t.rapor_turu === currentRaporTuru);
     }, [accessibleTasks, currentRaporTuru]);
 
-    // Sayfa yenilendiğinde görev boş kalmasın: en son çalışılan veya ilk görevi otomatik seç
+    // Sayfa ilk açıldığında görev boş kalmasın: en son çalışılan veya ilk görevi otomatik seç
+    const initialAutoSelectedRef = useRef(false);
     useEffect(() => {
-        if (!selectedTaskId && filteredTasks.length > 0) {
+        if (!initialAutoSelectedRef.current && !selectedTaskId && filteredTasks.length > 0) {
+            initialAutoSelectedRef.current = true;
             const saved = localStorage.getItem("mufyard_last_task_il");
             const match = saved && filteredTasks.some((t: any) => t.id === saved);
             const targetId = match ? saved : filteredTasks[0].id;
@@ -2417,11 +2420,11 @@ export default function DenetimIl() {
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                     {selectedTaskId && (
                         <button
-                            onClick={() => setSelectedTaskId(null)}
-                            className="xl:hidden flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap min-w-0"
+                            onClick={() => setIsSelectCityModalOpen(true)}
+                            className="xl:hidden flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap min-w-0 shadow-xs active:scale-95"
                             title="Tüm İller / Görevler Listesini Aç"
                         >
-                            <Building2 size={12} className="shrink-0" />
+                            <Building2 size={12} className="shrink-0 text-blue-600 dark:text-blue-400" />
                             <span className="truncate">İl Değiştir ({filteredTasks.length})</span>
                         </button>
                     )}
@@ -3612,6 +3615,64 @@ export default function DenetimIl() {
                             >
                                 Tamam
                             </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* İl Değiştir Hızlı Seçim Modalı (Mobil & Hızlı İl Geçişi) */}
+            {isSelectCityModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 pt-3 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+                    <div className="bg-white dark:bg-slate-900 border-2 border-blue-500 ring-4 ring-blue-500/20 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden max-h-[85vh] flex flex-col my-0 sm:my-auto animate-in zoom-in-95 duration-150">
+                        <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-950/30">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+                                    <Building2 size={16} />
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-black text-slate-900 dark:text-white">İl / Görev Değiştir</h4>
+                                    <p className="text-[11px] text-slate-400">Denetim yapacağınız ili seçiniz ({filteredTasks.length} İl)</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsSelectCityModalOpen(false)}
+                                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                        <div className="p-3 overflow-y-auto space-y-1.5 flex-1">
+                            {filteredTasks.map(t => {
+                                const isCurrent = t.id === selectedTaskId;
+                                return (
+                                    <button
+                                        key={t.id}
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedTaskId(t.id);
+                                            localStorage.setItem("mufyard_last_task_il", t.id);
+                                            navigate(`/denetim/${activeTab}?task_id=${t.id}`, { replace: true });
+                                            setIsSelectCityModalOpen(false);
+                                            toast.success(`${t.rapor_adi} denetimi açıldı`, { icon: "📍" });
+                                        }}
+                                        className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                                            isCurrent
+                                                ? "bg-blue-600 text-white border-blue-600 font-bold shadow-md shadow-blue-500/20"
+                                                : "bg-slate-50 dark:bg-slate-800/60 hover:bg-blue-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700"
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2.5 truncate min-w-0">
+                                            <MapPin size={15} className={isCurrent ? "text-white shrink-0" : "text-blue-500 shrink-0"} />
+                                            <span className="text-xs sm:text-sm font-bold truncate">{t.rapor_adi}</span>
+                                        </div>
+                                        {isCurrent && (
+                                            <span className="px-2 py-0.5 rounded-md bg-white/20 text-[10px] font-black uppercase shrink-0">
+                                                Aktif İl
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
