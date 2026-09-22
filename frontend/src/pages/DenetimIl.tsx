@@ -3622,7 +3622,7 @@ export default function DenetimIl() {
 
             {/* İl Değiştir Hızlı Seçim Modalı (Mobil & Hızlı İl Geçişi) */}
             {isSelectCityModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 pt-3 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+                <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 pt-3 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-hidden">
                     <div className="bg-white dark:bg-slate-900 border-2 border-blue-500 ring-4 ring-blue-500/20 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden max-h-[85vh] flex flex-col my-0 sm:my-auto animate-in zoom-in-95 duration-150">
                         <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-950/30">
                             <div className="flex items-center gap-2.5">

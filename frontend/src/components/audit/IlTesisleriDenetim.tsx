@@ -2120,8 +2120,8 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
             {isModalOpen && (() => {
                 const modalTheme = getFacilityTheme(formData.tur);
                 return (
-                    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 pt-2 sm:pt-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto overscroll-contain">
-                        <div className={`bg-white dark:bg-slate-900 border-2 ${modalTheme.border} ring-4 ${modalTheme.ring} rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden h-auto max-h-[94vh] sm:max-h-[88vh] flex flex-col my-0 sm:my-auto transition-all`}>
+                    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 pt-2 sm:pt-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-hidden">
+                        <div className={`bg-white dark:bg-slate-900 border-2 ${modalTheme.border} ring-4 ${modalTheme.ring} rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] my-0 sm:my-auto transition-all`}>
                             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
                                 <div className="flex items-center gap-2.5">
                                     <div className={`w-9 h-9 rounded-xl ${modalTheme.headerBg} flex items-center justify-center font-bold border`}>
@@ -2145,120 +2145,133 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                                 </button>
                             </div>
 
-                        <form onSubmit={handleSaveFacilityModal} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
-                            <div>
-                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                                    Tesis Adı <span className="text-rose-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.ad || ""}
-                                    onChange={e => setFormData(prev => ({ ...prev, ad: e.target.value }))}
-                                    placeholder="Örn: Atatürk Kapalı Spor Salonu"
-                                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <form onSubmit={handleSaveFacilityModal} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0">
                                 <div>
                                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                                        Tesis Türü
-                                    </label>
-                                    <select
-                                        value={formData.tur || PRESET_FACILITY_TYPES[0]}
-                                        onChange={e => setFormData(prev => ({ ...prev, tur: e.target.value }))}
-                                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-700 dark:text-slate-300 outline-none"
-                                    >
-                                        {PRESET_FACILITY_TYPES.map(t => (
-                                            <option key={t} value={t}>{t}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                                        Faaliyet Durumu
-                                    </label>
-                                    <select
-                                        value={formData.durum || "faal"}
-                                        onChange={e => setFormData(prev => ({ ...prev, durum: e.target.value as any }))}
-                                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-700 dark:text-slate-300 outline-none"
-                                    >
-                                        {PRESET_STATUS_OPTIONS.map(s => (
-                                            <option key={s.value} value={s.value}>{s.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                                        İlçe / Mevki
+                                        Tesis Adı <span className="text-rose-500">*</span>
                                     </label>
                                     <input
                                         type="text"
-                                        value={formData.ilce || ""}
-                                        onChange={e => setFormData(prev => ({ ...prev, ilce: e.target.value }))}
-                                        placeholder="Örn: Battalgazi / Merkez"
+                                        required
+                                        value={formData.ad || ""}
+                                        onChange={e => setFormData(prev => ({ ...prev, ad: e.target.value }))}
+                                        placeholder="Örn: Atatürk Kapalı Spor Salonu"
                                         className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500"
                                     />
                                 </div>
 
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                                            Tesis Türü
+                                        </label>
+                                        <select
+                                            value={formData.tur || PRESET_FACILITY_TYPES[0]}
+                                            onChange={e => setFormData(prev => ({ ...prev, tur: e.target.value }))}
+                                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500"
+                                        >
+                                            {PRESET_FACILITY_TYPES.map(t => (
+                                                <option key={t} value={t}>{t}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                                            İlçe
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.ilce || ""}
+                                            onChange={e => setFormData(prev => ({ ...prev, ilce: e.target.value }))}
+                                            placeholder="Örn: Çankaya"
+                                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                </div>
+
                                 <div>
                                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                                        Mülkiyet / Tahsis
+                                        Adres / Konum Detayı
                                     </label>
                                     <input
                                         type="text"
-                                        value={formData.mulkiyet || "GSB (Gençlik ve Spor Bakanlığı)"}
-                                        onChange={e => setFormData(prev => ({ ...prev, mulkiyet: e.target.value }))}
-                                        placeholder="Örn: GSB, Belediye Tahsisli, Kiralık"
-                                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                                        Denetim Tarihi
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={formData.denetimTarihi || new Date().toISOString().split("T")[0]}
-                                        onChange={e => setFormData(prev => ({ ...prev, denetimTarihi: e.target.value }))}
+                                        value={formData.adres || ""}
+                                        onChange={e => setFormData(prev => ({ ...prev, adres: e.target.value }))}
+                                        placeholder="Örn: Gazi Mah. Stadyum Cad. No: 4"
                                         className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500"
                                     />
                                 </div>
 
-                                <div>
-                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                                        Öncelik Seviyesi
-                                    </label>
-                                    <select
-                                        value={formData.oncelik || "normal"}
-                                        onChange={e => setFormData(prev => ({ ...prev, oncelik: e.target.value as any }))}
-                                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-700 dark:text-slate-300 outline-none"
-                                    >
-                                        {PRESET_PRIORITY_OPTIONS.map(p => (
-                                            <option key={p.value} value={p.value}>{p.label}</option>
-                                        ))}
-                                    </select>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                                            Mülkiyet Durumu
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.mulkiyet || ""}
+                                            onChange={e => setFormData(prev => ({ ...prev, mulkiyet: e.target.value }))}
+                                            placeholder="GSB, Belediye, Tahsisli vb."
+                                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                                            İnceleme / Denetim Tarihi
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={formData.denetimTarihi || ""}
+                                            onChange={e => setFormData(prev => ({ ...prev, denetimTarihi: e.target.value }))}
+                                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                                            Tesisin Faaliyet Durumu
+                                        </label>
+                                        <select
+                                            value={formData.durum || "faal"}
+                                            onChange={e => setFormData(prev => ({ ...prev, durum: e.target.value as any }))}
+                                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-700 dark:text-slate-300 outline-none"
+                                        >
+                                            {PRESET_STATUS_OPTIONS.map(s => (
+                                                <option key={s.value} value={s.value}>{s.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                                            Genel Durum Önceliği
+                                        </label>
+                                        <select
+                                            value={formData.oncelik || "normal"}
+                                            onChange={e => setFormData(prev => ({ ...prev, oncelik: e.target.value as any }))}
+                                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-bold text-slate-700 dark:text-slate-300 outline-none"
+                                        >
+                                            {PRESET_PRIORITY_OPTIONS.map(p => (
+                                                <option key={p.value} value={p.value}>{p.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Informational Callout: Step 1 / Step 2 Guidance */}
+                                <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-800/60 flex items-start gap-2.5">
+                                    <Info size={16} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                                    <div className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                                        <strong className="font-bold text-slate-900 dark:text-white block mb-0.5">Notlar ve Fotoğraflar Ayrı Butonlarla Eklenir</strong>
+                                        Önce genel bilgileri kaydedin. Kaydettikten sonra tesis kartı üzerindeki <strong className="text-blue-600 dark:text-blue-400 font-bold">"Not Düzenle"</strong> ve <strong className="text-blue-600 dark:text-blue-400 font-bold">"Fotoğraflar"</strong> butonlarına basarak tespit ve fotoğraflarınızı ayrıca ekleyebilirsiniz.
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Informational Callout: Step 1 / Step 2 Guidance */}
-                            <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-800/60 flex items-start gap-2.5">
-                                <Info size={16} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                                <div className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                                    <strong className="font-bold text-slate-900 dark:text-white block mb-0.5">Notlar ve Fotoğraflar Ayrı Butonlarla Eklenir</strong>
-                                    Önce genel bilgileri kaydedin. Kaydettikten sonra tesis kartı üzerindeki <strong className="text-blue-600 dark:text-blue-400 font-bold">"Not Düzenle"</strong> ve <strong className="text-blue-600 dark:text-blue-400 font-bold">"Fotoğraflar"</strong> butonlarına basarak tespit ve fotoğraflarınızı ayrıca ekleyebilirsiniz.
-                                </div>
-                            </div>
-
-                            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                            {/* Pinned Action Footer */}
+                            <div className="flex items-center justify-end gap-2.5 p-3 sm:p-4 border-t border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/80 dark:bg-slate-950/40">
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -2347,8 +2360,8 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                 const facTheme = getFacilityTheme(fac.tur);
 
                 return (
-                    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 pt-1 sm:pt-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto overscroll-contain">
-                        <div className={`bg-white dark:bg-slate-900 border-2 ${facTheme.border} ring-4 ${facTheme.ring} rounded-2xl w-full ${isTemplateDrawerOpen ? "max-w-5xl" : "max-w-3xl"} shadow-2xl overflow-hidden h-[95vh] sm:h-auto max-h-[95vh] sm:max-h-[86vh] flex flex-col transition-all duration-200 my-0 sm:my-auto`}>
+                    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 pt-2 sm:pt-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-hidden">
+                        <div className={`bg-white dark:bg-slate-900 border-2 ${facTheme.border} ring-4 ${facTheme.ring} rounded-2xl w-full ${isTemplateDrawerOpen ? "max-w-5xl" : "max-w-3xl"} shadow-2xl overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[88vh] transition-all duration-200 my-0 sm:my-auto`}>
                             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
                                 <div className="flex items-center gap-2.5 min-w-0">
                                     <div className={`w-8 h-8 rounded-lg ${facTheme.headerBg} flex items-center justify-center font-bold shrink-0 border`}>
