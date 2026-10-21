@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { onAuthStateChanged, signOut as firebaseSignOut, sendPasswordResetEmail } from "firebase/auth";
-import type { User } from "firebase/auth";
-import { auth, isElectron } from "../firebase";
+import { onAuthStateChanged, signOut as firebaseSignOut, sendPasswordResetEmail, type User } from "firebase/auth";
+import { auth } from "../firebase";
 import { setOnline, removeOnline, removeOnlineBeacon } from "../api/online";
 
 function resolveUserName(user: User | null, profile?: Profile | null) {
@@ -74,16 +73,18 @@ export function useAuth() {
                     await removeOnline(user.uid);
                 } catch (e) {}
             }
-            // Önce localStorage'ı temizle, sonra Firebase signOut yap
-            localStorage.removeItem("mufyard_assistant_messages");
+            // Oturumla ilgili localStorage önbelleklerini temizle
+            try {
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith("mufyard_")) {
+                        localStorage.removeItem(key);
+                    }
+                });
+            } catch (e) {}
             setUser(null);
             await firebaseSignOut(auth);
-            // Electron'da beyaz ekranı önlemek için tam yeniden yükleme; web'de hash routing
-            if (isElectron) {
-                window.location.reload();
-            } else {
-                window.location.hash = "#/login";
-            }
+            // Hem Electron hem Web tarafında temiz bir state için tam yeniden yükleme
+            window.location.reload();
         } catch (error) {
             console.error("Çıkış yapılırken hata oluştu:", error);
         }

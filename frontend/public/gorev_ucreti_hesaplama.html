@@ -217,6 +217,16 @@
                     } catch (e) {
                         console.warn("GitHub live config fetch failed, falling back to local...", e);
                     }
+
+                    try {
+                        const localResponse = await fetch("./mufyard_rates.json");
+                        if (localResponse.ok) {
+                            const data = await localResponse.json();
+                            setLiveConfig(data);
+                        }
+                    } catch (e) {
+                        console.error("Local config fetch failed", e);
+                    }
                 };
                 fetchLiveConfig();
             }, []);

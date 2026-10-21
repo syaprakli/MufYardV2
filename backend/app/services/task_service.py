@@ -107,13 +107,11 @@ class TaskService:
         if not user_id and not user_email: return []
         
         try:
-            # 1. Admin/Demo bypass
-            admin_id = "sefa.yaprakli@gsb.gov.tr"
-            if user_id == admin_id or user_email == admin_id or user_id == "admin":
-                docs = await asyncio.to_thread(lambda: tasks_ref.order_by('created_at', direction='DESCENDING').limit(500).stream())
-                return [ {**doc.to_dict(), 'id': doc.id} for doc in docs ]
+            test_uid = "tolEIwlWrHfWCQduDuXcnqBvWdo2"
+            test_email = "test@mufyard.com"
+            is_test_user = (user_id == test_uid or (user_email and user_email.lower() == test_email))
 
-            # 2. Parallel Queries with asyncio.gather
+            # Parallel Queries with asyncio.gather
             async def run_query(q):
                 if q is None: return []
                 return await asyncio.to_thread(lambda: list(q.stream()))
@@ -141,6 +139,18 @@ class TaskService:
                 if doc.id not in unique_tasks:
                     d = doc.to_dict()
                     d['id'] = doc.id
+                    # Test verisi izolasyonu: test kullanıcısı değilse test görevlerini filtrele
+                    if not is_test_user:
+                        task_owner = d.get('owner_id', '')
+                        task_assigned = d.get('assigned_to', []) or []
+                        task_shared = d.get('shared_with', []) or []
+                        task_accepted = d.get('accepted_collaborators', []) or []
+                        test_identifiers = [test_uid, test_email]
+                        if (task_owner in test_identifiers or 
+                            any(t in task_assigned for t in test_identifiers) or
+                            any(t in task_shared for t in test_identifiers) or
+                            any(t in task_accepted for t in test_identifiers)):
+                            continue
                     unique_tasks[doc.id] = d
             
             res = list(unique_tasks.values())

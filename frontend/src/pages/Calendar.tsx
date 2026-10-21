@@ -148,9 +148,25 @@ export default function Calendar() {
         return task.rapor_durumu === "Tamamlandı" && isOld;
     };
 
+    const isTestAccount = Boolean(
+        user?.email?.toLowerCase().includes("test") ||
+        user?.uid === "tolEIwlWrHfWCQduDuXcnqBvWdo2"
+    );
+
+    const isTestTask = (task: any) => {
+        if (isTestAccount) return false;
+        const testUid = "tolEIwlWrHfWCQduDuXcnqBvWdo2";
+        const testEmail = "test@mufyard.com";
+        const owner = (task.owner_id || "").toLowerCase();
+        const assigned = (task.assigned_to || []).map((a: any) => String(a).toLowerCase());
+        const shared = (task.shared_with || []).map((s: any) => String(s).toLowerCase());
+        const testIds = [testUid.toLowerCase(), testEmail];
+        return testIds.includes(owner) || assigned.some((a: string) => testIds.includes(a)) || shared.some((s: string) => testIds.includes(s));
+    };
+
     const tasks = useMemo(() => {
-        return (globalData.tasks || []).filter(t => !isArchivedTask(t));
-    }, [globalData.tasks]);
+        return (globalData.tasks || []).filter(t => !isArchivedTask(t) && !isTestTask(t));
+    }, [globalData.tasks, isTestAccount]);
 
     // ── helpers ────────────────────────────────────────────────────────────────
     const effectiveUid = useCallback(() => {

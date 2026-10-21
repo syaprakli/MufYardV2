@@ -7,6 +7,8 @@ class ContactBase(BaseModel):
     title: str = Field(default="", example="Başmüfettiş")
     unit: str = Field(default="", example="Rehberlik ve Denetim Başkanlığı")
     phone: str = Field(..., example="05xx xxx xx xx")
+    work_phone: Optional[str] = Field(default="", example="0312 596 60 00")
+    extension: Optional[str] = Field(default="", example="5103")
     email: Optional[str] = Field(default="", example="eposta@gsb.gov.tr")
     tags: List[str] = Field(default_factory=list, example=["Müfettiş", "Birim Amiri"])
     category: Optional[str] = Field(default=None, example="Başmüfettiş")
@@ -24,6 +26,8 @@ class ContactUpdate(BaseModel):
     title: Optional[str] = None
     unit: Optional[str] = None
     phone: Optional[str] = None
+    work_phone: Optional[str] = None
+    extension: Optional[str] = None
     email: Optional[str] = None
     category: Optional[str] = None
     sort_order: Optional[int] = None

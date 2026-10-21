@@ -2,7 +2,7 @@ import { Suspense, lazy, useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
-import { Save, Download, ArrowLeft, Loader2, FileText, CheckCircle, History, X, Sparkles, Pin, ChevronUp, ChevronDown, LayoutGrid, MessageSquare, BookOpen, Users, ClipboardCheck, AlertCircle } from "lucide-react";
+import { Save, Download, ArrowLeft, Loader2, FileText, CheckCircle, History, X, Sparkles, Pin, ChevronUp, ChevronDown, LayoutGrid, MessageSquare, BookOpen, Users, ClipboardCheck, AlertCircle, Layers } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { fetchAuditById, updateAudit, exportAuditToWord, type Audit, type AuditVersion } from "../lib/api/audit";
@@ -12,6 +12,9 @@ import VoiceToTextInput from "../components/report/VoiceToTextInput";
 import ReportEditorVersionLabelModal from "../components/report/ReportEditorVersionLabelModal";
 import ReportEditorProofreadPanel from "../components/report/ReportEditorProofreadPanel";
 import ReportEditorLegislationPanel from "../components/report/ReportEditorLegislationPanel";
+import ReportEditorSectionPanel from "../components/report/ReportEditorSectionPanel";
+import ReportDynamicBuilder from "../components/report/ReportDynamicBuilder";
+import { getFullReportHtmlWithCover, compileStructuredReportToHtml } from "../lib/reportSectionManager";
 
 import { generateReportSuggestion } from "../lib/api/ai";
 import { getSyncConflicts, clearSyncConflictsForAudit } from "../lib/api/syncQueue";
@@ -100,6 +103,7 @@ export default function ReportEditor() {
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
     const [isProofreadOpen, setIsProofreadOpen] = useState(false);
     const [isLegislationOpen, setIsLegislationOpen] = useState(false);
+    const [isSectionPanelOpen, setIsSectionPanelOpen] = useState(false);
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { data: cachedData, refreshAudits } = useGlobalData();
@@ -115,6 +119,7 @@ export default function ReportEditor() {
     const [saving, setSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const [autoSaveStatus, setAutoSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+    const [editorMode, setEditorMode] = useState<"builder" | "document">("builder");
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [versions, setVersions] = useState<AuditVersion[]>([]);
@@ -963,17 +968,74 @@ export default function ReportEditor() {
     const handleSelectTemplate = async (template: ReportTemplate) => {
         const confirmed = await confirm({
             title: "Şablon Yüklensin mi?",
-            message: `"${template.name}" şablonu yüklendiğinde editördeki tüm içeriğiniz temizlenecek ve şablon içeriği yazılacaktır. Devam etmek istiyor musunuz?`,
+            message: `"${template.name}" şablonu yüklendiğinde editördeki tüm içeriğiniz temizlenecek ve resmi şablon (varsa kapağıyla birlikte) yüklenecektir. Devam etmek istiyor musunuz?`,
             confirmText: "Evet, Şablonu Yükle",
             cancelText: "İptal"
         });
         if (confirmed) {
+            const finalHtml = getFullReportHtmlWithCover(template.id, template.html, REPORT_TEMPLATES);
+
             if (editorRef.current) {
-                editorRef.current.setContent(template.html);
-                setContent(template.html);
+                editorRef.current.setContent(finalHtml);
+                setContent(finalHtml);
             }
             setIsTemplateModalOpen(false);
-            toast.success(`"${template.name}" şablonu başarıyla yüklendi!`);
+            toast.success(`"${template.name}" resmi kapağıyla birlikte başarıyla yüklendi!`);
+        }
+    };
+
+    const handleScrollToSection = (sectionId: string) => {
+        if (editorRef.current) {
+            const doc = editorRef.current.getDoc();
+            if (doc) {
+                const el = doc.querySelector(`[data-section="${sectionId}"], #bolum-${sectionId}`);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    (el as HTMLElement).style.transition = 'background-color 0.4s';
+                    const origBg = (el as HTMLElement).style.backgroundColor;
+                    (el as HTMLElement).style.backgroundColor = '#dbeafe';
+                    setTimeout(() => {
+                        (el as HTMLElement).style.backgroundColor = origBg;
+                    }, 1200);
+                } else {
+                    toast.error("Bu bölüm metin içinde henüz bulunamadı.");
+                }
+            }
+        }
+    };
+
+    const handleUpdateContentFromSectionPanel = async (newHtml: string) => {
+        if (editorRef.current) {
+            editorRef.current.setContent(newHtml);
+        }
+        setContent(newHtml);
+        lastAutosaveSnapshotRef.current = newHtml;
+        if (id) {
+            try {
+                await updateAudit(id, { report_content: newHtml }, false, userIdentity);
+                setLastSaved(new Date());
+                setAutoSaveStatus("saved");
+            } catch {
+                setAutoSaveStatus("error");
+            }
+        }
+    };
+
+    const handleCompileFromBuilder = async (compiledHtml: string) => {
+        if (editorRef.current) {
+            editorRef.current.setContent(compiledHtml);
+        }
+        setContent(compiledHtml);
+        lastAutosaveSnapshotRef.current = compiledHtml;
+        setEditorMode("document");
+        if (id) {
+            try {
+                await updateAudit(id, { report_content: compiledHtml }, false, userIdentity);
+                setLastSaved(new Date());
+                setAutoSaveStatus("saved");
+            } catch {
+                setAutoSaveStatus("error");
+            }
         }
     };
 
@@ -1463,13 +1525,50 @@ export default function ReportEditor() {
                         </div>
                     </div>
 
-                    <div className="hidden lg:flex items-center gap-2 ml-0 md:ml-2">
-                        <div className="flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1 bg-slate-50/50">
-                            <button type="button" onClick={() => setZoom((z) => Math.max(70, z - 10))} className="text-[10px] font-black text-slate-400 hover:text-slate-800 px-1">-</button>
-                            <span className="text-[10px] font-black text-slate-600 min-w-[32px] text-center">{zoom}%</span>
-                            <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="text-[10px] font-black text-slate-400 hover:text-slate-800 px-1">+</button>
-                        </div>
+                    {/* Görünüm / Düzenleme Modu Seçici (Dinamik Yapılandırıcı vs TinyMCE) */}
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs ml-0 md:ml-3">
+                        <button
+                            type="button"
+                            onClick={() => setEditorMode("builder")}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                editorMode === "builder"
+                                    ? "bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-400 shadow-xs"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                            }`}
+                        >
+                            <Layers size={13} className={editorMode === "builder" ? "text-blue-600 dark:text-blue-400" : "text-slate-400"} />
+                            <span className="hidden sm:inline">Dinamik Yapılandırıcı</span>
+                            <span className="sm:hidden">Yapılandırıcı</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (editorRef.current && content) {
+                                    editorRef.current.setContent(content);
+                                }
+                                setEditorMode("document");
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                editorMode === "document"
+                                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                            }`}
+                        >
+                            <FileText size={13} className={editorMode === "document" ? "text-slate-900 dark:text-white" : "text-slate-400"} />
+                            <span className="hidden sm:inline">Resmi Belge (TinyMCE)</span>
+                            <span className="sm:hidden">Belge</span>
+                        </button>
                     </div>
+
+                    {editorMode === "document" && (
+                        <div className="hidden lg:flex items-center gap-2 ml-0 md:ml-1">
+                            <div className="flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1 bg-slate-50/50">
+                                <button type="button" onClick={() => setZoom((z) => Math.max(70, z - 10))} className="text-[10px] font-black text-slate-400 hover:text-slate-800 px-1">-</button>
+                                <span className="text-[10px] font-black text-slate-600 min-w-[32px] text-center">{zoom}%</span>
+                                <button type="button" onClick={() => setZoom((z) => Math.min(160, z + 10))} className="text-[10px] font-black text-slate-400 hover:text-slate-800 px-1">+</button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Mobil için İşlemleri Göster/Gizle Butonu */}
                     <div className="flex md:hidden w-full mt-1">
@@ -1501,6 +1600,7 @@ export default function ReportEditor() {
                         <Button variant="ghost" onClick={() => { openShareModal(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center flex-shrink-0">Paylaş</Button>
                         <Button variant="ghost" onClick={() => { openChat(`audit_${id}`, audit?.title || "Rapor Odası", "audit"); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center flex-shrink-0"><MessageSquare size={14} className="mr-1.5" /> Rapor Odası</Button>
                         <Button variant="ghost" onClick={() => { openTemplateModal(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center flex-shrink-0"><LayoutGrid size={14} className="mr-1.5" /> Şablon Seç</Button>
+                        <Button variant="ghost" onClick={() => { setIsSectionPanelOpen(true); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-blue-50 text-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/30 hover:shadow-sm transition-all justify-start md:justify-center flex-shrink-0"><Layers size={14} className="mr-1.5 text-blue-600 dark:text-blue-400" /> Bölümler & Maddeler</Button>
                         <Button variant="ghost" onClick={() => { openProofread(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center flex-shrink-0"><CheckCircle size={14} className="mr-1.5" /> Dil Kontrolü</Button>
                         <Button variant="ghost" onClick={() => { openLegislation(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg hover:bg-white hover:shadow-sm transition-all justify-start md:justify-center flex-shrink-0"><BookOpen size={14} className="mr-1.5" /> Mevzuat Öner</Button>
                         <Button variant="ghost" onClick={() => { openSnippetBank(); setShowMobileActions(false); }} className="h-8 px-3 text-[11px] font-bold rounded-lg justify-start md:justify-center flex-shrink-0">Taslak Metinler</Button>
@@ -1526,6 +1626,17 @@ export default function ReportEditor() {
                     
                     {/* Tüm panellerin açılması - Collapsible dışına alındı ki mobilde açıldıklarında görünürlükleri bozulmasın */}
                     {isAuditTrailOpen && <ReportEditorAuditTrailPanel isOpen={isAuditTrailOpen} onClose={() => setIsAuditTrailOpen(false)} auditId={id || ""} />}
+                    {isSectionPanelOpen && (
+                        <ReportEditorSectionPanel
+                            isOpen={isSectionPanelOpen}
+                            onClose={() => setIsSectionPanelOpen(false)}
+                            content={content}
+                            reportTitle={audit?.title || ""}
+                            onUpdateContent={handleUpdateContentFromSectionPanel}
+                            onScrollToSection={handleScrollToSection}
+                            onSwitchToBuilder={() => setEditorMode("builder")}
+                        />
+                    )}
                     {isSnippetBankOpen && (
                         <ReportEditorSnippetBankPanel 
                             isOpen={isSnippetBankOpen} 
@@ -1573,7 +1684,20 @@ export default function ReportEditor() {
             </div>
 
             <div className="flex-1 flex overflow-hidden">
-                <div className="flex-1 overflow-y-auto p-2 md:p-12 flex justify-center gap-6 bg-[#f8fafc] dark:bg-slate-950">
+                {editorMode === "builder" && (
+                    <ReportDynamicBuilder
+                        htmlContent={content}
+                        reportTitle={audit?.title || ""}
+                        onCompileAndSwitchToDoc={handleCompileFromBuilder}
+                        onStateChange={(state) => {
+                            const coverObj = REPORT_TEMPLATES.find(t => t.id === "1-_genel_teftiş_rapor_kapağı_taslağı_docx" || t.id.includes("kapağı"));
+                            const compiled = compileStructuredReportToHtml(state, coverObj?.html);
+                            setContent(compiled);
+                        }}
+                    />
+                )}
+
+                <div className={`flex-1 overflow-y-auto p-2 md:p-12 flex justify-center gap-6 bg-[#f8fafc] dark:bg-slate-950 ${editorMode === "document" ? "" : "hidden"}`}>
                     <div className="w-full max-w-[850px]">
                     {(auditRole === "view" || auditRole === "comment") && (
                         <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-800">

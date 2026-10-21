@@ -20,6 +20,9 @@ import { generateEvrakTalebiDocx } from "../lib/api/files";
 import { DenetimOzetTablolar } from "../components/audit/DenetimOzetTablolar";
 import { IlTesisleriDenetim, getSafeImageUrl, handleImageError } from "../components/audit/IlTesisleriDenetim";
 import { savePhotoToLocalDevice, exportPhotosToComputer } from "../utils/photoExportHelper";
+import ReportDynamicBuilder from "../components/report/ReportDynamicBuilder";
+import { compileStructuredReportToHtml } from "../lib/reportSectionManager";
+import { REPORT_TEMPLATES } from "../lib/reportTemplates";
 
 
 interface KnowledgeItem {
@@ -215,6 +218,7 @@ export default function DenetimIl() {
 
     // 4. Integrated Report Editor States
     const [reportEditing, setReportEditing] = useState(false);
+    const [reportTabMode, setReportTabMode] = useState<"builder" | "preview">("builder");
     const [reportContent, setReportContent] = useState("");
     const [reportSaving, setReportSaving] = useState(false);
     const [showReportSelectModal, setShowReportSelectModal] = useState(false);
@@ -2159,41 +2163,18 @@ export default function DenetimIl() {
             }
         });
 
-        const currentRaporTuru = categoryMap[activeTab];
-        let findingsHtml = `<h3><strong>BULUNAN TENKİTLER VE EKSİKLİKLER (${currentRaporTuru || "Denetim Formu"})</strong></h3>`;
-        if (findings.length > 0) {
-            findingsHtml += `<ul>`;
-            findings.forEach(f => {
-                findingsHtml += `<li><strong>Madde:</strong> ${f.text}<br/><strong>Müfettiş Notu:</strong> ${f.note || "<em>Belirtilmedi</em>"}</li>`;
-            });
-            findingsHtml += `</ul>`;
-        } else {
-            findingsHtml += `<p>Yapılan denetim neticesinde herhangi bir tenkit veya eksikliğe rastlanılmamıştır.</p>`;
-        }
-
         const facilities = Array.isArray(localAuditData.tesisler) ? localAuditData.tesisler : [];
-        if (facilities.length > 0) {
-            findingsHtml += `<br/><h3><strong>İL MÜDÜRLÜĞÜ SPOR TESİSLERİ VE SAHA TESPİTLERİ</strong></h3>`;
-            findingsHtml += `<table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; font-size: 13px; margin: 12px 0;">`;
-            findingsHtml += `<thead style="background-color: #f1f5f9;"><tr>
-                <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">No</th>
-                <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: left;">Tesis Adı ve Türü</th>
-                <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: left;">İlçe / Mevki</th>
-                <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">Durumu</th>
-                <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: left;">Tespit Edilen Eksiklik ve Notlar</th>
-            </tr></thead><tbody>`;
-            facilities.forEach((fac: any, idx: number) => {
-                const statusText = fac.durum === "faal" ? "Faal" : fac.durum === "bakimda" ? "Bakımda" : fac.durum === "kismen_faal" ? "Kısmen Faal" : "Atıl";
-                findingsHtml += `<tr>
-                    <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${idx + 1}</td>
-                    <td style="border: 1px solid #cbd5e1; padding: 6px;"><strong>${fac.ad}</strong><br/><span style="font-size: 11px; color: #64748b;">${fac.tur}</span></td>
-                    <td style="border: 1px solid #cbd5e1; padding: 6px;">${fac.ilce || "-"}</td>
-                    <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${statusText}</td>
-                    <td style="border: 1px solid #cbd5e1; padding: 6px;">${fac.bilgiNotu ? fac.bilgiNotu.replace(/\n/g, "<br/>") : "<em>Eksiklik veya arıza belirtilmemiştir.</em>"}</td>
-                </tr>`;
-            });
-            findingsHtml += `</tbody></table>`;
-        }
+
+        // 14 Başlıklı İl Müdürlüğü Rapor Taslağı ve Kapağı
+        const { REPORT_TEMPLATES } = await import("../lib/reportTemplates");
+        const { buildIlTeftisReportHtml, combineCoverWithReport } = await import("../lib/reportSectionManager");
+
+        const ilTemplate = REPORT_TEMPLATES.find(t => t.id === "2-_i̇l_müdürlüğü_genel_teftiş_raporu_taslağı_docx");
+        const coverTemplate = REPORT_TEMPLATES.find(t => t.id === "1-_genel_teftiş_rapor_kapağı_taslağı_docx");
+
+        const baseHtml = ilTemplate ? ilTemplate.html : `<p class="ql-align-justify"><strong>GİRİŞ</strong></p>`;
+        const structuredReport = buildIlTeftisReportHtml(baseHtml, findings, facilities);
+        const fullReportWithCover = combineCoverWithReport(coverTemplate?.html || "", structuredReport);
 
         let writeMode: "append" | "replace" = "replace";
         const strippedContent = (report.report_content || "").replace(/<[^>]*>/g, "").trim();
@@ -2206,8 +2187,8 @@ export default function DenetimIl() {
         if (report.report_content && !isPlaceholder) {
             const overwrite = await confirm({
                 title: "Bulgu Aktarımı",
-                message: "Seçtiğiniz raporda mevcut içerik bulunuyor. Üzerine yazmak (mevcut içeriği silmek) istiyor musunuz?",
-                confirmText: "Üzerine Yaz",
+                message: "Seçtiğiniz raporda mevcut içerik bulunuyor. Resmi 14 başlıklı şablon ve kapak ile üzerine yazmak istiyor musunuz?",
+                confirmText: "Resmi Şablon ile Üzerine Yaz",
                 cancelText: "Sonuna Ekle",
                 variant: "warning"
             });
@@ -2218,16 +2199,16 @@ export default function DenetimIl() {
             }
         }
 
-        let finalContent = findingsHtml;
+        let finalContent = fullReportWithCover;
         if (writeMode === "append") {
-            finalContent = (report.report_content || "") + "<br/>" + findingsHtml;
+            finalContent = (report.report_content || "") + "<br/>" + structuredReport;
         }
 
         try {
             await updateAudit(report.id, {
                 report_content: finalContent
             });
-            toast.success("Bulgular başarıyla rapora aktarıldı.");
+            toast.success("Bulgular 14 resmi başlığa başarıyla dağıtıldı ve kapak eklendi.");
             if (user?.uid) {
                 refreshAudits(user.uid, user.email || undefined);
             }
@@ -2996,7 +2977,7 @@ export default function DenetimIl() {
                                             </div>
 
                                             {/* Quick Switcher Pills */}
-                                            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto shrink-0 scroll-smooth touch-pan-x flex-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto shrink-0 scroll-smooth touch-pan-x flex-nowrap pr-2 sm:pr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                                                 {[
                                                     { id: "info", label: "Genel Bilgi" },
                                                     { id: "notes", label: "Notlar" },
@@ -3005,7 +2986,7 @@ export default function DenetimIl() {
                                                     { id: "checklist", label: "Kontrol Listesi" },
                                                     { id: "ozet_tablolar", label: "İstenecek Tablolar" },
                                                     { id: "editor", label: "Rapor" },
-                                                    { id: "evrak_talebi", label: "Evrak" }
+                                                    { id: "evrak_talebi", label: "Evrak Talebi" }
                                                 ].map(tab => (
                                                     <button
                                                         key={tab.id}
@@ -3052,82 +3033,145 @@ export default function DenetimIl() {
                                                     </div>
                                                 ) : (
                                                     <div className="flex-1 flex flex-col gap-4">
-                                                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/30 pb-2">
-                                                            <h3 className="text-xs font-black uppercase tracking-[0.15em] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                                                                <FileText size={14} className="text-blue-500" />
-                                                                <span>Denetim Raporu İçeriği</span>
-                                                            </h3>
+                                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 dark:border-slate-800/30 pb-3 gap-2">
+                                                            <div className="flex items-center gap-3">
+                                                                <h3 className="text-xs font-black uppercase tracking-[0.15em] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                                                    <FileText size={14} className="text-blue-500" />
+                                                                    <span>Denetim Raporu İçeriği</span>
+                                                                </h3>
+                                                                {/* Görünüm Modu Seçici */}
+                                                                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setReportTabMode("builder")}
+                                                                        className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                                                                            reportTabMode === "builder"
+                                                                                ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs"
+                                                                                : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                                                                        }`}
+                                                                    >
+                                                                        <span>🏗️ Dinamik Yapılandırıcı (14 Başlık)</span>
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setReportTabMode("preview")}
+                                                                        className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                                                                            reportTabMode === "preview"
+                                                                                ? "bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-xs"
+                                                                                : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                                                                        }`}
+                                                                    >
+                                                                        <span>📄 Belge Önizleme & Tenkit Bankası</span>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
                                                             <div className="flex items-center gap-1.5">
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
-                                                                    className="rounded-lg text-[10px] h-8"
+                                                                    className="rounded-lg text-[11px] h-8 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 font-bold"
                                                                     onClick={() => navigate(`/audit/${selectedReport.id}/report`)}
                                                                 >
-                                                                    <ExternalLink size={12} className="mr-1" /> Editörde Aç
+                                                                    <ExternalLink size={12} className="mr-1" /> Editörde Aç (TinyMCE)
                                                                 </Button>
-                                                                {reportEditing ? (
-                                                                    <div className="flex items-center gap-1">
+                                                                {reportTabMode === "preview" && (
+                                                                    reportEditing ? (
+                                                                        <div className="flex items-center gap-1">
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                className="rounded-lg text-[10px] h-8 text-slate-400"
+                                                                                onClick={() => {
+                                                                                    setReportContent(selectedReport.report_content || "");
+                                                                                    setReportEditing(false);
+                                                                                }}
+                                                                            >
+                                                                                İptal
+                                                                            </Button>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                className="rounded-lg text-[10px] h-8"
+                                                                                onClick={handleSaveReport}
+                                                                                disabled={reportSaving}
+                                                                            >
+                                                                                {reportSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} className="mr-1" />}
+                                                                                Kaydet
+                                                                            </Button>
+                                                                        </div>
+                                                                    ) : (
                                                                         <Button
                                                                             variant="outline"
                                                                             size="sm"
-                                                                            className="rounded-lg text-[10px] h-8 text-slate-400"
-                                                                            onClick={() => {
-                                                                                setReportContent(selectedReport.report_content || "");
-                                                                                setReportEditing(false);
-                                                                            }}
-                                                                        >
-                                                                            İptal
-                                                                        </Button>
-                                                                        <Button
-                                                                            size="sm"
                                                                             className="rounded-lg text-[10px] h-8"
-                                                                            onClick={handleSaveReport}
-                                                                            disabled={reportSaving}
+                                                                            onClick={() => setReportEditing(true)}
                                                                         >
-                                                                            {reportSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} className="mr-1" />}
-                                                                            Kaydet
+                                                                            Manuel Düzenle
                                                                         </Button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        className="rounded-lg text-[10px] h-8"
-                                                                        onClick={() => setReportEditing(true)}
-                                                                    >
-                                                                        Manuel Düzenle
-                                                                    </Button>
+                                                                    )
                                                                 )}
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 min-h-[300px]">
-                                                            {/* Left: Editor Area */}
-                                                            <div className="xl:col-span-7 flex flex-col gap-2">
-                                                                {reportEditing ? (
-                                                                    <textarea
-                                                                        value={reportContent}
-                                                                        onChange={e => setReportContent(e.target.value)}
-                                                                        className="flex-1 w-full p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-955/20 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed resize-none h-[350px] lg:h-full"
-                                                                        placeholder="Rapor içeriğini HTML formatında yazın..."
-                                                                    />
-                                                                ) : (
-                                                                    <div 
-                                                                        className="flex-1 p-4 rounded-xl border border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-955/5 text-xs text-slate-800 dark:text-slate-255 leading-relaxed overflow-y-auto select-text prose prose-sm dark:prose-invert max-w-none h-[350px] lg:h-full"
-                                                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(reportContent || "<p class='text-slate-400 italic'>Rapor içeriği boş.</p>") }}
-                                                                    />
-                                                                )}
-                                                                <p className="text-[10px] text-slate-400 font-bold">
-                                                                    * Rapor içeriği HTML formatındadır. TinyMCE zengin metin düzenleyiciyle düzenlemek için sağ üstteki "Editörde Aç" butonunu kullanın.
-                                                                </p>
+                                                        {reportTabMode === "builder" ? (
+                                                            <div className="flex-1 min-h-[600px] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs flex flex-col">
+                                                                <ReportDynamicBuilder
+                                                                    htmlContent={reportContent || selectedReport.report_content || ""}
+                                                                    reportTitle={selectedReport.title || selectedTask?.rapor_adi || "İl Müdürlüğü Genel Teftiş Raporu"}
+                                                                    templateId="2-_i̇l_müdürlüğü_genel_teftiş_raporu_taslağı_docx"
+                                                                    onCompileAndSwitchToDoc={async (compiledHtml) => {
+                                                                        setReportContent(compiledHtml);
+                                                                        try {
+                                                                            await updateAudit(selectedReport.id, { report_content: compiledHtml });
+                                                                            toast.success("Rapor derlendi ve kaydedildi.");
+                                                                            if (user?.uid) {
+                                                                                await refreshAudits(user.uid, user.email || undefined);
+                                                                            }
+                                                                            navigate(`/audit/${selectedReport.id}/report`);
+                                                                        } catch (e) {
+                                                                            toast.error("Rapor kaydedilemedi.");
+                                                                        }
+                                                                    }}
+                                                                    onStateChange={async (state) => {
+                                                                        const coverObj = REPORT_TEMPLATES.find(t => t.id === "1-_genel_teftiş_rapor_kapağı_taslağı_docx" || t.id.includes("kapağı"));
+                                                                        const compiled = compileStructuredReportToHtml(state, coverObj?.html);
+                                                                        setReportContent(compiled);
+                                                                        try {
+                                                                            await updateAudit(selectedReport.id, { report_content: compiled });
+                                                                        } catch (err) {
+                                                                            console.error("Auto-sync error:", err);
+                                                                        }
+                                                                    }}
+                                                                />
                                                             </div>
+                                                        ) : (
+                                                            <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 min-h-[300px]">
+                                                                {/* Left: Editor Area */}
+                                                                <div className="xl:col-span-7 flex flex-col gap-2">
+                                                                    {reportEditing ? (
+                                                                        <textarea
+                                                                            value={reportContent}
+                                                                            onChange={e => setReportContent(e.target.value)}
+                                                                            className="flex-1 w-full p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-955/20 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed resize-none h-[350px] lg:h-full"
+                                                                            placeholder="Rapor içeriğini HTML formatında yazın..."
+                                                                        />
+                                                                    ) : (
+                                                                        <div 
+                                                                            className="flex-1 p-4 rounded-xl border border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-955/5 text-xs text-slate-800 dark:text-slate-255 leading-relaxed overflow-y-auto select-text prose prose-sm dark:prose-invert max-w-none h-[350px] lg:h-full"
+                                                                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(reportContent || "<p class='text-slate-400 italic'>Rapor içeriği boş.</p>") }}
+                                                                        />
+                                                                    )}
+                                                                    <p className="text-[10px] text-slate-400 font-bold">
+                                                                        * Rapor içeriği HTML formatındadır. TinyMCE zengin metin düzenleyiciyle düzenlemek için sağ üstteki "Editörde Aç" butonunu kullanın.
+                                                                    </p>
+                                                                </div>
 
-                                                            {/* Right: AI Tenkit Bankası Panel */}
-                                                            <div className="xl:col-span-5 max-h-[500px]">
-                                                                {renderTenkitBank("editor")}
+                                                                {/* Right: AI Tenkit Bankası Panel */}
+                                                                <div className="xl:col-span-5 max-h-[500px]">
+                                                                    {renderTenkitBank("editor")}
+                                                                </div>
                                                             </div>
-                                                        </div>
+                                                        )}
                                                     </div>
                                                 )
                                             )}

@@ -8,6 +8,9 @@ class NoteService:
     @staticmethod
     async def get_notes(user_id: str, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
         notes_ref = db.collection('notes')
+        test_uid = "tolEIwlWrHfWCQduDuXcnqBvWdo2"
+        test_email = "test@mufyard.com"
+        is_test_user = (user_id == test_uid or (user_email and user_email.lower() == test_email))
         
         async def run_query(q):
             if q is None: return []
@@ -33,6 +36,10 @@ class NoteService:
             if doc.id not in unique_notes:
                 d = doc.to_dict()
                 d['id'] = doc.id
+                if not is_test_user:
+                    note_owner = d.get('owner_id', '')
+                    if note_owner in [test_uid, test_email]:
+                        continue
                 unique_notes[doc.id] = d
         
         notes = list(unique_notes.values())

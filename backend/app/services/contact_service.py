@@ -1,5 +1,6 @@
 from datetime import datetime
 import asyncio
+import re
 from typing import List, Optional, Dict, Any
 from app.lib.firebase_admin import db
 from app.schemas.contact import ContactCreate, ContactUpdate
@@ -30,8 +31,27 @@ class ContactService:
         return deleted_count
 
     @staticmethod
+    def _resolve_extension(c_data: Dict[str, Any]) -> str:
+        ext = str(c_data.get('extension') or '').strip()
+        if ext and ext != "None":
+            return ext
+        unit_str = str(c_data.get('unit') or '')
+        m = re.search(r'Dahili[:\s]+(\d+)', unit_str, re.IGNORECASE)
+        if m:
+            return m.group(1)
+        phone_str = str(c_data.get('phone') or '')
+        m_p = re.search(r'Dahili[:\s]+(\d+)', phone_str, re.IGNORECASE)
+        if m_p:
+            return m_p.group(1)
+        return ""
+
+    @staticmethod
     async def get_contacts(category: str, user_id: Optional[str] = None, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
         try:
+            test_uid = "tolEIwlWrHfWCQduDuXcnqBvWdo2"
+            test_email = "test@mufyard.com"
+            is_test_user = (user_id == test_uid or (user_email and user_email.lower() == test_email))
+
             contacts_ref = db.collection('contacts')
             
             if category == 'corporate':
@@ -41,6 +61,13 @@ class ContactService:
                 for doc in docs:
                     contact_data = doc.to_dict()
                     contact_data['id'] = doc.id
+                    if not is_test_user:
+                        c_owner = contact_data.get('owner_id', '')
+                        c_email = (contact_data.get('email') or '').lower()
+                        if c_owner in [test_uid, test_email] or c_email == test_email:
+                            continue
+                    contact_data['extension'] = ContactService._resolve_extension(contact_data)
+                    contact_data['work_phone'] = str(contact_data.get('work_phone') or '').strip()
                     contacts.append(contact_data)
                 contacts.sort(key=lambda x: (x.get('sort_order') is None, x.get('sort_order', 10**9), x.get('name', '').lower()))
                 return contacts
@@ -70,6 +97,14 @@ class ContactService:
                     if doc.id not in unique_contacts:
                         d = doc.to_dict()
                         d['id'] = doc.id
+                        if not is_test_user:
+                            c_owner = d.get('owner_id', '')
+                            c_email = (d.get('email') or '').lower()
+                            c_assigned = d.get('accepted_collaborators', []) or []
+                            if c_owner in [test_uid, test_email] or c_email == test_email or test_uid in c_assigned or test_email in c_assigned:
+                                continue
+                        d['extension'] = ContactService._resolve_extension(d)
+                        d['work_phone'] = str(d.get('work_phone') or '').strip()
                         unique_contacts[doc.id] = d
                 
                 contacts = list(unique_contacts.values())
@@ -116,6 +151,8 @@ class ContactService:
                                 "name": name_raw,
                                 "title": str(vals[2]).strip() if len(vals) > 2 and not pd.isna(vals[2]) else current_cat,
                                 "phone": str(vals[3]).strip() if len(vals) > 3 and not pd.isna(vals[3]) else "-",
+                                "work_phone": "",
+                                "extension": str(vals[4]).strip() if len(vals) > 4 and not pd.isna(vals[4]) else "",
                                 "unit": current_cat,
                                 "is_shared": True,
                                 "owner_id": "system_admin"
@@ -566,6 +603,8 @@ class ContactService:
 
                 contact_entry = {
                     "name": name, "title": title, "phone": phone, "email": email,
+                    "work_phone": "",
+                    "extension": extension,
                     "unit": unit_info, "tags": [current_category_title] if current_category_title else [],
                     "category": current_category_title, "sort_order": int(sequence) if sequence.isdigit() else None,
                     "is_shared": True, "owner_id": "system_admin", "updated_at": now,

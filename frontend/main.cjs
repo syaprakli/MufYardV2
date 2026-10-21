@@ -88,10 +88,12 @@ function isPortReachable(port, host = '127.0.0.1', timeoutMs = 800) {
 function killPortProcess(port) {
     return new Promise((resolve) => {
         const { exec } = require('child_process');
-        // Find and kill any process using the port
-        exec(`for /f "tokens=5" %a in ('netstat -ano ^| findstr :${port}.*LISTENING') do taskkill /F /PID %a`, 
+        // Find and kill any process tree using the port
+        exec(`for /f "tokens=5" %a in ('netstat -ano ^| findstr :${port}.*LISTENING') do taskkill /F /T /PID %a`, 
             { shell: 'cmd.exe' },
-            () => resolve() // Ignore errors - port might not be in use
+            () => {
+                setTimeout(resolve, 800);
+            }
         );
     });
 }
@@ -104,48 +106,65 @@ async function startBackend() {
         const logDir = getLogDir();
         const crashLog = path.join(logDir, 'backend_crash.log');
         const logStream = fs.createWriteStream(crashLog, { flags: 'a' });
-        logStream.write(`\n\n=== Backend başlatıldı: ${new Date().toISOString()} ===\n`);
+        logStream.write(`\n\n=== Backend kontrolü: ${new Date().toISOString()} ===\n`);
         logStream.write(`Exe path: ${backendExe}\n`);
         logStream.write(`CWD: ${path.dirname(backendExe)}\n\n`);
 
-        // Kill any process already on port 8000, then start our backend
-        killPortProcess(8000).then(() => {
-            backendProcess = spawn(backendExe, [], {
-                cwd: path.dirname(backendExe),
-                stdio: ['ignore', 'pipe', 'pipe'],
-                windowsHide: true,
-            });
+        // Port 8000 zaten aktifse ve servis çalışıyorsa tekrar başlatmaya çalışma (çakışmayı önle)
+        const alreadyRunning = await isPortReachable(8000);
+        if (alreadyRunning) {
+            logStream.write('[INFO] Port 8000 zaten aktif ve yanıt veriyor. Mevcut servis kullanılacak.\n');
+            return;
+        }
 
-            if (backendProcess.stdout) backendProcess.stdout.on('data', d => logStream.write('[OUT] ' + d));
-            if (backendProcess.stderr) backendProcess.stderr.on('data', d => logStream.write('[ERR] ' + d));
+        // Port aktif değilse, kalıntı süreçleri temizleyip başlat
+        await killPortProcess(8000);
 
-            backendProcess.on('error', (err) => logStream.write('[SPAWN_ERR] ' + err.message + '\n'));
-
-            backendProcess.on('exit', (code, signal) => {
-                logStream.write(`[EXIT] Kod: ${code}, Sinyal: ${signal}\n`);
-                if (code !== 0 && code !== null) {
-                    if (NativeNotification.isSupported()) {
-                        new NativeNotification({
-                            title: 'MufYARD - Servis Hatası',
-                            body: `Arka plan servisi beklenmedik şekilde kapandı (kod: ${code}). Lütfen uygulamayı yeniden başlatın.`,
-                        }).show();
-                    }
-                }
-            });
-
-            // Wait for port 8000 to be ready, notify if it never comes up
-            waitForPort(8000, 25, 2000)
-                .then(() => logStream.write('[INFO] Backend port 8000 hazır.\n'))
-                .catch(err => {
-                    logStream.write('[FATAL] ' + err.message + '\n');
-                    if (NativeNotification.isSupported()) {
-                        new NativeNotification({
-                            title: 'MufYARD - Bağlantı Hatası',
-                            body: `Arka plan servisi başlatılamadı. Log: ${crashLog}`,
-                        }).show();
-                    }
-                });
+        backendProcess = spawn(backendExe, [], {
+            cwd: path.dirname(backendExe),
+            stdio: ['ignore', 'pipe', 'pipe'],
+            windowsHide: true,
         });
+
+        if (backendProcess.stdout) backendProcess.stdout.on('data', d => logStream.write('[OUT] ' + d));
+        if (backendProcess.stderr) backendProcess.stderr.on('data', d => logStream.write('[ERR] ' + d));
+
+        backendProcess.on('error', (err) => logStream.write('[SPAWN_ERR] ' + err.message + '\n'));
+
+        backendProcess.on('exit', async (code, signal) => {
+            logStream.write(`[EXIT] Kod: ${code}, Sinyal: ${signal}\n`);
+            if (code !== 0 && code !== null) {
+                // Eğer çıkış koduna rağmen port 8000 çalışıyorsa (örn. başka bir süreç zaten yürütüyorsa)
+                // kullanıcıya gereksiz hata bildirimi gönderme.
+                const isWorking = await isPortReachable(8000);
+                if (isWorking) {
+                    logStream.write('[INFO] Çıkış koduna rağmen port 8000 aktif çalışıyor. Bildirim atlandı.\n');
+                    return;
+                }
+
+                if (NativeNotification.isSupported()) {
+                    new NativeNotification({
+                        title: 'MufYARD - Servis Hatası',
+                        body: `Arka plan servisi beklenmedik şekilde kapandı (kod: ${code}). Lütfen uygulamayı yeniden başlatın.`,
+                    }).show();
+                }
+            }
+        });
+
+        // Wait for port 8000 to be ready, notify if it never comes up
+        try {
+            await waitForPort(8000, 25, 2000);
+            logStream.write('[INFO] Backend port 8000 hazır.\n');
+        } catch (err) {
+            logStream.write('[FATAL] ' + err.message + '\n');
+            const isWorking = await isPortReachable(8000);
+            if (!isWorking && NativeNotification.isSupported()) {
+                new NativeNotification({
+                    title: 'MufYARD - Bağlantı Hatası',
+                    body: `Arka plan servisi başlatılamadı. Log: ${crashLog}`,
+                }).show();
+            }
+        }
     } else {
         const backendPath = getBackendPath();
         const backendAlreadyRunning = await isPortReachable(8000);

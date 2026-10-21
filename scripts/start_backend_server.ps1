@@ -3,14 +3,17 @@ $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
 
-$env:PYTHONPATH = "backend"
+$backendDir = Join-Path $projectRoot "backend"
+$pythonwExe = Join-Path $projectRoot ".venv\Scripts\pythonw.exe"
 $pythonExe = Join-Path $projectRoot ".venv\Scripts\python.exe"
 
-if (-not (Test-Path $pythonExe)) {
-    throw "Python executable not found: $pythonExe"
+$targetExe = if (Test-Path $pythonwExe) { $pythonwExe } else { $pythonExe }
+
+if (-not (Test-Path $targetExe)) {
+    throw "Python executable not found: $targetExe"
 }
 
-$existing = Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
+$existing = Get-CimInstance Win32_Process -Filter "Name LIKE 'python%'" |
     Where-Object { $_.CommandLine -like "*uvicorn app.main:app*--port 8000*" }
 
 if ($existing) {
@@ -18,7 +21,7 @@ if ($existing) {
     exit 0
 }
 
-Start-Process -FilePath $pythonExe -ArgumentList @(
+Start-Process -FilePath $targetExe -ArgumentList @(
     "-m",
     "uvicorn",
     "app.main:app",
@@ -26,6 +29,6 @@ Start-Process -FilePath $pythonExe -ArgumentList @(
     "0.0.0.0",
     "--port",
     "8000"
-) -WorkingDirectory $projectRoot -WindowStyle Hidden
+) -WorkingDirectory $backendDir
 
 Write-Output "Backend process started."

@@ -307,7 +307,8 @@ export default function Audit() {
                     const pool = reportTemplates.length > 0 ? reportTemplates : (await import("../lib/reportTemplates")).REPORT_TEMPLATES;
                     const found = pool.find(t => t.id === newAudit.template);
                     if (found) {
-                        selectedTemplateHtml = found.html;
+                        const { getFullReportHtmlWithCover } = await import("../lib/reportSectionManager");
+                        selectedTemplateHtml = getFullReportHtmlWithCover(found.id, found.html, pool);
                     }
                 }
             }

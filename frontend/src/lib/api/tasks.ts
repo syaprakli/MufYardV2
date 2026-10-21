@@ -66,6 +66,29 @@ export interface TaskCreate {
 // Smart Cache
 let taskCache: { [key: string]: { data: Task[], timestamp: number } } = {};
 const CACHE_DURATION = 60 * 1000;
+const TEST_UID = "tolEIwlWrHfWCQduDuXcnqBvWdo2";
+const TEST_EMAIL = "test@mufyard.com";
+
+function filterTestTasks(tasks: Task[], userId?: string, userEmail?: string): Task[] {
+    const isTest = userId === TEST_UID || (userEmail || "").toLowerCase().trim() === TEST_EMAIL;
+    if (isTest || !Array.isArray(tasks)) return tasks;
+    return tasks.filter(t => {
+        const owner = (t.owner_id || "").toLowerCase();
+        const assigned = (t.assigned_to || []).map(a => String(a).toLowerCase());
+        const shared = (t.shared_with || []).map(s => String(s).toLowerCase());
+        const accepted = (t.accepted_collaborators || []).map(s => String(s).toLowerCase());
+        const testIds = [TEST_UID.toLowerCase(), TEST_EMAIL];
+        if (testIds.includes(owner)) return false;
+        if (assigned.some(a => testIds.includes(a))) return false;
+        if (shared.some(s => testIds.includes(s))) return false;
+        if (accepted.some(s => testIds.includes(s))) return false;
+        return true;
+    });
+}
+
+export function clearTaskCache() {
+    taskCache = {};
+}
 
 export async function fetchTasks(userId?: string, userEmail?: string, forceRefresh: boolean = false): Promise<Task[]> {
     const cacheKey = `${userId || ""}|${userEmail || ""}`;
@@ -74,7 +97,7 @@ export async function fetchTasks(userId?: string, userEmail?: string, forceRefre
     // 1. Memory Cache Check
     const cached = taskCache[cacheKey];
     if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        return cached.data;
+        return filterTestTasks(cached.data, userId, userEmail);
     }
 
     try {
@@ -82,7 +105,8 @@ export async function fetchTasks(userId?: string, userEmail?: string, forceRefre
         const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/`, { headers });
         if (!response.ok) throw new Error("Görevler yüklenemedi.");
         
-        const data = await response.json();
+        const rawData = await response.json();
+        const data = filterTestTasks(rawData, userId, userEmail);
         
         // Update both memory and persistent cache
         taskCache[cacheKey] = { data, timestamp: Date.now() };
@@ -101,7 +125,7 @@ export async function fetchTasks(userId?: string, userEmail?: string, forceRefre
             try {
                 const parsed = JSON.parse(localData);
                 console.log("Loaded tasks from local storage fallback.");
-                return parsed.data;
+                return filterTestTasks(parsed.data, userId, userEmail);
             } catch (e) {
                 console.error("Error parsing local tasks cache:", e);
             }

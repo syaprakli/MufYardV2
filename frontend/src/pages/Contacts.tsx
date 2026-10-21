@@ -1,4 +1,4 @@
-import { Search, MapPin, Phone, Mail, User, Building2, Plus, Share2, Trash2, Loader2, Tag, Shield, ChevronRight, Edit2, Star } from "lucide-react";
+import { Search, MapPin, Phone, Mail, User, Building2, Plus, Share2, Trash2, Loader2, Tag, Shield, ChevronRight, Edit2, Star, PhoneCall } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { Button } from "../components/ui/Button";
@@ -23,6 +23,13 @@ export default function Contacts() {
 
     const [activeTab, setActiveTab] = useState<"corporate" | "personal">("personal");
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const isCurrentTestUser = Boolean(
+        user?.email?.toLowerCase().includes("test") ||
+        profile?.email?.toLowerCase().includes("test") ||
+        user?.uid === "tolEIwlWrHfWCQduDuXcnqBvWdo2" ||
+        localStorage.getItem("remembered_email")?.toLowerCase().includes("test")
+    );
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedRole, setSelectedRole] = useState("Tümü");
     const [favorites, setFavorites] = useState<string[]>([]);
@@ -53,6 +60,8 @@ export default function Contacts() {
         title: "",
         unit: "",
         phone: "",
+        work_phone: "",
+        extension: "",
         email: "",
         tagsString: "",
         is_shared: false
@@ -71,9 +80,17 @@ export default function Contacts() {
         const userEmail = user.email?.toLowerCase().trim();
         const userUid = user.uid;
         const userKeys = [userUid, userEmail].filter(Boolean) as string[];
+        const testUid = "tolEIwlWrHfWCQduDuXcnqBvWdo2".toLowerCase();
+        const testEmail = "test@mufyard.com";
+        const isTestContact = (c: any) => {
+            if (isCurrentTestUser) return false;
+            const owner = (c.owner_id || "").toString().toLowerCase().trim();
+            const cEmail = (c.email || "").toString().toLowerCase().trim();
+            return owner === testUid || cEmail === testEmail;
+        };
 
         if (activeTab === "personal") {
-            const data = (cachedData.contactsPersonal || []);
+            const data = (cachedData.contactsPersonal || []).filter(c => !isTestContact(c));
             // Kendi eklediklerim + kabul ettiklerim
             const accepted = data.filter(c => {
                 const cEmail = c.email?.toLowerCase().trim();
@@ -100,7 +117,7 @@ export default function Contacts() {
             const corp = (cachedData.contactsCorporate || []).filter(c => {
                 const cEmail = c.email?.toLowerCase().trim();
                 const isMe = cEmail === userEmail;
-                return !isMe;
+                return !isMe && !isTestContact(c);
             });
             return { contacts: corp, invitations: [] };
         }
@@ -171,13 +188,15 @@ export default function Contacts() {
                 title: newContact.title,
                 unit: newContact.unit,
                 phone: newContact.phone,
+                work_phone: newContact.work_phone.trim(),
+                extension: newContact.extension.trim(),
                 email: newContact.email,
                 tags: tags,
                 is_shared: newContact.is_shared,
                 owner_id: user.uid
             });
             setIsModalOpen(false);
-            setNewContact({ name: "", title: "", unit: "", phone: "", email: "", tagsString: "", is_shared: false });
+            setNewContact({ name: "", title: "", unit: "", phone: "", work_phone: "", extension: "", email: "", tagsString: "", is_shared: false });
             toast.success("Kişi başarıyla oluşturuldu.");
             loadContacts();
         } catch (error) {
@@ -199,6 +218,8 @@ export default function Contacts() {
                 title: newContact.title,
                 unit: newContact.unit,
                 phone: newContact.phone,
+                work_phone: newContact.work_phone.trim(),
+                extension: newContact.extension.trim(),
                 email: newContact.email,
                 tags: tags,
                 is_shared: newContact.is_shared,
@@ -206,7 +227,7 @@ export default function Contacts() {
             });
             setIsModalOpen(false);
             setEditingContact(null);
-            setNewContact({ name: "", title: "", unit: "", phone: "", email: "", tagsString: "", is_shared: false });
+            setNewContact({ name: "", title: "", unit: "", phone: "", work_phone: "", extension: "", email: "", tagsString: "", is_shared: false });
             toast.success("Kişi başarıyla güncellendi.");
             loadContacts();
         } catch (error: any) {
@@ -218,11 +239,17 @@ export default function Contacts() {
 
     const openEditModal = (contact: Contact) => {
         setEditingContact(contact);
+        const resolvedExt = (contact.extension || "").trim() || (() => {
+            const m = (contact.unit || "").match(/Dahili[:\s]+(\d+)/i);
+            return m ? m[1] : "";
+        })();
         setNewContact({
             name: contact.name,
             title: contact.title,
             unit: contact.unit,
             phone: contact.phone,
+            work_phone: contact.work_phone || "",
+            extension: resolvedExt,
             email: contact.email,
             tagsString: contact.tags?.join(', ') || "",
             is_shared: contact.is_shared
@@ -279,10 +306,16 @@ export default function Contacts() {
             const normName = normalize(c.name);
             const normUnit = normalize(c.unit || "");
             const normTitle = normalize(c.title || "");
+            const normWorkPhone = normalize(c.work_phone || "");
+            const normExtension = normalize(c.extension || "");
             
             const matchesSearch = normName.includes(normSearch) || 
                 normUnit.includes(normSearch) || 
                 normTitle.includes(normSearch) || 
+                normWorkPhone.includes(normSearch) ||
+                normExtension.includes(normSearch) ||
+                (c.phone && c.phone.includes(searchQuery.trim())) ||
+                (c.work_phone && c.work_phone.includes(searchQuery.trim())) ||
                 c.tags?.some((t: string) => normalize(t).includes(normSearch));
             
             const normCategory = normalize(c.category || c.tags?.[0] || "");
@@ -377,7 +410,7 @@ export default function Contacts() {
 
                     <Button onClick={() => {
                         setEditingContact(null);
-                        setNewContact({ name: "", title: "", unit: "", phone: "", email: "", tagsString: "", is_shared: false });
+                        setNewContact({ name: "", title: "", unit: "", phone: "", work_phone: "", extension: "", email: "", tagsString: "", is_shared: false });
                         setIsModalOpen(true);
                     }} className="h-11 rounded-xl shadow-lg shadow-primary/20">
                         <Plus size={20} className="mr-2" /> Yeni Kişi
@@ -500,6 +533,8 @@ export default function Contacts() {
                                                 isFavorite={favorites.includes(contact.id)}
                                                 onToggleFavorite={() => toggleFavorite(contact.id)}
                                                 isOwner={contact.owner_id === user?.uid || contact.is_shared}
+                                                isCorporate={true}
+                                                isTestUser={isCurrentTestUser}
                                                 onEdit={() => openEditModal(contact)}
                                                 onShare={() => setShareContactItem(contact)}
                                                 onShareCorporate={() => handleShare(contact.id)}
@@ -525,6 +560,8 @@ export default function Contacts() {
                                 isFavorite={favorites.includes(contact.id)}
                                 onToggleFavorite={() => toggleFavorite(contact.id)}
                                 isOwner={contact.owner_id === user?.uid || contact.is_shared}
+                                isCorporate={false}
+                                isTestUser={isCurrentTestUser}
                                 onEdit={() => openEditModal(contact)}
                                 onShare={() => setShareContactItem(contact)}
                                 onShareCorporate={() => handleShare(contact.id)}
@@ -594,27 +631,45 @@ export default function Contacts() {
                             />
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-secondary uppercase tracking-widest">Cep Telefonu</label>
+                        <input 
+                            required
+                            className="w-full px-4 py-3 rounded-xl border border-border focus:ring-2 focus:ring-primary/20 outline-none font-outfit"
+                            placeholder="Örn: 05xx xxx xx xx"
+                            value={newContact.phone}
+                            onChange={(e) => setNewContact({...newContact, phone: e.target.value})}
+                        />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-secondary uppercase tracking-widest">Telefon</label>
+                            <label className="text-xs font-bold text-secondary uppercase tracking-widest">İş No (İş Telefonu)</label>
                             <input 
-                                required
                                 className="w-full px-4 py-3 rounded-xl border border-border focus:ring-2 focus:ring-primary/20 outline-none font-outfit"
-                                placeholder="05xx xxx xx xx"
-                                value={newContact.phone}
-                                onChange={(e) => setNewContact({...newContact, phone: e.target.value})}
+                                placeholder="Örn: 0312 596 60 00"
+                                value={newContact.work_phone}
+                                onChange={(e) => setNewContact({...newContact, work_phone: e.target.value})}
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-secondary uppercase tracking-widest">E-Posta</label>
+                            <label className="text-xs font-bold text-secondary uppercase tracking-widest">Dahili No</label>
                             <input 
-                                type="email"
                                 className="w-full px-4 py-3 rounded-xl border border-border focus:ring-2 focus:ring-primary/20 outline-none font-outfit"
-                                placeholder="eposta@gsb.gov.tr"
-                                value={newContact.email}
-                                onChange={(e) => setNewContact({...newContact, email: e.target.value})}
+                                placeholder="Örn: 5103"
+                                value={newContact.extension}
+                                onChange={(e) => setNewContact({...newContact, extension: e.target.value})}
                             />
                         </div>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-secondary uppercase tracking-widest">E-Posta</label>
+                        <input 
+                            type="email"
+                            className="w-full px-4 py-3 rounded-xl border border-border focus:ring-2 focus:ring-primary/20 outline-none font-outfit"
+                            placeholder="eposta@gsb.gov.tr"
+                            value={newContact.email}
+                            onChange={(e) => setNewContact({...newContact, email: e.target.value})}
+                        />
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-secondary uppercase tracking-widest">Etiketler (Virgül ile ayırın)</label>
@@ -661,7 +716,22 @@ export default function Contacts() {
     );
 }
 
-function ContactCard({ contact, isOwner, isFavorite, onToggleFavorite, onEdit, onShare, onShareCorporate, onDelete, onChat }: { contact: Contact, isOwner: boolean, isFavorite?: boolean, onToggleFavorite?: () => void, onEdit: () => void, onShare: () => void, onShareCorporate: () => void, onDelete: () => void, onChat: () => void }) {
+function ContactCard({ contact, isOwner, isFavorite, onToggleFavorite, onEdit, onShare, onShareCorporate, onDelete, onChat, isCorporate = false, isTestUser = false }: { contact: Contact, isOwner: boolean, isFavorite?: boolean, onToggleFavorite?: () => void, onEdit: () => void, onShare: () => void, onShareCorporate: () => void, onDelete: () => void, onChat: () => void, isCorporate?: boolean, isTestUser?: boolean }) {
+
+    const isMasked = isCorporate && isTestUser;
+    const effectiveExtension = (contact.extension || "").trim() || (() => {
+        const m = (contact.unit || "").match(/Dahili[:\s]+(\d+)/i);
+        return m ? m[1] : "";
+    })();
+
+    const handleCopyExtension = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (effectiveExtension) {
+            navigator.clipboard.writeText(effectiveExtension);
+            toast.success(`Dahili numara kopyalandı: ${effectiveExtension}`);
+        }
+    };
 
     return (
         <Card className="p-5 relative group overflow-hidden border border-border hover:border-primary/50 transition-all shadow-sm hover:shadow-md h-full flex flex-col">
@@ -721,12 +791,54 @@ function ContactCard({ contact, isOwner, isFavorite, onToggleFavorite, onEdit, o
                 )}
 
                 <div className="space-y-3 pt-5 border-t border-border/50">
-                    <a href={`tel:${contact.phone}`} className="flex items-center gap-3 text-xs text-primary font-medium hover:text-indigo-600 transition-colors w-full" title={contact.phone}>
-                        <Phone size={16} className="text-secondary shrink-0" /> <span className="truncate">{contact.phone}</span>
-                    </a>
-                    <a href={`mailto:${contact.email}`} className="flex items-center gap-3 text-xs text-primary font-medium hover:text-indigo-600 transition-colors w-full" title={contact.email}>
-                        <Mail size={16} className="text-secondary shrink-0" /> <span className="truncate">{contact.email}</span>
-                    </a>
+                    {isMasked ? (
+                        <div className="flex items-center gap-3 text-xs text-slate-400 select-none w-full cursor-not-allowed opacity-80" title="Test hesabı için cep telefonu gizlenmiştir">
+                            <Phone size={16} className="text-slate-300 dark:text-slate-600 shrink-0" /> 
+                            <span className="truncate italic text-slate-400">Gizlendi (Test Hesabı)</span>
+                        </div>
+                    ) : (
+                        contact.phone && contact.phone !== "-" && (
+                            <a href={`tel:${contact.phone}`} className="flex items-center gap-3 text-xs text-primary font-medium hover:text-indigo-600 transition-colors w-full" title={`Cep: ${contact.phone}`}>
+                                <Phone size={16} className="text-secondary shrink-0" /> <span className="truncate">{contact.phone}</span>
+                            </a>
+                        )
+                    )}
+
+                    {(contact.work_phone || effectiveExtension) && (
+                        <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+                            {contact.work_phone ? (
+                                <a 
+                                    href={`tel:${contact.work_phone}`}
+                                    className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200 font-medium hover:text-indigo-600 transition-colors py-1 truncate"
+                                    title={`İş Telefonu: ${contact.work_phone}`}
+                                >
+                                    <Building2 size={15} className="text-slate-400 shrink-0" />
+                                    <span className="truncate">İş: {contact.work_phone}</span>
+                                </a>
+                            ) : null}
+
+                            {effectiveExtension && (
+                                <button
+                                    type="button"
+                                    onClick={handleCopyExtension}
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold border border-indigo-100 transition-all group/ext cursor-pointer ${!contact.work_phone ? 'w-full justify-between' : 'ml-auto'}`}
+                                    title="Dahili numarayı kopyalamak için tıklayın"
+                                >
+                                    <div className="flex items-center gap-1.5">
+                                        <PhoneCall size={13} className="text-indigo-500 shrink-0" />
+                                        <span>Dahili: <strong className="text-indigo-950 font-bold">{effectiveExtension}</strong></span>
+                                    </div>
+                                    <span className="text-[9px] uppercase font-bold tracking-wider text-indigo-400 group-hover/ext:text-indigo-600 ml-1">Kopyala</span>
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {contact.email && (
+                        <a href={`mailto:${contact.email}`} className="flex items-center gap-3 text-xs text-primary font-medium hover:text-indigo-600 transition-colors w-full" title={contact.email}>
+                            <Mail size={16} className="text-secondary shrink-0" /> <span className="truncate">{contact.email}</span>
+                        </a>
+                    )}
                 </div>
                 
                 <Button 

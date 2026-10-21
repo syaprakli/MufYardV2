@@ -43,20 +43,58 @@ interface GlobalDataContextType {
 
 const GlobalDataContext = createContext<GlobalDataContextType | undefined>(undefined);
 
+const TEST_UID = "tolEIwlWrHfWCQduDuXcnqBvWdo2";
+const TEST_EMAIL = "test@mufyard.com";
+
+function isTestAccount(uid?: string, email?: string): boolean {
+    if (!uid && !email) return false;
+    const lowerEmail = (email || "").toLowerCase().trim();
+    return uid === TEST_UID || lowerEmail === TEST_EMAIL;
+}
+
+function sanitizeForUser<T extends Record<string, any>>(list: T[], isTest: boolean): T[] {
+    if (!Array.isArray(list)) return [];
+    if (isTest) return list;
+    return list.filter(item => {
+        const owner = (item.owner_id || "").toString().toLowerCase().trim();
+        const itemEmail = (item.email || "").toString().toLowerCase().trim();
+        const assigned = Array.isArray(item.assigned_to) 
+            ? item.assigned_to.map((a: any) => String(a).toLowerCase().trim()) 
+            : [];
+        const shared = Array.isArray(item.shared_with) 
+            ? item.shared_with.map((s: any) => String(s).toLowerCase().trim()) 
+            : [];
+        const accepted = Array.isArray(item.accepted_collaborators) 
+            ? item.accepted_collaborators.map((s: any) => String(s).toLowerCase().trim()) 
+            : [];
+
+        const testIds = [TEST_UID.toLowerCase(), TEST_EMAIL];
+        if (testIds.includes(owner)) return false;
+        if (itemEmail === TEST_EMAIL) return false;
+        if (assigned.some(a => testIds.includes(a))) return false;
+        if (shared.some(s => testIds.includes(s))) return false;
+        if (accepted.some(s => testIds.includes(s))) return false;
+        return true;
+    });
+}
+
 // --- Stale-while-revalidate: load persisted cache from localStorage immediately ---
 function loadPersistedCache(uid: string): Partial<GlobalData> {
+    const isTest = isTestAccount(uid);
     try {
         const tasks = (() => {
             const raw = localStorage.getItem(`mufyard_tasks_cache_${uid}`);
             if (!raw) return [];
             const parsed = JSON.parse(raw);
-            return Array.isArray(parsed.data) ? parsed.data : [];
+            const list = Array.isArray(parsed.data) ? parsed.data : [];
+            return sanitizeForUser(list, isTest);
         })();
         const audits = (() => {
             const raw = localStorage.getItem(`mufyard_audits_cache_${uid}`);
             if (!raw) return [];
             const parsed = JSON.parse(raw);
-            return Array.isArray(parsed.data) ? parsed.data : [];
+            const list = Array.isArray(parsed.data) ? parsed.data : [];
+            return sanitizeForUser(list, isTest);
         })();
         const profile = (() => {
             const raw = localStorage.getItem(`mufyard_profile_cache_${uid}`);
@@ -110,14 +148,12 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (cacheInjectedRef.current !== uid) {
             cacheInjectedRef.current = uid;
             const persisted = loadPersistedCache(uid);
-            if (persisted.tasks?.length || persisted.audits?.length || persisted.profile) {
-                setData(prev => ({
-                    ...prev,
-                    tasks: persisted.tasks ?? prev.tasks,
-                    audits: persisted.audits ?? prev.audits,
-                    profile: persisted.profile ?? prev.profile,
-                }));
-            }
+            setData(prev => ({
+                ...prev,
+                tasks: persisted.tasks || [],
+                audits: persisted.audits || [],
+                profile: persisted.profile || null,
+            }));
         }
         
         if (!force && 
@@ -141,6 +177,7 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
             const now = Date.now();
             const profileData = profileRes.status === 'fulfilled' ? profileRes.value : null;
+            const isTest = isTestAccount(uid, email || profileData?.email);
             
             // Current user identity keys for filtering
             const myUid = uid;
@@ -160,15 +197,20 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             // Trial akisi kapatildi: tum kullanicilar icin deneme kisitlari pasif.
             const daysLeft = 9999;
             const finalExpired = false;
+
+            const rawTasks = tasksRes.status === 'fulfilled' ? tasksRes.value : [];
+            const rawAudits = auditsRes.status === 'fulfilled' ? auditsRes.value : [];
+            const rawCorp = contactsCorpRes.status === 'fulfilled' ? contactsCorpRes.value : [];
+            const rawPers = contactsPersRes.status === 'fulfilled' ? contactsPersRes.value : [];
             
             if (profileData) {
                 setData({
                     stats: statsRes.status === 'fulfilled' ? statsRes.value : { stats: [], news: [], forum_posts: [] },
-                    tasks: tasksRes.status === 'fulfilled' ? tasksRes.value : [],
+                    tasks: sanitizeForUser(rawTasks, isTest),
                     profile: profileData,
-                    audits: auditsRes.status === 'fulfilled' ? auditsRes.value : [],
-                    contactsCorporate: filterMe(contactsCorpRes.status === 'fulfilled' ? contactsCorpRes.value : []),
-                    contactsPersonal: filterMe(contactsPersRes.status === 'fulfilled' ? contactsPersRes.value : []),
+                    audits: sanitizeForUser(rawAudits, isTest),
+                    contactsCorporate: filterMe(sanitizeForUser(rawCorp, isTest)),
+                    contactsPersonal: filterMe(sanitizeForUser(rawPers, isTest)),
                     lastFetched: now,
                     trialDaysLeft: daysLeft,
                     isTrialExpired: finalExpired,
@@ -179,8 +221,8 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 setData(prev => ({
                     ...prev,
                     stats: statsRes.status === 'fulfilled' ? statsRes.value : prev.stats,
-                    tasks: tasksRes.status === 'fulfilled' ? tasksRes.value : prev.tasks,
-                    audits: auditsRes.status === 'fulfilled' ? auditsRes.value : prev.audits,
+                    tasks: sanitizeForUser(rawTasks, isTest),
+                    audits: sanitizeForUser(rawAudits, isTest),
                 }));
             }
             lastFetchedRef.current = now;
@@ -197,7 +239,8 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const refreshTasks = useCallback(async (uid: string, force = true) => {
         try {
             const tasks = await tasksApi.fetchTasks(uid, undefined, force);
-            setData(prev => ({ ...prev, tasks }));
+            const isTest = isTestAccount(uid);
+            setData(prev => ({ ...prev, tasks: sanitizeForUser(tasks, isTest) }));
         } catch (error) {
             console.error("Tasks refresh error:", error);
         }
@@ -206,7 +249,8 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const refreshAudits = useCallback(async (uid: string, email?: string) => {
         try {
             const audits = await auditsApi.fetchAudits(uid, email, true);
-            setData(prev => ({ ...prev, audits }));
+            const isTest = isTestAccount(uid, email);
+            setData(prev => ({ ...prev, audits: sanitizeForUser(audits, isTest) }));
         } catch (error) {
             console.error("Audits refresh error:", error);
         }
@@ -215,9 +259,11 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const refreshContactsCorporate = useCallback(async () => {
         try {
             const contactsCorporate = await fetchContacts('corporate');
+            const isTest = isTestAccount(currentUidRef.current || undefined);
+            const sanitized = sanitizeForUser(contactsCorporate, isTest);
             // Current user filter in individual refresh
             const myKeys = [currentUidRef.current].filter(Boolean) as string[];
-            const filtered = contactsCorporate.filter((item: any) => {
+            const filtered = sanitized.filter((item: any) => {
                 const itemUid = item.uid || item.id;
                 const itemEmail = (item.email || "").toLowerCase().trim();
                 return !myKeys.includes(itemUid) && !myKeys.some(k => itemEmail === k.toLowerCase());
@@ -231,8 +277,10 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const refreshContactsPersonal = useCallback(async (uid: string, email?: string) => {
         try {
             const contactsPersonal = await fetchContacts('personal', uid, email);
+            const isTest = isTestAccount(uid, email);
+            const sanitized = sanitizeForUser(contactsPersonal, isTest);
             const myKeys = [uid, email?.toLowerCase()].filter(Boolean) as string[];
-            const filtered = contactsPersonal.filter((item: any) => {
+            const filtered = sanitized.filter((item: any) => {
                 const itemUid = item.uid || item.id;
                 const itemEmail = (item.email || "").toLowerCase().trim();
                 return !myKeys.includes(itemUid) && !myKeys.includes(itemEmail);

@@ -41,6 +41,7 @@ import { LOJMAN_RATES, CITY_DISCOUNT_GROUPS } from "../lib/lojmanRates";
 import { YOLLUK_H_RATES, YOLLUK_COEFFICIENTS } from "../lib/yollukRates";
 import { OzelBedenEgitimiDenetim } from "../components/audit/OzelBedenEgitimiDenetim";
 import { EsikDegerlerSection } from "../components/files/EsikDegerlerSection";
+import { mufyardRates } from "../data/mufyardRates";
 
 const DEFAULT_BAZ_RATES: Record<string, { ydo: string; maktu: number; buyuksehirTavan: number; digerIlTavan: number }> = {
     "2026": { ydo: "%25,49 (VUK 585)", maktu: 18471.21, buyuksehirTavan: 92356.05, digerIlTavan: 55413.63 },
@@ -145,7 +146,7 @@ export default function Files() {
     const [isTarifeCetveliOpen, setIsTarifeCetveliOpen] = useState<boolean>(false);
     const [isStadyumTarifeOpen, setIsStadyumTarifeOpen] = useState<boolean>(false);
     const [stadyumTarifeTab, setStadyumTarifeTab] = useState<string>("2026-2027");
-    const [stadyumRatesData, setStadyumRatesData] = useState<any>(null);
+    const [stadyumRatesData, setStadyumRatesData] = useState<any>(mufyardRates.stadyumTahsisRates);
     const [stadyumKdvRate, setStadyumKdvRate] = useState<number>(20);
     const [stadyumIsKdvDahil, setStadyumIsKdvDahil] = useState<boolean>(false);
     const [stadyumIsGencSpor, setStadyumIsGencSpor] = useState<boolean>(false);
@@ -165,7 +166,7 @@ export default function Files() {
     const [bazIlTuru, setBazIlTuru] = useState<"buyuksehir" | "diger">("buyuksehir");
     const [bazSozlesmeBedeliStr, setBazSozlesmeBedeliStr] = useState<string>("");
     const [bazIsKdvDahil, setBazIsKdvDahil] = useState<boolean>(false);
-    const [bazRatesData, setBazRatesData] = useState<any>(null);
+    const [bazRatesData, setBazRatesData] = useState<any>(mufyardRates.bazIstasyonuRates || DEFAULT_BAZ_RATES);
     const [bazDocYerSecim, setBazDocYerSecim] = useState<boolean>(false);
     const [bazDocRuhsat, setBazDocRuhsat] = useState<boolean>(false);
     const [bazDocProtokol, setBazDocProtokol] = useState<boolean>(false);
@@ -1293,7 +1294,7 @@ const calculateYollukValues = () => {
                             <Button 
                                 size="sm" 
                                 variant="outline" 
-                                onClick={() => window.open("/mufettis_yardimcisi_degerlendirme_formu.html", "_blank")}
+                                onClick={() => window.open("./mufettis_yardimcisi_degerlendirme_formu.html", "_blank")}
                                 className="rounded-xl bg-white/10 hover:bg-white/20 border-white/20 text-white font-bold"
                             >
                                 <ExternalLink size={14} className="mr-2" /> Yeni Sekmede Aç
@@ -1310,7 +1311,7 @@ const calculateYollukValues = () => {
                     </div>
                     <div className="flex-1 bg-slate-100 dark:bg-slate-955 relative">
                         <iframe 
-                            src="/mufettis_yardimcisi_degerlendirme_formu.html" 
+                            src="./mufettis_yardimcisi_degerlendirme_formu.html" 
                             className="w-full h-full border-none shadow-inner"
                         />
                     </div>
@@ -2374,7 +2375,7 @@ const calculateYollukValues = () => {
                             <Button 
                                 size="sm" 
                                 variant="outline" 
-                                onClick={() => window.open("/hakedis_hesaplama.html", "_blank")}
+                                onClick={() => window.open("./hakedis_hesaplama.html", "_blank")}
                                 className="rounded-xl bg-white/10 hover:bg-white/20 border-white/20 text-white font-bold"
                             >
                                 <ExternalLink size={14} className="mr-2" /> Yeni Sekmede Aç
@@ -2391,7 +2392,7 @@ const calculateYollukValues = () => {
                     </div>
                     <div className="flex-1 bg-slate-100 dark:bg-slate-955 relative">
                         <iframe 
-                            src="/hakedis_hesaplama.html" 
+                            src="./hakedis_hesaplama.html" 
                             className="w-full h-full border-none shadow-inner"
                         />
                     </div>
@@ -6760,19 +6761,8 @@ const renderPratikModal = () => {
         const renderTarifeCetveliModal = () => {
         if (!isTarifeCetveliOpen) return null;
         
-        // Modal açıldığında eğer tablo verisi yoksa, yükle.
-        if (!stadyumRatesData) {
-            fetch("/mufyard_rates.json").then(r => r.json()).then(d => {
-                if (d.stadyumTahsisRates) setStadyumRatesData(d.stadyumTahsisRates);
-            }).catch(() => toast.error("Tarife verileri yüklenemedi."));
-            return createPortal(
-                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="text-white text-sm font-bold animate-pulse">Tarife cetvelleri yükleniyor...</div>
-                </div>
-            , document.body);
-        }
-
-        const seasonData = stadyumRatesData[stadyumSezon] || {};
+        const effectiveRates = stadyumRatesData || mufyardRates.stadyumTahsisRates;
+        const seasonData = effectiveRates?.[stadyumSezon] || {};
         const ligKeys = Object.keys(seasonData);
 
         return createPortal(
@@ -7466,19 +7456,8 @@ const renderPratikModal = () => {
     const renderStadyumModal = () => {
         if (!isStadyumModalOpen) return null;
 
-        // Load rates data on first open
-        if (!stadyumRatesData) {
-            fetch("/mufyard_rates.json").then(r => r.json()).then(d => {
-                if (d.stadyumTahsisRates) setStadyumRatesData(d.stadyumTahsisRates);
-            }).catch(() => toast.error("Tarife verileri yüklenemedi."));
-            return createPortal(
-                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-                    <div className="text-white text-sm font-bold animate-pulse">Tarife verileri yükleniyor...</div>
-                </div>
-            , document.body);
-        }
-
-        const seasonData = stadyumRatesData[stadyumSezon];
+        const effectiveRates = stadyumRatesData || mufyardRates.stadyumTahsisRates;
+        const seasonData = effectiveRates?.[stadyumSezon];
         const ligKeys = seasonData ? Object.keys(seasonData) : [];
         const ligData = seasonData?.[stadyumLig];
         const tiers = ligData?.tiers || [];
@@ -7982,18 +7961,7 @@ const renderPratikModal = () => {
     const renderBazModal = () => {
         if (!isBazModalOpen) return null;
 
-        if (!bazRatesData) {
-            fetch("/mufyard_rates.json")
-                .then(r => r.json())
-                .then(d => {
-                    if (d.bazIstasyonuRates) setBazRatesData(d.bazIstasyonuRates);
-                })
-                .catch(() => {
-                    setBazRatesData(DEFAULT_BAZ_RATES);
-                });
-        }
-
-        const rates = bazRatesData || DEFAULT_BAZ_RATES;
+        const rates = bazRatesData || mufyardRates.bazIstasyonuRates || DEFAULT_BAZ_RATES;
         const rateInfo = rates[bazYil] || DEFAULT_BAZ_RATES[bazYil] || DEFAULT_BAZ_RATES["2026"] || DEFAULT_BAZ_RATES["2025"];
         const maktu = rateInfo.maktu;
         const kat = bazIlTuru === "buyuksehir" ? 5 : 3;

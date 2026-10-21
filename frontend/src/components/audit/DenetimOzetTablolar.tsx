@@ -1033,7 +1033,7 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                         <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => window.open('/mufettis_ozet_tablolar.html', '_blank')}
+                            onClick={() => window.open('./mufettis_ozet_tablolar.html', '_blank')}
                             className="rounded-xl h-8 text-[11px] font-semibold border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 px-2 justify-center gap-1"
                             title="Bağımsız interaktif HTML formunu yeni pencerede/sekmede açar"
                         >

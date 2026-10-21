@@ -52,15 +52,11 @@ class AuditService:
             docs = await asyncio.to_thread(lambda: audits_ref.where('is_public', '==', True).limit(200).select(fields).stream())
             return [ {**doc.to_dict(), 'id': doc.id} for doc in docs]
 
-        # 2. Admin/Demo bypass
-        admin_id = "sefa.yaprakli@gsb.gov.tr"
-        if user_id == admin_id or user_email == admin_id or user_id == "admin":
-            fields = ['title', 'date', 'status', 'inspector', 'location', 'owner_id', 
-                      'assigned_to', 'shared_with', 'shared_roles', 'task_id', 'report_seq', 'is_public', 'created_at', 'audit_data', 'report_created']
-            docs = await asyncio.to_thread(lambda: audits_ref.order_by('created_at', direction='DESCENDING').limit(500).select(fields).stream())
-            return [ {**doc.to_dict(), 'id': doc.id} for doc in docs]
+        test_uid = "tolEIwlWrHfWCQduDuXcnqBvWdo2"
+        test_email = "test@mufyard.com"
+        is_test_user = (user_id == test_uid or (user_email and user_email.lower() == test_email))
 
-        # 3. Parallel Queries with asyncio.gather
+        # Parallel Queries with asyncio.gather
         async def run_query(q):
             if q is None: return []
             # Optimization: Select only metadata fields to avoid fetching large 'report_content'
@@ -91,6 +87,18 @@ class AuditService:
             if doc.id not in unique_audits:
                 d = doc.to_dict()
                 d['id'] = doc.id
+                # Test verisi izolasyonu: test kullanıcısı değilse test denetimlerini filtrele
+                if not is_test_user:
+                    audit_owner = d.get('owner_id', '')
+                    audit_assigned = d.get('assigned_to', []) or []
+                    audit_shared = d.get('shared_with', []) or []
+                    audit_accepted = d.get('accepted_collaborators', []) or []
+                    test_identifiers = [test_uid, test_email]
+                    if (audit_owner in test_identifiers or 
+                        any(t in audit_assigned for t in test_identifiers) or
+                        any(t in audit_shared for t in test_identifiers) or
+                        any(t in audit_accepted for t in test_identifiers)):
+                        continue
                 unique_audits[doc.id] = d
         
         sorted_audits = list(unique_audits.values())

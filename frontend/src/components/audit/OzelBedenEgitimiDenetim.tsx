@@ -800,7 +800,7 @@ export const OzelBedenEgitimiDenetim: React.FC<OzelBedenEgitimiDenetimProps> = (
                     <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => window.open('/ozel_beden_egitimi_tesisleri_denetimi.html', '_blank')}
+                        onClick={() => window.open('./ozel_beden_egitimi_tesisleri_denetimi.html', '_blank')}
                         className="rounded-xl h-8 text-[11px] font-semibold border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 px-2.5 justify-center gap-1"
                         title="Bağımsız interaktif HTML formunu yeni sekmede açar"
                     >

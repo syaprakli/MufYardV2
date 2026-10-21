@@ -8,6 +8,8 @@ export interface Contact {
     title: string;
     unit: string;
     phone: string;
+    work_phone?: string;
+    extension?: string;
     email: string;
     tags: string[];
     category?: string;
@@ -22,6 +24,8 @@ export interface ContactCreate {
     title: string;
     unit: string;
     phone: string;
+    work_phone?: string;
+    extension?: string;
     email: string;
     tags: string[];
     category?: string;

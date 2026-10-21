@@ -1,0 +1,2026 @@
+// Auto-generated bundled rates for 100% offline and packaged desktop app support
+export const mufyardRates = {
+  "lojmanRates": {
+    "2026": {
+      "kerpic": 9.47,
+      "kalorifersiz": 14.82,
+      "kaloriferli": 19.46,
+      "kapici": 2.46,
+      "elektrik": 4.9,
+      "su": 4.25,
+      "elektrik_su": 9.15,
+      "kuyu_su": 2.12,
+      "yakit": 11.23,
+      "ortak_alan": 0.98
+    },
+    "2025": {
+      "kerpic": 7.43,
+      "kalorifersiz": 11.62,
+      "kaloriferli": 15.26,
+      "kapici": 1.93,
+      "elektrik": 3.84,
+      "su": 3.33,
+      "elektrik_su": 7.17,
+      "kuyu_su": 1.66,
+      "yakit": 8.81,
+      "ortak_alan": 0.77
+    },
+    "2024": {
+      "kerpic": 5.15,
+      "kalorifersiz": 8.05,
+      "kaloriferli": 10.57,
+      "kapici": 1.34,
+      "elektrik": 2.66,
+      "su": 2.31,
+      "elektrik_su": 4.97,
+      "kuyu_su": 1.15,
+      "yakit": 6.1,
+      "ortak_alan": 0.53
+    },
+    "2023": {
+      "kerpic": 3.25,
+      "kalorifersiz": 5.08,
+      "kaloriferli": 6.67,
+      "kapici": 0.85,
+      "elektrik": 1.68,
+      "su": 1.46,
+      "elektrik_su": 3.14,
+      "kuyu_su": 0.73,
+      "yakit": 3.85,
+      "ortak_alan": 0.33
+    },
+    "2022": {
+      "kerpic": 2.05,
+      "kalorifersiz": 3.21,
+      "kaloriferli": 4.21,
+      "kapici": 0.54,
+      "elektrik": 1.06,
+      "su": 0.92,
+      "elektrik_su": 1.98,
+      "kuyu_su": 0.46,
+      "yakit": 2.43,
+      "ortak_alan": 0.21
+    },
+    "2021": {
+      "kerpic": 1.55,
+      "kalorifersiz": 2.42,
+      "kaloriferli": 3.18,
+      "kapici": 0.41,
+      "elektrik": 0.8,
+      "su": 0.7,
+      "elektrik_su": 1.5,
+      "kuyu_su": 0.35,
+      "yakit": 1.83,
+      "ortak_alan": 0.16
+    },
+    "2020": {
+      "kerpic": 1.35,
+      "kalorifersiz": 2.11,
+      "kaloriferli": 2.77,
+      "kapici": 0.36,
+      "elektrik": 0.7,
+      "su": 0.61,
+      "elektrik_su": 1.31,
+      "kuyu_su": 0.3,
+      "yakit": 1.6,
+      "ortak_alan": 0.14
+    }
+  },
+  "yollukRates": {
+    "2026": {
+      "ek_8000_plus": 890,
+      "ek_6400_8000": 880,
+      "ek_3600_6400": 870,
+      "der_1_4": 860,
+      "der_5_15": 850
+    },
+    "2025": {
+      "ek_8000_plus": 680,
+      "ek_6400_8000": 650,
+      "ek_3600_6400": 635,
+      "der_1_4": 610,
+      "der_5_15": 600
+    },
+    "2024": {
+      "ek_8000_plus": 465,
+      "ek_6400_8000": 435,
+      "ek_3600_6400": 420,
+      "der_1_4": 405,
+      "der_5_15": 400
+    },
+    "2023": {
+      "ek_8000_plus": 236,
+      "ek_6400_8000": 220,
+      "ek_3600_6400": 212,
+      "der_1_4": 203,
+      "der_5_15": 200
+    },
+    "2022": {
+      "ek_8000_plus": 104,
+      "ek_6400_8000": 97,
+      "ek_3600_6400": 93,
+      "der_1_4": 89,
+      "der_5_15": 87
+    },
+    "2021": {
+      "ek_8000_plus": 69.5,
+      "ek_6400_8000": 64.5,
+      "ek_3600_6400": 60.5,
+      "der_1_4": 57.5,
+      "der_5_15": 55.5
+    },
+    "2020": {
+      "ek_8000_plus": 61.5,
+      "ek_6400_8000": 57.5,
+      "ek_3600_6400": 54.0,
+      "der_1_4": 51.5,
+      "der_5_15": 50.0
+    }
+  },
+  "yollukCoefficients": {
+    "2026": {
+      "jan_jun": 1.387871,
+      "jul_dec": 1.575512
+    },
+    "2025": {
+      "jan_jun": 1.012556,
+      "jul_dec": 1.170211
+    },
+    "2024": {
+      "jan_jun": 0.760871,
+      "jul_dec": 0.907796
+    },
+    "2023": {
+      "jan_jun": 0.433684,
+      "jul_dec": 0.509796
+    },
+    "2022": {
+      "jan_jun": 0.235445,
+      "jul_dec": 0.333603
+    },
+    "2021": {
+      "jan_jun": 0.165786,
+      "jul_dec": 0.179797
+    },
+    "2020": {
+      "jan_jun": 0.146061,
+      "jul_dec": 0.154461
+    }
+  },
+  "pratikBilgiler": {
+    "damgaVergisi": [
+      {
+        "name": "Sözleşme & Taahhütname",
+        "rate": "Binde 9,48"
+      },
+      {
+        "name": "Kira Mukavelenamesi",
+        "rate": "Binde 1,89"
+      },
+      {
+        "name": "KDV / Muhtasar Beyan. (2026)",
+        "rate": "791,00 TL"
+      },
+      {
+        "name": "MUHSGK Beyan. (2026)",
+        "rate": "939,70 TL"
+      },
+      {
+        "name": "Yıllık Gelir Beyan. (2026)",
+        "rate": "1.189,50 TL"
+      },
+      {
+        "name": "Gelir Beyan. (2025 Eylül Sonrası)",
+        "rate": "1.000,00 TL"
+      },
+      {
+        "name": "KDV/Muhtasar (2025 Eylül Sonrası)",
+        "rate": "665,00 TL"
+      },
+      {
+        "name": "Damga Vergisi Üst Sınırı (2026)",
+        "rate": "29.115.961,10 TL"
+      }
+    ],
+    "kdvTevkifat": [
+      {
+        "name": "Yapım İşleri & Mühendislik",
+        "rate": "4/10"
+      },
+      {
+        "name": "Etüt, Danışmanlık & Denetim",
+        "rate": "9/10"
+      },
+      {
+        "name": "Makine, Teçhizat & Taşıt Bakım",
+        "rate": "7/10"
+      },
+      {
+        "name": "Yemek Servisi & Organizasyon",
+        "rate": "5/10"
+      },
+      {
+        "name": "İşgücü Temin Hizmetleri",
+        "rate": "9/10"
+      },
+      {
+        "name": "Temizlik, Çevre & Bahçe Bakım",
+        "rate": "9/10"
+      },
+      {
+        "name": "Yapı Denetim Hizmetleri",
+        "rate": "9/10"
+      },
+      {
+        "name": "Servis Taşımacılığı",
+        "rate": "5/10"
+      },
+      {
+        "name": "Karayolu ile Yük Taşıma",
+        "rate": "2/10"
+      },
+      {
+        "name": "Ticari Reklam Hizmetleri",
+        "rate": "3/10"
+      },
+      {
+        "name": "Fason Tekstil & Konfeksiyon",
+        "rate": "7/10"
+      }
+    ],
+    "gecikmeZammi": [
+      {
+        "term": "13.11.2025 - Günümüz",
+        "rate": "%3,70",
+        "active": true
+      },
+      {
+        "term": "21.05.2024 - 12.11.2025",
+        "rate": "%4,50"
+      },
+      {
+        "term": "14.11.2023 - 20.05.2024",
+        "rate": "%3,50"
+      },
+      {
+        "term": "21.07.2023 - 13.11.2023",
+        "rate": "%2,50"
+      }
+    ],
+    "dogrudanTemin": [
+      {
+        "year": "2020",
+        "metro": "97.008,00",
+        "other": "32.316,00"
+      },
+      {
+        "year": "2021",
+        "metro": "121.405,00",
+        "other": "40.443,00"
+      },
+      {
+        "year": "2022",
+        "metro": "218.395,00",
+        "other": "72.752,00"
+      },
+      {
+        "year": "2023",
+        "metro": "431.810,00",
+        "other": "143.845,00"
+      },
+      {
+        "year": "2024",
+        "metro": "622.756,00",
+        "other": "207.453,00"
+      },
+      {
+        "year": "2025 *",
+        "metro": "800.366,00",
+        "other": "266.618,00",
+        "active": true
+      },
+      {
+        "year": "2026 **",
+        "metro": "1.021.827,00",
+        "other": "340.391,00",
+        "active": true
+      }
+    ],
+    "dogrudanTeminNote": "* 01.02.2025 - 31.01.2026 dönemini kapsar.\n** 01.02.2026 - 31.01.2027 dönemini kapsar.",
+    "memurKatsayilari": [
+      {
+        "p": "2020 Ocak - Haz",
+        "v": "0,146061"
+      },
+      {
+        "p": "2020 Tem - Ara",
+        "v": "0,154461"
+      },
+      {
+        "p": "2021 Ocak - Haz",
+        "v": "0,165786"
+      },
+      {
+        "p": "2021 Tem - Ara",
+        "v": "0,179797"
+      },
+      {
+        "p": "2022 Ocak - Haz",
+        "v": "0,235445"
+      },
+      {
+        "p": "2022 Tem - Ara",
+        "v": "0,333603"
+      },
+      {
+        "p": "2023 Ocak - Haz",
+        "v": "0,433684"
+      },
+      {
+        "p": "2023 Tem - Ara",
+        "v": "0,509796"
+      },
+      {
+        "p": "2024 Ocak - Haz",
+        "v": "0,760871"
+      },
+      {
+        "p": "2024 Tem - Ara",
+        "v": "0,907796"
+      },
+      {
+        "p": "2025 Ocak - Haz",
+        "v": "1,012556"
+      },
+      {
+        "p": "2025 Tem - Ara",
+        "v": "1,170211"
+      },
+      {
+        "p": "2026 Ocak - Haz",
+        "v": "1,387871"
+      },
+      {
+        "p": "2026 Tem - Ara",
+        "v": "1,575512"
+      }
+    ],
+    "aileYardimi": [
+      {
+        "p": "2020 Ocak - Haz",
+        "e": "351,00 TL",
+        "c": "77-130 TL"
+      },
+      {
+        "p": "2020 Tem - Ara",
+        "e": "375,00 TL",
+        "c": "77-130 TL"
+      },
+      {
+        "p": "2021 Ocak",
+        "e": "403,00 TL",
+        "c": "77-130 TL"
+      },
+      {
+        "p": "2021 Temmuz",
+        "e": "436,00 TL",
+        "c": "77-130 TL"
+      },
+      {
+        "p": "2022 İlk Yarı",
+        "e": "521,00 TL",
+        "c": "77-130 TL"
+      },
+      {
+        "p": "2022 Temmuz",
+        "e": "730,00 TL",
+        "c": "77-130 TL"
+      },
+      {
+        "p": "2023 Ocak - Haz",
+        "e": "1.157,00 TL",
+        "c": "216,84 TL"
+      },
+      {
+        "p": "2023 Tem - Ara",
+        "e": "2.208,00 TL",
+        "c": "254,90 TL"
+      },
+      {
+        "p": "2024 Ocak",
+        "e": "3.111,00 TL",
+        "c": "400,05 TL"
+      },
+      {
+        "p": "2024 Temmuz",
+        "e": "3.897,00 TL",
+        "c": "485,00 TL"
+      },
+      {
+        "p": "2025 Ocak",
+        "e": "4.550,00 TL",
+        "c": "506,28 TL"
+      },
+      {
+        "p": "2025 Temmuz",
+        "e": "5.270,00 TL",
+        "c": "585,11 TL"
+      },
+      {
+        "p": "2026 Ocak - Haz",
+        "e": "3.154,63 TL",
+        "c": "693,92 TL",
+        "active": true
+      },
+      {
+        "p": "2026 Tem - Ara",
+        "e": "3.581,45 TL",
+        "c": "787,82 TL",
+        "active": true
+      }
+    ]
+  },
+  "stadyumTahsisRates": {
+    "2026-2027": {
+      "superLig": {
+        "label": "I) Süper Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 20000,
+            "label": "20.000'e kadar",
+            "sezonluk": 123703.9,
+            "tekMac": 309260.11
+          },
+          {
+            "code": "B",
+            "min": 20001,
+            "max": 23000,
+            "label": "20.001 - 23.000",
+            "sezonluk": 149679.13,
+            "tekMac": 364926.98
+          },
+          {
+            "code": "C",
+            "min": 23001,
+            "max": 26000,
+            "label": "23.001 - 26.000",
+            "sezonluk": 175659.76,
+            "tekMac": 420593.84
+          },
+          {
+            "code": "D",
+            "min": 26001,
+            "max": 30000,
+            "label": "26.001 - 30.000",
+            "sezonluk": 210296.99,
+            "tekMac": 494816.33
+          },
+          {
+            "code": "E",
+            "min": 30001,
+            "max": 33000,
+            "label": "30.001 - 33.000",
+            "sezonluk": 242460.08,
+            "tekMac": 556651.01
+          },
+          {
+            "code": "F",
+            "min": 33001,
+            "max": 36000,
+            "label": "33.001 - 36.000",
+            "sezonluk": 274623.17,
+            "tekMac": 618485.69
+          },
+          {
+            "code": "G",
+            "min": 36001,
+            "max": 39000,
+            "label": "36.001 - 39.000",
+            "sezonluk": 306786.26,
+            "tekMac": 680320.37
+          },
+          {
+            "code": "H",
+            "min": 39001,
+            "max": 42000,
+            "label": "39.001 - 42.000",
+            "sezonluk": 338949.34,
+            "tekMac": 742155.05
+          },
+          {
+            "code": "İ",
+            "min": 42001,
+            "max": 45000,
+            "label": "42.001 - 45.000",
+            "sezonluk": 371112.43,
+            "tekMac": 803989.73
+          },
+          {
+            "code": "J",
+            "min": 45001,
+            "max": 48000,
+            "label": "45.001 - 48.000",
+            "sezonluk": 389668.05,
+            "tekMac": 859738.13
+          },
+          {
+            "code": "K",
+            "min": 48001,
+            "max": 51000,
+            "label": "48.001 - 51.000",
+            "sezonluk": 408223.67,
+            "tekMac": 915486.54
+          },
+          {
+            "code": "L",
+            "min": 51001,
+            "max": 54000,
+            "label": "51.001 - 54.000",
+            "sezonluk": 426779.29,
+            "tekMac": 971234.95
+          },
+          {
+            "code": "M",
+            "min": 54001,
+            "max": 57000,
+            "label": "54.001 - 57.000",
+            "sezonluk": 445334.91,
+            "tekMac": 1026983.36
+          },
+          {
+            "code": "N",
+            "min": 57001,
+            "max": 60000,
+            "label": "57.001 - 60.000",
+            "sezonluk": 463890.54,
+            "tekMac": 1082731.77
+          },
+          {
+            "code": "O",
+            "min": 60001,
+            "max": 65000,
+            "label": "60.001 - 65.000",
+            "sezonluk": 494816.55,
+            "tekMac": 1175645.78
+          },
+          {
+            "code": "P",
+            "min": 65001,
+            "max": 70000,
+            "label": "65.001 - 70.000",
+            "sezonluk": 525742.63,
+            "tekMac": 1268559.79
+          },
+          {
+            "code": "R",
+            "min": 70001,
+            "max": 999999,
+            "label": "70.001 ve Üzeri",
+            "sezonluk": 556668.64,
+            "tekMac": 1361467.98
+          }
+        ]
+      },
+      "lig1": {
+        "label": "II) 1. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 10000,
+            "label": "10.000'e kadar",
+            "sezonluk": 64879.78,
+            "tekMac": 142735.16
+          },
+          {
+            "code": "B",
+            "min": 10001,
+            "max": 20000,
+            "label": "10.001 - 20.000",
+            "sezonluk": 90831.36,
+            "tekMac": 185988.35
+          },
+          {
+            "code": "C",
+            "min": 20001,
+            "max": 30000,
+            "label": "20.001 - 30.000",
+            "sezonluk": 129759.57,
+            "tekMac": 268169.04
+          },
+          {
+            "code": "D",
+            "min": 30001,
+            "max": 999999,
+            "label": "30.000 ve Üzeri",
+            "sezonluk": 173012.75,
+            "tekMac": 389278.7
+          }
+        ]
+      },
+      "lig2": {
+        "label": "III) 2. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 5000,
+            "label": "5.000'e kadar",
+            "sezonluk": 30103.43,
+            "tekMac": 84170.83
+          },
+          {
+            "code": "B",
+            "min": 5001,
+            "max": 10000,
+            "label": "5.001 - 10.000",
+            "sezonluk": 53200.22,
+            "tekMac": 99827.38
+          },
+          {
+            "code": "C",
+            "min": 10001,
+            "max": 15000,
+            "label": "10.001 - 15.000",
+            "sezonluk": 85034.36,
+            "tekMac": 150693.88
+          },
+          {
+            "code": "D",
+            "min": 15001,
+            "max": 999999,
+            "label": "15.001 ve Üzeri",
+            "sezonluk": 99827.38,
+            "tekMac": 336683.31
+          }
+        ]
+      },
+      "lig3": {
+        "label": "IV) 3. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 5000,
+            "label": "5.000'e kadar",
+            "sezonluk": 14273.44,
+            "tekMac": 35466.81
+          },
+          {
+            "code": "B",
+            "min": 5001,
+            "max": 10000,
+            "label": "5.001 - 10.000",
+            "sezonluk": 35466.81,
+            "tekMac": 51471.33
+          },
+          {
+            "code": "C",
+            "min": 10001,
+            "max": 15000,
+            "label": "10.001 - 15.000",
+            "sezonluk": 43166.47,
+            "tekMac": 86160.23
+          },
+          {
+            "code": "D",
+            "min": 15001,
+            "max": 999999,
+            "label": "15.001 ve Üzeri",
+            "sezonluk": 51471.33,
+            "tekMac": 136941.1
+          }
+        ]
+      }
+    },
+    "2025-2026": {
+      "superLig": {
+        "label": "I) Süper Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 20000,
+            "label": "20.000'e kadar",
+            "sezonluk": 93637.04,
+            "tekMac": 234092.89
+          },
+          {
+            "code": "B",
+            "min": 20001,
+            "max": 23000,
+            "label": "20.001 - 23.000",
+            "sezonluk": 113298.87,
+            "tekMac": 276229.64
+          },
+          {
+            "code": "C",
+            "min": 23001,
+            "max": 26000,
+            "label": "23.001 - 26.000",
+            "sezonluk": 132964.77,
+            "tekMac": 318366.39
+          },
+          {
+            "code": "D",
+            "min": 26001,
+            "max": 30000,
+            "label": "26.001 - 30.000",
+            "sezonluk": 159183.25,
+            "tekMac": 374548.73
+          },
+          {
+            "code": "E",
+            "min": 30001,
+            "max": 33000,
+            "label": "30.001 - 33.000",
+            "sezonluk": 183528.94,
+            "tekMac": 421354.18
+          },
+          {
+            "code": "F",
+            "min": 33001,
+            "max": 36000,
+            "label": "33.001 - 36.000",
+            "sezonluk": 207874.63,
+            "tekMac": 468159.63
+          },
+          {
+            "code": "G",
+            "min": 36001,
+            "max": 39000,
+            "label": "36.001 - 39.000",
+            "sezonluk": 232220.31,
+            "tekMac": 514965.08
+          },
+          {
+            "code": "H",
+            "min": 39001,
+            "max": 42000,
+            "label": "39.001 - 42.000",
+            "sezonluk": 256566.0,
+            "tekMac": 561770.53
+          },
+          {
+            "code": "İ",
+            "min": 42001,
+            "max": 45000,
+            "label": "42.001 - 45.000",
+            "sezonluk": 280911.69,
+            "tekMac": 608575.98
+          },
+          {
+            "code": "J",
+            "min": 45001,
+            "max": 48000,
+            "label": "45.001 - 48.000",
+            "sezonluk": 294957.27,
+            "tekMac": 650774.46
+          },
+          {
+            "code": "K",
+            "min": 48001,
+            "max": 51000,
+            "label": "48.001 - 51.000",
+            "sezonluk": 309002.86,
+            "tekMac": 692972.93
+          },
+          {
+            "code": "L",
+            "min": 51001,
+            "max": 54000,
+            "label": "51.001 - 54.000",
+            "sezonluk": 323048.44,
+            "tekMac": 735171.41
+          },
+          {
+            "code": "M",
+            "min": 54001,
+            "max": 57000,
+            "label": "54.001 - 57.000",
+            "sezonluk": 337094.02,
+            "tekMac": 777369.89
+          },
+          {
+            "code": "N",
+            "min": 57001,
+            "max": 60000,
+            "label": "57.001 - 60.000",
+            "sezonluk": 351139.61,
+            "tekMac": 819568.37
+          },
+          {
+            "code": "O",
+            "min": 60001,
+            "max": 65000,
+            "label": "60.001 - 65.000",
+            "sezonluk": 374548.9,
+            "tekMac": 889899.16
+          },
+          {
+            "code": "P",
+            "min": 65001,
+            "max": 70000,
+            "label": "65.001 - 70.000",
+            "sezonluk": 397958.24,
+            "tekMac": 960229.96
+          },
+          {
+            "code": "R",
+            "min": 70001,
+            "max": 999999,
+            "label": "70.001 ve Üzeri",
+            "sezonluk": 421367.53,
+            "tekMac": 1030556.34
+          }
+        ]
+      },
+      "lig1": {
+        "label": "II) 1. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 10000,
+            "label": "10.000'e kadar",
+            "sezonluk": 49110.43,
+            "tekMac": 108042.66
+          },
+          {
+            "code": "B",
+            "min": 10001,
+            "max": 20000,
+            "label": "10.001 - 20.000",
+            "sezonluk": 68754.34,
+            "tekMac": 140782.94
+          },
+          {
+            "code": "C",
+            "min": 20001,
+            "max": 30000,
+            "label": "20.001 - 30.000",
+            "sezonluk": 98220.85,
+            "tekMac": 202989.21
+          },
+          {
+            "code": "D",
+            "min": 30001,
+            "max": 999999,
+            "label": "30.000 ve Üzeri",
+            "sezonluk": 130961.13,
+            "tekMac": 294662.55
+          }
+        ]
+      },
+      "lig2": {
+        "label": "III) 2. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 5000,
+            "label": "5.000'e kadar",
+            "sezonluk": 22786.64,
+            "tekMac": 63712.69
+          },
+          {
+            "code": "B",
+            "min": 5001,
+            "max": 10000,
+            "label": "5.001 - 10.000",
+            "sezonluk": 40269.64,
+            "tekMac": 75563.83
+          },
+          {
+            "code": "C",
+            "min": 10001,
+            "max": 15000,
+            "label": "10.001 - 15.000",
+            "sezonluk": 64366.33,
+            "tekMac": 114066.97
+          },
+          {
+            "code": "D",
+            "min": 15001,
+            "max": 999999,
+            "label": "15.001 ve Üzeri",
+            "sezonluk": 75563.83,
+            "tekMac": 254880.74
+          }
+        ]
+      },
+      "lig3": {
+        "label": "IV) 3. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 5000,
+            "label": "5.000'e kadar",
+            "sezonluk": 10804.21,
+            "tekMac": 26846.43
+          },
+          {
+            "code": "B",
+            "min": 5001,
+            "max": 10000,
+            "label": "5.001 - 10.000",
+            "sezonluk": 26846.43,
+            "tekMac": 38960.96
+          },
+          {
+            "code": "C",
+            "min": 10001,
+            "max": 15000,
+            "label": "10.001 - 15.000",
+            "sezonluk": 32674.64,
+            "tekMac": 65218.56
+          },
+          {
+            "code": "D",
+            "min": 15001,
+            "max": 999999,
+            "label": "15.001 ve Üzeri",
+            "sezonluk": 38960.96,
+            "tekMac": 103656.88
+          }
+        ]
+      }
+    },
+    "2024-2025": {
+      "superLig": {
+        "label": "I) Süper Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 20000,
+            "label": "20.000'e kadar",
+            "sezonluk": 64222.94,
+            "tekMac": 160557.54
+          },
+          {
+            "code": "B",
+            "min": 20001,
+            "max": 23000,
+            "label": "20.001 - 23.000",
+            "sezonluk": 77708.41,
+            "tekMac": 189457.92
+          },
+          {
+            "code": "C",
+            "min": 23001,
+            "max": 26000,
+            "label": "23.001 - 26.000",
+            "sezonluk": 91196.69,
+            "tekMac": 218358.3
+          },
+          {
+            "code": "D",
+            "min": 26001,
+            "max": 30000,
+            "label": "26.001 - 30.000",
+            "sezonluk": 109179.19,
+            "tekMac": 256892.13
+          },
+          {
+            "code": "E",
+            "min": 30001,
+            "max": 33000,
+            "label": "30.001 - 33.000",
+            "sezonluk": 125877.19,
+            "tekMac": 288994.64
+          },
+          {
+            "code": "F",
+            "min": 33001,
+            "max": 36000,
+            "label": "33.001 - 36.000",
+            "sezonluk": 142575.19,
+            "tekMac": 321097.14
+          },
+          {
+            "code": "G",
+            "min": 36001,
+            "max": 39000,
+            "label": "36.001 - 39.000",
+            "sezonluk": 159273.19,
+            "tekMac": 353199.64
+          },
+          {
+            "code": "H",
+            "min": 39001,
+            "max": 42000,
+            "label": "39.001 - 42.000",
+            "sezonluk": 175971.19,
+            "tekMac": 385302.15
+          },
+          {
+            "code": "İ",
+            "min": 42001,
+            "max": 45000,
+            "label": "42.001 - 45.000",
+            "sezonluk": 192669.2,
+            "tekMac": 417404.65
+          },
+          {
+            "code": "J",
+            "min": 45001,
+            "max": 48000,
+            "label": "45.001 - 48.000",
+            "sezonluk": 202302.65,
+            "tekMac": 446347.36
+          },
+          {
+            "code": "K",
+            "min": 48001,
+            "max": 51000,
+            "label": "48.001 - 51.000",
+            "sezonluk": 211936.11,
+            "tekMac": 475290.08
+          },
+          {
+            "code": "L",
+            "min": 51001,
+            "max": 54000,
+            "label": "51.001 - 54.000",
+            "sezonluk": 221569.57,
+            "tekMac": 504232.79
+          },
+          {
+            "code": "M",
+            "min": 54001,
+            "max": 57000,
+            "label": "54.001 - 57.000",
+            "sezonluk": 231203.03,
+            "tekMac": 533175.51
+          },
+          {
+            "code": "N",
+            "min": 57001,
+            "max": 60000,
+            "label": "57.001 - 60.000",
+            "sezonluk": 240836.49,
+            "tekMac": 562118.22
+          },
+          {
+            "code": "O",
+            "min": 60001,
+            "max": 65000,
+            "label": "60.001 - 65.000",
+            "sezonluk": 256892.25,
+            "tekMac": 610356.08
+          },
+          {
+            "code": "P",
+            "min": 65001,
+            "max": 70000,
+            "label": "65.001 - 70.000",
+            "sezonluk": 272948.04,
+            "tekMac": 658593.93
+          },
+          {
+            "code": "R",
+            "min": 70001,
+            "max": 999999,
+            "label": "70.001 ve üzeri",
+            "sezonluk": 289003.79,
+            "tekMac": 706828.76
+          }
+        ]
+      },
+      "lig1": {
+        "label": "II) 1. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 10000,
+            "label": "10.000'e kadar",
+            "sezonluk": 33683.42,
+            "tekMac": 74103.33
+          },
+          {
+            "code": "B",
+            "min": 10001,
+            "max": 20000,
+            "label": "10.001 - 20.000",
+            "sezonluk": 47156.61,
+            "tekMac": 96558.95
+          },
+          {
+            "code": "C",
+            "min": 20001,
+            "max": 30000,
+            "label": "20.001 - 30.000",
+            "sezonluk": 67366.84,
+            "tekMac": 139224.42
+          },
+          {
+            "code": "D",
+            "min": 30001,
+            "max": 999999,
+            "label": "30.000 ve üzeri",
+            "sezonluk": 89822.45,
+            "tekMac": 202100.51
+          }
+        ]
+      },
+      "lig2": {
+        "label": "III) 2. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 5000,
+            "label": "5.000'e kadar",
+            "sezonluk": 15628.7,
+            "tekMac": 43698.69
+          },
+          {
+            "code": "B",
+            "min": 5001,
+            "max": 10000,
+            "label": "5.001 - 10.000",
+            "sezonluk": 27619.78,
+            "tekMac": 51827.05
+          },
+          {
+            "code": "C",
+            "min": 10001,
+            "max": 15000,
+            "label": "10.001 - 15.000",
+            "sezonluk": 44147.0,
+            "tekMac": 78235.23
+          },
+          {
+            "code": "D",
+            "min": 15001,
+            "max": 999999,
+            "label": "15.001 ve üzeri",
+            "sezonluk": 51827.05,
+            "tekMac": 174794.75
+          }
+        ]
+      },
+      "lig3": {
+        "label": "IV) 3. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 5000,
+            "label": "5.000'e kadar",
+            "sezonluk": 7410.3,
+            "tekMac": 18413.19
+          },
+          {
+            "code": "B",
+            "min": 5001,
+            "max": 10000,
+            "label": "5.001 - 10.000",
+            "sezonluk": 18413.19,
+            "tekMac": 26722.2
+          },
+          {
+            "code": "C",
+            "min": 10001,
+            "max": 15000,
+            "label": "10.001 - 15.000",
+            "sezonluk": 22410.59,
+            "tekMac": 44731.52
+          },
+          {
+            "code": "D",
+            "min": 15001,
+            "max": 999999,
+            "label": "15.001 ve üzeri",
+            "sezonluk": 26722.2,
+            "tekMac": 71095.25
+          }
+        ]
+      }
+    },
+    "2023-2024": {
+      "superLig": {
+        "label": "I) Süper Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 20000,
+            "label": "20.000'e kadar",
+            "sezonluk": 38906.49,
+            "tekMac": 97266.33
+          },
+          {
+            "code": "B",
+            "min": 20001,
+            "max": 23000,
+            "label": "20.001 - 23.000",
+            "sezonluk": 47076.04,
+            "tekMac": 114774.29
+          },
+          {
+            "code": "C",
+            "min": 23001,
+            "max": 26000,
+            "label": "23.001 - 26.000",
+            "sezonluk": 55247.28,
+            "tekMac": 132282.24
+          },
+          {
+            "code": "D",
+            "min": 26001,
+            "max": 30000,
+            "label": "26.001 - 30.000",
+            "sezonluk": 66141.14,
+            "tekMac": 155626.18
+          },
+          {
+            "code": "E",
+            "min": 30001,
+            "max": 33000,
+            "label": "30.001 - 33.000",
+            "sezonluk": 76256.85,
+            "tekMac": 175073.99
+          },
+          {
+            "code": "F",
+            "min": 33001,
+            "max": 36000,
+            "label": "33.001 - 36.000",
+            "sezonluk": 86372.56,
+            "tekMac": 194521.8
+          },
+          {
+            "code": "G",
+            "min": 36001,
+            "max": 39000,
+            "label": "36.001 - 39.000",
+            "sezonluk": 96488.27,
+            "tekMac": 213969.62
+          },
+          {
+            "code": "H",
+            "min": 39001,
+            "max": 42000,
+            "label": "39.001 - 42.000",
+            "sezonluk": 106603.98,
+            "tekMac": 233417.43
+          },
+          {
+            "code": "İ",
+            "min": 42001,
+            "max": 45000,
+            "label": "42.001 - 45.000",
+            "sezonluk": 116719.69,
+            "tekMac": 252865.24
+          },
+          {
+            "code": "J",
+            "min": 45001,
+            "max": 48000,
+            "label": "45.001 - 48.000",
+            "sezonluk": 122555.68,
+            "tekMac": 270398.84
+          },
+          {
+            "code": "K",
+            "min": 48001,
+            "max": 51000,
+            "label": "48.001 - 51.000",
+            "sezonluk": 128391.66,
+            "tekMac": 287932.44
+          },
+          {
+            "code": "L",
+            "min": 51001,
+            "max": 54000,
+            "label": "51.001 - 54.000",
+            "sezonluk": 134227.65,
+            "tekMac": 305466.04
+          },
+          {
+            "code": "M",
+            "min": 54001,
+            "max": 57000,
+            "label": "54.001 - 57.000",
+            "sezonluk": 140063.63,
+            "tekMac": 322999.64
+          },
+          {
+            "code": "N",
+            "min": 57001,
+            "max": 60000,
+            "label": "57.001 - 60.000",
+            "sezonluk": 145899.61,
+            "tekMac": 340533.24
+          },
+          {
+            "code": "O",
+            "min": 60001,
+            "max": 65000,
+            "label": "60.001 - 65.000",
+            "sezonluk": 155626.25,
+            "tekMac": 369755.91
+          },
+          {
+            "code": "P",
+            "min": 65001,
+            "max": 70000,
+            "label": "65.001 - 70.000",
+            "sezonluk": 165352.9,
+            "tekMac": 398978.58
+          },
+          {
+            "code": "R",
+            "min": 70001,
+            "max": 999999,
+            "label": "70.001 ve üzeri",
+            "sezonluk": 175079.54,
+            "tekMac": 428199.41
+          }
+        ]
+      },
+      "lig1": {
+        "label": "II) 1. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 10000,
+            "label": "10.000'e kadar",
+            "sezonluk": 20405.54,
+            "tekMac": 44892.07
+          },
+          {
+            "code": "B",
+            "min": 10001,
+            "max": 20000,
+            "label": "10.001 - 20.000",
+            "sezonluk": 28567.65,
+            "tekMac": 58495.76
+          },
+          {
+            "code": "C",
+            "min": 20001,
+            "max": 30000,
+            "label": "20.001 - 30.000",
+            "sezonluk": 40811.07,
+            "tekMac": 84342.66
+          },
+          {
+            "code": "D",
+            "min": 30001,
+            "max": 999999,
+            "label": "30.000 ve üzeri",
+            "sezonluk": 54414.76,
+            "tekMac": 122433.22
+          }
+        ]
+      },
+      "lig2": {
+        "label": "III) 2. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 5000,
+            "label": "5.000'e kadar",
+            "sezonluk": 9467.92,
+            "tekMac": 26472.82
+          },
+          {
+            "code": "B",
+            "min": 5001,
+            "max": 10000,
+            "label": "5.001 - 10.000",
+            "sezonluk": 16732.16,
+            "tekMac": 31397.01
+          },
+          {
+            "code": "C",
+            "min": 10001,
+            "max": 15000,
+            "label": "10.001 - 15.000",
+            "sezonluk": 26744.41,
+            "tekMac": 47395.19
+          },
+          {
+            "code": "D",
+            "min": 15001,
+            "max": 999999,
+            "label": "15.001 ve üzeri",
+            "sezonluk": 31397.01,
+            "tekMac": 105891.29
+          }
+        ]
+      },
+      "lig3": {
+        "label": "IV) 3. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 5000,
+            "label": "5.000'e kadar",
+            "sezonluk": 4489.18,
+            "tekMac": 11154.77
+          },
+          {
+            "code": "B",
+            "min": 5001,
+            "max": 10000,
+            "label": "5.001 - 10.000",
+            "sezonluk": 11154.77,
+            "tekMac": 16188.4
+          },
+          {
+            "code": "C",
+            "min": 10001,
+            "max": 15000,
+            "label": "10.001 - 15.000",
+            "sezonluk": 13576.42,
+            "tekMac": 27098.52
+          },
+          {
+            "code": "D",
+            "min": 15001,
+            "max": 999999,
+            "label": "15.001 ve üzeri",
+            "sezonluk": 16188.4,
+            "tekMac": 43069.76
+          }
+        ]
+      }
+    },
+    "2022-2023": {
+      "superLig": {
+        "label": "I) Süper Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 20000,
+            "label": "20.000'e kadar",
+            "sezonluk": 27871.97,
+            "tekMac": 69680.02
+          },
+          {
+            "code": "B",
+            "min": 20001,
+            "max": 23000,
+            "label": "20.001 - 23.000",
+            "sezonluk": 33724.5,
+            "tekMac": 82222.43
+          },
+          {
+            "code": "C",
+            "min": 23001,
+            "max": 26000,
+            "label": "23.001 - 26.000",
+            "sezonluk": 39578.25,
+            "tekMac": 94764.84
+          },
+          {
+            "code": "D",
+            "min": 26001,
+            "max": 30000,
+            "label": "26.001 - 30.000",
+            "sezonluk": 47382.44,
+            "tekMac": 111488.06
+          },
+          {
+            "code": "E",
+            "min": 30001,
+            "max": 33000,
+            "label": "30.001 - 33.000",
+            "sezonluk": 54629.17,
+            "tekMac": 125420.15
+          },
+          {
+            "code": "F",
+            "min": 33001,
+            "max": 36000,
+            "label": "33.001 - 36.000",
+            "sezonluk": 61875.9,
+            "tekMac": 139352.25
+          },
+          {
+            "code": "G",
+            "min": 36001,
+            "max": 39000,
+            "label": "36.001 - 39.000",
+            "sezonluk": 69122.63,
+            "tekMac": 153284.34
+          },
+          {
+            "code": "H",
+            "min": 39001,
+            "max": 42000,
+            "label": "39.001 - 42.000",
+            "sezonluk": 76369.35,
+            "tekMac": 167216.44
+          },
+          {
+            "code": "İ",
+            "min": 42001,
+            "max": 45000,
+            "label": "42.001 - 45.000",
+            "sezonluk": 83616.08,
+            "tekMac": 181148.53
+          },
+          {
+            "code": "J",
+            "min": 45001,
+            "max": 48000,
+            "label": "45.001 - 48.000",
+            "sezonluk": 87796.89,
+            "tekMac": 193709.32
+          },
+          {
+            "code": "K",
+            "min": 48001,
+            "max": 51000,
+            "label": "48.001 - 51.000",
+            "sezonluk": 91977.69,
+            "tekMac": 206270.1
+          },
+          {
+            "code": "L",
+            "min": 51001,
+            "max": 54000,
+            "label": "51.001 - 54.000",
+            "sezonluk": 96158.5,
+            "tekMac": 218830.89
+          },
+          {
+            "code": "M",
+            "min": 54001,
+            "max": 57000,
+            "label": "54.001 - 57.000",
+            "sezonluk": 100339.3,
+            "tekMac": 231391.68
+          },
+          {
+            "code": "N",
+            "min": 57001,
+            "max": 60000,
+            "label": "57.001 - 60.000",
+            "sezonluk": 104520.11,
+            "tekMac": 243952.46
+          },
+          {
+            "code": "O",
+            "min": 60001,
+            "max": 65000,
+            "label": "60.001 - 65.000",
+            "sezonluk": 111488.11,
+            "tekMac": 264887.1
+          },
+          {
+            "code": "P",
+            "min": 65001,
+            "max": 70000,
+            "label": "65.001 - 70.000",
+            "sezonluk": 118456.12,
+            "tekMac": 285821.75
+          },
+          {
+            "code": "R",
+            "min": 70001,
+            "max": 999999,
+            "label": "70.001 ve üzeri",
+            "sezonluk": 125424.13,
+            "tekMac": 306755.07
+          }
+        ]
+      },
+      "lig1": {
+        "label": "II) 1. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 10000,
+            "label": "10.000'e kadar",
+            "sezonluk": 14618.19,
+            "tekMac": 32159.94
+          },
+          {
+            "code": "B",
+            "min": 10001,
+            "max": 20000,
+            "label": "10.001 - 20.000",
+            "sezonluk": 20465.4,
+            "tekMac": 41905.41
+          },
+          {
+            "code": "C",
+            "min": 20001,
+            "max": 30000,
+            "label": "20.001 - 30.000",
+            "sezonluk": 29236.39,
+            "tekMac": 60421.7
+          },
+          {
+            "code": "D",
+            "min": 30001,
+            "max": 999999,
+            "label": "30.000 ve üzeri",
+            "sezonluk": 38981.85,
+            "tekMac": 87709.18
+          }
+        ]
+      },
+      "lig2": {
+        "label": "III) 2. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 5000,
+            "label": "5.000'e kadar",
+            "sezonluk": 6782.66,
+            "tekMac": 18964.7
+          },
+          {
+            "code": "B",
+            "min": 5001,
+            "max": 10000,
+            "label": "5.001 - 10.000",
+            "sezonluk": 11986.65,
+            "tekMac": 22492.31
+          },
+          {
+            "code": "C",
+            "min": 10001,
+            "max": 15000,
+            "label": "10.001 - 15.000",
+            "sezonluk": 19159.26,
+            "tekMac": 33953.14
+          },
+          {
+            "code": "D",
+            "min": 15001,
+            "max": 999999,
+            "label": "15.001 ve üzeri",
+            "sezonluk": 22492.31,
+            "tekMac": 75858.79
+          }
+        ]
+      },
+      "lig3": {
+        "label": "IV) 3. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 5000,
+            "label": "5.000'e kadar",
+            "sezonluk": 3215.98,
+            "tekMac": 7991.1
+          },
+          {
+            "code": "B",
+            "min": 5001,
+            "max": 10000,
+            "label": "5.001 - 10.000",
+            "sezonluk": 7991.1,
+            "tekMac": 11597.11
+          },
+          {
+            "code": "C",
+            "min": 10001,
+            "max": 15000,
+            "label": "10.001 - 15.000",
+            "sezonluk": 9725.92,
+            "tekMac": 19412.93
+          },
+          {
+            "code": "D",
+            "min": 15001,
+            "max": 999999,
+            "label": "15.001 ve üzeri",
+            "sezonluk": 11597.11,
+            "tekMac": 30854.47
+          }
+        ]
+      }
+    },
+    "2020-2021": {
+      "superLig": {
+        "label": "I) Süper Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 20000,
+            "label": "20.000'e kadar",
+            "sezonluk": 18971.82,
+            "tekMac": 47429.6
+          },
+          {
+            "code": "B",
+            "min": 20001,
+            "max": 23000,
+            "label": "20.001 - 23.000",
+            "sezonluk": 22955.5,
+            "tekMac": 55966.94
+          },
+          {
+            "code": "C",
+            "min": 23001,
+            "max": 26000,
+            "label": "23.001 - 26.000",
+            "sezonluk": 26940.02,
+            "tekMac": 64504.27
+          },
+          {
+            "code": "D",
+            "min": 26001,
+            "max": 30000,
+            "label": "26.001 - 30.000",
+            "sezonluk": 32252.15,
+            "tekMac": 75887.39
+          },
+          {
+            "code": "E",
+            "min": 30001,
+            "max": 33000,
+            "label": "30.001 - 33.000",
+            "sezonluk": 37184.83,
+            "tekMac": 85370.65
+          },
+          {
+            "code": "F",
+            "min": 33001,
+            "max": 36000,
+            "label": "33.001 - 36.000",
+            "sezonluk": 42117.52,
+            "tekMac": 94853.91
+          },
+          {
+            "code": "G",
+            "min": 36001,
+            "max": 39000,
+            "label": "36.001 - 39.000",
+            "sezonluk": 47050.2,
+            "tekMac": 104337.17
+          },
+          {
+            "code": "H",
+            "min": 39001,
+            "max": 42000,
+            "label": "39.001 - 42.000",
+            "sezonluk": 51982.88,
+            "tekMac": 113820.43
+          },
+          {
+            "code": "İ",
+            "min": 42001,
+            "max": 45000,
+            "label": "42.001 - 45.000",
+            "sezonluk": 56915.57,
+            "tekMac": 123303.69
+          },
+          {
+            "code": "J",
+            "min": 45001,
+            "max": 48000,
+            "label": "45.001 - 48.000",
+            "sezonluk": 59761.35,
+            "tekMac": 131853.53
+          },
+          {
+            "code": "K",
+            "min": 48001,
+            "max": 51000,
+            "label": "48.001 - 51.000",
+            "sezonluk": 62607.12,
+            "tekMac": 140403.37
+          },
+          {
+            "code": "L",
+            "min": 51001,
+            "max": 54000,
+            "label": "51.001 - 54.000",
+            "sezonluk": 65452.9,
+            "tekMac": 148953.21
+          },
+          {
+            "code": "M",
+            "min": 54001,
+            "max": 57000,
+            "label": "54.001 - 57.000",
+            "sezonluk": 68298.68,
+            "tekMac": 157503.06
+          },
+          {
+            "code": "N",
+            "min": 57001,
+            "max": 60000,
+            "label": "57.001 - 60.000",
+            "sezonluk": 71144.46,
+            "tekMac": 166052.9
+          },
+          {
+            "code": "O",
+            "min": 60001,
+            "max": 65000,
+            "label": "60.001 - 65.000",
+            "sezonluk": 75887.42,
+            "tekMac": 180302.63
+          },
+          {
+            "code": "P",
+            "min": 65001,
+            "max": 70000,
+            "label": "65.001 - 70.000",
+            "sezonluk": 80630.39,
+            "tekMac": 194552.37
+          },
+          {
+            "code": "R",
+            "min": 70001,
+            "max": 999999,
+            "label": "70.001 ve Üzeri",
+            "sezonluk": 85373.35,
+            "tekMac": 208801.21
+          }
+        ]
+      },
+      "lig1": {
+        "label": "II) 1. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 10000,
+            "label": "10.000'e kadar",
+            "sezonluk": 9950.27,
+            "tekMac": 21890.54
+          },
+          {
+            "code": "B",
+            "min": 10001,
+            "max": 20000,
+            "label": "10.001 - 20.000",
+            "sezonluk": 13930.33,
+            "tekMac": 28524.06
+          },
+          {
+            "code": "C",
+            "min": 20001,
+            "max": 30000,
+            "label": "20.001 - 30.000",
+            "sezonluk": 19900.54,
+            "tekMac": 41127.68
+          },
+          {
+            "code": "D",
+            "min": 30001,
+            "max": 999999,
+            "label": "30.000 ve Üzeri",
+            "sezonluk": 26534.06,
+            "tekMac": 59701.63
+          }
+        ]
+      },
+      "lig2": {
+        "label": "III) 2. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 5000,
+            "label": "5.000'e kadar",
+            "sezonluk": 4616.81,
+            "tekMac": 12908.84
+          },
+          {
+            "code": "B",
+            "min": 5001,
+            "max": 10000,
+            "label": "5.001 - 10.000",
+            "sezonluk": 8159.04,
+            "tekMac": 15310.0
+          },
+          {
+            "code": "C",
+            "min": 10001,
+            "max": 15000,
+            "label": "10.001 - 15.000",
+            "sezonluk": 13041.27,
+            "tekMac": 23111.13
+          },
+          {
+            "code": "D",
+            "min": 15001,
+            "max": 999999,
+            "label": "15.001 ve Üzeri",
+            "sezonluk": 15310.0,
+            "tekMac": 51635.36
+          }
+        ]
+      },
+      "lig3": {
+        "label": "IV) 3. Lig",
+        "tiers": [
+          {
+            "code": "A",
+            "min": 0,
+            "max": 5000,
+            "label": "5.000'e kadar",
+            "sezonluk": 2189.04,
+            "tekMac": 5439.36
+          },
+          {
+            "code": "B",
+            "min": 5001,
+            "max": 10000,
+            "label": "5.001 - 10.000",
+            "sezonluk": 5439.36,
+            "tekMac": 7893.89
+          },
+          {
+            "code": "C",
+            "min": 10001,
+            "max": 15000,
+            "label": "10.001 - 15.000",
+            "sezonluk": 6629.22,
+            "tekMac": 13213.94
+          },
+          {
+            "code": "D",
+            "min": 15001,
+            "max": 999999,
+            "label": "15.001 ve Üzeri",
+            "sezonluk": 7893.89,
+            "tekMac": 21001.93
+          }
+        ]
+      }
+    }
+  },
+  "bazIstasyonuRates": {
+    "2026": {
+      "ydo": "%25,49 (VUK 585)",
+      "maktu": 18471.21,
+      "buyuksehirTavan": 92356.05,
+      "digerIlTavan": 55413.63
+    },
+    "2025": {
+      "ydo": "%43,93 (VUK 574)",
+      "maktu": 14719.27,
+      "buyuksehirTavan": 73596.35,
+      "digerIlTavan": 44157.81
+    },
+    "2024": {
+      "ydo": "%58,46 (VUK 554)",
+      "maktu": 10226.69,
+      "buyuksehirTavan": 51133.45,
+      "digerIlTavan": 30680.07
+    },
+    "2023": {
+      "ydo": "%19,30 (Bakanlık maktu tarife güncellemesi)",
+      "maktu": 6453.8,
+      "buyuksehirTavan": 32269.0,
+      "digerIlTavan": 19361.4
+    },
+    "2022": {
+      "ydo": "%36,20 (VUK 533)",
+      "maktu": 5409.36,
+      "buyuksehirTavan": 27046.8,
+      "digerIlTavan": 16228.08
+    },
+    "2021": {
+      "ydo": "%9,11 (VUK 521)",
+      "maktu": 3971.65,
+      "buyuksehirTavan": 19858.25,
+      "digerIlTavan": 11914.95
+    },
+    "2020": {
+      "ydo": "%22,58 (VUK 512)",
+      "maktu": 3640.04,
+      "buyuksehirTavan": 18200.2,
+      "digerIlTavan": 10920.12
+    },
+    "2019": {
+      "ydo": "%23,73 (VUK 503)",
+      "maktu": 2969.52,
+      "buyuksehirTavan": 14847.6,
+      "digerIlTavan": 8908.56
+    },
+    "2018": {
+      "ydo": "(Yönetmelik başlangıç tutarı)",
+      "maktu": 2400.0,
+      "buyuksehirTavan": 12000.0,
+      "digerIlTavan": 7200.0
+    }
+  }
+} as const;
+export default mufyardRates;

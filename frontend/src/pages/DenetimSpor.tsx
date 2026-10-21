@@ -18,6 +18,9 @@ import { createAudit, updateAudit, deleteAudit, fetchAuditById } from "../lib/ap
 import { updateTask } from "../lib/api/tasks";
 import { sanitizeHtml } from "../lib/sanitize";
 import { savePhotoToLocalDevice, exportPhotosToComputer } from "../utils/photoExportHelper";
+import ReportDynamicBuilder from "../components/report/ReportDynamicBuilder";
+import { compileStructuredReportToHtml } from "../lib/reportSectionManager";
+import { REPORT_TEMPLATES } from "../lib/reportTemplates";
 
 
 const EVRAK_TALEP_MADDELERI = [
@@ -216,6 +219,7 @@ export default function DenetimSpor() {
 
     // 4. Integrated Report Editor States
     const [reportEditing, setReportEditing] = useState(false);
+    const [reportTabMode, setReportTabMode] = useState<"builder" | "preview">("builder");
     const [reportContent, setReportContent] = useState("");
     const [reportSaving, setReportSaving] = useState(false);
     const [showReportSelectModal, setShowReportSelectModal] = useState(false);
@@ -1433,17 +1437,17 @@ export default function DenetimSpor() {
             }
         });
 
-        const currentRaporTuru = categoryMap[activeTab];
-        let findingsHtml = `<h3><strong>BULUNAN TENKİTLER VE EKSİKLİKLER (${currentRaporTuru || "Denetim Formu"})</strong></h3>`;
-        if (findings.length > 0) {
-            findingsHtml += `<ul>`;
-            findings.forEach(f => {
-                findingsHtml += `<li><strong>Madde:</strong> ${f.text}<br/><strong>Müfettiş Notu:</strong> ${f.note || "<em>Belirtilmedi</em>"}</li>`;
-            });
-            findingsHtml += `</ul>`;
-        } else {
-            findingsHtml += `<p>Yapılan denetim neticesinde herhangi bir tenkit veya eksikliğe rastlanılmamıştır.</p>`;
-        }
+        // Spor Kulüpleri Rapor Taslağı ve Kapağı
+        const { REPORT_TEMPLATES } = await import("../lib/reportTemplates");
+        const { buildSporReportHtml, combineCoverWithReport } = await import("../lib/reportSectionManager");
+
+        const sporTemplate = REPORT_TEMPLATES.find(t => t.id === "spor_kulüpleri_genel_denetim_raporu_taslağı01_09_2025_docx") ||
+                             REPORT_TEMPLATES.find(t => t.id === "2-_kulüp_i̇nceleme_rapor_taslağı_docx");
+        const coverTemplate = REPORT_TEMPLATES.find(t => t.id === "1-_kulüp_i̇nceleme_rapor_kapağı_taslağı_docx");
+
+        const baseHtml = sporTemplate ? sporTemplate.html : `<p class="ql-align-justify"><strong>GİRİŞ</strong></p>`;
+        const structuredReport = buildSporReportHtml(baseHtml, findings);
+        const fullReportWithCover = combineCoverWithReport(coverTemplate?.html || "", structuredReport);
 
         let writeMode: "append" | "replace" = "replace";
         const strippedContent = (report.report_content || "").replace(/<[^>]*>/g, "").trim();
@@ -1456,8 +1460,8 @@ export default function DenetimSpor() {
         if (report.report_content && !isPlaceholder) {
             const overwrite = await confirm({
                 title: "Bulgu Aktarımı",
-                message: "Seçtiğiniz raporda mevcut içerik bulunuyor. Üzerine yazmak (mevcut içeriği silmek) istiyor musunuz?",
-                confirmText: "Üzerine Yaz",
+                message: "Seçtiğiniz raporda mevcut içerik bulunuyor. Resmi Spor Kulüpleri şablonu ve kapağı ile üzerine yazmak istiyor musunuz?",
+                confirmText: "Resmi Şablon ile Üzerine Yaz",
                 cancelText: "Sonuna Ekle",
                 variant: "warning"
             });
@@ -1468,16 +1472,16 @@ export default function DenetimSpor() {
             }
         }
 
-        let finalContent = findingsHtml;
+        let finalContent = fullReportWithCover;
         if (writeMode === "append") {
-            finalContent = (report.report_content || "") + "<br/>" + findingsHtml;
+            finalContent = (report.report_content || "") + "<br/>" + structuredReport;
         }
 
         try {
             await updateAudit(report.id, {
                 report_content: finalContent
             });
-            toast.success("Bulgular başarıyla rapora aktarıldı.");
+            toast.success("Bulgular resmi Spor Kulüpleri şablonuna aktarıldı ve kapak eklendi.");
             if (user?.uid) {
                 refreshAudits(user.uid, user.email || undefined);
             }
@@ -2988,82 +2992,145 @@ export default function DenetimSpor() {
                                                     </div>
                                                 ) : (
                                                     <div className="flex-1 flex flex-col gap-4">
-                                                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/30 pb-2">
-                                                            <h3 className="text-xs font-black uppercase tracking-[0.15em] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                                                                <FileText size={14} className="text-blue-500" />
-                                                                <span>Denetim Raporu İçeriği</span>
-                                                            </h3>
+                                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 dark:border-slate-800/30 pb-3 gap-2">
+                                                            <div className="flex items-center gap-3">
+                                                                <h3 className="text-xs font-black uppercase tracking-[0.15em] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                                                    <FileText size={14} className="text-blue-500" />
+                                                                    <span>Denetim Raporu İçeriği</span>
+                                                                </h3>
+                                                                {/* Görünüm Modu Seçici */}
+                                                                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setReportTabMode("builder")}
+                                                                        className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                                                                            reportTabMode === "builder"
+                                                                                ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs"
+                                                                                : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                                                                        }`}
+                                                                    >
+                                                                        <span>🏗️ Dinamik Yapılandırıcı (Kulüp Başlıkları)</span>
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setReportTabMode("preview")}
+                                                                        className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                                                                            reportTabMode === "preview"
+                                                                                ? "bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-xs"
+                                                                                : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                                                                        }`}
+                                                                    >
+                                                                        <span>📄 Belge Önizleme & Tenkit Bankası</span>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
                                                             <div className="flex items-center gap-1.5">
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
-                                                                    className="rounded-lg text-[10px] h-8"
+                                                                    className="rounded-lg text-[11px] h-8 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 font-bold"
                                                                     onClick={() => navigate(`/audit/${selectedReport.id}/report`)}
                                                                 >
-                                                                    <ExternalLink size={12} className="mr-1" /> Editörde Aç
+                                                                    <ExternalLink size={12} className="mr-1" /> Editörde Aç (TinyMCE)
                                                                 </Button>
-                                                                {reportEditing ? (
-                                                                    <div className="flex items-center gap-1">
+                                                                {reportTabMode === "preview" && (
+                                                                    reportEditing ? (
+                                                                        <div className="flex items-center gap-1">
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                className="rounded-lg text-[10px] h-8 text-slate-400"
+                                                                                onClick={() => {
+                                                                                    setReportContent(selectedReport.report_content || "");
+                                                                                    setReportEditing(false);
+                                                                                }}
+                                                                            >
+                                                                                İptal
+                                                                            </Button>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                className="rounded-lg text-[10px] h-8"
+                                                                                onClick={handleSaveReport}
+                                                                                disabled={reportSaving}
+                                                                            >
+                                                                                {reportSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} className="mr-1" />}
+                                                                                Kaydet
+                                                                            </Button>
+                                                                        </div>
+                                                                    ) : (
                                                                         <Button
                                                                             variant="outline"
                                                                             size="sm"
-                                                                            className="rounded-lg text-[10px] h-8 text-slate-400"
-                                                                            onClick={() => {
-                                                                                setReportContent(selectedReport.report_content || "");
-                                                                                setReportEditing(false);
-                                                                            }}
-                                                                        >
-                                                                            İptal
-                                                                        </Button>
-                                                                        <Button
-                                                                            size="sm"
                                                                             className="rounded-lg text-[10px] h-8"
-                                                                            onClick={handleSaveReport}
-                                                                            disabled={reportSaving}
+                                                                            onClick={() => setReportEditing(true)}
                                                                         >
-                                                                            {reportSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} className="mr-1" />}
-                                                                            Kaydet
+                                                                            Manuel Düzenle
                                                                         </Button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        className="rounded-lg text-[10px] h-8"
-                                                                        onClick={() => setReportEditing(true)}
-                                                                    >
-                                                                        Manuel Düzenle
-                                                                    </Button>
+                                                                    )
                                                                 )}
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 min-h-[300px]">
-                                                            {/* Left: Editor Area */}
-                                                            <div className="xl:col-span-7 flex flex-col gap-2">
-                                                                {reportEditing ? (
-                                                                    <textarea
-                                                                        value={reportContent}
-                                                                        onChange={e => setReportContent(e.target.value)}
-                                                                        className="flex-1 w-full p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-955/20 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed resize-none h-[350px] lg:h-full"
-                                                                        placeholder="Rapor içeriğini HTML formatında yazın..."
-                                                                    />
-                                                                ) : (
-                                                                    <div 
-                                                                        className="flex-1 p-4 rounded-xl border border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-955/5 text-xs text-slate-800 dark:text-slate-255 leading-relaxed overflow-y-auto select-text prose prose-sm dark:prose-invert max-w-none h-[350px] lg:h-full"
-                                                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(reportContent || "<p class='text-slate-400 italic'>Rapor içeriği boş.</p>") }}
-                                                                    />
-                                                                )}
-                                                                <p className="text-[10px] text-slate-400 font-bold">
-                                                                    * Rapor içeriği HTML formatındadır. TinyMCE zengin metin düzenleyiciyle düzenlemek için sağ üstteki "Editörde Aç" butonunu kullanın.
-                                                                </p>
+                                                        {reportTabMode === "builder" ? (
+                                                            <div className="flex-1 min-h-[600px] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs flex flex-col">
+                                                                <ReportDynamicBuilder
+                                                                    htmlContent={reportContent || selectedReport.report_content || ""}
+                                                                    reportTitle={selectedReport.title || selectedTask?.rapor_adi || "Spor Kulüpleri Genel Teftiş Raporu"}
+                                                                    templateId="6-_spor_kulüpleri_genel_teftiş_raporu_taslağı_docx"
+                                                                    onCompileAndSwitchToDoc={async (compiledHtml) => {
+                                                                        setReportContent(compiledHtml);
+                                                                        try {
+                                                                            await updateAudit(selectedReport.id, { report_content: compiledHtml });
+                                                                            toast.success("Rapor derlendi ve kaydedildi.");
+                                                                            if (user?.uid) {
+                                                                                await refreshAudits(user.uid, user.email || undefined);
+                                                                            }
+                                                                            navigate(`/audit/${selectedReport.id}/report`);
+                                                                        } catch (e) {
+                                                                            toast.error("Rapor kaydedilemedi.");
+                                                                        }
+                                                                    }}
+                                                                    onStateChange={async (state) => {
+                                                                        const coverObj = REPORT_TEMPLATES.find(t => t.id.includes("kulüp") || t.id.includes("kapağı"));
+                                                                        const compiled = compileStructuredReportToHtml(state, coverObj?.html);
+                                                                        setReportContent(compiled);
+                                                                        try {
+                                                                            await updateAudit(selectedReport.id, { report_content: compiled });
+                                                                        } catch (err) {
+                                                                            console.error("Auto-sync error:", err);
+                                                                        }
+                                                                    }}
+                                                                />
                                                             </div>
+                                                        ) : (
+                                                            <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 min-h-[300px]">
+                                                                {/* Left: Editor Area */}
+                                                                <div className="xl:col-span-7 flex flex-col gap-2">
+                                                                    {reportEditing ? (
+                                                                        <textarea
+                                                                            value={reportContent}
+                                                                            onChange={e => setReportContent(e.target.value)}
+                                                                            className="flex-1 w-full p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-955/20 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed resize-none h-[350px] lg:h-full"
+                                                                            placeholder="Rapor içeriğini HTML formatında yazın..."
+                                                                        />
+                                                                    ) : (
+                                                                        <div 
+                                                                            className="flex-1 p-4 rounded-xl border border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-955/5 text-xs text-slate-800 dark:text-slate-255 leading-relaxed overflow-y-auto select-text prose prose-sm dark:prose-invert max-w-none h-[350px] lg:h-full"
+                                                                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(reportContent || "<p class='text-slate-400 italic'>Rapor içeriği boş.</p>") }}
+                                                                        />
+                                                                    )}
+                                                                    <p className="text-[10px] text-slate-400 font-bold">
+                                                                        * Rapor içeriği HTML formatındadır. TinyMCE zengin metin düzenleyiciyle düzenlemek için sağ üstteki "Editörde Aç" butonunu kullanın.
+                                                                    </p>
+                                                                </div>
 
-                                                            {/* Right: AI Tenkit Bankası Panel */}
-                                                            <div className="xl:col-span-5 max-h-[500px]">
-                                                                {renderTenkitBank("editor")}
+                                                                {/* Right: AI Tenkit Bankası Panel */}
+                                                                <div className="xl:col-span-5 max-h-[500px]">
+                                                                    {renderTenkitBank("editor")}
+                                                                </div>
                                                             </div>
-                                                        </div>
+                                                        )}
                                                     </div>
                                                 )
                                             )}

@@ -39,6 +39,23 @@ export interface AuditVersion {
 // Smart Cache
 let auditCache: { [key: string]: { data: Audit[], timestamp: number } } = {};
 const CACHE_DURATION = 60 * 1000;
+const TEST_UID = "tolEIwlWrHfWCQduDuXcnqBvWdo2";
+const TEST_EMAIL = "test@mufyard.com";
+
+function filterTestAudits(audits: Audit[], userId?: string, userEmail?: string): Audit[] {
+    const isTest = userId === TEST_UID || (userEmail || "").toLowerCase().trim() === TEST_EMAIL;
+    if (isTest || !Array.isArray(audits)) return audits;
+    return audits.filter(a => {
+        const owner = (a.owner_id || "").toLowerCase();
+        const assigned = (a.assigned_to || []).map(x => String(x).toLowerCase());
+        const shared = (a.shared_with || []).map(x => String(x).toLowerCase());
+        const testIds = [TEST_UID.toLowerCase(), TEST_EMAIL];
+        if (testIds.includes(owner)) return false;
+        if (assigned.some(x => testIds.includes(x))) return false;
+        if (shared.some(x => testIds.includes(x))) return false;
+        return true;
+    });
+}
 
 export async function fetchAudits(userId?: string, userEmail?: string, forceRefresh: boolean = false): Promise<Audit[]> {
     const key = `${userId || 'anon'}_${userEmail || 'anon'}`;
@@ -46,7 +63,7 @@ export async function fetchAudits(userId?: string, userEmail?: string, forceRefr
     const now = Date.now();
     
     if (!forceRefresh && auditCache[key] && (now - auditCache[key].timestamp < CACHE_DURATION)) {
-        return auditCache[key].data;
+        return filterTestAudits(auditCache[key].data, userId, userEmail);
     }
 
     try {
@@ -57,7 +74,8 @@ export async function fetchAudits(userId?: string, userEmail?: string, forceRefr
         if (!response.ok) {
             throw new Error("Denetimler yüklenemedi.");
         }
-        const data = await response.json();
+        const rawData = await response.json();
+        const data = filterTestAudits(rawData, userId, userEmail);
         
         // Update both memory and persistent cache
         auditCache[key] = { data, timestamp: now };
@@ -75,7 +93,7 @@ export async function fetchAudits(userId?: string, userEmail?: string, forceRefr
             try {
                 const parsed = JSON.parse(localData);
                 console.log("Loaded audits from local storage fallback.");
-                return parsed.data;
+                return filterTestAudits(parsed.data, userId, userEmail);
             } catch (e) {
                 console.error("Error parsing local audits cache:", e);
             }
