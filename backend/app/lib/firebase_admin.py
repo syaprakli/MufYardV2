@@ -4,7 +4,7 @@ import os
 import uuid
 import logging
 import json
-from app.config import get_settings
+from app.config import get_settings, LOCAL_FILES_MODE
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -36,7 +36,14 @@ def log_key_details(source_name: str, key_str: str):
         f"lines={lines_count}, starts_with='{clean_k[:25]}', ends_with='{clean_k[-25:]}'"
     )
 
+class _YerelDosyaModu(Exception):
+    pass
+
+
 try:
+    if LOCAL_FILES_MODE:
+        # Yerel dosya modu: hiçbir kaynaktan (env, firebase_secrets, dosya) yönetici anahtarı okunmaz.
+        raise _YerelDosyaModu()
     cred = None
     _cred_dict: dict = {}
     
@@ -123,6 +130,9 @@ try:
     else:
         logger.warning("Firebase certificate not found. Using Demo Mock DB.")
         is_mock = True
+except _YerelDosyaModu:
+    logger.info("Yerel dosya modu: Firebase yönetici bağlantısı kullanılmıyor.")
+    is_mock = True
 except Exception as e:
     logger.error(f"Failed to initialize Firebase: {e}. Falling back to Mock DB.")
     is_mock = True

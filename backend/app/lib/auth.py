@@ -7,6 +7,7 @@ from fastapi import Depends, Header, HTTPException
 from firebase_admin import auth as firebase_auth
 
 from app.lib.firebase_admin import db, is_mock
+from app.config import FIREBASE_PROJECT_ID, LOCAL_FILES_MODE
 
 
 _logger = logging.getLogger(__name__)
@@ -78,6 +79,32 @@ async def is_account_active(decoded_token: Dict[str, Any]) -> bool:
     return True
 
 
+_LOCAL_TOKEN_REQUEST = None
+
+
+def _verify_token_without_admin(token: str) -> Dict[str, Any]:
+    """Yerel dosya modu: Firebase ID token'ını Google'ın herkese açık sertifikalarıyla doğrular.
+
+    Yönetici anahtarı gerekmez. Sertifikalar HTTP önbellek başlıklarına göre önbelleğe alınır
+    (firebase_admin'in yaptığı gibi).
+    """
+    global _LOCAL_TOKEN_REQUEST
+    from google.oauth2 import id_token as google_id_token
+    from google.auth.transport import requests as google_requests
+    if _LOCAL_TOKEN_REQUEST is None:
+        import cachecontrol
+        import requests
+        _LOCAL_TOKEN_REQUEST = google_requests.Request(session=cachecontrol.CacheControl(requests.Session()))
+    claims = google_id_token.verify_firebase_token(
+        token, _LOCAL_TOKEN_REQUEST, audience=FIREBASE_PROJECT_ID, clock_skew_in_seconds=60
+    )
+    if not claims or claims.get("iss") != f"https://securetoken.google.com/{FIREBASE_PROJECT_ID}":
+        raise ValueError("Token bu projeye ait değil.")
+    claims = dict(claims)
+    claims.setdefault("uid", claims.get("user_id") or claims.get("sub"))
+    return claims
+
+
 async def _get_role_for_uid(uid: str) -> str:
     now = time.monotonic()
     if uid in _ROLE_CACHE:
@@ -115,7 +142,10 @@ async def get_current_user(
             decoded = None
             for attempt in range(3):
                 try:
-                    decoded = await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=60))
+                    if LOCAL_FILES_MODE:
+                        decoded = await asyncio.to_thread(_verify_token_without_admin, token)
+                    else:
+                        decoded = await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=60))
                     break
                 except Exception as e:
                     err_str = str(e).lower()
@@ -137,6 +167,10 @@ async def get_current_user(
             if not email_verified:
                 # Doğrulanmamış hesaplar (ör. başkasının e-postasıyla açılmış) hiçbir veriye erişemez.
                 raise HTTPException(status_code=403, detail=EMAIL_NOT_VERIFIED_DETAIL)
+            if LOCAL_FILES_MODE:
+                # Yerel servis yalnızca bu bilgisayardaki Belgeler\MufYARD dosyalarına erişir;
+                # oturum sahibi bu dosyaların sahibidir.
+                return {"uid": uid, "email": email, "email_verified": True, "role": "admin", "local": True}
             if not await is_account_active(decoded):
                 raise HTTPException(status_code=401, detail=ACCOUNT_INACTIVE_DETAIL)
             role = await _get_role_for_uid(uid)
@@ -149,7 +183,7 @@ async def get_current_user(
             raise HTTPException(status_code=401, detail="Kimlik doğrulama başarısız.")
 
     # Dev fallback: only when backend runs with mock Firebase
-    if is_mock and x_user_id:
+    if is_mock and x_user_id and not LOCAL_FILES_MODE:
         role = await _get_role_for_uid(x_user_id)
         return {"uid": x_user_id, "email": x_user_email, "email_verified": False, "role": role}
 

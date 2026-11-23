@@ -129,7 +129,8 @@ ALLOWED_EXTENSIONS = {
     '.mp4', '.avi', '.mov', '.mkv',
     '.zip', '.rar', '.7z',
 }
-IS_DESKTOP = os.environ.get("MUFYARD_DESKTOP", "false").lower() == "true"
+from app.config import LOCAL_FILES_MODE
+IS_DESKTOP = os.environ.get("MUFYARD_DESKTOP", "false").lower() == "true" or LOCAL_FILES_MODE
 
 
 
@@ -555,7 +556,9 @@ async def open_task_folder(
     """
     try:
         task_data = {}
-        if metadata and (metadata.rapor_adi or metadata.rapor_kodu):
+        # Sunucuda görev her zaman veritabanından okunur (istemcinin gönderdiği sahiplik bilgisine güvenilmez).
+        # Yerel dosya modunda veritabanı yoktur; klasör kullanıcının kendi bilgisayarındadır.
+        if LOCAL_FILES_MODE and metadata and (metadata.rapor_adi or metadata.rapor_kodu):
             task_data = {
                 'baslama_tarihi': metadata.baslama_tarihi or utcnow().isoformat().split('T')[0],
                 'rapor_turu': metadata.rapor_turu or 'Diger',
@@ -639,16 +642,17 @@ async def open_task_folder(
                 audit_title
             )
 
-        # Open in OS Explorer
-        if os.name == 'nt': # Windows
-            await asyncio.to_thread(os.startfile, full_path)
-        elif os.name == 'posix': # Mac/Linux
-            import subprocess
-            import platform
-            if platform.system() == 'Darwin':
-                subprocess.run(['open', full_path])
-            else:
-                subprocess.run(['xdg-open', full_path])
+        # Open in OS Explorer (yalnızca masaüstünde; sunucuda gezgin yok)
+        if IS_DESKTOP:
+            if os.name == 'nt': # Windows
+                await asyncio.to_thread(os.startfile, full_path)
+            elif os.name == 'posix': # Mac/Linux
+                import subprocess
+                import platform
+                if platform.system() == 'Darwin':
+                    subprocess.run(['open', full_path])
+                else:
+                    subprocess.run(['xdg-open', full_path])
             
         return {"status": "success", "path": full_path}
     except HTTPException as he:
@@ -669,7 +673,9 @@ async def create_task_folder_endpoint(
     """
     try:
         task_data = {}
-        if metadata and (metadata.rapor_adi or metadata.rapor_kodu):
+        # Sunucuda görev her zaman veritabanından okunur (istemcinin gönderdiği sahiplik bilgisine güvenilmez).
+        # Yerel dosya modunda veritabanı yoktur; klasör kullanıcının kendi bilgisayarındadır.
+        if LOCAL_FILES_MODE and metadata and (metadata.rapor_adi or metadata.rapor_kodu):
             task_data = {
                 'baslama_tarihi': metadata.baslama_tarihi or utcnow().isoformat().split('T')[0],
                 'rapor_turu': metadata.rapor_turu or 'Diger',

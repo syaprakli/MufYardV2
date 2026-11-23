@@ -12,7 +12,7 @@ from fastapi import FastAPI, Depends, Request, Query
 from slowapi.middleware import SlowAPIMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from app.config import get_settings, get_founder_emails, BASE_DIR, DATA_DIR
+from app.config import get_settings, get_founder_emails, BASE_DIR, DATA_DIR, LOCAL_FILES_MODE
 from app.lib.rate_limiter import limiter
 from app.lib.body_limit import BodySizeLimitMiddleware
 from app.lib.log_redaction import install_log_redaction
@@ -96,8 +96,9 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     from app.lib.firebase_admin import is_mock
-    logger.info(f"Uygulama başlıyor. DATA_DIR: {DATA_DIR} | Firebase: {'MOCK' if is_mock else 'real'}")
-    if is_mock:
+    mode = "YEREL DOSYA MODU" if LOCAL_FILES_MODE else ("MOCK" if is_mock else "real")
+    logger.info(f"Uygulama başlıyor. DATA_DIR: {DATA_DIR} | Firebase: {mode}")
+    if is_mock and not LOCAL_FILES_MODE:
         logger.warning("Firebase başlatılamadı; Mock DB kullanılıyor. Üretimde kimlik bilgilerini kontrol edin.")
     yield
 
@@ -208,6 +209,9 @@ _allowed_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:5173",
     "app://.",  # Electron
+    # Kurulu masaüstü uygulaması sayfayı file:// adresinden yükler; tarayıcı Origin'i "null" gönderir.
+    # API kimliği çerez değil Bearer token ile doğrulandığı için bu güvenli (CSRF yüzeyi yok).
+    "null",
     "https://mufyardv2.web.app",
     "https://mufyardv2.firebaseapp.com",
 ]
@@ -231,28 +235,31 @@ app.add_middleware(
 )
 
 # Routers
-app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
-app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])
-app.include_router(contacts.router, prefix="/api/contacts", tags=["Contacts"])
-app.include_router(legislation.router, prefix="/api/legislation", tags=["Legislation"])
-app.include_router(notes.router, prefix="/api/notes", tags=["Notes"])
-app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
-app.include_router(profiles.router, prefix="/api/profiles", tags=["Profiles"])
-app.include_router(licenses.router, prefix="/api/licenses", tags=["Licenses"])
-app.include_router(inspectors.router, prefix="/api/inspectors", tags=["Inspectors"])
 app.include_router(files.router, prefix="/api/files", tags=["Files"])
-app.include_router(ai.router, prefix="/api/ai", tags=["AI"])
-app.include_router(collaboration.router, prefix="/api/collaboration", tags=["Collaboration"])
-app.include_router(ai_knowledge.router, prefix="/api/ai-knowledge", tags=["AI Knowledge"])
-app.include_router(online.router, prefix="/api/online", tags=["Online"])
-app.include_router(backup.router, prefix="/api/backup", tags=["Backup"])
-app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
-app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])
-app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
-app.include_router(settings_router.router, prefix="/api/settings", tags=["Settings"])
-app.include_router(search.router, prefix="/api/search", tags=["Search"])
-app.include_router(audit_trail.router, prefix="/api/audit-trail", tags=["AuditTrail"])
-app.include_router(reminders.router, prefix="/api/reminders", tags=["Reminders"])
+
+# Yerel dosya modunda yalnızca dosya uç noktaları açılır; ortak veriler sunucudan gelir.
+if not LOCAL_FILES_MODE:
+    app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+    app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])
+    app.include_router(contacts.router, prefix="/api/contacts", tags=["Contacts"])
+    app.include_router(legislation.router, prefix="/api/legislation", tags=["Legislation"])
+    app.include_router(notes.router, prefix="/api/notes", tags=["Notes"])
+    app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
+    app.include_router(profiles.router, prefix="/api/profiles", tags=["Profiles"])
+    app.include_router(licenses.router, prefix="/api/licenses", tags=["Licenses"])
+    app.include_router(inspectors.router, prefix="/api/inspectors", tags=["Inspectors"])
+    app.include_router(ai.router, prefix="/api/ai", tags=["AI"])
+    app.include_router(collaboration.router, prefix="/api/collaboration", tags=["Collaboration"])
+    app.include_router(ai_knowledge.router, prefix="/api/ai-knowledge", tags=["AI Knowledge"])
+    app.include_router(online.router, prefix="/api/online", tags=["Online"])
+    app.include_router(backup.router, prefix="/api/backup", tags=["Backup"])
+    app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
+    app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"])
+    app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
+    app.include_router(settings_router.router, prefix="/api/settings", tags=["Settings"])
+    app.include_router(search.router, prefix="/api/search", tags=["Search"])
+    app.include_router(audit_trail.router, prefix="/api/audit-trail", tags=["AuditTrail"])
+    app.include_router(reminders.router, prefix="/api/reminders", tags=["Reminders"])
 
 # --- WEBSOCKET CHAT ENDPOINT ---
 # Moved here to avoid 404 issues with router prefixes in production

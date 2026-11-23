@@ -40,6 +40,13 @@ def get_data_dir():
 
 DATA_DIR = get_data_dir()
 
+# Yerel dosya modu: kurulu masaüstü uygulamasının bilgisayarda çalıştırdığı servis.
+# Firebase yönetici anahtarı YOKTUR; yalnızca Belgeler\MufYARD altındaki dosya işlemlerini yapar.
+# Görev/denetim gibi ortak veriler sunucudan (Railway) gelir. Plan: docs/PLAN-yerel-dosya-modu.md
+LOCAL_FILES_MODE = os.getenv("MUFYARD_LOCAL_FILES", "").strip().lower() in ("1", "true", "yes")
+# Kullanıcı oturumu (Firebase ID token) bu projeye göre doğrulanır; anahtar gerekmez.
+FIREBASE_PROJECT_ID = os.getenv("MUFYARD_FIREBASE_PROJECT_ID", "mufyardv2").strip()
+
 class Settings(BaseSettings):
     # App Settings
     APP_NAME: str = "MufYARD"
