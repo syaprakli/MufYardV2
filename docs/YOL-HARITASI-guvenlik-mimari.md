@@ -34,8 +34,8 @@
 | C3 | AI yazma araçları (mesaj gönder, kişi/not sil…) onaysız çalışıyor → dolaylı prompt injection | MEDIUM→HIGH | ⏸ AI yeniden tasarımında ele alınacak (öneri: araç "öneri" döner, kullanıcı onaylar) | — |
 | C4 | Yüklemeler belleğe alındıktan sonra boyut kontrolü; bazılarında sınır yok | MEDIUM | ✅ `BodySizeLimitMiddleware` (25 MB / mevzuat 50 MB / yedek 100 MB) | e5af56f |
 | C5 | Rate limit IP'ye göre ve `X-Forwarded-For` ile atlatılabiliyordu | MEDIUM | ✅ uid bazlı, en sağdaki proxy IP'si | a84db7b |
-| C6 | Rol önbelleği 5 dk (yetkisi alınan admin 5 dk daha admin) | LOW | ⬜ | — |
-| C7 | `verify_id_token(check_revoked=False)` → devre dışı kullanıcı token süresi dolana kadar (≤1 saat) erişir | LOW-MEDIUM | ⬜ | — |
+| C6 | Rol önbelleği 5 dk (yetkisi alınan admin 5 dk daha admin) | LOW | ✅ 60 sn + rol değişince/profil silinince/yedek yüklenince anında temizlenir | e003d42 |
+| C7 | `verify_id_token(check_revoked=False)` → devre dışı kullanıcı token süresi dolana kadar (≤1 saat) erişir | LOW-MEDIUM | ✅ Hesap durumu (devre dışı / oturum iptali) her istekte, uid başına 60 sn önbellekle; HTTP + tüm WebSocket'ler | e003d42 |
 | C8 | Gemini ücretsiz anahtarlarıyla içerik Google eğitiminde kullanılabilir | MEDIUM (KVKK) | ✅ Ayarlar ve Asistan ekranında uyarı | b1ff15f |
 
 ## 2. Performans
@@ -70,7 +70,7 @@
 | Q3 | İki editör (TinyMCE + Quill/Yjs) | ⬜ Rapor yeniden tasarımında birine karar verilmeli |
 | Q4 | `owner_id` bazen uid bazen e-posta | ⬜ P6 ile birlikte tek kimlik (uid) + veri göçü |
 | Q5 | `google.generativeai` desteği bitti | ⬜ `google.genai`'ye geçiş (istemci başına API anahtarı da global yarışı tamamen kaldırır) |
-| Q6 | `datetime.utcnow`, pydantic `.dict()` eskimiş | ⬜ Toplu değişim |
+| Q6 | `datetime.utcnow`, pydantic `.dict()`, `on_event` eskimiş | ✅ `timeutil.utcnow()` (aynı değer), `model_dump/model_copy`, `lifespan` (d2b2cf6) |
 | Q7 | Repo kirliliği (scratch, eski deploy kopyası, kullanıcı yüklemeleri, loglar) | ✅ Takipten çıkarıldı (0233715). `backend/uploads` git geçmişinde duruyor |
 | Q8 | `esbuild` yalnızca proje dışından bulunuyordu → CI build kırılıyordu | ✅ d25161a |
 
@@ -92,6 +92,5 @@
 
 1. AI yazma + rapor/tenkit yeniden tasarımı (C3, P4, Q3 birlikte)
 2. Q1 — denetim sayfalarının birleştirilmesi
-3. C6/C7 — küçük güvenlik iyileştirmeleri
-4. Q5 — `google.genai` geçişi
-5. P6/Q4 — veri modeli (büyüme öncesi)
+3. Q5 — `google.genai` geçişi (AI yeniden tasarımıyla birlikte)
+4. P6/Q4 — veri modeli (büyüme öncesi)
