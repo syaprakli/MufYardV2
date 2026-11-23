@@ -83,11 +83,12 @@
 | K1 | Sunucu ve dosyalar ABD'deydi | ✅ AB'ye taşındı (Firestore zaten AB) |
 | K2 | KVKK md. 9 yurt dışı aktarım (AB de yurt dışı) | 👤 Kurum KVKK irtibat kişisiyle değerlendirilmeli |
 | K3 | 2019/12 Genelgesi: kamu verisinin yurt içi saklanması | 👤 Rapor verisinin bulutta tutulup tutulamayacağı kurumla netleşmeli; gerekirse raporlar masaüstünde / yurt içi sunucuda |
-| K4 | Firebase Storage bucket konumu | ⬜ Doğrulanmadı (yerel anahtar güncellenince okunabilir) |
+| K4 | Firebase Storage bucket konumu | ⚠️ **US-EAST1 (ABD)** — 23.11.2026'da doğrulandı. Sunucuya yüklenen dosyalar (denetim fotoğrafları, Kamusal Alan, "Sunucuya Gönder") ABD'de. Bucket konumu değiştirilemez; AB'de yeni bucket + nesne göçü + adres güncellemesi gerekir. K2/K3 kurum kararına bağlı |
 
 ## 6. Bekleyen kullanıcı aksiyonları
 
-- 👤 `backend/firebase-credentials.json` → Railway'deki `FIREBASE_SERVICE_ACCOUNT_JSON` (anahtar `13c48d2a…`) ile değiştirilmeli; yerel dosya geçersiz anahtar içeriyor.
+- ✅ Yerel `firebase-credentials.json` güncellendi (kullanıcı).
+- 👤 Yeni kurulum dosyası testi (`docs/PLAN-yerel-dosya-modu.md` aşama 6).
 - 👤 K2/K3 için kurum görüşmesi.
 
 ## 7. Önerilen sıradaki adımlar
