@@ -66,7 +66,7 @@
 
 | # | Bulgu | Durum |
 |---|---|---|
-| Q1 | 5 `Denetim*.tsx` sayfası (~16 bin satır) %82–97 aynı | ⬜ Tek bileşen + tesis türüne göre config. **Yeni tesis türü eklemeden önce yapılmalı** |
+| Q1 | 5 `Denetim*.tsx` sayfası (~16 bin satır) %82–97 aynı | ✅ Tek `pages/denetim/DenetimSayfasi.tsx` + `denetimTurleri.ts` (~6.100 satır). Plan: `docs/PLAN-denetim-sayfalari-birlestirme.md` |
 | Q2 | `Files.tsx` 9.419 satır, 174 `useState` | ⬜ Ağaç / önizleme / paylaşım / yükleme bileşenlerine bölünmeli |
 | Q3 | İki editör (TinyMCE + Quill/Yjs) | ⬜ Rapor yeniden tasarımında birine karar verilmeli |
 | Q4 | `owner_id` bazen uid bazen e-posta | ⬜ P6 ile birlikte tek kimlik (uid) + veri göçü |
@@ -92,6 +92,6 @@
 ## 7. Önerilen sıradaki adımlar
 
 1. AI yazma + rapor/tenkit yeniden tasarımı (C3, P4, Q3 birlikte)
-2. Q1 — denetim sayfalarının birleştirilmesi
+2. D6 — masaüstünde yerel dosyalar (`docs/PLAN-yerel-dosya-modu.md`)
 3. Q5 — `google.genai` geçişi (AI yeniden tasarımıyla birlikte)
 4. P6/Q4 — veri modeli (büyüme öncesi)

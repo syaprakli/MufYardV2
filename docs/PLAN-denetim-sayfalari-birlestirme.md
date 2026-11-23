@@ -1,6 +1,6 @@
 # PLAN — Denetim Sayfalarının Birleştirilmesi (Yol haritası Q1)
 
-> Durum: **uygulanıyor** · Hazırlanma: 23.11.2026
+> Durum: **tamamlandı** (23.11.2026) · Hazırlanma: 23.11.2026
 >
 > | Aşama | Durum |
 > |---|---|
@@ -9,8 +9,8 @@
 > | 2 Özel Yurt | ✅ `/denetim/ozel` → `DenetimSayfasi tur="ozel"`; kullanıcı testi ✅ |
 > | 3 KYK | ✅ `/denetim/kyk` → `DenetimSayfasi tur="kyk"`. KYK farkları iki bayrakla: `ilAltGorevleri` (İl görevi altında yurtlar, alt görev otomatik oluşturma), `ozetKartiTasarimi` (KYK üst bölüm tasarımı). İki yönlü satır kontrolü temiz. Kullanıcı testi ✅ |
 > | 4 Spor + Federasyon | ✅ `/denetim/spor`, `/denetim/federasyon` → ortak sayfa. Ayarlar: `pano` (pano + evrak talep yazısı; bloklar eski sayfalardan birebir, tür başına ayrı), `raporSablonu` (bulgu aktarımı: resmi Spor/Federasyon şablonu + kapak), `raporOlusturucu` (ReportDynamicBuilder; başlık, şablon, kapak anahtarı, etiket). Evrak maddeleri `evrakTalepMaddeleri.ts`. Rapor yazma kodu **değiştirilmeden** taşındı. Düzeltmeler: Spor fotoğraf büyütme (yeni pencere → uygulama içi; Electron'da yerel fotoğraflarda çalışmıyordu), modül kartları telefonda sıkı yerleşim (herkese), geçersiz renk sınıfları. İki yönlü satır kontrolü temiz. Kullanıcı testi ✅ (rapor editörü ayrıca denenecek) |
-> | 5 İl | ✅ `/denetim/il` → ortak sayfa. Büyük ölçüde farklılaşmış bölümler bütün olarak `tur === "il"` ile ayrıldı (fotoğraf yükleme, rapor verisi yükleme + tesis tarayıcı yedeği, görev başlığı il seçici, sekme çubuğu, kart alt kısmı); evrak talebi / istenecek tablolar (tenkit) / tesisler `ilEkleri` içinde **değiştirilmeden**; `DenetimOzetTablolar` ve `IlTesisleriDenetim` yalnızca İl'de, ihtiyaç anında yüklenir. İl'de kaldırılmış "Bu İle Bağlı KYK" paneli ortak sayfadan da kaldırıldı. Ayarlar: `raporSablonu: "il"`, `raporOlusturucu` (14 Başlık, `kapakId`), `sonGorevAnahtari`. Doğrulama temiz. **Kullanıcı testi bekleniyor** |
-> | 6 Eski dosyaların silinmesi | ⬜ İl testi sonrası |
+> | 5 İl | ✅ `/denetim/il` → ortak sayfa. Büyük ölçüde farklılaşmış bölümler bütün olarak `tur === "il"` ile ayrıldı (fotoğraf yükleme, rapor verisi yükleme + tesis tarayıcı yedeği, görev başlığı il seçici, sekme çubuğu, kart alt kısmı); evrak talebi / istenecek tablolar (tenkit) / tesisler `ilEkleri` içinde **değiştirilmeden**; `DenetimOzetTablolar` ve `IlTesisleriDenetim` yalnızca İl'de, ihtiyaç anında yüklenir. İl'de kaldırılmış "Bu İle Bağlı KYK" paneli ortak sayfadan da kaldırıldı. Ayarlar: `raporSablonu: "il"`, `raporOlusturucu` (14 Başlık, `kapakId`), `sonGorevAnahtari`. Doğrulama temiz. Kullanıcı testi ✅ (sekme çubuğu taşması düzeltildi: geniş ekranda alt satıra geçer) |
+> | 6 Eski dosyaların silinmesi | ✅ 5 eski sayfa (16.577 satır) silindi; geri dönüş git geçmişinden |
 
 ## 1. Mevcut durum (ölçüldü)
 

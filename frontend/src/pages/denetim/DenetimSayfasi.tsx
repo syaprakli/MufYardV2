@@ -4967,7 +4967,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                                 </div>
 
                                                 {/* Quick Switcher Pills */}
-                                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto shrink-0 scroll-smooth touch-pan-x flex-nowrap pr-2 sm:pr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto min-w-0 scroll-smooth touch-pan-x flex-nowrap lg:flex-wrap lg:justify-end lg:overflow-visible pr-2 sm:pr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                                                     {[
                                                         { id: "info", label: "Genel Bilgi" },
                                                         { id: "notes", label: "Notlar" },

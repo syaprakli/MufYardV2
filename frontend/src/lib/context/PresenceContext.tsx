@@ -213,9 +213,11 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
+        // Masaüstünde yerel backend açılışta birkaç saniye hazır olmayabilir; bağlantı kısa sürede
+        // kurulursa yanlış uyarı göstermemek için daha uzun beklenir.
         const timer = setTimeout(() => {
             setConnectionFailed(true);
-        }, 5000);
+        }, 20000);
 
         return () => clearTimeout(timer);
     }, [wsConnected, user?.uid]);
