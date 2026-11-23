@@ -6,8 +6,8 @@
 > |---|---|
 > | 0 Test altyapısı | Ertelendi: sayfalar uygulama bağlamlarına (auth, ortak veri, onay, yönlendirme) sıkı bağlı; bunun yerine her geçişte "ayar = eski sayfa" eşdeğerlik kontrolü yapılıyor |
 > | 1 Ortak yardımcılar | Aşama 2 ile birlikte yapıldı (yardımcılar ortak sayfada) |
-> | 2 Özel Yurt | ✅ `/denetim/ozel` → `DenetimSayfasi tur="ozel"`; eşdeğerlik: yalnızca fonksiyon başlığı farklı. **Kullanıcı testi bekleniyor** |
-> | 3 KYK | ⬜ |
+> | 2 Özel Yurt | ✅ `/denetim/ozel` → `DenetimSayfasi tur="ozel"`; kullanıcı testi ✅ |
+> | 3 KYK | ✅ `/denetim/kyk` → `DenetimSayfasi tur="kyk"`. KYK farkları iki bayrakla: `ilAltGorevleri` (İl görevi altında yurtlar, alt görev otomatik oluşturma), `ozetKartiTasarimi` (KYK üst bölüm tasarımı). İki yönlü satır kontrolü temiz. **Kullanıcı testi bekleniyor** |
 > | 4 Spor + Federasyon | ⬜ |
 > | 5 İl | ⬜ |
 > | 6 Eski dosyaların silinmesi | ⬜ |
@@ -96,6 +96,8 @@ Kopyalar 5 aydır ayrı geliştiği için ortak sanılan bazı bölümler sayfal
 ## 6. Açık sorular (kullanıcıya)
 
 - ✅ Çözüldü (kullanıcı onayı): kart alt yazıları ve rapor adı örneği denetlenen kurumu göstermeli (Yurt Müdürlüğü / Spor Kulübü / Federasyon). `denetimTurleri.ts` ve henüz geçirilmemiş eski sayfalarda düzeltildi.
+
+- ❓ Üst bölüm tasarımı: Özel/İl/Spor/Federasyon "Aktif Form seçici + Durum" kullanıyor, KYK "özet kartı (kod, müfettiş, tarih) + Denetime Başla". Şimdilik ikisi de korunuyor (`ozetKartiTasarimi`). Tek tasarıma inilecekse hangisi?
 
 ## 7. Karar bekleyenler (ilk taslak)
 

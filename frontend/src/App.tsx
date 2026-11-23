@@ -30,7 +30,6 @@ const Assistant = lazy(() => import("./pages/Assistant"));
 const Denetim = lazy(() => import("./pages/Denetim"));
 const DenetimIl = lazy(() => import("./pages/DenetimIl"));
 const DenetimFederasyon = lazy(() => import("./pages/DenetimFederasyon"));
-const DenetimKyk = lazy(() => import("./pages/DenetimKyk"));
 // Denetim sayfaları ortak sayfaya aşamalı olarak geçiriliyor (docs/PLAN-denetim-sayfalari-birlestirme.md).
 // Geri dönüş: ilgili Route'ta <DenetimSayfasi tur="..."/> yerine eski sayfayı kullanın.
 const DenetimSayfasi = lazy(() => import("./pages/denetim/DenetimSayfasi"));
@@ -226,7 +225,7 @@ function App() {
                         <Route path="denetim" element={<Denetim />} />
                         <Route path="denetim/il" element={<DenetimIl />} />
                         <Route path="denetim/federasyon" element={<DenetimFederasyon />} />
-                        <Route path="denetim/kyk" element={<DenetimKyk />} />
+                        <Route path="denetim/kyk" element={<DenetimSayfasi key="kyk" tur="kyk" />} />
                         <Route path="denetim/ozel" element={<DenetimSayfasi key="ozel" tur="ozel" />} />
                         <Route path="denetim/spor" element={<DenetimSpor />} />
                         <Route path="denetim/bilgi-bankasi" element={<DenetimBilgiBankasi />} />
