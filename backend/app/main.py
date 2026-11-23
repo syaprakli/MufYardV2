@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import get_settings, get_founder_emails, BASE_DIR, DATA_DIR
 from app.lib.rate_limiter import limiter
+from app.lib.body_limit import BodySizeLimitMiddleware
 from app.lib.auth import get_current_user
 from typing import Any, Dict
 
@@ -216,6 +217,8 @@ _allowed_origins = list(set(_allowed_origins + _env_origins))
 # IMPORTANT: FastAPI middleware order is LIFO (last added = outermost = runs first)
 # CORSMiddleware MUST be added LAST so it runs FIRST on incoming requests
 # This ensures CORS headers are added to ALL responses including error responses
+# Gövde boyutu sınırı: yüklemeler belleğe/diske alınmadan önce reddedilir (CORS bunu sarar).
+app.add_middleware(BodySizeLimitMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
