@@ -7,8 +7,8 @@
 > | 0 Test altyapısı | Ertelendi: sayfalar uygulama bağlamlarına (auth, ortak veri, onay, yönlendirme) sıkı bağlı; bunun yerine her geçişte "ayar = eski sayfa" eşdeğerlik kontrolü yapılıyor |
 > | 1 Ortak yardımcılar | Aşama 2 ile birlikte yapıldı (yardımcılar ortak sayfada) |
 > | 2 Özel Yurt | ✅ `/denetim/ozel` → `DenetimSayfasi tur="ozel"`; kullanıcı testi ✅ |
-> | 3 KYK | ✅ `/denetim/kyk` → `DenetimSayfasi tur="kyk"`. KYK farkları iki bayrakla: `ilAltGorevleri` (İl görevi altında yurtlar, alt görev otomatik oluşturma), `ozetKartiTasarimi` (KYK üst bölüm tasarımı). İki yönlü satır kontrolü temiz. **Kullanıcı testi bekleniyor** |
-> | 4 Spor + Federasyon | ⬜ |
+> | 3 KYK | ✅ `/denetim/kyk` → `DenetimSayfasi tur="kyk"`. KYK farkları iki bayrakla: `ilAltGorevleri` (İl görevi altında yurtlar, alt görev otomatik oluşturma), `ozetKartiTasarimi` (KYK üst bölüm tasarımı). İki yönlü satır kontrolü temiz. Kullanıcı testi bekleniyor |
+> | 4 Spor + Federasyon | ✅ `/denetim/spor`, `/denetim/federasyon` → ortak sayfa. Ayarlar: `pano` (pano + evrak talep yazısı; bloklar eski sayfalardan birebir, tür başına ayrı), `raporSablonu` (bulgu aktarımı: resmi Spor/Federasyon şablonu + kapak), `raporOlusturucu` (ReportDynamicBuilder; başlık, şablon, kapak anahtarı, etiket). Evrak maddeleri `evrakTalepMaddeleri.ts`. Rapor yazma kodu **değiştirilmeden** taşındı. Düzeltmeler: Spor fotoğraf büyütme (yeni pencere → uygulama içi; Electron'da yerel fotoğraflarda çalışmıyordu), modül kartları telefonda sıkı yerleşim (herkese), geçersiz renk sınıfları. İki yönlü satır kontrolü temiz. **Kullanıcı testi bekleniyor** |
 > | 5 İl | ⬜ |
 > | 6 Eski dosyaların silinmesi | ⬜ |
 

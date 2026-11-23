@@ -34,6 +34,12 @@ export interface DenetimTuruAyari {
     ilAltGorevleri: boolean;
     /** KYK tasarımı: seçili görevin üstünde özet kartı (kod, müfettiş, tarih, "Denetime Başla") */
     ozetKartiTasarimi: boolean;
+    /** Spor / Federasyon: pano sekmesi ve evrak talep yazısı */
+    pano: boolean;
+    /** Bulguları rapora aktarırken kullanılan şablon */
+    raporSablonu: "liste" | "spor" | "federasyon";
+    /** Rapor sekmesinde dinamik yapılandırıcı (ReportDynamicBuilder) */
+    raporOlusturucu: null | { varsayilanBaslik: string; templateId: string; kapakAnahtari: string; yapilandiriciEtiketi: string };
 }
 
 export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
@@ -50,6 +56,9 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         raporAdiOrnegi: "Özel Yurt Denetimi 2026",
         ilAltGorevleri: false,
         ozetKartiTasarimi: false,
+        pano: false,
+        raporSablonu: "liste",
+        raporOlusturucu: null,
     },
     kyk: {
         key: "kyk",
@@ -64,6 +73,9 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         raporAdiOrnegi: "KYK Yurt Denetimi 2026",
         ilAltGorevleri: true,
         ozetKartiTasarimi: true,
+        pano: false,
+        raporSablonu: "liste",
+        raporOlusturucu: null,
     },
     il: {
         key: "il",
@@ -78,6 +90,9 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         raporAdiOrnegi: "İl Müdürlüğü Denetimi 2026",
         ilAltGorevleri: false,
         ozetKartiTasarimi: false,
+        pano: false,
+        raporSablonu: "liste",
+        raporOlusturucu: null,
     },
     spor: {
         key: "spor",
@@ -92,6 +107,9 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         raporAdiOrnegi: "Spor Kulübü Denetimi 2026",
         ilAltGorevleri: false,
         ozetKartiTasarimi: false,
+        pano: true,
+        raporSablonu: "spor",
+        raporOlusturucu: { varsayilanBaslik: "Spor Kulüpleri Genel Teftiş Raporu", templateId: "6-_spor_kulüpleri_genel_teftiş_raporu_taslağı_docx", kapakAnahtari: "kulüp", yapilandiriciEtiketi: "Kulüp Başlıkları" },
     },
     federasyon: {
         key: "federasyon",
@@ -106,5 +124,8 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         raporAdiOrnegi: "Federasyon Denetimi 2026",
         ilAltGorevleri: false,
         ozetKartiTasarimi: false,
+        pano: true,
+        raporSablonu: "federasyon",
+        raporOlusturucu: { varsayilanBaslik: "Federasyon Genel Teftiş Raporu", templateId: "4-_federasyonlar_genel_teftiş_raporu_taslağı_docx", kapakAnahtari: "federasyon", yapilandiriciEtiketi: "8 Başlık" },
     },
 };

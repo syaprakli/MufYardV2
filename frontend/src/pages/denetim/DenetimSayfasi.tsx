@@ -8,7 +8,7 @@ import {
     BookOpen, ClipboardCheck, Bot, Plus, Edit2, Trash2, Search,
     Tag, ChevronRight, X, Check, Loader2, Database, Sparkles, FileText,
     ArrowRight, Info, AlertCircle, Save, ExternalLink, Play, ArrowLeft,
-    Download, Building2
+    Download, Building2, Printer, Copy, Camera
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { API_URL } from "../../lib/config";
@@ -35,6 +35,10 @@ interface KnowledgeItem {
 
 import { AUDIT_TEMPLATES } from "../../lib/auditTemplates";
 import { DENETIM_TURLERI, type DenetimTuruKey } from "./denetimTurleri";
+import { SPOR_EVRAK_TALEP_MADDELERI, FEDERASYON_EVRAK_TALEP_MADDELERI } from "./evrakTalepMaddeleri";
+import ReportDynamicBuilder from "../../components/report/ReportDynamicBuilder";
+import { compileStructuredReportToHtml } from "../../lib/reportSectionManager";
+import { REPORT_TEMPLATES } from "../../lib/reportTemplates";
 
 const PRESET_CATEGORIES = [
     "Yurt İşlemleri", "Spor Tesisi", "Federasyon", "Denetim Genel",
@@ -146,6 +150,65 @@ const getNextReportTitle = (task: any, allTasks: any[], existingReportsCount: nu
 
 export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
     const ayar = DENETIM_TURLERI[tur];
+    const raporOlusturucu = ayar.raporOlusturucu;
+
+    // Evrak talebi formu varsayılanları (Spor Kulübü / Federasyon). Diğer türlerde alan hiç eklenmez.
+    const evrakTalepMaddeleri = tur === "spor" ? SPOR_EVRAK_TALEP_MADDELERI : tur === "federasyon" ? FEDERASYON_EVRAK_TALEP_MADDELERI : [];
+    const yeniEvrakTalep = (): Record<string, any> => {
+        const EVRAK_TALEP_MADDELERI = evrakTalepMaddeleri;
+        if (tur === "spor") {
+            return { evrakTalep: {
+            olurTarihi: "",
+            olurSayisi: "",
+            gorevTarihi: "",
+            gorevSayisi: "",
+            mufettisAdi: "",
+            mufettisUnvani: "Bakanlık Müfettişi",
+            denetimYili: new Date().getFullYear().toString(),
+            teslimSuresi: "7",
+            selectedItems: EVRAK_TALEP_MADDELERI.map((_, i) => i),
+            customText: ""
+        } };
+        }
+        if (tur === "federasyon") {
+            return { evrakTalep: null };
+        }
+        return {};
+    };
+    const yuklenenEvrakTalep = (ad: any): Record<string, any> => {
+        const EVRAK_TALEP_MADDELERI = evrakTalepMaddeleri;
+        if (tur === "spor") {
+            return { evrakTalep: ad.evrakTalep || {
+            olurTarihi: "",
+            olurSayisi: "",
+            gorevTarihi: "",
+            gorevSayisi: "",
+            mufettisAdi: "",
+            mufettisUnvani: "Bakanlık Müfettişi",
+            denetimYili: new Date().getFullYear().toString(),
+            teslimSuresi: "7",
+            selectedItems: EVRAK_TALEP_MADDELERI.map((_, i) => i),
+            customText: ""
+        } };
+        }
+        if (tur === "federasyon") {
+            return { evrakTalep: ad.evrakTalep || {
+                    olurTarihi: "",
+                    olurSayisi: "",
+                    gorevTarihi: "",
+                    gorevSayisi: "",
+                    mufettisAdi: profile?.full_name || "",
+                    mufettisUnvani: "Bakanlık Müfettişi",
+                    denetimDonemi: "01.01.2021 - 31.12.2024",
+                    denetimYili: "2021-2024",
+                    defterDonemi: "01.01.2021 - 30.06.2024",
+                    teslimSuresi: "7",
+                    selectedItems: EVRAK_TALEP_MADDELERI.map((_, i) => i),
+                    customText: ""
+                } };
+        }
+        return {};
+    };
     const confirm = useConfirm();
     const navigate = useNavigate();
     const { user, profile } = useAuth();
@@ -175,6 +238,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
     }, [navigate, activeTab]);
 
     // 3. AI Knowledge base states (CRUD)
+    const [reportTabMode, setReportTabMode] = useState<"builder" | "preview">("builder");
     const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
     const [knowledgeLoading, setKnowledgeLoading] = useState(false);
     const [knowledgeSearch, setKnowledgeSearch] = useState("");
@@ -233,7 +297,8 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
         generalNotes: "",
         photos: [],
         photo_descriptions: {},
-        form: {}
+        form: {},
+        ...yeniEvrakTalep()
     });
     const [activeQuestionForTenkit, setActiveQuestionForTenkit] = useState<string | null>(null);
     const [isSavingAuditData, setIsSavingAuditData] = useState(false);
@@ -414,7 +479,8 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                 generalNotes: ad.generalNotes || "",
                 photos: ad.photos || [],
                 photo_descriptions: ad.photo_descriptions || {},
-                form: ad.form || {}
+                form: ad.form || {},
+                ...yuklenenEvrakTalep(ad)
             });
         } else {
             setReportContent("");
@@ -423,11 +489,17 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                 generalNotes: "",
                 photos: [],
                 photo_descriptions: {},
-                form: {}
+                form: {},
+                ...yeniEvrakTalep()
             });
         }
         setReportEditing(false);
-    }, [selectedReport?.id]);
+    }, [selectedReport?.id, profile?.full_name]);
+
+    // Spor / Federasyon: görev değişince pano sekmesi açılır.
+    useEffect(() => {
+        if (ayar.pano) setActiveDetailTab("dashboard");
+    }, [selectedTaskId]);
 
     const handleSaveAuditData = async (updatedData = localAuditData) => {
         if (!selectedReport) return;
@@ -473,7 +545,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                 await refreshTasks(user.uid);
             }
             // Go back to the dashboard/info tab
-            setActiveDetailTab("info");
+            setActiveDetailTab(ayar.pano ? "dashboard" : "info");
         } catch (error) {
             console.error("Error deleting audit:", error);
             toast.error("Denetim formu silinirken bir hata oluştu.");
@@ -963,7 +1035,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
         return (
             <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 xl:overflow-hidden h-auto xl:h-full">
                 <div className={`flex flex-col gap-4 xl:overflow-hidden h-auto xl:h-full ${activeQuestionForTenkit ? "xl:col-span-7" : "xl:col-span-12"}`}>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-955 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
                         <div className="flex-1 relative">
                             <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input
@@ -1156,7 +1228,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                         {mode === "editor" ? "Rapora Ekle" : "Nota Ekle"}
                                     </Button>
                                 </div>
-                                <div className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-3 bg-slate-50 dark:bg-slate-955/5 p-2 rounded font-medium border border-slate-100 dark:border-slate-800/20" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.standard_remark || "") }} />
+                                <div className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-3 bg-slate-50 dark:bg-slate-950/5 p-2 rounded font-medium border border-slate-100 dark:border-slate-800/20" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.standard_remark || "") }} />
                             </div>
                         ))
                     )}
@@ -1458,17 +1530,58 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
             }
         });
 
-        const currentRaporTuru = categoryMap[activeTab];
-        let findingsHtml = `<h3><strong>BULUNAN TENKİTLER VE EKSİKLİKLER (${currentRaporTuru || "Denetim Formu"})</strong></h3>`;
-        if (findings.length > 0) {
-            findingsHtml += `<ul>`;
-            findings.forEach(f => {
-                findingsHtml += `<li><strong>Madde:</strong> ${f.text}<br/><strong>Müfettiş Notu:</strong> ${f.note || "<em>Belirtilmedi</em>"}</li>`;
-            });
-            findingsHtml += `</ul>`;
+        // Rapor şablonu türe göre: Spor / Federasyon resmi şablon + kapak; diğerleri bulgu listesi.
+        let findingsHtml = "";
+        let structuredReport = "";
+        let fullReportWithCover = "";
+        if (ayar.raporSablonu === "spor") {
+            // Spor Kulüpleri Rapor Taslağı ve Kapağı
+            const { REPORT_TEMPLATES } = await import("../../lib/reportTemplates");
+            const { buildSporReportHtml, combineCoverWithReport } = await import("../../lib/reportSectionManager");
+
+            const sporTemplate = REPORT_TEMPLATES.find(t => t.id === "spor_kulüpleri_genel_denetim_raporu_taslağı01_09_2025_docx") ||
+                                 REPORT_TEMPLATES.find(t => t.id === "2-_kulüp_i̇nceleme_rapor_taslağı_docx");
+            const coverTemplate = REPORT_TEMPLATES.find(t => t.id === "1-_kulüp_i̇nceleme_rapor_kapağı_taslağı_docx");
+
+            const baseHtml = sporTemplate ? sporTemplate.html : `<p class="ql-align-justify"><strong>GİRİŞ</strong></p>`;
+            structuredReport = buildSporReportHtml(baseHtml, findings);
+            fullReportWithCover = combineCoverWithReport(coverTemplate?.html || "", structuredReport);
+        } else if (ayar.raporSablonu === "federasyon") {
+            // Federasyon Genel Teftiş Raporu ve Kapağı
+            const { REPORT_TEMPLATES } = await import("../../lib/reportTemplates");
+            const { buildFederasyonReportHtml, combineCoverWithReport } = await import("../../lib/reportSectionManager");
+
+            const fedTemplate = REPORT_TEMPLATES.find(t => t.id === "4-_federasyon_genel_teftiş_raporu_taslağı_docx");
+            const coverTemplate = REPORT_TEMPLATES.find(t => t.id === "1-_genel_teftiş_rapor_kapağı_taslağı_docx");
+
+            const baseHtml = fedTemplate ? fedTemplate.html : `<p class="ql-align-justify"><strong>GİRİŞ</strong></p>`;
+            structuredReport = buildFederasyonReportHtml(baseHtml, findings);
+            fullReportWithCover = combineCoverWithReport(coverTemplate?.html || "", structuredReport);
         } else {
-            findingsHtml += `<p>Yapılan denetim neticesinde herhangi bir tenkit veya eksikliğe rastlanılmamıştır.</p>`;
+            const currentRaporTuru = categoryMap[activeTab];
+            findingsHtml = `<h3><strong>BULUNAN TENKİTLER VE EKSİKLİKLER (${currentRaporTuru || "Denetim Formu"})</strong></h3>`;
+            if (findings.length > 0) {
+                findingsHtml += `<ul>`;
+                findings.forEach(f => {
+                    findingsHtml += `<li><strong>Madde:</strong> ${f.text}<br/><strong>Müfettiş Notu:</strong> ${f.note || "<em>Belirtilmedi</em>"}</li>`;
+                });
+                findingsHtml += `</ul>`;
+            } else {
+                findingsHtml += `<p>Yapılan denetim neticesinde herhangi bir tenkit veya eksikliğe rastlanılmamıştır.</p>`;
+            }
         }
+        const resmiSablon = ayar.raporSablonu === "spor" || ayar.raporSablonu === "federasyon";
+        const onayMesaji = ayar.raporSablonu === "spor"
+            ? "Seçtiğiniz raporda mevcut içerik bulunuyor. Resmi Spor Kulüpleri şablonu ve kapağı ile üzerine yazmak istiyor musunuz?"
+            : ayar.raporSablonu === "federasyon"
+                ? "Seçtiğiniz raporda mevcut içerik bulunuyor. Resmi Federasyon teftiş şablonu ve kapak ile üzerine yazmak istiyor musunuz?"
+                : "Seçtiğiniz raporda mevcut içerik bulunuyor. Üzerine yazmak (mevcut içeriği silmek) istiyor musunuz?";
+        const onayDugmesi = resmiSablon ? "Resmi Şablon ile Üzerine Yaz" : "Üzerine Yaz";
+        const basariMesaji = ayar.raporSablonu === "spor"
+            ? "Bulgular resmi Spor Kulüpleri şablonuna aktarıldı ve kapak eklendi."
+            : ayar.raporSablonu === "federasyon"
+                ? "Bulgular resmi Federasyon teftiş başlıklarına başarıyla dağıtıldı ve kapak eklendi."
+                : "Bulgular başarıyla rapora aktarıldı.";
 
         let writeMode: "append" | "replace" = "replace";
         const strippedContent = (report.report_content || "").replace(/<[^>]*>/g, "").trim();
@@ -1481,8 +1594,8 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
         if (report.report_content && !isPlaceholder) {
             const overwrite = await confirm({
                 title: "Bulgu Aktarımı",
-                message: "Seçtiğiniz raporda mevcut içerik bulunuyor. Üzerine yazmak (mevcut içeriği silmek) istiyor musunuz?",
-                confirmText: "Üzerine Yaz",
+                message: onayMesaji,
+                confirmText: onayDugmesi,
                 cancelText: "Sonuna Ekle",
                 variant: "warning"
             });
@@ -1493,16 +1606,16 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
             }
         }
 
-        let finalContent = findingsHtml;
+        let finalContent = resmiSablon ? fullReportWithCover : findingsHtml;
         if (writeMode === "append") {
-            finalContent = (report.report_content || "") + "<br/>" + findingsHtml;
+            finalContent = (report.report_content || "") + "<br/>" + (resmiSablon ? structuredReport : findingsHtml);
         }
 
         try {
             await updateAudit(report.id, {
                 report_content: finalContent
             });
-            toast.success("Bulgular başarıyla rapora aktarıldı.");
+            toast.success(basariMesaji);
             if (user?.uid) {
                 refreshAudits(user.uid, user.email || undefined);
             }
@@ -1669,6 +1782,1465 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
     });
 
     const knowledgeCategories = [...new Set(knowledgeItems.map(i => i.category))].sort();
+
+    // --- sporPanoEkleri: eski sayfadan birebir alındı (yalnızca o türde çağrılır) ---
+    const sporPanoEkleri = () => {
+        const EVRAK_TALEP_MADDELERI = SPOR_EVRAK_TALEP_MADDELERI;
+        const ensureReportInitialized = async () => {
+            if (selectedReport) return selectedReport;
+        
+            // Initialize report automatically
+            const defaultReportNo = selectedTask?.rapor_kodu || "DENETİM-1";
+            const newAuditPayload = {
+                task_id: selectedTask!.id,
+                title: defaultReportNo,
+                location: "",
+                date: new Date().toLocaleDateString("tr-TR"),
+                inspector: profile?.full_name || user?.displayName || user?.email?.split('@')[0] || "Müfettiş",
+                status: "Devam Ediyor",
+                report_content: `<h1>${defaultReportNo}</h1><p>Denetim bulguları ve tespitleri buraya kaydedilecektir.</p>`,
+                owner_id: user?.uid,
+                assigned_to: [user?.uid].filter(Boolean) as string[],
+                report_seq: 1,
+                report_created: false
+            };
+        
+            try {
+                const createdAudit = await createAudit(newAuditPayload);
+                try {
+                    await updateTask(selectedTask!.id, { rapor_durumu: "Devam Ediyor" });
+                } catch (err) {
+                    console.error("Task status update error:", err);
+                }
+                if (user?.uid) {
+                    await refreshAudits(user.uid, user.email || undefined);
+                }
+                return createdAudit;
+            } catch (err) {
+                console.error("Failed to initialize audit:", err);
+                toast.error("Denetim başlatılamadı.");
+                throw err;
+            }
+        };
+
+        const renderDashboardTab = () => {
+            const modules = [
+                {
+                    id: "evrak_talebi",
+                    title: "Evrak Talep Yazısı",
+                    description: "Denetimin başında kulüpten istenecek yasal defterler, tüzükler ve mali evrakın resmi talep yazısı modülü.",
+                    icon: FileText,
+                    color: {
+                        bg: "bg-blue-50/50 dark:bg-blue-955/10",
+                        border: "border-blue-100 dark:border-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700/50",
+                        text: "text-blue-600 dark:text-blue-400",
+                        glow: "shadow-blue-500/5 dark:shadow-blue-500/10"
+                    },
+                    stats: "31 Madde / Şablon"
+                },
+                {
+                    id: "checklist",
+                    title: "Denetim Kontrol Listesi",
+                    description: "Spor kulübünün idari ve mali süreçlerini incelemek ve bulgu girmek için 105 maddelik denetim formu.",
+                    icon: ClipboardCheck,
+                    color: {
+                        bg: "bg-emerald-50/50 dark:bg-emerald-955/10",
+                        border: "border-emerald-100 dark:border-emerald-900/30 hover:border-emerald-300 dark:hover:border-emerald-700/50",
+                        text: "text-emerald-600 dark:text-emerald-400",
+                        glow: "shadow-emerald-500/5 dark:shadow-emerald-500/10"
+                    },
+                    stats: "105 Standart Soru"
+                },
+                {
+                    id: "editor",
+                    title: "Rapor Editörü",
+                    description: "Denetim raporu taslağını oluşturma, zengin metin düzenleme ve tenkit maddelerini rapora aktarma modülü.",
+                    icon: BookOpen,
+                    color: {
+                        bg: "bg-indigo-50/50 dark:bg-indigo-955/10",
+                        border: "border-indigo-100 dark:border-indigo-900/30 hover:border-indigo-300 dark:hover:border-indigo-700/50",
+                        text: "text-indigo-600 dark:text-indigo-400",
+                        glow: "shadow-indigo-500/5 dark:shadow-indigo-500/10"
+                    },
+                    stats: "Denetim Raporu Yazımı"
+                },
+                {
+                    id: "notes",
+                    title: "Hızlı Notlar",
+                    description: "Denetim süresince alınacak geçici notlar, hatırlatmalar ve müfettişin serbest karalama alanı.",
+                    icon: Edit2,
+                    color: {
+                        bg: "bg-amber-50/50 dark:bg-amber-955/10",
+                        border: "border-amber-100 dark:border-amber-900/30 hover:border-amber-300 dark:hover:border-amber-700/50",
+                        text: "text-amber-600 dark:text-amber-400",
+                        glow: "shadow-amber-500/5 dark:shadow-amber-500/10"
+                    },
+                    stats: "Çalışma Notları"
+                },
+                {
+                    id: "photos",
+                    title: "Fotoğraflar ve Belgeler",
+                    description: "Denetim yerinden, belgelerden veya kulüp defterlerinden çekilerek sisteme eklenen görseller.",
+                    icon: Camera,
+                    color: {
+                        bg: "bg-rose-50/50 dark:bg-rose-955/10",
+                        border: "border-rose-100 dark:border-rose-900/30 hover:border-rose-300 dark:hover:border-rose-700/50",
+                        text: "text-rose-600 dark:text-rose-400",
+                        glow: "shadow-rose-500/5 dark:shadow-rose-500/10"
+                    },
+                    stats: "Denetim Fotoğrafları"
+                },
+                {
+                    id: "info",
+                    title: "Genel Bilgiler",
+                    description: "Göreve ait süreler, başlama tarihi, rapor numaraları, görevli müfettişler ve durum bilgileri.",
+                    icon: Info,
+                    color: {
+                        bg: "bg-slate-50/50 dark:bg-slate-900/10",
+                        border: "border-slate-200 dark:border-slate-800 hover:border-slate-350 dark:hover:border-slate-700",
+                        text: "text-slate-700 dark:text-slate-300",
+                        glow: "shadow-slate-500/5 dark:shadow-slate-500/10"
+                    },
+                    stats: "Görev Tanımları"
+                }
+            ];
+
+            return (
+                <div className="space-y-6">
+                    <div>
+                        <h3 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-wider">Denetim Modülleri</h3>
+                        <p className="text-[11px] text-slate-400 font-bold mt-0.5">Bu göreve ait aktif denetim süreçleri ve doküman hazırlama araçları</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {modules.map(mod => {
+                            const Icon = mod.icon;
+                            return (
+                                <div
+                                    key={mod.id}
+                                    onClick={async () => {
+                                        if (mod.id !== "info" && !selectedReport) {
+                                            try {
+                                                await ensureReportInitialized();
+                                            } catch (err) {
+                                                return;
+                                            }
+                                        }
+                                        setActiveDetailTab(mod.id as any);
+                                    }}
+                                    className={`group relative flex flex-col justify-between bg-white dark:bg-slate-900/35 border ${mod.color.border} rounded-2xl p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg cursor-pointer ${mod.color.glow}`}
+                                >
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className={`w-10 h-10 rounded-xl ${mod.color.bg} flex items-center justify-center transition-transform duration-300 group-hover:scale-105`}>
+                                                <Icon size={18} className={mod.color.text} />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-black text-slate-900 dark:text-white tracking-tight group-hover:text-primary transition-colors">
+                                                {mod.title}
+                                            </h4>
+                                            <p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium leading-relaxed">
+                                                {mod.description}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800/50 pt-3 mt-4">
+                                        <span className={`text-[9px] font-black uppercase tracking-wider ${mod.color.text}`}>
+                                            {mod.stats}
+                                        </span>
+                                        <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 group-hover:text-primary dark:group-hover:text-slate-350 transition-colors">
+                                            <span>Giriş Yap</span>
+                                            <ArrowRight size={12} className="transition-transform duration-300 group-hover:translate-x-0.5" />
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        };
+
+        const renderEvrakTalebiTab = () => {
+            const evrakTalep = localAuditData.evrakTalep || {
+                olurTarihi: "",
+                olurSayisi: "",
+                gorevTarihi: "",
+                gorevSayisi: "",
+                mufettisAdi: "",
+                mufettisUnvani: "Bakanlık Müfettişi",
+                denetimYili: new Date().getFullYear().toString(),
+                teslimSuresi: "7",
+                selectedItems: EVRAK_TALEP_MADDELERI.map((_, i) => i),
+                customText: ""
+            };
+
+            const updateEvrakTalepField = (key: string, value: any) => {
+                const updated = {
+                    ...localAuditData,
+                    evrakTalep: {
+                        ...evrakTalep,
+                        [key]: value
+                    }
+                };
+                setLocalAuditData(updated);
+                handleSaveAuditData(updated);
+            };
+
+            const toggleItem = (index: number) => {
+                let items = [...(evrakTalep.selectedItems || [])];
+                if (items.includes(index)) {
+                    items = items.filter((i: number) => i !== index);
+                } else {
+                    items.push(index);
+                    items.sort((a, b) => a - b);
+                }
+                updateEvrakTalepField("selectedItems", items);
+            };
+
+            const selectAll = () => {
+                updateEvrakTalepField("selectedItems", EVRAK_TALEP_MADDELERI.map((_, i) => i));
+            };
+
+            const selectNone = () => {
+                updateEvrakTalepField("selectedItems", []);
+            };
+
+            // Live text formatting
+            const olurTarihiStr = evrakTalep.olurTarihi || ".......";
+            const olurSayisiStr = evrakTalep.olurSayisi || ".......";
+            const gorevTarihiStr = evrakTalep.gorevTarihi || ".......";
+            const gorevSayisiStr = evrakTalep.gorevSayisi || ".......";
+            const denetimYiliStr = evrakTalep.denetimYili || new Date().getFullYear().toString();
+            const teslimSuresiStr = evrakTalep.teslimSuresi || "7";
+            const kulupAdiStr = selectedTask?.rapor_adi ? selectedTask.rapor_adi.toUpperCase() : "....... SPOR KULÜBÜ";
+            const inspectorName = evrakTalep.mufettisAdi || ".......";
+            const inspectorTitle = evrakTalep.mufettisUnvani || "Bakanlık Müfettişi";
+
+            // Generate printable/copyable text
+            const getPlainText = () => {
+                let text = `T.C.\nGENÇLİK VE SPOR BAKANLIĞI\nBakanlık Müfettişliği\n\n`;
+                text += `Konu: Teftiş/Denetim İşleri\n\n`;
+                text += `${kulupAdiStr} SPOR KULÜBÜ BAŞKANLIĞINA\n\n`;
+                text += `İlgi: a) ${olurTarihiStr} tarihli ve ${olurSayisiStr} sayılı Makam Oluru.\n`;
+                text += `      b) ${gorevTarihiStr} tarihli ve ${gorevSayisiStr} sayılı Görevlendirme Yazısı.\n\n`;
+                text += `İlgi (a)'da yer alan Bakanlık Makamı Oluru ve ilgi (b)'de kayıtlı Rehberlik ve Denetim Başkanlığının Görev Emri uyarınca, ${denetimYiliStr} yılı Spor Kulüpleri ve Spor Anonim Şirketleri Genel Denetimi kapsamında aşağıda belirtilen tüm bilgi ve belgelerin madde bazında tasniflenmiş onaylı suretlerinin denetime hazır hale getirilerek ${teslimSuresiStr} (yedi) gün içinde Müfettişliğe teslim edilmesini rica ederim.\n\n`;
+                text += `TALEP EDİLEN BİLGİ VE BELGELER:\n\n`;
+            
+                let count = 1;
+                EVRAK_TALEP_MADDELERI.forEach((item, index) => {
+                    if (evrakTalep.selectedItems?.includes(index)) {
+                        text += `${count}. ${item}\n`;
+                        count++;
+                    }
+                });
+            
+                text += `\n\n${inspectorName}\n${inspectorTitle}`;
+                return text;
+            };
+
+            const handleCopyText = () => {
+                navigator.clipboard.writeText(getPlainText());
+                toast.success("Belge metni panoya kopyalandı!");
+            };
+
+            const handlePrint = () => {
+                const printWindow = window.open("", "_blank");
+                if (!printWindow) return;
+                printWindow.document.write(`
+                    <html>
+                    <head>
+                        <title>Evrak Talep Yazısı - ${selectedTask?.rapor_adi || ''}</title>
+                        <style>
+                            body {
+                                font-family: 'Times New Roman', Times, serif;
+                                line-height: 1.5;
+                                padding: 50px;
+                                color: #000;
+                                font-size: 14px;
+                            }
+                            .header {
+                                text-align: center;
+                                margin-bottom: 30px;
+                                font-weight: bold;
+                            }
+                            .subject {
+                                margin-bottom: 20px;
+                            }
+                            .recipient {
+                                font-weight: bold;
+                                margin-bottom: 20px;
+                                text-align: center;
+                            }
+                            .reference {
+                                margin-bottom: 20px;
+                                margin-left: 20px;
+                            }
+                            .content {
+                                text-align: justify;
+                                text-indent: 40px;
+                                margin-bottom: 20px;
+                            }
+                            .list-title {
+                                font-weight: bold;
+                                margin-bottom: 10px;
+                            }
+                            ol {
+                                margin-left: 20px;
+                                padding-left: 0;
+                                text-align: justify;
+                            }
+                            li {
+                                margin-bottom: 8px;
+                            }
+                            .signature {
+                                float: right;
+                                text-align: center;
+                                margin-top: 40px;
+                                margin-right: 50px;
+                                font-weight: bold;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            T.C.<br />
+                            GENÇLİK VE SPOR BAKANLIĞI<br />
+                            Bakanlık Müfettişliği
+                        </div>
+                    
+                        <div class="subject">
+                            <strong>Konu:</strong> Teftiş/Denetim İşleri
+                        </div>
+                    
+                        <div class="recipient">
+                            ${kulupAdiStr} SPOR KULÜBÜ BAŞKANLIĞINA
+                        </div>
+                    
+                        <div class="reference">
+                            <strong>İlgi:</strong><br />
+                            a) ${olurTarihiStr} tarihli ve ${olurSayisiStr} sayılı Makam Oluru.<br />
+                            b) ${gorevTarihiStr} tarihli ve ${gorevSayisiStr} sayılı Görevlendirme Yazısı.
+                        </div>
+                    
+                        <div class="content">
+                            İlgi (a)'da yer alan Bakanlık Makamı Oluru ve ilgi (b)'de kayıtlı Rehberlik ve Denetim Başkanlığının Görev Emri uyarınca, ${denetimYiliStr} yılı Spor Kulüpleri ve Spor Anonim Şirketleri Genel Denetimi kapsamında aşağıda belirtilen tüm bilgi ve belgelerin madde bazında tasniflenmiş onaylı suretlerinin denetime hazır hale getirilerek ${teslimSuresiStr} (yedi) gün içinde Müfettişliğe teslim edilmesini rica ederim.
+                        </div>
+                    
+                        <div class="list-title">TALEP EDİLEN BİLGİ VE BELGELER:</div>
+                        <ol>
+                            ${EVRAK_TALEP_MADDELERI.map((item, index) => {
+                                if (evrakTalep.selectedItems?.includes(index)) {
+                                    return `<li>${item}</li>`;
+                                }
+                                return "";
+                            }).join("")}
+                        </ol>
+                    
+                        <div class="signature">
+                            ${inspectorName}<br />
+                            ${inspectorTitle}
+                        </div>
+                    
+                        <script>
+                            window.onload = function() {
+                                window.print();
+                            }
+                        </script>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+            };
+
+            const handleDownloadWord = () => {
+                const kulupAdiClean = (selectedTask?.rapor_adi || "Evrak_Talep_Yazisi").replace(/[\s/\\?%*:|"<>]/g, "_");
+                const filename = `Spor_Kulubu_Evrak_Talep_Yazisi_${kulupAdiClean}.doc`;
+            
+                let htmlContent = `
+                    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+                    <head>
+                        <meta charset="utf-8">
+                        <title>Evrak Talep Yazısı</title>
+                        <style>
+                            @page {
+                                size: A4;
+                                margin: 2.5cm;
+                            }
+                            body {
+                                font-family: 'Times New Roman', Times, serif;
+                                font-size: 12pt;
+                                line-height: 1.5;
+                                color: #000000;
+                            }
+                            .header {
+                                text-align: center;
+                                font-weight: bold;
+                                margin-bottom: 24pt;
+                            }
+                            .subject {
+                                margin-bottom: 18pt;
+                            }
+                            .recipient {
+                                font-weight: bold;
+                                margin-bottom: 18pt;
+                                text-align: center;
+                            }
+                            .reference {
+                                margin-bottom: 18pt;
+                                margin-left: 20pt;
+                            }
+                            .content {
+                                text-align: justify;
+                                text-indent: 30pt;
+                                margin-bottom: 18pt;
+                            }
+                            .list-title {
+                                font-weight: bold;
+                                margin-bottom: 12pt;
+                            }
+                            ol {
+                                margin-left: 20pt;
+                                padding-left: 0;
+                            }
+                            li {
+                                margin-bottom: 6pt;
+                                text-align: justify;
+                            }
+                            .signature-container {
+                                margin-top: 36pt;
+                                width: 100%;
+                            }
+                            .signature-table {
+                                width: 100%;
+                                border: none;
+                            }
+                            .signature-td {
+                                width: 60%;
+                            }
+                            .signature-box-td {
+                                width: 40%;
+                                text-align: center;
+                                font-weight: bold;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            T.C.<br />
+                            GENÇLİK VE SPOR BAKANLIĞI<br />
+                            Bakanlık Müfettişliği
+                        </div>
+                    
+                        <div class="subject">
+                            <strong>Konu:</strong> Teftiş/Denetim İşleri
+                        </div>
+                    
+                        <div class="recipient">
+                            ${kulupAdiStr} SPOR KULÜBÜ BAŞKANLIĞINA
+                        </div>
+                    
+                        <div class="reference">
+                            <strong>İlgi:</strong><br />
+                            a) ${olurTarihiStr} tarihli ve ${olurSayisiStr} sayılı Makam Oluru.<br />
+                            b) ${gorevTarihiStr} tarihli ve ${gorevSayisiStr} sayılı Görevlendirme Yazısı.
+                        </div>
+                    
+                        <div class="content">
+                            İlgi (a)'da yer alan Bakanlık Makamı Oluru ve ilgi (b)'de kayıtlı Rehberlik ve Denetim Başkanlığının Görev Emri uyarınca, ${denetimYiliStr} yılı Spor Kulüpleri ve Spor Anonim Şirketleri Genel Denetimi kapsamında aşağıda belirtilen tüm bilgi ve belgelerin madde bazında tasniflenmiş onaylı suretlerinin denetime hazır hale getirilerek ${teslimSuresiStr} (yedi) gün içinde Müfettişliğe teslim edilmesini rica ederim.
+                        </div>
+                    
+                        <div class="list-title">TALEP EDİLEN BİLGİ VE BELGELER:</div>
+                        <ol>
+                            ${EVRAK_TALEP_MADDELERI.map((item, index) => {
+                                if (evrakTalep.selectedItems?.includes(index)) {
+                                    return `<li>${item}</li>`;
+                                }
+                                return "";
+                            }).join("")}
+                        </ol>
+                    
+                        <div class="signature-container">
+                            <table class="signature-table">
+                                <tr>
+                                    <td class="signature-td"></td>
+                                    <td class="signature-box-td">
+                                        ${inspectorName}<br />
+                                        ${inspectorTitle}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </body>
+                    </html>
+                `;
+
+                const blob = new Blob(['\ufeff' + htmlContent], {
+                    type: 'application/msword;charset=utf-8'
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                toast.success("Word dosyası başarıyla indirildi!");
+            };
+
+            return (
+                <div className="flex flex-col gap-6">
+                    {/* Back button and Toolbar */}
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/50 pb-4 flex-wrap gap-3">
+                        <button
+                            onClick={() => setActiveDetailTab("dashboard")}
+                            className="flex items-center gap-2 text-xs font-black text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors uppercase tracking-wider"
+                        >
+                            <ArrowLeft size={14} />
+                            <span>Modüllere Dön</span>
+                        </button>
+                    
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-xl text-[10px] font-black h-9"
+                                onClick={handleCopyText}
+                            >
+                                <Copy size={12} className="mr-1.5" /> METNİ KOPYALA
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-xl text-[10px] font-black h-9"
+                                onClick={handlePrint}
+                            >
+                                <Printer size={12} className="mr-1.5" /> YAZDIR / PDF
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-xl text-[10px] font-black h-9"
+                                onClick={handleDownloadWord}
+                            >
+                                <Download size={12} className="mr-1.5" /> WORD İNDİR
+                            </Button>
+                            <Button
+                                size="sm"
+                                className="rounded-xl text-[10px] font-black h-9 shadow-md shadow-primary/25"
+                                onClick={() => handleSaveAuditData(localAuditData)}
+                                disabled={isSavingAuditData}
+                            >
+                                {isSavingAuditData ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Save size={12} className="mr-1.5" />}
+                                KAYDET
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                        {/* Form Controls */}
+                        <div className="xl:col-span-5 space-y-6">
+                            <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-850 dark:text-slate-200">Yazı Bilgileri</h4>
+                                <div className="h-px bg-slate-200 dark:bg-slate-800/60" />
+                            
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5 col-span-2">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Müfettiş Adı Soyadı</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.mufettisAdi || ""}
+                                            onChange={e => updateEvrakTalepField("mufettisAdi", e.target.value)}
+                                            placeholder="Örn: Sefa YAPRAKLI"
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5 col-span-2">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Müfettiş Unvanı</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.mufettisUnvani || ""}
+                                            onChange={e => updateEvrakTalepField("mufettisUnvani", e.target.value)}
+                                            placeholder="Örn: Bakanlık Müfettişi, Bakanlık Müfettiş Yardımcısı..."
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Makam Oluru Tarih</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.olurTarihi || ""}
+                                            onChange={e => updateEvrakTalepField("olurTarihi", e.target.value)}
+                                            placeholder="Örn: 21.01.2025"
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Makam Oluru Sayı</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.olurSayisi || ""}
+                                            onChange={e => updateEvrakTalepField("olurSayisi", e.target.value)}
+                                            placeholder="Örn: 41444738-660-26"
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Görevlendirme Tarih</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.gorevTarihi || ""}
+                                            onChange={e => updateEvrakTalepField("gorevTarihi", e.target.value)}
+                                            placeholder="Örn: 11.09.2025"
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Görevlendirme Sayı</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.gorevSayisi || ""}
+                                            onChange={e => updateEvrakTalepField("gorevSayisi", e.target.value)}
+                                            placeholder="Örn: E-41444738-660..."
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Denetim Yılı</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.denetimYili || ""}
+                                            onChange={e => updateEvrakTalepField("denetimYili", e.target.value)}
+                                            placeholder="Örn: 2025"
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Teslim Süresi (Gün)</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.teslimSuresi || ""}
+                                            onChange={e => updateEvrakTalepField("teslimSuresi", e.target.value)}
+                                            placeholder="Örn: 7"
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Checklist selection */}
+                            <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4 flex flex-col max-h-[400px]">
+                                <div className="flex justify-between items-center">
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-850 dark:text-slate-200">Talep Edilen Evrak Listesi</h4>
+                                    <div className="flex gap-2">
+                                        <button onClick={selectAll} className="text-[10px] font-bold text-blue-500 hover:underline">Tümünü Seç</button>
+                                        <span className="text-[10px] text-slate-350">|</span>
+                                        <button onClick={selectNone} className="text-[10px] font-bold text-blue-500 hover:underline">Temizle</button>
+                                    </div>
+                                </div>
+                                <div className="h-px bg-slate-200 dark:bg-slate-800/60" />
+                                <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                    {EVRAK_TALEP_MADDELERI.map((item, index) => {
+                                        const isChecked = evrakTalep.selectedItems?.includes(index);
+                                        return (
+                                            <div
+                                                key={index}
+                                                onClick={() => toggleItem(index)}
+                                                className={`flex items-start gap-2.5 p-2 rounded-xl border text-left cursor-pointer transition-all ${
+                                                    isChecked
+                                                        ? "bg-blue-600/5 dark:bg-blue-950/10 border-blue-200 dark:border-blue-900/40"
+                                                        : "bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-850 opacity-60"
+                                                }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() => {}}
+                                                    className="mt-0.5 pointer-events-none"
+                                                />
+                                                <span className="text-[11px] text-slate-800 dark:text-slate-200 font-bold leading-snug">
+                                                    {index + 1}. {item}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Letter Preview Area */}
+                        <div className="xl:col-span-7 space-y-3">
+                            <div className="flex justify-between items-center px-1">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Resmi Belge Önizleme</span>
+                                <span className="text-[9px] font-bold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-500">{evrakTalep.selectedItems?.length || 0} Evrak Seçili</span>
+                            </div>
+                        
+                            <div className="bg-white text-slate-900 border border-slate-200 dark:border-slate-850 p-8 shadow-md rounded-2xl font-serif text-[12px] leading-relaxed max-w-full select-text min-h-[500px] overflow-x-auto relative">
+                                {/* Watermark/Official letter styling simulation */}
+                                <div className="text-center font-bold mb-6 text-[13px] border-b border-double border-slate-200 pb-4">
+                                    T.C.<br />
+                                    GENÇLİK VE SPOR BAKANLIĞI<br />
+                                    Bakanlık Müfettişliği
+                                </div>
+                            
+                                <div className="mb-4">
+                                    <strong>Konu:</strong> Teftiş/Denetim İşleri
+                                </div>
+                            
+                                <div className="text-center font-bold my-5 text-[13px] tracking-wide">
+                                    {kulupAdiStr} SPOR KULÜBÜ BAŞKANLIĞINA
+                                </div>
+                            
+                                <div className="mb-5 pl-4 border-l-2 border-slate-200">
+                                    <strong>İlgi:</strong><br />
+                                    a) {olurTarihiStr} tarihli ve {olurSayisiStr} sayılı Makam Oluru.<br />
+                                    b) {gorevTarihiStr} tarihli ve {gorevSayisiStr} sayılı Görevlendirme Yazısı.
+                                </div>
+                            
+                                <p className="text-justify mb-5" style={{ textIndent: "20px" }}>
+                                    İlgi (a)'da yer alan Bakanlık Makamı Oluru ve ilgi (b)'de kayıtlı Rehberlik ve Denetim Başkanlığının Görev Emri uyarınca, <strong>{denetimYiliStr}</strong> yılı Spor Kulüpleri ve Spor Anonim Şirketleri Genel Denetimi kapsamında aşağıda belirtilen tüm bilgi ve belgelerin madde bazında tasniflenmiş onaylı suretlerinin denetime hazır hale getirilerek <strong>{teslimSuresiStr} (yedi)</strong> gün içinde Müfettişliğe teslim edilmesini rica ederim.
+                                </p>
+                            
+                                <div className="font-bold mb-2">TALEP EDİLEN BİLGİ VE BELGELER:</div>
+                                <ol className="list-decimal pl-5 space-y-1.5 text-justify">
+                                    {EVRAK_TALEP_MADDELERI.map((item, index) => {
+                                        if (evrakTalep.selectedItems?.includes(index)) {
+                                            return (
+                                                <li key={index} className="pl-1">
+                                                    {item}
+                                                </li>
+                                            );
+                                        }
+                                        return null;
+                                    })}
+                                </ol>
+                            
+                                <div className="mt-8 float-right text-center font-bold pr-6">
+                                    {inspectorName}<br />
+                                    <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400">Bakanlık Müfettişi</span>
+                                </div>
+                                <div className="clear-both" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        return { ensureReportInitialized, renderDashboardTab, renderEvrakTalebiTab };
+    };
+
+    // --- federasyonPanoEkleri: eski sayfadan birebir alındı (yalnızca o türde çağrılır) ---
+    const federasyonPanoEkleri = () => {
+        const EVRAK_TALEP_MADDELERI = FEDERASYON_EVRAK_TALEP_MADDELERI;
+        const renderDashboardTab = () => {
+            const modules = [
+                {
+                    id: "evrak_talebi",
+                    title: "Evrak Talep Yazısı",
+                    description: "Denetimin başında federasyondan istenecek yasal defterler, kararlar ve mali evrakın resmi talep yazısı modülü.",
+                    icon: FileText,
+                    color: {
+                        bg: "bg-blue-50/50 dark:bg-blue-955/10",
+                        border: "border-blue-100 dark:border-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700/50",
+                        text: "text-blue-600 dark:text-blue-400",
+                        glow: "shadow-blue-500/5 dark:shadow-blue-500/10"
+                    },
+                    stats: "32 Madde / Şablon"
+                },
+                {
+                    id: "checklist",
+                    title: "Denetim Kontrol Listesi",
+                    description: "Federasyonun idari ve mali süreçlerini incelemek ve bulgu girmek için standart kontrol listesi.",
+                    icon: ClipboardCheck,
+                    color: {
+                        bg: "bg-emerald-50/50 dark:bg-emerald-955/10",
+                        border: "border-emerald-100 dark:border-emerald-900/30 hover:border-emerald-300 dark:hover:border-emerald-700/50",
+                        text: "text-emerald-600 dark:text-emerald-400",
+                        glow: "shadow-emerald-500/5 dark:shadow-emerald-500/10"
+                    },
+                    stats: "Standart Denetim Formu"
+                },
+                {
+                    id: "editor",
+                    title: "Rapor Editörü",
+                    description: "Denetim raporu taslağını oluşturma, zengin metin düzenleme ve tenkit maddelerini rapora aktarma modülü.",
+                    icon: BookOpen,
+                    color: {
+                        bg: "bg-indigo-50/50 dark:bg-indigo-955/10",
+                        border: "border-indigo-100 dark:border-indigo-900/30 hover:border-indigo-300 dark:hover:border-indigo-700/50",
+                        text: "text-indigo-600 dark:text-indigo-400",
+                        glow: "shadow-indigo-500/5 dark:shadow-indigo-500/10"
+                    },
+                    stats: "Denetim Raporu Yazımı"
+                },
+                {
+                    id: "notes",
+                    title: "Hızlı Notlar",
+                    description: "Denetim süresince alınacak geçici notlar, hatırlatmalar ve müfettişin serbest karalama alanı.",
+                    icon: Edit2,
+                    color: {
+                        bg: "bg-amber-50/50 dark:bg-amber-955/10",
+                        border: "border-amber-100 dark:border-amber-900/30 hover:border-amber-300 dark:hover:border-amber-700/50",
+                        text: "text-amber-600 dark:text-amber-400",
+                        glow: "shadow-amber-500/5 dark:shadow-amber-500/10"
+                    },
+                    stats: "Çalışma Notları"
+                },
+                {
+                    id: "photos",
+                    title: "Fotoğraflar ve Belgeler",
+                    description: "Denetim yerinden, belgelerden veya defterlerden çekilerek sisteme eklenen görseller.",
+                    icon: Camera,
+                    color: {
+                        bg: "bg-rose-50/50 dark:bg-rose-955/10",
+                        border: "border-rose-100 dark:border-rose-900/30 hover:border-rose-300 dark:hover:border-rose-700/50",
+                        text: "text-rose-600 dark:text-rose-400",
+                        glow: "shadow-rose-500/5 dark:shadow-rose-500/10"
+                    },
+                    stats: "Denetim Fotoğrafları"
+                },
+                {
+                    id: "info",
+                    title: "Genel Bilgiler",
+                    description: "Göreve ait süreler, başlama tarihi, rapor numaraları, görevli müfettişler ve durum bilgileri.",
+                    icon: Info,
+                    color: {
+                        bg: "bg-slate-50/50 dark:bg-slate-900/10",
+                        border: "border-slate-200 dark:border-slate-800 hover:border-slate-350 dark:hover:border-slate-700",
+                        text: "text-slate-700 dark:text-slate-300",
+                        glow: "shadow-slate-500/5 dark:shadow-slate-500/10"
+                    },
+                    stats: "Görev Tanımları"
+                }
+            ];
+
+            return (
+                <div className="space-y-6">
+                    <div>
+                        <h3 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-wider">Denetim Modülleri</h3>
+                        <p className="text-[11px] text-slate-400 font-bold mt-0.5">Bu göreve ait aktif denetim süreçleri ve doküman hazırlama araçları</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {modules.map(mod => {
+                            const Icon = mod.icon;
+                            return (
+                                <div
+                                    key={mod.id}
+                                    onClick={() => setActiveDetailTab(mod.id as any)}
+                                    className={`group relative flex flex-col justify-between bg-white dark:bg-slate-900/35 border ${mod.color.border} rounded-2xl p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg cursor-pointer ${mod.color.glow}`}
+                                >
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className={`w-10 h-10 rounded-xl ${mod.color.bg} flex items-center justify-center transition-transform duration-300 group-hover:scale-105`}>
+                                                <Icon size={18} className={mod.color.text} />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="font-bold text-sm text-slate-900 dark:text-white tracking-tight group-hover:text-primary transition-colors">
+                                                {mod.title}
+                                            </h4>
+                                            <p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium leading-relaxed">
+                                                {mod.description}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800/50 pt-3 mt-4">
+                                        <span className={`text-[9px] font-black uppercase tracking-wider ${mod.color.text}`}>
+                                            {mod.stats}
+                                        </span>
+                                        <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 group-hover:text-primary dark:group-hover:text-slate-350 transition-colors">
+                                            <span>Giriş Yap</span>
+                                            <ArrowRight size={12} className="transition-transform duration-300 group-hover:translate-x-0.5" />
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        };
+
+        const renderEvrakTalebiTab = () => {
+            const evrakTalep = localAuditData.evrakTalep || {
+                olurTarihi: "",
+                olurSayisi: "",
+                gorevTarihi: "",
+                gorevSayisi: "",
+                mufettisAdi: profile?.full_name || "",
+                mufettisUnvani: "Bakanlık Müfettişi",
+                denetimDonemi: "01.01.2021 - 31.12.2024",
+                denetimYili: "2021-2024",
+                defterDonemi: "01.01.2021 - 30.06.2024",
+                teslimSuresi: "7",
+                selectedItems: EVRAK_TALEP_MADDELERI.map((_, i) => i),
+                customText: ""
+            };
+
+            const updateEvrakTalepField = (key: string, value: any) => {
+                const updated = {
+                    ...localAuditData,
+                    evrakTalep: {
+                        ...evrakTalep,
+                        [key]: value
+                    }
+                };
+                setLocalAuditData(updated);
+                handleSaveAuditData(updated);
+            };
+
+            const toggleItem = (index: number) => {
+                let items = [...(evrakTalep.selectedItems || [])];
+                if (items.includes(index)) {
+                    items = items.filter((i: number) => i !== index);
+                } else {
+                    items.push(index);
+                    items.sort((a, b) => a - b);
+                }
+                updateEvrakTalepField("selectedItems", items);
+            };
+
+            const selectAll = () => {
+                updateEvrakTalepField("selectedItems", EVRAK_TALEP_MADDELERI.map((_, i) => i));
+            };
+
+            const selectNone = () => {
+                updateEvrakTalepField("selectedItems", []);
+            };
+
+            // Live text formatting
+            const olurTarihiStr = evrakTalep.olurTarihi || ".......";
+            const olurSayisiStr = evrakTalep.olurSayisi || ".......";
+            const gorevTarihiStr = evrakTalep.gorevTarihi || ".......";
+            const gorevSayisiStr = evrakTalep.gorevSayisi || ".......";
+            const denetimDonemiStr = evrakTalep.denetimDonemi || "01.01.2021 - 31.12.2024";
+            const denetimYiliStr = evrakTalep.denetimYili || "2021-2024";
+            const defterDonemiStr = evrakTalep.defterDonemi || "01.01.2021 - 30.06.2024";
+            const teslimSuresiStr = evrakTalep.teslimSuresi || "7";
+            const recipientNameStr = selectedTask?.rapor_adi ? selectedTask.rapor_adi.toUpperCase() : "....... VOLEYBOL FEDERASYONU";
+            const inspectorName = evrakTalep.mufettisAdi || ".......";
+            const inspectorTitle = evrakTalep.mufettisUnvani || "Bakanlık Müfettişi";
+
+            const getFormattedItem = (itemText: string) => {
+                return itemText
+                    .replace(/\{donem\}/g, denetimDonemiStr)
+                    .replace(/\{yillar\}/g, denetimYiliStr)
+                    .replace(/01\.01\.2021-30\.06\.2024/g, defterDonemiStr);
+            };
+
+            // Generate printable/copyable text
+            const getPlainText = () => {
+                let text = `T.C.\nGENÇLİK VE SPOR BAKANLIĞI\nBakanlık Müfettişliği\n\n`;
+                text += `Konu: Görev Emirleri\n\n`;
+                text += `${recipientNameStr} BAŞKANLIĞINA\n\n`;
+                text += `İlgi: a) Bakanlık Makamının ${olurTarihiStr} tarihli ve ${olurSayisiStr} sayılı Oluru.\n`;
+                text += `      b) Rehberlik ve Denetim Başkanlığının ${gorevTarihiStr} tarih ve ${gorevSayisiStr} sayılı Görev Emri.\n\n`;
+                text += `İlgi (a)'da kayıtlı Makam Oluru ve ilgi (b)'de kayıtlı Görev Emri uyarınca, ${recipientNameStr}'nın ${denetimDonemiStr} tarihleri arasındaki Genel Denetimi, Müfettişliğimizce yapılacaktır. Aşağıda belirtilen tüm bilgi ve belgelerin tasniflenmiş onaylı suretlerinin denetime hazır hale getirilerek ${teslimSuresiStr} gün içinde Müfettişliğimize teslim edilmesini rica ederim.\n\n`;
+                text += `TALEP EDİLEN BİLGİ VE BELGELER:\n\n`;
+            
+                let count = 1;
+                EVRAK_TALEP_MADDELERI.forEach((item, index) => {
+                    if (evrakTalep.selectedItems?.includes(index)) {
+                        text += `${count}. ${getFormattedItem(item)}\n`;
+                        count++;
+                    }
+                });
+            
+                text += `\n\nMüfettişliğimize cevaben hazırlanacak tablo ve listeler Federasyon onaylı olarak ibraz edilmelidir.\nBilgilerinizi ve gereğini rica ederim.\n\n`;
+                text += `${inspectorName}\n${inspectorTitle}`;
+                return text;
+            };
+
+            const handleCopyText = () => {
+                navigator.clipboard.writeText(getPlainText());
+                toast.success("Belge metni panoya kopyalandı!");
+            };
+
+            const handlePrint = () => {
+                const printWindow = window.open("", "_blank");
+                if (!printWindow) return;
+                printWindow.document.write(`
+                    <html>
+                    <head>
+                        <title>Evrak Talep Yazısı - ${selectedTask?.rapor_adi || ''}</title>
+                        <style>
+                            body {
+                                font-family: 'Times New Roman', Times, serif;
+                                line-height: 1.5;
+                                padding: 50px;
+                                color: #000;
+                                font-size: 14px;
+                            }
+                            .header {
+                                text-align: center;
+                                margin-bottom: 30px;
+                                font-weight: bold;
+                            }
+                            .subject {
+                                margin-bottom: 20px;
+                            }
+                            .recipient {
+                                font-weight: bold;
+                                margin-bottom: 20px;
+                                text-align: center;
+                            }
+                            .reference {
+                                margin-bottom: 20px;
+                                margin-left: 20px;
+                            }
+                            .content {
+                                text-align: justify;
+                                text-indent: 40px;
+                                margin-bottom: 20px;
+                            }
+                            .list-title {
+                                font-weight: bold;
+                                margin-bottom: 10px;
+                            }
+                            ol {
+                                margin-left: 20px;
+                                padding-left: 0;
+                                text-align: justify;
+                            }
+                            li {
+                                margin-bottom: 8px;
+                            }
+                            .footer-note {
+                                text-indent: 40px;
+                                margin-top: 20px;
+                                margin-bottom: 20px;
+                                text-align: justify;
+                            }
+                            .signature {
+                                float: right;
+                                text-align: center;
+                                margin-top: 40px;
+                                margin-right: 50px;
+                                font-weight: bold;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            T.C.<br />
+                            GENÇLİK VE SPOR BAKANLIĞI<br />
+                            Bakanlık Müfettişliği
+                        </div>
+                    
+                        <div class="subject">
+                            <strong>Konu:</strong> Görev Emirleri
+                        </div>
+                    
+                        <div class="recipient">
+                            ${recipientNameStr} BAŞKANLIĞINA
+                        </div>
+                    
+                        <div class="reference">
+                            <strong>İlgi:</strong><br />
+                            a) Bakanlık Makamının ${olurTarihiStr} tarihli ve ${olurSayisiStr} sayılı Oluru.<br />
+                            b) Rehberlik ve Denetim Başkanlığının ${gorevTarihiStr} tarih ve ${gorevSayisiStr} sayılı Görev Emri.
+                        </div>
+                    
+                        <div class="content">
+                            İlgi (a)'da kayıtlı Makam Oluru ve ilgi (b)'de kayıtlı Görev Emri uyarınca, ${recipientNameStr}'nın ${denetimDonemiStr} tarihleri arasındaki Genel Denetimi, Müfettişliğimizce yapılacaktır. Aşağıda belirtilen tüm bilgi ve belgelerin tasniflenmiş onaylı suretlerinin denetime hazır hale getirilerek ${teslimSuresiStr} gün içinde Müfettişliğimize teslim edilmesini rica ederim.
+                        </div>
+                    
+                        <div class="list-title">TALEP EDİLEN BİLGİ VE BELGELER:</div>
+                        <ol>
+                            ${EVRAK_TALEP_MADDELERI.map((item, index) => {
+                                if (evrakTalep.selectedItems?.includes(index)) {
+                                    return `<li>${getFormattedItem(item)}</li>`;
+                                }
+                                return "";
+                            }).join("")}
+                        </ol>
+                    
+                        <div class="footer-note">
+                            Müfettişliğimize cevaben hazırlanacak tablo ve listeler Federasyon onaylı olarak ibraz edilmelidir.<br/>
+                            Bilgilerinizi ve gereğini rica ederim.
+                        </div>
+                    
+                        <div class="signature">
+                            ${inspectorName}<br />
+                            ${inspectorTitle}
+                        </div>
+                    
+                        <script>
+                            window.onload = function() {
+                                window.print();
+                            }
+                        </script>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+            };
+
+            const handleDownloadWord = () => {
+                const fedNameClean = (selectedTask?.rapor_adi || "Evrak_Talep_Yazisi").replace(/[\s/\\?%*:|"<>]/g, "_");
+                const filename = `Federasyon_Evrak_Talep_Yazisi_${fedNameClean}.doc`;
+            
+                let htmlContent = `
+                    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+                    <head>
+                        <meta charset="utf-8">
+                        <title>Evrak Talep Yazısı</title>
+                        <style>
+                            @page {
+                                size: A4;
+                                margin: 2.5cm;
+                            }
+                            body {
+                                font-family: 'Times New Roman', Times, serif;
+                                font-size: 12pt;
+                                line-height: 1.5;
+                                color: #000000;
+                            }
+                            .header {
+                                text-align: center;
+                                font-weight: bold;
+                                margin-bottom: 24pt;
+                            }
+                            .subject {
+                                margin-bottom: 18pt;
+                            }
+                            .recipient {
+                                font-weight: bold;
+                                margin-bottom: 18pt;
+                                text-align: center;
+                            }
+                            .reference {
+                                margin-bottom: 18pt;
+                                margin-left: 20pt;
+                            }
+                            .content {
+                                text-align: justify;
+                                text-indent: 30pt;
+                                margin-bottom: 18pt;
+                            }
+                            .list-title {
+                                font-weight: bold;
+                                margin-bottom: 12pt;
+                            }
+                            ol {
+                                margin-left: 20pt;
+                                padding-left: 0;
+                            }
+                            li {
+                                margin-bottom: 6pt;
+                                text-align: justify;
+                            }
+                            .footer-note {
+                                text-align: justify;
+                                text-indent: 30pt;
+                                margin-top: 18pt;
+                                margin-bottom: 18pt;
+                            }
+                            .signature-container {
+                                margin-top: 36pt;
+                                width: 100%;
+                            }
+                            .signature-table {
+                                width: 100%;
+                                border: none;
+                            }
+                            .signature-td {
+                                width: 60%;
+                            }
+                            .signature-box-td {
+                                width: 40%;
+                                text-align: center;
+                                font-weight: bold;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            T.C.<br />
+                            GENÇLİK VE SPOR BAKANLIĞI<br />
+                            Bakanlık Müfettişliği
+                        </div>
+                    
+                        <div class="subject">
+                            <strong>Konu:</strong> Görev Emirleri
+                        </div>
+                    
+                        <div class="recipient">
+                            ${recipientNameStr} BAŞKANLIĞINA
+                        </div>
+                    
+                        <div class="reference">
+                            <strong>İlgi:</strong><br />
+                            a) Bakanlık Makamının ${olurTarihiStr} tarihli ve ${olurSayisiStr} sayılı Oluru.<br />
+                            b) Rehberlik ve Denetim Başkanlığının ${gorevTarihiStr} tarih ve ${gorevSayisiStr} sayılı Görev Emri.
+                        </div>
+                    
+                        <div class="content">
+                            İlgi (a)'da kayıtlı Makam Oluru ve ilgi (b)'de kayıtlı Görev Emri uyarınca, ${recipientNameStr}'nın ${denetimDonemiStr} tarihleri arasındaki Genel Denetimi, Müfettişliğimizce yapılacaktır. Aşağıda belirtilen tüm bilgi ve belgelerin tasniflenmiş onaylı suretlerinin denetime hazır hale getirilerek ${teslimSuresiStr} gün içinde Müfettişliğimize teslim edilmesini rica ederim.
+                        </div>
+                    
+                        <div class="list-title">TALEP EDİLEN BİLGİ VE BELGELER:</div>
+                        <ol>
+                            ${EVRAK_TALEP_MADDELERI.map((item, index) => {
+                                if (evrakTalep.selectedItems?.includes(index)) {
+                                    return `<li>${getFormattedItem(item)}</li>`;
+                                }
+                                return "";
+                            }).join("")}
+                        </ol>
+
+                        <div class="footer-note">
+                            Müfettişliğimize cevaben hazırlanacak tablo ve listeler Federasyon onaylı olarak ibraz edilmelidir.<br/>
+                            Bilgilerinizi ve gereğini rica ederim.
+                        </div>
+                    
+                        <div class="signature-container">
+                            <table class="signature-table">
+                                <tr>
+                                    <td class="signature-td"></td>
+                                    <td class="signature-box-td">
+                                        ${inspectorName}<br />
+                                        ${inspectorTitle}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </body>
+                    </html>
+                `;
+
+                const blob = new Blob(['\ufeff' + htmlContent], {
+                    type: 'application/msword;charset=utf-8'
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                toast.success("Word dosyası başarıyla indirildi!");
+            };
+
+            return (
+                <div className="flex flex-col gap-6">
+                    {/* Back button and Toolbar */}
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/50 pb-4 flex-wrap gap-3">
+                        <button
+                            onClick={() => setActiveDetailTab("dashboard")}
+                            className="flex items-center gap-2 text-xs font-black text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors uppercase tracking-wider"
+                        >
+                            <ArrowLeft size={14} />
+                            <span>Modüllere Dön</span>
+                        </button>
+                    
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-xl text-[10px] font-black h-9"
+                                onClick={handleCopyText}
+                            >
+                                <Copy size={12} className="mr-1.5" /> METNİ KOPYALA
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-xl text-[10px] font-black h-9"
+                                onClick={handlePrint}
+                            >
+                                <Printer size={12} className="mr-1.5" /> YAZDIR / PDF
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-xl text-[10px] font-black h-9"
+                                onClick={handleDownloadWord}
+                            >
+                                <Download size={12} className="mr-1.5" /> WORD İNDİR
+                            </Button>
+                            <Button
+                                size="sm"
+                                className="rounded-xl text-[10px] font-black h-9 shadow-md shadow-primary/25"
+                                onClick={() => handleSaveAuditData(localAuditData)}
+                                disabled={isSavingAuditData}
+                            >
+                                {isSavingAuditData ? <Loader2 size={12} className="animate-spin mr-1.5" /> : <Save size={12} className="mr-1.5" />}
+                                KAYDET
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                        {/* Form Controls */}
+                        <div className="xl:col-span-5 space-y-6">
+                            <div className="bg-slate-50 dark:bg-slate-955 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-slate-850 dark:text-slate-200">Yazı Bilgileri</h4>
+                                <div className="h-px bg-slate-200 dark:bg-slate-800/60" />
+                            
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5 col-span-2">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Müfettiş Adı Soyadı</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.mufettisAdi || ""}
+                                            onChange={e => updateEvrakTalepField("mufettisAdi", e.target.value)}
+                                            placeholder="Örn: Sefa YAPRAKLI"
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5 col-span-2">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Müfettiş Unvanı</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.mufettisUnvani || ""}
+                                            onChange={e => updateEvrakTalepField("mufettisUnvani", e.target.value)}
+                                            placeholder="Örn: Bakanlık Müfettişi..."
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5 col-span-2">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Denetim Dönemi (Tarih Aralığı)</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.denetimDonemi || ""}
+                                            onChange={e => updateEvrakTalepField("denetimDonemi", e.target.value)}
+                                            placeholder="Örn: 01.01.2021 - 31.12.2024"
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5 col-span-2">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Defter Karar Tarih Aralığı (M. 12)</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.defterDonemi || ""}
+                                            onChange={e => updateEvrakTalepField("defterDonemi", e.target.value)}
+                                            placeholder="Örn: 01.01.2021 - 30.06.2024"
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Makam Oluru Tarih</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.olurTarihi || ""}
+                                            onChange={e => updateEvrakTalepField("olurTarihi", e.target.value)}
+                                            placeholder="Örn: 21.01.2025"
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Makam Oluru Sayı</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.olurSayisi || ""}
+                                            onChange={e => updateEvrakTalepField("olurSayisi", e.target.value)}
+                                            placeholder="Örn: 41444738-660-26"
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Görevlendirme Tarih</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.gorevTarihi || ""}
+                                            onChange={e => updateEvrakTalepField("gorevTarihi", e.target.value)}
+                                            placeholder="Örn: 24.01.2025"
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Görevlendirme Sayı</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.gorevSayisi || ""}
+                                            onChange={e => updateEvrakTalepField("gorevSayisi", e.target.value)}
+                                            placeholder="Örn: E-41444738-662..."
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Denetim Yılları</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.denetimYili || ""}
+                                            onChange={e => updateEvrakTalepField("denetimYili", e.target.value)}
+                                            placeholder="Örn: 2021-2024"
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Teslim Süresi (Gün)</label>
+                                        <input
+                                            type="text"
+                                            value={evrakTalep.teslimSuresi || ""}
+                                            onChange={e => updateEvrakTalepField("teslimSuresi", e.target.value)}
+                                            placeholder="Örn: 7"
+                                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-250 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Checklist selection */}
+                            <div className="bg-slate-50 dark:bg-slate-955 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4 flex flex-col max-h-[400px]">
+                                <div className="flex justify-between items-center">
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-850 dark:text-slate-200">Talep Edilen Evrak Listesi</h4>
+                                    <div className="flex gap-2">
+                                        <button onClick={selectAll} className="text-[10px] font-bold text-blue-500 hover:underline">Tümünü Seç</button>
+                                        <span className="text-[10px] text-slate-350">|</span>
+                                        <button onClick={selectNone} className="text-[10px] font-bold text-blue-500 hover:underline">Temizle</button>
+                                    </div>
+                                </div>
+                                <div className="h-px bg-slate-200 dark:bg-slate-800/60" />
+                                <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                    {EVRAK_TALEP_MADDELERI.map((item, index) => {
+                                        const isChecked = evrakTalep.selectedItems?.includes(index);
+                                        return (
+                                            <div
+                                                key={index}
+                                                onClick={() => toggleItem(index)}
+                                                className={`flex items-start gap-2.5 p-2 rounded-xl border text-left cursor-pointer transition-all ${
+                                                    isChecked
+                                                        ? "bg-blue-600/5 dark:bg-blue-955/10 border-blue-200 dark:border-blue-900/40"
+                                                        : "bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-850 opacity-60"
+                                                }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() => {}}
+                                                    className="mt-0.5 pointer-events-none"
+                                                />
+                                                <span className="text-[11px] text-slate-800 dark:text-slate-200 font-bold leading-snug">
+                                                    {index + 1}. {getFormattedItem(item)}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Preview Area */}
+                        <div className="xl:col-span-7 bg-slate-50 dark:bg-slate-955 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-850 dark:text-slate-200">Resmi Yazı Önizleme</h4>
+                            <div className="h-px bg-slate-200 dark:bg-slate-800/60" />
+                        
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-850 text-slate-900 dark:text-slate-100 font-serif leading-relaxed text-xs shadow-sm whitespace-pre-wrap text-justify max-h-[700px] overflow-y-auto select-text">
+                                {getPlainText()}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        return { renderDashboardTab, renderEvrakTalebiTab };
+    };
+
+    const panoEkleri = tur === "spor" ? sporPanoEkleri() : tur === "federasyon" ? federasyonPanoEkleri() : null;
 
     return (
         <div className="flex flex-col gap-4 sm:gap-6 min-h-full xl:h-[calc(100vh-140px)] animate-in fade-in duration-300">
@@ -1862,12 +3434,19 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                 <div className="flex-1 flex flex-col xl:flex-row gap-4 xl:gap-6 xl:overflow-hidden">
                     {/* 2. Tasks list pane */}
                     <div className={`w-full xl:w-80 bg-white dark:bg-slate-900/30 backdrop-blur-md border border-slate-100 dark:border-slate-900/50 rounded-2xl p-4 flex-col gap-3 flex-shrink-0 overflow-y-auto ${selectedTaskId ? (activeDetailTab !== "hub" ? "hidden" : "hidden xl:flex") : "flex"}`}>
-                        <div className="px-1 flex items-start justify-between gap-2">
-                            <div>
+                        {tur === "federasyon" ? (
+                            <div className="px-1 py-1 border-b border-slate-100 dark:border-slate-850">
                                 <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">{currentRaporTuru}</h3>
                                 <p className="text-[10px] text-slate-400 font-bold">Aktif denetim görevleri listesi</p>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="px-1 flex items-start justify-between gap-2">
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">{currentRaporTuru}</h3>
+                                    <p className="text-[10px] text-slate-400 font-bold">Aktif denetim görevleri listesi</p>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="h-px bg-slate-100 dark:bg-slate-800/50" />
 
@@ -1922,7 +3501,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                                 </div>
                                                 <h4 className="font-bold text-xs text-slate-800 dark:text-slate-200 line-clamp-2 leading-tight">{task.rapor_adi}</h4>
                                                 <div className="flex items-center gap-2 mt-2 text-[9px] text-slate-400 font-semibold">
-                                                    <span>Görev Tarihi: {task.baslama_tarihi}</span>
+                                                    <span>{tur === "federasyon" ? "Başlama" : "Görev Tarihi"}: {task.baslama_tarihi}</span>
                                                     <span>•</span>
                                                     <span>{task.sure_gun} Gün</span>
                                                 </div>
@@ -2299,7 +3878,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                             ];
 
                                             return (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-5">
                                                     {cards.map(card => {
                                                         const IconComp = card.icon;
                                                         return (
@@ -2309,7 +3888,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                                                     handleSaveAuditData(localAuditData);
                                                                     setActiveDetailTab(card.id as any);
                                                                 }}
-                                                                className={`group cursor-pointer rounded-2xl p-6 border transition-all duration-200 flex flex-col justify-between gap-5 relative overflow-hidden ${
+                                                                className={`group cursor-pointer rounded-2xl p-4 sm:p-6 border transition-all duration-200 flex flex-col justify-between gap-4 sm:gap-5 relative overflow-hidden ${
                                                                     card.highlight
                                                                         ? "bg-gradient-to-br from-blue-50/70 to-white dark:from-blue-950/20 dark:to-slate-900/60 border-blue-300 dark:border-blue-800 shadow-md shadow-blue-500/5 hover:border-blue-500 hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-0.5"
                                                                         : "bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 shadow-sm hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md hover:-translate-y-0.5"
@@ -2425,6 +4004,8 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                             {activeDetailTab === "notes" && renderNotesTab()}
                                             {activeDetailTab === "photos" && renderPhotosTab()}
                                             {activeDetailTab === "checklist" && renderChecklistTab()}
+                                            {panoEkleri && activeDetailTab === "dashboard" && panoEkleri.renderDashboardTab()}
+                                            {panoEkleri && activeDetailTab === "evrak_talebi" && panoEkleri.renderEvrakTalebiTab()}
                                             
                                             {activeDetailTab === "editor" && (
                                                 selectedReport.report_created === false ? (
@@ -2444,82 +4025,228 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                                     </div>
                                                 ) : (
                                                     <div className="flex-1 flex flex-col gap-4">
-                                                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/30 pb-2">
-                                                            <h3 className="text-xs font-black uppercase tracking-[0.15em] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                                                                <FileText size={14} className="text-blue-500" />
-                                                                <span>Denetim Raporu İçeriği</span>
-                                                            </h3>
-                                                            <div className="flex items-center gap-1.5">
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    className="rounded-lg text-[10px] h-8"
-                                                                    onClick={() => navigate(`/audit/${selectedReport.id}/report`)}
-                                                                >
-                                                                    <ExternalLink size={12} className="mr-1" /> Editörde Aç
-                                                                </Button>
-                                                                {reportEditing ? (
-                                                                    <div className="flex items-center gap-1">
+                                                        {raporOlusturucu ? (
+                                                            <>
+                                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 dark:border-slate-800/30 pb-3 gap-2">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <h3 className="text-xs font-black uppercase tracking-[0.15em] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                                                            <FileText size={14} className="text-blue-500" />
+                                                                            <span>Denetim Raporu İçeriği</span>
+                                                                        </h3>
+                                                                        {/* Görünüm Modu Seçici */}
+                                                                        <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setReportTabMode("builder")}
+                                                                                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                                                                                    reportTabMode === "builder"
+                                                                                        ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs"
+                                                                                        : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                                                                                }`}
+                                                                            >
+                                                                                <span>🏗️ Dinamik Yapılandırıcı ({raporOlusturucu!.yapilandiriciEtiketi})</span>
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setReportTabMode("preview")}
+                                                                                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                                                                                    reportTabMode === "preview"
+                                                                                        ? "bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-xs"
+                                                                                        : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                                                                                }`}
+                                                                            >
+                                                                                <span>📄 Belge Önizleme & Tenkit Bankası</span>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-1.5">
                                                                         <Button
                                                                             variant="outline"
                                                                             size="sm"
-                                                                            className="rounded-lg text-[10px] h-8 text-slate-400"
-                                                                            onClick={() => {
-                                                                                setReportContent(selectedReport.report_content || "");
-                                                                                setReportEditing(false);
+                                                                            className="rounded-lg text-[11px] h-8 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 font-bold"
+                                                                            onClick={() => navigate(`/audit/${selectedReport.id}/report`)}
+                                                                        >
+                                                                            <ExternalLink size={12} className="mr-1" /> Editörde Aç (TinyMCE)
+                                                                        </Button>
+                                                                        {reportTabMode === "preview" && (
+                                                                            reportEditing ? (
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <Button
+                                                                                        variant="outline"
+                                                                                        size="sm"
+                                                                                        className="rounded-lg text-[10px] h-8 text-slate-400"
+                                                                                        onClick={() => {
+                                                                                            setReportContent(selectedReport.report_content || "");
+                                                                                            setReportEditing(false);
+                                                                                        }}
+                                                                                    >
+                                                                                        İptal
+                                                                                    </Button>
+                                                                                    <Button
+                                                                                        size="sm"
+                                                                                        className="rounded-lg text-[10px] h-8"
+                                                                                        onClick={handleSaveReport}
+                                                                                        disabled={reportSaving}
+                                                                                    >
+                                                                                        {reportSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} className="mr-1" />}
+                                                                                        Kaydet
+                                                                                    </Button>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <Button
+                                                                                    variant="outline"
+                                                                                    size="sm"
+                                                                                    className="rounded-lg text-[10px] h-8"
+                                                                                    onClick={() => setReportEditing(true)}
+                                                                                >
+                                                                                    Manuel Düzenle
+                                                                                </Button>
+                                                                            )
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                {reportTabMode === "builder" ? (
+                                                                    <div className="flex-1 min-h-[600px] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs flex flex-col">
+                                                                        <ReportDynamicBuilder
+                                                                            htmlContent={reportContent || selectedReport.report_content || ""}
+                                                                            reportTitle={selectedReport.title || selectedTask?.rapor_adi || raporOlusturucu!.varsayilanBaslik}
+                                                                            templateId={raporOlusturucu!.templateId}
+                                                                            onCompileAndSwitchToDoc={async (compiledHtml) => {
+                                                                                setReportContent(compiledHtml);
+                                                                                try {
+                                                                                    await updateAudit(selectedReport.id, { report_content: compiledHtml });
+                                                                                    toast.success("Rapor derlendi ve kaydedildi.");
+                                                                                    if (user?.uid) {
+                                                                                        await refreshAudits(user.uid, user.email || undefined);
+                                                                                    }
+                                                                                    navigate(`/audit/${selectedReport.id}/report`);
+                                                                                } catch (e) {
+                                                                                    toast.error("Rapor kaydedilemedi.");
+                                                                                }
                                                                             }}
-                                                                        >
-                                                                            İptal
-                                                                        </Button>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            className="rounded-lg text-[10px] h-8"
-                                                                            onClick={handleSaveReport}
-                                                                            disabled={reportSaving}
-                                                                        >
-                                                                            {reportSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} className="mr-1" />}
-                                                                            Kaydet
-                                                                        </Button>
+                                                                            onStateChange={async (state) => {
+                                                                                const coverObj = REPORT_TEMPLATES.find(t => t.id.includes(raporOlusturucu!.kapakAnahtari) || t.id.includes("kapağı"));
+                                                                                const compiled = compileStructuredReportToHtml(state, coverObj?.html);
+                                                                                setReportContent(compiled);
+                                                                                try {
+                                                                                    await updateAudit(selectedReport.id, { report_content: compiled });
+                                                                                } catch (err) {
+                                                                                    console.error("Auto-sync error:", err);
+                                                                                }
+                                                                            }}
+                                                                        />
                                                                     </div>
                                                                 ) : (
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        className="rounded-lg text-[10px] h-8"
-                                                                        onClick={() => setReportEditing(true)}
-                                                                    >
-                                                                        Manuel Düzenle
-                                                                    </Button>
-                                                                )}
-                                                            </div>
-                                                        </div>
+                                                                    <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 min-h-[300px]">
+                                                                        {/* Left: Editor Area */}
+                                                                        <div className="xl:col-span-7 flex flex-col gap-2">
+                                                                            {reportEditing ? (
+                                                                                <textarea
+                                                                                    value={reportContent}
+                                                                                    onChange={e => setReportContent(e.target.value)}
+                                                                                    className="flex-1 w-full p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-955/20 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed resize-none h-[350px] lg:h-full"
+                                                                                    placeholder="Rapor içeriğini HTML formatında yazın..."
+                                                                                />
+                                                                            ) : (
+                                                                                <div 
+                                                                                    className="flex-1 p-4 rounded-xl border border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-955/5 text-xs text-slate-800 dark:text-slate-255 leading-relaxed overflow-y-auto select-text prose prose-sm dark:prose-invert max-w-none h-[350px] lg:h-full"
+                                                                                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(reportContent || "<p class='text-slate-400 italic'>Rapor içeriği boş.</p>") }}
+                                                                                />
+                                                                            )}
+                                                                            <p className="text-[10px] text-slate-400 font-bold">
+                                                                                * Rapor içeriği HTML formatındadır. TinyMCE zengin metin düzenleyiciyle düzenlemek için sağ üstteki "Editörde Aç" butonunu kullanın.
+                                                                            </p>
+                                                                        </div>
 
-                                                        <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 min-h-[300px]">
-                                                            {/* Left: Editor Area */}
-                                                            <div className="xl:col-span-7 flex flex-col gap-2">
-                                                                {reportEditing ? (
-                                                                    <textarea
-                                                                        value={reportContent}
-                                                                        onChange={e => setReportContent(e.target.value)}
-                                                                        className="flex-1 w-full p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-955/20 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed resize-none h-[350px] lg:h-full"
-                                                                        placeholder="Rapor içeriğini HTML formatında yazın..."
-                                                                    />
-                                                                ) : (
-                                                                    <div 
-                                                                        className="flex-1 p-4 rounded-xl border border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-955/5 text-xs text-slate-800 dark:text-slate-255 leading-relaxed overflow-y-auto select-text prose prose-sm dark:prose-invert max-w-none h-[350px] lg:h-full"
-                                                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(reportContent || "<p class='text-slate-400 italic'>Rapor içeriği boş.</p>") }}
-                                                                    />
+                                                                        {/* Right: AI Tenkit Bankası Panel */}
+                                                                        <div className="xl:col-span-5 max-h-[500px]">
+                                                                            {renderTenkitBank("editor")}
+                                                                        </div>
+                                                                    </div>
                                                                 )}
-                                                                <p className="text-[10px] text-slate-400 font-bold">
-                                                                    * Rapor içeriği HTML formatındadır. TinyMCE zengin metin düzenleyiciyle düzenlemek için sağ üstteki "Editörde Aç" butonunu kullanın.
-                                                                </p>
-                                                            </div>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/30 pb-2">
+                                                                    <h3 className="text-xs font-black uppercase tracking-[0.15em] text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                                                        <FileText size={14} className="text-blue-500" />
+                                                                        <span>Denetim Raporu İçeriği</span>
+                                                                    </h3>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="rounded-lg text-[10px] h-8"
+                                                                            onClick={() => navigate(`/audit/${selectedReport.id}/report`)}
+                                                                        >
+                                                                            <ExternalLink size={12} className="mr-1" /> Editörde Aç
+                                                                        </Button>
+                                                                        {reportEditing ? (
+                                                                            <div className="flex items-center gap-1">
+                                                                                <Button
+                                                                                    variant="outline"
+                                                                                    size="sm"
+                                                                                    className="rounded-lg text-[10px] h-8 text-slate-400"
+                                                                                    onClick={() => {
+                                                                                        setReportContent(selectedReport.report_content || "");
+                                                                                        setReportEditing(false);
+                                                                                    }}
+                                                                                >
+                                                                                    İptal
+                                                                                </Button>
+                                                                                <Button
+                                                                                    size="sm"
+                                                                                    className="rounded-lg text-[10px] h-8"
+                                                                                    onClick={handleSaveReport}
+                                                                                    disabled={reportSaving}
+                                                                                >
+                                                                                    {reportSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} className="mr-1" />}
+                                                                                    Kaydet
+                                                                                </Button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                className="rounded-lg text-[10px] h-8"
+                                                                                onClick={() => setReportEditing(true)}
+                                                                            >
+                                                                                Manuel Düzenle
+                                                                            </Button>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
 
-                                                            {/* Right: AI Tenkit Bankası Panel */}
-                                                            <div className="xl:col-span-5 max-h-[500px]">
-                                                                {renderTenkitBank("editor")}
-                                                            </div>
-                                                        </div>
+                                                                <div className="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 min-h-[300px]">
+                                                                    {/* Left: Editor Area */}
+                                                                    <div className="xl:col-span-7 flex flex-col gap-2">
+                                                                        {reportEditing ? (
+                                                                            <textarea
+                                                                                value={reportContent}
+                                                                                onChange={e => setReportContent(e.target.value)}
+                                                                                className="flex-1 w-full p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-955/20 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500/20 leading-relaxed resize-none h-[350px] lg:h-full"
+                                                                                placeholder="Rapor içeriğini HTML formatında yazın..."
+                                                                            />
+                                                                        ) : (
+                                                                            <div 
+                                                                                className="flex-1 p-4 rounded-xl border border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-955/5 text-xs text-slate-800 dark:text-slate-255 leading-relaxed overflow-y-auto select-text prose prose-sm dark:prose-invert max-w-none h-[350px] lg:h-full"
+                                                                                dangerouslySetInnerHTML={{ __html: sanitizeHtml(reportContent || "<p class='text-slate-400 italic'>Rapor içeriği boş.</p>") }}
+                                                                            />
+                                                                        )}
+                                                                        <p className="text-[10px] text-slate-400 font-bold">
+                                                                            * Rapor içeriği HTML formatındadır. TinyMCE zengin metin düzenleyiciyle düzenlemek için sağ üstteki "Editörde Aç" butonunu kullanın.
+                                                                        </p>
+                                                                    </div>
+
+                                                                    {/* Right: AI Tenkit Bankası Panel */}
+                                                                    <div className="xl:col-span-5 max-h-[500px]">
+                                                                        {renderTenkitBank("editor")}
+                                                                    </div>
+                                                                </div>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 )
                                             )}
