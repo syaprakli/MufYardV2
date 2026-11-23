@@ -41,6 +41,9 @@ import ReportDynamicBuilder from "../../components/report/ReportDynamicBuilder";
 import { compileStructuredReportToHtml } from "../../lib/reportSectionManager";
 import { REPORT_TEMPLATES } from "../../lib/reportTemplates";
 import { TenkitTakibi } from "../../components/audit/TenkitTakibi";
+import { getPendingAuditUpdate } from "../../lib/api/syncQueue";
+import { fotoDamgala, fotoMetaOku, damgaTercihi, damgaTercihiKaydet, tarihMetni, konumMetni, haritaAdresi, type FotoMeta } from "../../lib/fotoDamga";
+import { bekleyenFotoEkle, bekleyenFotolar, bekleyenFotoSil, type BekleyenFoto } from "../../lib/offlinePhotos";
 
 const PRESET_CATEGORIES = [
     "Yurt İşlemleri", "Spor Tesisi", "Federasyon", "Denetim Genel",
@@ -330,6 +333,9 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
     const [activeQuestionForTenkit, setActiveQuestionForTenkit] = useState<string | null>(null);
     const [isSavingAuditData, setIsSavingAuditData] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const [fotoDamgaAcik, setFotoDamgaAcik] = useState<boolean>(() => damgaTercihi());
+    const [bekleyenler, setBekleyenler] = useState<BekleyenFoto[]>([]);
+    const bekleyenYukleniyorRef = useRef(false);
     const [checklistAreaFilter, setChecklistAreaFilter] = useState<string>("");
     const [checklistSearch, setChecklistSearch] = useState<string>( "");
     const [checklistStatusFilter, setChecklistStatusFilter] = useState<string>("");
@@ -510,7 +516,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                         if (fullAudit) {
                             setReportContent(fullAudit.report_content || "");
                             if (fullAudit.audit_data) {
-                                const fad = fullAudit.audit_data;
+                                const fad = { ...fullAudit.audit_data, ...(getPendingAuditUpdate(selectedReport.id)?.audit_data || {}) };
                                 setLocalAuditData((prev: any) => {
                                     const serverTesisler = Array.isArray(fad.tesisler) ? fad.tesisler : [];
                                     let safeTesisler = serverTesisler;
@@ -552,7 +558,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                         setReportContent(selectedReport.report_content || "");
                     });
 
-                const ad = selectedReport.audit_data || {};
+                const ad = { ...(selectedReport.audit_data || {}), ...(getPendingAuditUpdate(selectedReport.id)?.audit_data || {}) };
                 let initialTesisler = Array.isArray(ad.tesisler) ? ad.tesisler : [];
                 try {
                     const mirrorRaw = localStorage.getItem(`mufyard_facilities_mirror_${selectedReport.id}`);
@@ -572,6 +578,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                     generalNotes: ad.generalNotes || "",
                     photos: ad.photos || [],
                     photo_descriptions: ad.photo_descriptions || {},
+                photo_meta: ad.photo_meta || {},
                     tesisler: initialTesisler,
                     form: ad.form || {},
                     evrakTalep: ad.evrakTalep || null,
@@ -607,12 +614,13 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                     setReportContent(selectedReport.report_content || "");
                 });
 
-            const ad = selectedReport.audit_data || {};
+            const ad = { ...(selectedReport.audit_data || {}), ...(getPendingAuditUpdate(selectedReport.id)?.audit_data || {}) };
             setLocalAuditData({
                 info: ad.info || {},
                 generalNotes: ad.generalNotes || "",
                 photos: ad.photos || [],
                 photo_descriptions: ad.photo_descriptions || {},
+                photo_meta: ad.photo_meta || {},
                 form: ad.form || {},
                 ...yuklenenEvrakTalep(ad)
             });
@@ -714,53 +722,178 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
         });
     };
 
+    // --- Fotoğraf yükleme: damga + çevrimdışı kuyruk (tüm denetim türleri) ---
+    const fotoSunucuyaYukle = async (blob: Blob, ad: string, auditId: string): Promise<string> => {
+        const formData = new FormData();
+        formData.append("file", blob, ad);
+        const params = new URLSearchParams({ path: `denetim_fotograflari/${auditId}` });
+        if (user?.uid) params.append("uid", user.uid);
+        const authHeaders = await getAuthHeaders();
+        const ctrl = new AbortController();
+        const zamanAsimi = window.setTimeout(() => ctrl.abort(), 90000);
+        try {
+            const res = await fetch(`${API_URL}/files/upload?${params.toString()}`, {
+                method: "POST",
+                headers: { ...authHeaders },
+                body: formData,
+                signal: ctrl.signal,
+            });
+            if (!res.ok) {
+                const err: any = new Error(`HTTP ${res.status}`);
+                err.status = res.status;
+                throw err;
+            }
+            const data = await res.json();
+            if (!data?.url) throw new Error("Sunucu adres döndürmedi");
+            return data.url as string;
+        } finally {
+            window.clearTimeout(zamanAsimi);
+        }
+    };
+
+    // Bağlantı / sunucu kaynaklı hatada fotoğraf cihazda bekletilir; 4xx (yetki, boyut) kullanıcıya bildirilir.
+    const baglantiHatasi = (e: any) => !navigator.onLine || !e?.status || e.status >= 500 || e.status === 408 || e.status === 429;
+
+    const fotograflariIsle = async (files: File[], auditId: string) => {
+        const urls: string[] = [];
+        const meta: Record<string, FotoMeta> = {};
+        let kuyruk = 0;
+        for (const file of files) {
+            const hazir = fotoDamgaAcik
+                ? await fotoDamgala(file)
+                : { blob: file as Blob, ad: file.name || "foto.jpg", meta: await fotoMetaOku(file) };
+            try {
+                const url = await fotoSunucuyaYukle(hazir.blob, hazir.ad, auditId);
+                urls.push(url);
+                meta[url] = hazir.meta;
+            } catch (e: any) {
+                if (!baglantiHatasi(e)) {
+                    toast.error(`${file.name} yüklenemedi (${e?.message || "hata"}).`);
+                    continue;
+                }
+                try {
+                    const kayit = await bekleyenFotoEkle({ auditId, ad: hazir.ad, blob: hazir.blob, meta: hazir.meta });
+                    kuyruk++;
+                    if (auditId === selectedReport?.id) setBekleyenler(prev => [...prev, kayit]);
+                } catch {
+                    toast.error(`${file.name} cihazda saklanamadı.`);
+                }
+            }
+        }
+        return { urls, meta, kuyruk };
+    };
+
+    const fotolariDenetimeEkle = (urls: string[], meta: Record<string, FotoMeta>, auditId?: string) => {
+        if (!urls.length) return;
+        setLocalAuditData((prev: any) => {
+            const next = {
+                ...prev,
+                photos: [...(prev.photos || []), ...urls.filter(u => !(prev.photos || []).includes(u))],
+                photo_meta: { ...(prev.photo_meta || {}), ...meta },
+            };
+            if (!auditId || auditId === selectedReport?.id) {
+                void handleSaveAuditData(next);
+            } else {
+                void updateAudit(auditId, { audit_data: next }).catch(() => toast.error("Denetim verileri kaydedilemedi."));
+            }
+            return next;
+        });
+    };
+
+    const yuklemeSonucuBildir = (yuklenen: number, bekleyen: number) => {
+        if (yuklenen) toast.success(`${yuklenen} fotoğraf yüklendi.`);
+        if (bekleyen) {
+            toast(`İnternet yok: ${bekleyen} fotoğraf cihazda bekliyor. Bağlantı gelince otomatik yüklenecek.`, { icon: "📶", duration: 6000 });
+        }
+    };
+
     const handlePhotoUploadStandart = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0 || !selectedReport) return;
-        const file = e.target.files[0];
-        
+        const files = Array.from(e.target.files);
+        e.target.value = "";
         setUploadingPhoto(true);
         try {
-            savePhotoToLocalDevice(file, `${ayar.fotoOneki}_${selectedReport?.title || "Denetim"}`);
-
-            const formData = new FormData();
-            formData.append("file", file);
-            
-            let url = `${API_URL}/files/upload`;
-            const params = new URLSearchParams();
-            params.append("path", `denetim_fotograflari/${selectedReport.id}`);
-            if (user?.uid) params.append("uid", user.uid);
-            url += `?${params.toString()}`;
-            
-            const authHeaders = await getAuthHeaders();
-            const res = await fetch(url, {
-                method: "POST",
-                headers: {
-                    ...authHeaders
-                },
-                body: formData
-            });
-            
-            if (!res.ok) {
-                throw new Error("Fotoğraf yüklenemedi");
-            }
-            
-            const data = await res.json();
-            const newPhotoUrl = data.url;
-            
-            const updatedPhotos = [...(localAuditData.photos || []), newPhotoUrl];
-            const updatedData = {
-                ...localAuditData,
-                photos: updatedPhotos
-            };
-            setLocalAuditData(updatedData);
-            await handleSaveAuditData(updatedData);
-            toast.success("Fotoğraf yüklendi.");
+            savePhotoToLocalDevice(files, `${ayar.fotoOneki}_${selectedReport?.title || "Denetim"}`);
+            const { urls, meta, kuyruk } = await fotograflariIsle(files, selectedReport.id);
+            fotolariDenetimeEkle(urls, meta, selectedReport.id);
+            yuklemeSonucuBildir(urls.length, kuyruk);
         } catch (error) {
             console.error("Photo upload error:", error);
             toast.error("Fotoğraf yüklenirken bir hata oluştu.");
         } finally {
             setUploadingPhoto(false);
         }
+    };
+
+    // Bekleyen (çevrimdışı) fotoğraflar: denetim açıkken bağlantı gelince yüklenir
+    useEffect(() => {
+        let iptal = false;
+        setBekleyenler([]);
+        if (selectedReport?.id) {
+            bekleyenFotolar(selectedReport.id).then(l => { if (!iptal) setBekleyenler(l); });
+        }
+        return () => { iptal = true; };
+    }, [selectedReport?.id]);
+
+    const bekleyenOnizlemeler = useMemo(
+        () => bekleyenler.map(b => ({ ...b, onizleme: URL.createObjectURL(b.blob) })),
+        [bekleyenler]
+    );
+    useEffect(() => () => bekleyenOnizlemeler.forEach(b => URL.revokeObjectURL(b.onizleme)), [bekleyenOnizlemeler]);
+
+    const bekleyenleriYukleRef = useRef<() => Promise<void>>(async () => {});
+    bekleyenleriYukleRef.current = async () => {
+        const auditId = selectedReport?.id;
+        if (!auditId || bekleyenYukleniyorRef.current || !navigator.onLine) return;
+        const liste = await bekleyenFotolar(auditId);
+        if (!liste.length) return;
+        bekleyenYukleniyorRef.current = true;
+        const urls: string[] = [];
+        const meta: Record<string, FotoMeta> = {};
+        try {
+            for (const b of liste) {
+                try {
+                    const url = await fotoSunucuyaYukle(b.blob, b.ad, auditId);
+                    urls.push(url);
+                    if (b.meta) meta[url] = b.meta;
+                    await bekleyenFotoSil(b.id);
+                } catch (e) {
+                    if (baglantiHatasi(e)) break;
+                }
+            }
+        } finally {
+            bekleyenYukleniyorRef.current = false;
+        }
+        if (urls.length) {
+            fotolariDenetimeEkle(urls, meta, auditId);
+            toast.success(`Bekleyen ${urls.length} fotoğraf yüklendi.`);
+        }
+        if (selectedReport?.id === auditId) setBekleyenler(await bekleyenFotolar(auditId));
+    };
+
+    useEffect(() => {
+        if (!selectedReport?.id) return;
+        const calistir = () => { void bekleyenleriYukleRef.current(); };
+        const ilk = window.setTimeout(calistir, 3000);
+        const aralik = window.setInterval(calistir, 45000);
+        window.addEventListener("online", calistir);
+        return () => {
+            window.clearTimeout(ilk);
+            window.clearInterval(aralik);
+            window.removeEventListener("online", calistir);
+        };
+    }, [selectedReport?.id]);
+
+    const bekleyenFotoKaldir = async (id: string) => {
+        const onay = await confirm({
+            title: "Bekleyen Fotoğrafı Sil",
+            message: "Bu fotoğraf henüz sunucuya yüklenmedi. Cihazdan da silinecek. Emin misiniz?",
+            confirmText: "Sil",
+            variant: "danger"
+        });
+        if (!onay) return;
+        await bekleyenFotoSil(id).catch(() => undefined);
+        setBekleyenler(prev => prev.filter(b => b.id !== id));
     };
 
     // İl: birden çok fotoğraf, rapor yoksa taslak oluşturma, yüklenemezse base64 yedeği (eski DenetimIl.tsx)
@@ -804,79 +937,20 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
             }
 
             const targetAuditId = activeAudit?.id || selectedTask?.id || "temp_audit";
-            const targetApi = API_URL;
-            const uploadedUrls: string[] = [];
-
-            for (const file of files) {
-                try {
-                    const formData = new FormData();
-                    formData.append("file", file);
-                    
-                    let url = `${targetApi}/files/upload`;
-                    const params = new URLSearchParams();
-                    params.append("path", `denetim_fotograflari/${targetAuditId}`);
-                    if (user?.uid) params.append("uid", user.uid);
-                    url += `?${params.toString()}`;
-                    
-                    const authHeaders = await getAuthHeaders();
-                    const res = await fetch(url, {
-                        method: "POST",
-                        headers: {
-                            ...authHeaders
-                        },
-                        body: formData
-                    });
-                    
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data?.url) {
-                            uploadedUrls.push(data.url);
-                        }
-                    } else {
-                        // Fallback: Convert to Base64 so photo is NEVER lost!
-                        const base64Url = await new Promise<string>((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = () => resolve(reader.result as string);
-                            reader.onerror = reject;
-                            reader.readAsDataURL(file);
-                        });
-                        uploadedUrls.push(base64Url);
-                    }
-                } catch (singleErr) {
-                    console.warn("Upload failed for file, using base64 fallback:", singleErr);
-                    try {
-                        const base64Url = await new Promise<string>((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = () => resolve(reader.result as string);
-                            reader.onerror = reject;
-                            reader.readAsDataURL(file);
-                        });
-                        uploadedUrls.push(base64Url);
-                    } catch {
-                        // ignore
-                    }
-                }
-            }
-
-            if (uploadedUrls.length === 0) {
-                throw new Error("Fotoğraflar yüklenemedi");
-            }
-            
-            const updatedPhotos = [...(localAuditData.photos || []), ...uploadedUrls];
-            const updatedData = {
-                ...localAuditData,
-                photos: updatedPhotos
-            };
-            setLocalAuditData(updatedData);
+            const { urls, meta, kuyruk } = await fotograflariIsle(files, targetAuditId);
             if (activeAudit) {
-                await updateAudit(activeAudit.id, {
-                    audit_data: updatedData
-                });
-                if (user?.uid) {
+                fotolariDenetimeEkle(urls, meta, activeAudit.id);
+                if (activeAudit.id !== selectedReport?.id && user?.uid) {
                     refreshAudits(user.uid, user.email || undefined);
                 }
+            } else if (urls.length) {
+                setLocalAuditData((prev: any) => ({
+                    ...prev,
+                    photos: [...(prev.photos || []), ...urls],
+                    photo_meta: { ...(prev.photo_meta || {}), ...meta },
+                }));
             }
-            toast.success(`${uploadedUrls.length} adet fotoğraf yüklendi.`);
+            yuklemeSonucuBildir(urls.length, kuyruk);
         } catch (error) {
             console.error("Photo upload error:", error);
             toast.error("Fotoğraf yüklenirken bir hata oluştu.");
@@ -906,7 +980,8 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
         const updatedData = {
             ...localAuditData,
             photos: updatedPhotos,
-            photo_descriptions: updatedDescriptions
+            photo_descriptions: updatedDescriptions,
+            photo_meta: Object.fromEntries(Object.entries(localAuditData.photo_meta || {}).filter(([k]) => k !== deletedPhotoUrl))
         };
         setLocalAuditData(updatedData);
         await handleSaveAuditData(updatedData);
@@ -1167,6 +1242,15 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                 <span>Bilgisayara Aktar ({photos.length})</span>
                             </button>
                         )}
+                        <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400 cursor-pointer select-none" title="Fotoğrafa çekim tarihi ve konumu yazılır. Orijinal dosya değişmez.">
+                            <input
+                                type="checkbox"
+                                checked={fotoDamgaAcik}
+                                onChange={e => { setFotoDamgaAcik(e.target.checked); damgaTercihiKaydet(e.target.checked); }}
+                                className="accent-blue-600"
+                            />
+                            Tarih/konum damgası
+                        </label>
                         <label className={`flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-all duration-200 shadow-md shadow-blue-500/20 ${uploadingPhoto ? "opacity-50 pointer-events-none" : ""}`}>
                             {uploadingPhoto ? (
                                 <>
@@ -1182,7 +1266,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                             <input
                                 type="file"
                                 accept="image/*"
-                                multiple={tur === "il"}
+                                multiple
                                 className="hidden"
                                 onChange={handlePhotoUpload}
                                 disabled={uploadingPhoto}
@@ -1192,6 +1276,38 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                 </div>
 
                 <div className="h-px bg-slate-105 dark:bg-slate-800/50" />
+
+                {bekleyenOnizlemeler.length > 0 && (
+                    <div className="rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/10 p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="text-[11px] font-black text-amber-700 dark:text-amber-400">
+                                📶 Yükleme bekleyen {bekleyenOnizlemeler.length} fotoğraf (cihazda saklanıyor)
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => void bekleyenleriYukleRef.current()}
+                                className="text-[10px] font-bold text-amber-700 dark:text-amber-400 hover:underline"
+                            >
+                                Şimdi dene
+                            </button>
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                            {bekleyenOnizlemeler.map(b => (
+                                <div key={b.id} className="relative w-20 h-20 rounded-lg overflow-hidden border border-amber-200 dark:border-amber-900/40">
+                                    <img src={b.onizleme} alt="" className="w-full h-full object-cover opacity-80" />
+                                    <button
+                                        type="button"
+                                        onClick={() => bekleyenFotoKaldir(b.id)}
+                                        className="absolute top-1 right-1 w-5 h-5 bg-black/70 hover:bg-red-600 text-white rounded flex items-center justify-center"
+                                        title="Bekleyen fotoğrafı sil"
+                                    >
+                                        <X size={11} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {photos.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl gap-3">
@@ -1257,6 +1373,29 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                             placeholder="Görsel açıklaması ekleyin..."
                                             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20"
                                         />
+                                        {(() => {
+                                            const m = localAuditData.photo_meta?.[url];
+                                            if (!m?.tarih) return null;
+                                            const harita = haritaAdresi(m);
+                                            return (
+                                                <div className="mt-1.5 flex items-center gap-2 flex-wrap text-[10px] font-semibold text-slate-400">
+                                                    <span title={m.tarih_kaynagi === "exif" ? "Çekim tarihi (fotoğraf bilgisinden)" : "Yükleme tarihi (fotoğrafta çekim tarihi yok)"}>
+                                                        📅 {tarihMetni(m.tarih)}{m.tarih_kaynagi === "cihaz" ? " (yükleme)" : ""}
+                                                    </span>
+                                                    {harita && (
+                                                        <a
+                                                            href={harita}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-blue-500 hover:underline"
+                                                            title={m.konum_kaynagi === "exif" ? "Fotoğrafın GPS bilgisi" : "Yükleme anındaki cihaz konumu"}
+                                                        >
+                                                            📍 {konumMetni(m)}
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             );

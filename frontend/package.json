@@ -104,5 +104,8 @@
       "uninstallerIcon": "public/favicon.ico",
       "uninstallDisplayName": "MufYARD"
     }
+  },
+  "dependencies": {
+    "exifr": "7.1.3"
   }
 }

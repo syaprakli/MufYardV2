@@ -24,25 +24,56 @@ const SYNC_CONFLICTS_STORAGE_KEY = 'mufyard_sync_conflicts';
 
 export function addToQueue(action: string, args: any[], meta?: Record<string, any>) {
     const queue: QueuedAction[] = getQueue();
-    const newAction: QueuedAction = {
-        id: Math.random().toString(36).substr(2, 9),
-        action,
-        args,
-        timestamp: Date.now(),
-        meta
-    };
-    
-    queue.push(newAction);
-    localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue));
+
+    // Aynı denetimin bekleyen güncellemesi varsa yenisi onunla birleştirilir: çevrimdışıyken her
+    // kayıt tam denetim verisini taşıdığı için ayrı ayrı biriktirmek depolamayı hızla doldurur.
+    const auditId = action === 'updateAudit' ? String(meta?.auditId || args?.[0] || '') : '';
+    const existing = auditId
+        ? queue.find(q => q.action === 'updateAudit' && String(q.meta?.auditId || q.args?.[0] || '') === auditId)
+        : undefined;
+    if (existing) {
+        existing.args = [args[0], { ...(existing.args?.[1] || {}), ...(args[1] || {}) }, args[2] ?? existing.args?.[2], args[3] ?? existing.args?.[3]];
+        existing.meta = {
+            ...(existing.meta || {}),
+            ...(meta || {}),
+            hasReportContent: Boolean(existing.meta?.hasReportContent || meta?.hasReportContent),
+            // İçerik aynı olsa bile (senkron sırasında yeniden kuyruğa alınma) değişiklik fark edilsin
+            updatedAt: Date.now(),
+        };
+    } else {
+        queue.push({
+            id: Math.random().toString(36).substr(2, 9),
+            action,
+            args,
+            timestamp: Date.now(),
+            meta
+        });
+    }
+    try {
+        localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue));
+    } catch (e) {
+        console.error("Offline queue could not be stored:", e);
+        toast.error("Cihaz depolaması dolu: çevrimdışı değişiklik saklanamadı.", { id: 'offline-save-failed' });
+        return;
+    }
 
     if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("mufyard-queue-updated"));
     }
-    
+
     toast.success("Çevrimdışı kaydedildi. İnternet gelince senkronize edilecek.", {
+        id: 'offline-save',
         icon: '💾',
         duration: 4000
     });
+}
+
+/** Denetim için henüz sunucuya gitmemiş (birleştirilmiş) güncelleme; yoksa null. */
+export function getPendingAuditUpdate(auditId: string): Record<string, any> | null {
+    const merged = getQueue()
+        .filter(q => q.action === 'updateAudit' && String(q.meta?.auditId || q.args?.[0] || '') === auditId)
+        .reduce((acc, q) => ({ ...acc, ...(q.args?.[1] || {}) }), {} as Record<string, any>);
+    return Object.keys(merged).length ? merged : null;
 }
 
 export function getQueue(): QueuedAction[] {
@@ -148,13 +179,26 @@ export async function processQueue(apiMap: Record<string, Function>) {
         }
     }
 
-    if (remainingQueue.length === 0) {
+    // Senkronizasyon sırasında kuyruğa eklenenler (ör. yeniden kesilen bağlantıda tekrar kuyruğa
+    // alınan işlem) silinmesin; işlenmiş bir öğe bu arada güncellendiyse yeni hali saklanır.
+    const processedIds = new Set(queue.map(q => q.id));
+    const snapshot = new Map(queue.map(q => [q.id, JSON.stringify(q)]));
+    const current = getQueue();
+    const changedDuringSync = current.filter(q => processedIds.has(q.id) && snapshot.get(q.id) !== JSON.stringify(q));
+    const addedDuringSync = current.filter(q => !processedIds.has(q.id));
+    const changedIds = new Set(changedDuringSync.map(q => q.id));
+    const finalQueue = [
+        ...remainingQueue.filter(q => !changedIds.has(q.id)),
+        ...changedDuringSync,
+        ...addedDuringSync,
+    ];
+    if (finalQueue.length === 0) {
         clearQueue();
     } else {
-        localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(remainingQueue));
+        localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(finalQueue));
     }
     setSyncConflicts(conflicts);
-    
+
     if (failCount === 0 && conflictCount === 0) {
         toast.success(`${successCount} işlem başarıyla senkronize edildi.`, { id: 'syncing' });
     } else if (conflictCount > 0) {
@@ -167,6 +211,6 @@ export async function processQueue(apiMap: Record<string, Function>) {
         successCount,
         failCount,
         conflictCount,
-        remainingCount: remainingQueue.length
+        remainingCount: finalQueue.length
     };
 }
