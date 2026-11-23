@@ -23,6 +23,14 @@ export function useAuth() {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            // E-postası doğrulanmamış hesaplar giriş yapmamış sayılır (backend de 403 döner).
+            // Oturum burada kapatılmaz; kayıt akışı doğrulama e-postasını bu oturumla gönderir.
+            if (firebaseUser && !firebaseUser.emailVerified) {
+                setUser(null);
+                setProfile(null);
+                setLoading(false);
+                return;
+            }
             setUser(firebaseUser);
             if (firebaseUser) {
                 try {

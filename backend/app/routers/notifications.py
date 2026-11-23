@@ -47,10 +47,13 @@ async def _authenticate_notification_ws_identity(websocket: WebSocket, requested
                 raise WebSocketDisconnect(code=1008)
 
             uid = decoded.get("uid")
-            if not uid or uid != requested_user_id:
+            if not uid or uid != requested_user_id or not decoded.get("email_verified", False):
                 await websocket.close(code=1008)
                 raise WebSocketDisconnect(code=1008)
             return uid
+        except WebSocketDisconnect:
+            # Bağlantı yukarıda zaten kapatıldı; ikinci kez kapatmaya çalışma.
+            raise
         except Exception as e:
             import logging
             logging.getLogger("app.notifications").error(f"Notification WS authentication failed: {e}", exc_info=True)

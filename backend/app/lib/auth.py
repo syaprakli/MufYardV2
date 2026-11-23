@@ -8,6 +8,14 @@ from app.lib.firebase_admin import db, is_mock
 
 
 _ROLE_CACHE: Dict[str, tuple[str, float]] = {} # uid -> (role, timestamp)
+
+# İstemci bu metni tanıyıp kullanıcıyı doğrulama ekranına yönlendirir.
+EMAIL_NOT_VERIFIED_DETAIL = "E-posta adresiniz doğrulanmamış. Lütfen e-postanıza gönderilen doğrulama bağlantısına tıklayıp tekrar giriş yapın."
+
+
+def is_email_verified(decoded_token: Dict[str, Any]) -> bool:
+    """Firebase ID token'ındaki email_verified bayrağı. Tüm kullanıcılar için zorunludur (alan adı istisnası yok)."""
+    return bool((decoded_token or {}).get("email_verified", False))
 _CACHE_TTL = 300 # 5 dakika cache
 
 async def _get_role_for_uid(uid: str) -> str:
@@ -65,7 +73,10 @@ async def get_current_user(
                 raise HTTPException(status_code=401, detail="Token içinde kullanıcı kimliği bulunamadı.")
 
             email = decoded.get("email")
-            email_verified = bool(decoded.get("email_verified", False))
+            email_verified = is_email_verified(decoded)
+            if not email_verified:
+                # Doğrulanmamış hesaplar (ör. başkasının e-postasıyla açılmış) hiçbir veriye erişemez.
+                raise HTTPException(status_code=403, detail=EMAIL_NOT_VERIFIED_DETAIL)
             role = await _get_role_for_uid(uid)
             return {"uid": uid, "email": email, "email_verified": email_verified, "role": role}
         except HTTPException:

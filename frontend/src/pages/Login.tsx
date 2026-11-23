@@ -50,23 +50,34 @@ export default function Login() {
             let userEmail = email;
             if (isRegister) {
                 if (!fullName.trim()) throw new Error("Lütfen adınızı ve soyadınızı girin.");
-                result = await signUp(email, password, fullName);
-                userUid = result.user?.uid;
-                userName = fullName;
-                userEmail = email;
+                await signUp(email, password, fullName); // doğrulama e-postasını da gönderir
+                // Doğrulanana kadar giriş yapılamaz: oturumu kapat ve giriş ekranında kal.
+                const { getAuth, signOut } = await import("firebase/auth");
+                await signOut(getAuth());
+                toast.success("Kayıt oluşturuldu. E-postanıza gönderilen doğrulama bağlantısına tıkladıktan sonra giriş yapabilirsiniz (spam klasörünü de kontrol edin).", { duration: 8000 });
+                setIsRegister(false);
+                return;
             } else {
                 result = await signIn(email, password);
                 userUid = result.user?.uid;
                 userName = result.user?.displayName || "";
                 userEmail = result.user?.email || email;
-                // E-posta doğrulaması olmayan hesapların girişini engelle (GSB mailleri hariç).
-                const fbUser = result.user as any;
-                const isGsbEmail = fbUser?.email?.toLowerCase().endsWith("@gsb.gov.tr") || fbUser?.email?.toLowerCase().endsWith("@gbs.gov.tr");
-                if (fbUser?.emailVerified === false && !isGsbEmail) {
-                    import("firebase/auth").then(({ getAuth, signOut }) => {
-                        signOut(getAuth());
-                    });
-                    throw new Error("Hesabınız henüz aktif edilmemiş. Lütfen e-postanıza gönderilen doğrulama linkine tıklayın.");
+                // E-postası doğrulanmamış hesaplar giremez (alan adı istisnası yok; backend de 403 döner).
+                if (result.user && !result.user.emailVerified) {
+                    const { getAuth, signOut, sendEmailVerification } = await import("firebase/auth");
+                    let resent = false;
+                    try {
+                        await sendEmailVerification(result.user);
+                        resent = true;
+                    } catch {
+                        // auth/too-many-requests vb. — yine de girişi engelle
+                    }
+                    await signOut(getAuth());
+                    throw new Error(
+                        resent
+                            ? "E-posta adresiniz henüz doğrulanmamış. Doğrulama bağlantısını yeniden gönderdik; bağlantıya tıkladıktan sonra tekrar giriş yapın."
+                            : "E-posta adresiniz henüz doğrulanmamış. Lütfen e-postanıza gönderilen doğrulama bağlantısına tıklayın."
+                    );
                 }
             }
 
@@ -104,10 +115,6 @@ export default function Login() {
             } else {
                 localStorage.removeItem("remembered_email");
                 localStorage.removeItem("remembered_email_enabled");
-            }
-
-            if (isRegister) {
-                toast.success("Doğrulama e-postası gönderildi. Lütfen gelen kutusu veya spam klasörünü kontrol edin.");
             }
 
             // Yönlendirme

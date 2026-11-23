@@ -108,6 +108,7 @@ class HardcodedBypassRemovalTests(unittest.TestCase):
 
 class ReportCollabWebSocketTests(unittest.TestCase):
     def _access(self, token, decoded, user_role="user", audit=AUDIT):
+        decoded = {"email_verified": True, **decoded}
         async def run():
             with patch("firebase_admin.auth.verify_id_token", return_value=decoded), \
                  patch("app.lib.auth._get_role_for_uid", new=AsyncMock(return_value=user_role)), \
@@ -123,6 +124,9 @@ class ReportCollabWebSocketTests(unittest.TestCase):
         self.assertEqual(self._access("t", {"uid": "mod"}, user_role="moderator"), "read")
         self.assertEqual(self._access("t", {"uid": "adm"}, user_role="admin"), "edit")
         self.assertIsNone(self._access("t", {"uid": "owner_uid"}, audit=None))
+
+    def test_unverified_email_rejected(self):
+        self.assertIsNone(self._access("t", {"uid": "owner_uid", "email_verified": False}))
 
     def test_invalid_token_rejected(self):
         async def run():
