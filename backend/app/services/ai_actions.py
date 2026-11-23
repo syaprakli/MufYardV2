@@ -247,6 +247,33 @@ AI_TOOLS = [
 
 # ─── Aksiyon Çalıştırıcı ────────────────────────────────────────
 
+def _resolve_reports_path(rel_path: str) -> str | None:
+    """Raporlar kökü altındaki yolu döner; kök dışına çıkan (../, kardeş önek vb.) yollar için None."""
+    base = os.path.realpath(BASE_REPORTS_DIR)
+    target = os.path.realpath(os.path.join(base, (rel_path or "").replace("\\", "/").lstrip("/")))
+    try:
+        if os.path.commonpath([base, target]) != base:
+            return None
+    except ValueError:
+        return None
+    return target
+
+
+def _rel_to_reports(abs_path: str) -> str:
+    if not abs_path:
+        return ""
+    rel = os.path.relpath(abs_path, os.path.realpath(BASE_REPORTS_DIR)).replace("\\", "/")
+    return "" if rel == "." else rel.strip("/")
+
+
+def _can_read_report(rel_path: str, user: Dict[str, Any]) -> bool:
+    """files.py ile aynı kural: admin veya dosya/üst klasör üzerinde okuma izni."""
+    if (user.get("role") or "user").strip().lower() == "admin":
+        return True
+    uid = user.get("uid") or ""
+    return bool(uid and rel_path and FolderManager.check_permission_or_ancestor(rel_path, uid, "read"))
+
+
 async def execute_action(
     function_name: str,
     args: Dict[str, Any],
@@ -500,12 +527,31 @@ async def execute_action(
         # ─── DOSYA ERİŞİMİ ──────────────────────────────
         elif function_name == "list_files":
             sub_path = args.get("path", "")
-            start = os.path.join(BASE_REPORTS_DIR, sub_path) if sub_path else BASE_REPORTS_DIR
             # Güvenlik: Raporlar klasörü dışına çıkmasın
-            start = os.path.normpath(start)
-            if not start.startswith(os.path.normpath(BASE_REPORTS_DIR)):
+            start = _resolve_reports_path(sub_path)
+            if start is None:
                 return {"success": False, "action": "list_files", "message": "❌ Güvenlik: Sadece Raporlar klasörüne erişilebilir."}
-            tree = await asyncio.to_thread(FolderManager.get_tree, start)
+            start_rel = _rel_to_reports(start)
+            if start_rel and not os.path.isdir(start):
+                return {"success": False, "action": "list_files", "message": f"❌ Klasör bulunamadı: {sub_path}"}
+            raw_tree = await asyncio.to_thread(FolderManager.get_tree, start)
+
+            # Yetki: sadece kullanıcının okuma izni olan dosyalar ve bunları içeren klasörler görünür.
+            def _full_rel(item_id: str) -> str:
+                return f"{start_rel}/{item_id}".strip("/") if start_rel else item_id
+
+            readable_files = {
+                it["id"] for it in raw_tree
+                if it.get("type") != "folder" and _can_read_report(_full_rel(it["id"]), user)
+            }
+            tree = []
+            for it in raw_tree:
+                if it.get("type") == "folder":
+                    prefix = it["id"].rstrip("/") + "/"
+                    if _can_read_report(_full_rel(it["id"]), user) or any(f.startswith(prefix) for f in readable_files):
+                        tree.append(it)
+                elif it["id"] in readable_files:
+                    tree.append(it)
             if not tree:
                 return {"success": True, "action": "list_files", "message": f"📂 '{sub_path or 'Raporlar'}' klasöründe dosya/klasör bulunmuyor.", "data": {"count": 0}}
             # Sadece doğrudan alt öğeleri göster (max 30)
@@ -527,11 +573,12 @@ async def execute_action(
 
         elif function_name == "read_file_content":
             file_path = args.get("file_path", "")
-            abs_path = os.path.normpath(os.path.join(BASE_REPORTS_DIR, file_path))
+            abs_path = _resolve_reports_path(file_path)
             # Güvenlik: Raporlar klasörü dışına çıkmasın
-            if not abs_path.startswith(os.path.normpath(BASE_REPORTS_DIR)):
+            if abs_path is None:
                 return {"success": False, "action": "read_file_content", "message": "❌ Güvenlik: Sadece Raporlar klasöründeki dosyalar okunabilir."}
-            if not os.path.exists(abs_path):
+            # Yetki: dosya izni yoksa varlığını da açığa çıkarmadan aynı mesajı dön.
+            if not _can_read_report(_rel_to_reports(abs_path), user) or not os.path.exists(abs_path):
                 return {"success": False, "action": "read_file_content", "message": f"❌ Dosya bulunamadı: {file_path}"}
             if os.path.isdir(abs_path):
                 return {"success": False, "action": "read_file_content", "message": "❌ Bu bir klasör, dosya değil. list_files kullanın."}

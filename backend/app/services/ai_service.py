@@ -122,6 +122,40 @@ def _extract_text_from_docx(file_bytes: bytes) -> str:
     return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
 
 
+
+def _can_read_legislation(leg: Dict[str, Any], user: Dict[str, Any] | None) -> bool:
+    """Herkese açık mevzuat herkese; özel mevzuat yalnızca sahibine ve admin'e açıktır."""
+    if leg.get("is_public", True):
+        return True
+    if not user:
+        return False
+    if (user.get("role") or "user").strip().lower() == "admin":
+        return True
+    owner = leg.get("owner_id")
+    return bool(owner) and owner in {user.get("uid"), user.get("email")}
+
+
+def _resolve_legislation_local_path(local_path: str, owner_id: str | None) -> str | None:
+    """local_path'i Mevzuat klasörü içinde çözer; dışarı çıkan veya başkasının Kisisel klasörünü
+    gösteren yollar için None döner (local_path istemci tarafından gönderilebildiği için güvenilmez)."""
+    base = os.path.realpath(MEVZUAT_DIR)
+    rel = (local_path or "").replace("\\", "/").lstrip("/")
+    # Upload ve klasör senkronu her zaman "/Mevzuat/..." üretir; başka önekler reddedilir.
+    if rel.split("/", 1)[0].lower() != "mevzuat" or "/" not in rel:
+        return None
+    rel = rel.split("/", 1)[1]
+    target = os.path.realpath(os.path.join(base, rel))
+    try:
+        if not rel or os.path.commonpath([base, target]) != base:
+            return None
+    except ValueError:
+        return None
+    parts = os.path.relpath(target, base).replace("\\", "/").split("/")
+    if parts and parts[0].lower() == "kisisel":
+        if len(parts) < 3 or not owner_id or parts[1] != owner_id:
+            return None
+    return target
+
 class AIService:
     # ──────────── MAIN CHAT (ChatGPT-like + Function Calling) ────────────
     async def chat(
@@ -423,7 +457,7 @@ GÜNCEL TARİH: {datetime.now().strftime('%d.%m.%Y')}
 
         # Belirli bir belge mi yoksa tümü mü?
         if legislation_id:
-            leg_context = await self._get_single_legislation_text(legislation_id)
+            leg_context = await self._get_single_legislation_text(legislation_id, user)
         else:
             leg_context = await self._get_legislation_context(user)
 
@@ -502,14 +536,16 @@ TALİMATLAR:
         except Exception as e:
             return f"Mevzuat verileri yüklenirken hata: {str(e)}"
 
-    async def _get_single_legislation_text(self, legislation_id: str) -> str:
-        """Tek bir mevzuat belgesinin tam içeriğini döner."""
+    async def _get_single_legislation_text(self, legislation_id: str, user: Dict[str, Any] | None = None) -> str:
+        """Tek bir mevzuat belgesinin tam içeriğini döner (yalnızca herkese açık veya kullanıcıya ait belgeler)."""
         try:
             doc_ref = db.collection('legislations').document(legislation_id)
             doc = await asyncio.to_thread(doc_ref.get)
             if not doc.exists:
                 return "Belge bulunamadı."
-            d = doc.to_dict()
+            d = doc.to_dict() or {}
+            if not _can_read_legislation(d, user):
+                return "Belge bulunamadı."
 
             parts = [f"BELGE: {d.get('title', '')}"]
             content = d.get('content', '')
@@ -530,10 +566,10 @@ TALİMATLAR:
             local_path = leg_data.get('local_path', '')
             document_url = leg_data.get('document_url', '')
 
-            # Önce lokal dosya dene
+            # Önce lokal dosya dene (yalnızca Mevzuat klasörü içinden)
             if local_path:
-                abs_path = os.path.join(os.path.dirname(MEVZUAT_DIR), local_path.lstrip('/'))
-                if os.path.exists(abs_path):
+                abs_path = _resolve_legislation_local_path(local_path, leg_data.get('owner_id'))
+                if abs_path and os.path.exists(abs_path):
                     return await self._extract_file_text(abs_path)
 
             # Firebase Storage'dan dene
