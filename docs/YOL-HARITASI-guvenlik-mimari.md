@@ -59,6 +59,7 @@
 | D2 | Rapor kodu: sırasız `limit(1000)` + hata durumunda "1" → yinelenen resmi numara | ✅ Yıl önekli aralık sorgusu, kilit, hata fırlatır | 0adc468 |
 | D3 | `file_permissions.json` atomik değil; bozulunca tüm izinler silinebilirdi; eşzamanlı yazmalar kayboluyordu | ✅ Atomik yazma, `.bak`, bozuksa yazmayı reddet, kilitli güncelleme | ecc8429 |
 | D4 | E-postayla paylaşımda bildirim gitmiyordu (Python'da `.trim()` yok) | ✅ | e29487e |
+| D6 | Kurulu masaüstü uygulaması Railway'e bağlanıyor → görev klasörleri bilgisayarda değil sunucuda oluşuyor (eski düzen yönetici anahtarını kuruluma koyuyordu) | ⬜ Kullanıcı kararı: dosyalar bilgisayarda, istenirse sunucuya. Plan: `docs/PLAN-yerel-dosya-modu.md`. **Bu bitene kadar yeni .exe çıkarılmamalı** | — |
 | D5 | Yatay ölçek mümkün değil: süreç içi durum (WebSocket odaları, önbellekler, rate limit, rapor kodu kilidi), izinler yerel diskte | ⬜ 1000+ aktif kullanıcıda: izinler → Firestore, dosyalar → Storage, yayınlar/rate limit → Redis, rapor kodu → Firestore transaction sayacı | — |
 
 ## 4. Kod kalitesi
