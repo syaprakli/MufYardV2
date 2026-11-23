@@ -12,3 +12,4 @@ scratch/
 *.zip
 *.rar
 *.7z
+backend_deploy/

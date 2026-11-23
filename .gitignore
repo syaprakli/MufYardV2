@@ -58,3 +58,12 @@ Mevzuat/
 
 frontend/public/Harc�rah/*.pdf
 
+
+# Repo temizliği (2026-11): eski kopyalar, kullanıcı yüklemeleri, loglar ve medya
+backend_deploy/
+backend/uploads/
+backend/security_reports/
+backend/crash_log.txt
+backend/*.log
+scratch_extracted_*.txt
+*.mp4
