@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Wand2, Loader2, Save, Eye, EyeOff } from "lucide-react";
+import { Wand2, Loader2, Save, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { toast } from "react-hot-toast";
@@ -97,6 +97,18 @@ export const AISection: React.FC<AISectionProps> = ({ profile, setProfile }) => 
                 <div className="space-y-2">
                     <h3 className="text-xl font-black font-outfit text-primary tracking-tight">Gemini API Anahtarı</h3>
                     <p className="text-xs text-slate-500 font-medium">Yapay zeka asistanını kullanmak için kendi Google AI Studio anahtarınızı kullanabilirsiniz.</p>
+                </div>
+
+                <div className="flex gap-3 px-4 py-3 rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300">
+                    <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+                    <div className="text-xs font-medium space-y-1">
+                        <p className="font-black">Veri gizliliği uyarısı</p>
+                        <p>
+                            Ücretsiz (faturalandırması kapalı) Google AI Studio anahtarlarıyla gönderilen içerik, Google tarafından
+                            ürün geliştirme amacıyla kullanılabilir ve insanlar tarafından incelenebilir. Rapor, tutanak veya kişisel
+                            veri içeren belgelerle çalışacaksanız faturalandırması açık (ücretli) bir anahtar kullanın.
+                        </p>
+                    </div>
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-4">

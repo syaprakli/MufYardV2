@@ -392,6 +392,10 @@ export default function Assistant() {
                         <span>•</span>
                         <span className="flex items-center gap-1"><Info size={12} /> Veri Kaynağı: Firestore Cloud</span>
                     </div>
+                    <p className="mt-2 text-center text-[11px] font-medium text-amber-700 dark:text-amber-400 flex items-center justify-center gap-1.5">
+                        <AlertCircle size={12} className="shrink-0" />
+                        Yazdıklarınız ve asistanın okuduğu belgeler işlenmek üzere Google Gemini'ye gönderilir. Kişisel veri ve gizli rapor içeriği paylaşmayın.
+                    </p>
                 </div>
             </Card>
         </div>
