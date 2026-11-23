@@ -95,7 +95,7 @@ Kopyalar 5 aydır ayrı geliştiği için ortak sanılan bazı bölümler sayfal
 
 ## 6. Açık sorular (kullanıcıya)
 
-- Özel Yurt, Spor ve Federasyon sayfalarındaki hub kartı alt başlıkları "İl Müdürlüğü kurumsal…" / "İl Müdürlüğünden istenecek…" diyor; yalnızca KYK'da "Yurt Müdürlüğü". Kopyadan kalma hata mı? Doğru metinler ne olmalı? (Şimdilik olduğu gibi korunuyor: `denetimTurleri.ts`)
+- ✅ Çözüldü (kullanıcı onayı): kart alt yazıları ve rapor adı örneği denetlenen kurumu göstermeli (Yurt Müdürlüğü / Spor Kulübü / Federasyon). `denetimTurleri.ts` ve henüz geçirilmemiş eski sayfalarda düzeltildi.
 
 ## 7. Karar bekleyenler (ilk taslak)
 

@@ -28,6 +28,8 @@ export interface DenetimTuruAyari {
     /** Hub kartı alt başlıkları */
     kurumsalVeriAciklamasi: string;
     evrakTalepAciklamasi: string;
+    /** Yeni rapor adı kutusundaki örnek ("Örn: …") */
+    raporAdiOrnegi: string;
 }
 
 export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
@@ -39,9 +41,9 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         cogulEtiket: "Yurtlar",
         fotoOneki: "Ozel",
         dosyaOneki: "Ozel_Denetim",
-        // Not: KYK dışındaki sayfalarda "İl Müdürlüğü" metni kopyadan kalmış olabilir (planda açık soru).
-        kurumsalVeriAciklamasi: "İl Müdürlüğü kurumsal, tesis ve personel temel verileri",
-        evrakTalepAciklamasi: "İl Müdürlüğünden istenecek resmi evrak talep yazısı",
+        kurumsalVeriAciklamasi: "Yurt Müdürlüğü kurumsal, kapasite ve personel temel verileri",
+        evrakTalepAciklamasi: "Yurt Müdürlüğünden istenecek resmi evrak talep yazısı",
+        raporAdiOrnegi: "Özel Yurt Denetimi 2026",
     },
     kyk: {
         key: "kyk",
@@ -53,6 +55,7 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         dosyaOneki: "KYK_Denetimi",
         kurumsalVeriAciklamasi: "Yurt Müdürlüğü kurumsal, kapasite ve personel temel verileri",
         evrakTalepAciklamasi: "Yurt Müdürlüğünden istenecek resmi evrak talep yazısı",
+        raporAdiOrnegi: "KYK Yurt Denetimi 2026",
     },
     il: {
         key: "il",
@@ -64,6 +67,7 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         dosyaOneki: "Il_Denetimi",
         kurumsalVeriAciklamasi: "İl Müdürlüğü kurumsal, tesis ve personel temel verileri",
         evrakTalepAciklamasi: "İl Müdürlüğünden istenecek resmi evrak talep yazısı",
+        raporAdiOrnegi: "İl Müdürlüğü Denetimi 2026",
     },
     spor: {
         key: "spor",
@@ -73,8 +77,9 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         cogulEtiket: "Kulüpler",
         fotoOneki: "Spor",
         dosyaOneki: "Spor_Denetimi",
-        kurumsalVeriAciklamasi: "İl Müdürlüğü kurumsal, tesis ve personel temel verileri",
-        evrakTalepAciklamasi: "İl Müdürlüğünden istenecek resmi evrak talep yazısı",
+        kurumsalVeriAciklamasi: "Spor Kulübü kurumsal, tesis ve personel temel verileri",
+        evrakTalepAciklamasi: "Spor Kulübünden istenecek resmi evrak talep yazısı",
+        raporAdiOrnegi: "Spor Kulübü Denetimi 2026",
     },
     federasyon: {
         key: "federasyon",
@@ -84,7 +89,8 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         cogulEtiket: "Federasyonlar",
         fotoOneki: "Federasyon",
         dosyaOneki: "Federasyon",
-        kurumsalVeriAciklamasi: "İl Müdürlüğü kurumsal, tesis ve personel temel verileri",
-        evrakTalepAciklamasi: "İl Müdürlüğünden istenecek resmi evrak talep yazısı",
+        kurumsalVeriAciklamasi: "Federasyon kurumsal, tesis ve personel temel verileri",
+        evrakTalepAciklamasi: "Federasyondan istenecek resmi evrak talep yazısı",
+        raporAdiOrnegi: "Federasyon Denetimi 2026",
     },
 };

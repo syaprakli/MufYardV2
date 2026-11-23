@@ -2538,7 +2538,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                             type="text"
                                             value={prepAuditName}
                                             onChange={e => setPrepAuditName(e.target.value)}
-                                            placeholder="Örn: İl Müdürlüğü Denetimi 2026"
+                                            placeholder={`Örn: ${ayar.raporAdiOrnegi}`}
                                             className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 bg-white dark:bg-slate-950/20 text-slate-900 dark:text-white transition-all"
                                             disabled={isCreatingReport}
                                         />

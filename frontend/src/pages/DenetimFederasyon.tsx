@@ -2740,7 +2740,7 @@ export default function DenetimFederasyon() {
                                                 {
                                                     id: "info",
                                                     title: "Genel Bilgiler",
-                                                    subtitle: "İl Müdürlüğü kurumsal, tesis ve personel temel verileri",
+                                                    subtitle: "Federasyon kurumsal, tesis ve personel temel verileri",
                                                     icon: Info,
                                                     badge: localAuditData.info?.mudur_adi ? "Dolduruldu" : "Bekliyor",
                                                     badgeColor: localAuditData.info?.mudur_adi ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700",
@@ -2786,7 +2786,7 @@ export default function DenetimFederasyon() {
                                                 {
                                                     id: "evrak_talebi",
                                                     title: "Evrak Talebi",
-                                                    subtitle: "İl Müdürlüğünden istenecek resmi evrak talep yazısı",
+                                                    subtitle: "Federasyondan istenecek resmi evrak talep yazısı",
                                                     icon: BookOpen,
                                                     badge: "Resmi Yazı",
                                                     badgeColor: "bg-purple-500/10 text-purple-600 border-purple-500/20",
@@ -3360,7 +3360,7 @@ export default function DenetimFederasyon() {
                                             type="text"
                                             value={prepAuditName}
                                             onChange={e => setPrepAuditName(e.target.value)}
-                                            placeholder="Örn: İl Müdürlüğü Denetimi 2026"
+                                            placeholder="Örn: Federasyon Denetimi 2026"
                                             className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 bg-white dark:bg-slate-950/20 text-slate-900 dark:text-white transition-all"
                                             disabled={isCreatingReport}
                                         />
