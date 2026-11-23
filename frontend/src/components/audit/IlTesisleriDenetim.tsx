@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import * as XLSX from "xlsx";
+import { exportJsonToExcel } from "../../lib/excelHelpers";
 import {
     Building2, Plus, Search, Trash2, Edit3, Image as ImageIcon,
     AlertTriangle, X, ChevronDown, ChevronUp,
@@ -10,7 +10,7 @@ import {
 import { Button } from "../ui/Button";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../../lib/context/ConfirmContext";
-import { API_URL, LOCAL_API_URL, IS_ELECTRON } from "../../lib/config";
+import { API_URL } from "../../lib/config";
 import { getAuthHeaders } from "../../lib/api/utils";
 import { getSafeImageUrl, handleImageError } from "../../lib/utils";
 import { savePhotoToLocalDevice, exportPhotosToComputer } from "../../utils/photoExportHelper";
@@ -471,7 +471,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
     };
 
     // Emergency Excel export
-    const handleEmergencyExportExcel = () => {
+    const handleEmergencyExportExcel = async () => {
         try {
             if (!facilities || facilities.length === 0) {
                 toast.error("Dışa aktarılacak tesis bulunamadı.");
@@ -495,27 +495,15 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
                 "Kayıt Zamanı": f.createdAt || ""
             }));
 
-            const wb = XLSX.utils.book_new();
-            const ws = XLSX.utils.json_to_sheet(exportData);
-            ws['!cols'] = [
-                { wch: 6 },
-                { wch: 30 },
-                { wch: 25 },
-                { wch: 15 },
-                { wch: 25 },
-                { wch: 20 },
-                { wch: 20 },
-                { wch: 18 },
-                { wch: 15 },
-                { wch: 50 },
-                { wch: 15 },
-                { wch: 22 }
-            ];
-            XLSX.utils.book_append_sheet(wb, ws, "Tesis Denetimleri");
             const rawTitle = selectedReport?.title || selectedTask?.rapor_adi || "Tesis_Denetim";
             const reportTitle = rawTitle.replace(/[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ_-]/g, "_");
             const dateStr = new Date().toISOString().split("T")[0];
-            XLSX.writeFile(wb, `${reportTitle}_Tesis_Listesi_${dateStr}.xlsx`);
+            await exportJsonToExcel(
+                exportData,
+                "Tesis Denetimleri",
+                `${reportTitle}_Tesis_Listesi_${dateStr}.xlsx`,
+                [6, 30, 25, 15, 25, 20, 20, 18, 15, 50, 15, 22]
+            );
             toast.success("Tüm tesisler Excel dosyası olarak cihazınıza indirildi!", { icon: "📥" });
         } catch (err) {
             console.error("Excel export error:", err);
@@ -915,7 +903,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
 
             const uploadedUrls: string[] = [];
             const targetReportId = selectedReport?.id || selectedTask?.id || "temp_denetim";
-            const targetApi = IS_ELECTRON ? LOCAL_API_URL : API_URL;
+            const targetApi = API_URL;
 
             for (const file of files) {
                 try {
@@ -1011,7 +999,7 @@ export const IlTesisleriDenetim: React.FC<IlTesisleriDenetimProps> = ({
             savePhotoToLocalDevice(file, `Tesis_${facilityId}_Yenileme`);
 
             const targetReportId = selectedReport?.id || selectedTask?.id || "temp_denetim";
-            const targetApi = IS_ELECTRON ? LOCAL_API_URL : API_URL;
+            const targetApi = API_URL;
 
             const fd = new FormData();
             fd.append("file", file);

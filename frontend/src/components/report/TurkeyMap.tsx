@@ -4,6 +4,7 @@ import { Button } from "../ui/Button";
 import { Star, MapPin, Search, Plus, Home, Utensils, X, ArrowLeft, Trash2, MessageSquare, Camera } from "lucide-react";
 import { API_URL, BASE_URL } from "../../lib/config";
 import { savePhotoToLocalDevice } from "../../utils/photoExportHelper";
+import { sanitizeSvg } from "../../lib/sanitize";
 
 const resolveAttachmentUrl = (url: string | null | undefined) => {
   if (!url) return '';
@@ -603,7 +604,7 @@ export function TurkeyMap({
                 `}</style>
                 <g
                   className="turkey"
-                  dangerouslySetInnerHTML={{ __html: svgContent }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeSvg(svgContent) }}
                 />
               </svg>
             ) : (

@@ -417,6 +417,7 @@ export default function Tasks() {
         rapor_adi: "",
         rapor_turu: "İnceleme",
         baslama_tarihi: new Date().toISOString().split("T")[0],
+        olur_tarihi: new Date().toISOString().split("T")[0],
         bitis_tarihi: new Date().toISOString().split("T")[0],
         sure_gun: 30,
         assigned_to: [] as string[],
@@ -534,12 +535,45 @@ export default function Tasks() {
                 }]
             };
             await createTask(payload);
-            toast.success(isLegacyMode ? "Eski kayıt arşive eklendi." : "Yeni görev oluşturuldu.");
+            // Görev oluşturulduğunda Olur Tarihine göre Zamanaşımı Takibine otomatik kaydet
+            try {
+                const { createReminder, calculateExpirationDate } = await import("../lib/api/reminders");
+                const targetOlurTarihi = form.olur_tarihi || form.baslama_tarihi || new Date().toISOString().split("T")[0];
+                
+                let cat = "genel_gorev";
+                if (form.rapor_turu === "Soruşturma") cat = "disiplin_657";
+                else if (form.rapor_turu === "Denetim") cat = "mali_denetim";
+                else if (form.rapor_turu === "İnceleme") cat = "genel_gorev";
+
+                const expDate = calculateExpirationDate(targetOlurTarihi, cat);
+                if (expDate) {
+                    await createReminder({
+                        title: `${form.rapor_adi} (${form.rapor_turu})`,
+                        description: `Rapor Kodu: ${finalRaporKodu || autoKodu || "Yeni Görev"} | Olur Tarihi: ${new Date(targetOlurTarihi).toLocaleDateString("tr-TR")} | Görev eklenirken otomatik oluşturulan zamanaşımı takibi.`,
+                        reminder_type: "zamanasimi",
+                        category: cat,
+                        incident_date: targetOlurTarihi,
+                        expiration_date: expDate,
+                        notify_before_months: 2,
+                        priority: "urgent",
+                        status: "active"
+                    });
+                }
+            } catch (remErr) {
+                console.warn("Otomatik zamanaşımı takibi eklenemedi:", remErr);
+            }
+
+            toast.success(
+                isLegacyMode 
+                    ? "Eski kayıt arşive eklendi." 
+                    : "Yeni görev oluşturuldu ve Zamanaşımı Takibine (2 ay uyarı kuralıyla) otomatik eklendi! ⏰"
+            );
             setForm({
                 rapor_kodu: "",
                 rapor_adi: "",
                 rapor_turu: "İnceleme",
                 baslama_tarihi: new Date().toISOString().split("T")[0],
+        olur_tarihi: new Date().toISOString().split("T")[0],
                 bitis_tarihi: new Date().toISOString().split("T")[0],
                 sure_gun: 30,
                 assigned_to: [],
@@ -1678,7 +1712,7 @@ export default function Tasks() {
                         )}
 
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
-                            <div className="md:col-span-6 lg:col-span-3 space-y-1.5">
+                            <div className="md:col-span-4 lg:col-span-3 space-y-1.5">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">{isLegacyMode ? "Görev Başlangıç Tarihi" : "Görev Tarihi"}</label>
                                 <input
                                     type="date"
@@ -1687,7 +1721,17 @@ export default function Tasks() {
                                     className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold outline-none"
                                 />
                             </div>
-                            <div className="md:col-span-6 lg:col-span-2 space-y-1.5">
+                            <div className="md:col-span-4 lg:col-span-3 space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Olur Tarihi</label>
+                                <input
+                                    type="date"
+                                    value={form.olur_tarihi || form.baslama_tarihi}
+                                    onChange={e => setForm({ ...form, olur_tarihi: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:ring-4 focus:ring-primary/10 transition-all text-sm font-bold outline-none"
+                                    title="Zamanaşımı süresi bu tarihten itibaren hesaplanır ve 2 ay öncesinde uyarı verilir"
+                                />
+                            </div>
+                            <div className="md:col-span-4 lg:col-span-2 space-y-1.5">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">{isLegacyMode ? "Görev Bitiş Tarihi" : "Süre (Gün)"}</label>
                                 {isLegacyMode ? (
                                     <input
@@ -1706,7 +1750,7 @@ export default function Tasks() {
                                     />
                                 )}
                             </div>
-                            <div className="md:col-span-12 lg:col-span-7 space-y-1.5 relative" ref={inspectorDropdownRef}>
+                            <div className="md:col-span-12 lg:col-span-4 space-y-1.5 relative" ref={inspectorDropdownRef}>
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1">Görevde Yer Alan Kişiler</label>
                                 <div
                                     onClick={() => setShowInspectorDropdown(p => !p)}

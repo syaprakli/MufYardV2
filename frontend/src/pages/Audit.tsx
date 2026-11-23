@@ -11,6 +11,7 @@ import { updateTask } from "../lib/api/tasks";
 import { useAuth } from "../lib/hooks/useAuth";
 import { isElectron } from "../lib/firebase";
 import { cn } from "../lib/utils";
+import { sanitizeHtml, escapeHtml } from "../lib/sanitize";
 
 import { useGlobalData } from "../lib/context/GlobalDataContext";
 
@@ -1194,7 +1195,7 @@ export default function Audit() {
                                             </div>
                                             {result.snippet && (
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium bg-slate-50 dark:bg-slate-950/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/50">
-                                                    ... <span dangerouslySetInnerHTML={{ __html: result.snippet.replace(new RegExp(`(${globalSearchQuery})`, 'gi'), '<mark class="bg-yellow-100 dark:bg-yellow-950/60 text-slate-800 dark:text-yellow-250 px-0.5 rounded">$1</mark>') }} /> ...
+                                                    ... <span dangerouslySetInnerHTML={{ __html: sanitizeHtml((() => { const safeSnippet = escapeHtml(result.snippet || ""); const safeQuery = escapeHtml(globalSearchQuery || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); return safeQuery ? safeSnippet.replace(new RegExp(`(${safeQuery})`, "gi"), '<mark class="bg-yellow-100 dark:bg-yellow-950/60 text-slate-800 dark:text-yellow-250 px-0.5 rounded">$1</mark>') : safeSnippet; })()) }} /> ...
                                                 </p>
                                             )}
                                         </div>

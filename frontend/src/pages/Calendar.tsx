@@ -1,4 +1,7 @@
-import { ChevronLeft, ChevronRight, Plus, Clock, FileText, Trash2, Shield, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock, FileText, Trash2, Shield, Loader2, Calendar as CalendarIcon } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import Reminders from "./Reminders";
+import { fetchReminders, getDaysRemaining } from "../lib/api/reminders";
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { Button } from "../components/ui/Button";
@@ -140,6 +143,19 @@ export default function Calendar() {
     // Firestore-backed notes: flat list, grouped on render
     const [allNotes, setAllNotes] = useState<CalendarNote[]>([]);
     const [notesLoading, setNotesLoading] = useState(false);
+
+    const [searchParams, setSearchParams] = useSearchParams();
+    const currentTab = (searchParams.get("tab") === "zamanasimi" || searchParams.get("tab") === "hatirlatici") ? "hatirlatici" : "takvim";
+    const [criticalZamanasimiCount, setCriticalZamanasimiCount] = useState(0);
+
+    useEffect(() => {
+        const uid = user?.uid;
+        if (!uid) return;
+        fetchReminders(uid).then((items) => {
+            const crit = items.filter(r => r.status === "active" && getDaysRemaining(r.expiration_date) <= (r.notify_before_months || 2) * 30);
+            setCriticalZamanasimiCount(crit.length);
+        }).catch(() => {});
+    }, [user?.uid]);
 
     const isArchivedTask = (task: any) => {
         const isOld = task.baslama_tarihi
@@ -325,7 +341,48 @@ export default function Calendar() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+            {/* Sub-page Navigation Tabs */}
+            <div className="flex items-center gap-2 border-b border-border pb-4">
+                <button
+                    type="button"
+                    onClick={() => setSearchParams({ tab: "takvim" })}
+                    className={cn(
+                        "px-6 h-11 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer",
+                        currentTab === "takvim"
+                            ? "bg-primary text-white shadow-lg shadow-primary/20"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                >
+                    <CalendarIcon size={16} />
+                    <span>Genel Takvim</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setSearchParams({ tab: "hatirlatici" })}
+                    className={cn(
+                        "px-6 h-11 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 relative cursor-pointer",
+                        currentTab === "hatirlatici"
+                            ? "bg-primary text-white shadow-lg shadow-primary/20"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                >
+                    <Clock size={16} />
+                    <span>Hatırlatıcılar</span>
+                    {criticalZamanasimiCount > 0 && (
+                        <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
+                            {criticalZamanasimiCount}
+                        </span>
+                    )}
+                </button>
+            </div>
+
+            {currentTab === "hatirlatici" ? (
+                <div className="pt-2 animate-in fade-in duration-300">
+                    <Reminders />
+                </div>
+            ) : (
+                <>
+                    <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
                 {/* Calendar Grid */}
                 <div className="xl:col-span-3 card p-6">
                     <div className="flex justify-between items-center mb-8">
@@ -573,6 +630,8 @@ export default function Calendar() {
                     </div>
                 </div>
             </Modal>
+                </>
+            )}
         </div>
     );
 }

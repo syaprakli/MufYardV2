@@ -19,6 +19,7 @@ import {
     generateWizardReport 
 } from "../../lib/api/ai";
 import { toast } from "react-hot-toast";
+import { sanitizeHtml } from "../../lib/sanitize";
 
 type Finding = {
     id: string;
@@ -595,7 +596,7 @@ export default function ReportWizardModal({ isOpen, onClose, auditId, findings, 
 
                                     {/* Preview Block */}
                                     <div className="rounded-2xl border border-slate-200/60 dark:border-slate-850 bg-white dark:bg-slate-900 p-5 prose max-w-none prose-slate dark:prose-invert text-xs leading-relaxed max-h-[300px] overflow-y-auto">
-                                        <div dangerouslySetInnerHTML={{ __html: generatedHtml }} />
+                                        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(generatedHtml || "") }} />
                                     </div>
                                 </div>
                             )}

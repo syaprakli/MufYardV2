@@ -4,6 +4,7 @@ import {
     BookOpen, X, Check, Loader2, Database, Sparkles
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
+import { sanitizeHtml } from "../lib/sanitize";
 import { API_URL } from "../lib/config";
 import { toast } from "react-hot-toast";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
@@ -317,7 +318,7 @@ export default function AIKnowledge() {
 
                             <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Resmi Tenkit Metni</p>
-                                <div className="text-sm text-slate-700 font-medium leading-relaxed line-clamp-4" dangerouslySetInnerHTML={{ __html: item.standard_remark }} />
+                                <div className="text-sm text-slate-700 font-medium leading-relaxed line-clamp-4" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.standard_remark || "") }} />
                             </div>
 
                             {item.tags && item.tags.length > 0 && (

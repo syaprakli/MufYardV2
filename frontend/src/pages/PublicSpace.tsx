@@ -1,45 +1,59 @@
 // ── post content markdown renderer ────────────────────────────────────────────
+import { sanitizeHtml, escapeHtml, isSafeHttpUrl } from "../lib/sanitize";
+
 function renderPostContent(raw: string, resolveUrl: (url: string) => string) {
     if (!raw) return "";
-    
-    // Escape HTML first
-    let safe = raw
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-    
+
+    // Escape HTML metacharacters including quotes first
+    let safe = escapeHtml(raw);
+
     // Bold / italic
     safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     safe = safe.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    
+
+    const unescapeBasic = (val: string) =>
+        val
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'");
+
     // Markdown Images: ![alt](url)
     safe = safe.replace(/!\[(.*?)\]\((.*?)\)/g, (_, alt, url) => {
-        // HTML kaçış yapıldıktan sonra URL'de &amp; vs. oluşmuş olabilir, çöz
-        const decodedUrl = url.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
-        const fullUrl = resolveUrl(decodedUrl);
-        // Escape single quotes for the onclick JS handler to prevent crashes with filenames like "L'image.png"
-        const escapedUrl = fullUrl.replace(/'/g, "\\'");
+        const fullUrl = resolveUrl(unescapeBasic(url));
+        if (!isSafeHttpUrl(fullUrl)) {
+            return escapeHtml(alt || '');
+        }
+        const safeUrlAttr = escapeHtml(fullUrl);
+        const safeAlt = escapeHtml(unescapeBasic(alt));
         return `<div class="my-4 rounded-3xl overflow-hidden border border-border shadow-sm group/inline-img relative">
-            <img src="${fullUrl}" alt="${alt}" class="w-full h-auto max-h-[500px] object-contain bg-muted/30 transition-transform hover:scale-[1.01] cursor-zoom-in" onclick="window.open('${escapedUrl}', '_blank')"/>
-            ${alt ? `<div class="absolute bottom-0 left-0 right-0 p-3 bg-black/40 backdrop-blur-sm text-white text-[10px] font-black tracking-widest opacity-0 group-hover/inline-img:opacity-100 transition-opacity">${alt.toUpperCase()}</div>` : ''}
+            <a href="${safeUrlAttr}" target="_blank" rel="noopener noreferrer">
+                <img src="${safeUrlAttr}" alt="${safeAlt}" class="w-full h-auto max-h-[500px] object-contain bg-muted/30 transition-transform hover:scale-[1.01] cursor-zoom-in"/>
+            </a>
+            ${safeAlt ? `<div class="absolute bottom-0 left-0 right-0 p-3 bg-black/40 backdrop-blur-sm text-white text-[10px] font-black tracking-widest opacity-0 group-hover/inline-img:opacity-100 transition-opacity">${safeAlt.toUpperCase()}</div>` : ''}
         </div>`;
     });
 
     // Markdown Links: [text](url)
     safe = safe.replace(/\[(.+?)\]\((.+?)\)/g, (_, text, url) => {
-        const fullUrl = resolveUrl(url);
-        return `<a href="${fullUrl}" target="_blank" class="text-primary font-black hover:underline decoration-2 underline-offset-4">${text}</a>`;
+        const fullUrl = resolveUrl(unescapeBasic(url));
+        if (!isSafeHttpUrl(fullUrl)) {
+            return escapeHtml(unescapeBasic(text));
+        }
+        const safeUrlAttr = escapeHtml(fullUrl);
+        return `<a href="${safeUrlAttr}" target="_blank" rel="noopener noreferrer" class="text-primary font-black hover:underline decoration-2 underline-offset-4">${text}</a>`;
     });
 
     // Horizontal rule
     safe = safe.replace(/---/g, '<hr class="my-6 border-border/60"/>');
-    
-    // Process lines → paragraphs / lists
+
+    // Process lines -> paragraphs / lists
     const lines = safe.split('\n');
     let html = '';
     let ulOpen = false;
     let olOpen = false;
-    
+
     for (const line of lines) {
         if (/^- /.test(line)) {
             if (olOpen) { html += '</ol>'; olOpen = false; }
@@ -52,24 +66,23 @@ function renderPostContent(raw: string, resolveUrl: (url: string) => string) {
         } else {
             if (ulOpen) { html += '</ul>'; ulOpen = false; }
             if (olOpen) { html += '</ol>'; olOpen = false; }
-            
+
             if (line.trim() === '') {
                 html += '<div class="h-2"></div>';
             } else {
-                // Auto-link URLs that are not already in a tag
                 let processedLine = line;
                 if (!processedLine.includes('<a') && !processedLine.includes('<img')) {
-                    processedLine = processedLine.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="text-primary hover:underline">$1</a>');
+                    processedLine = processedLine.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">$1</a>');
                 }
                 html += `<p class="mb-3 font-medium text-slate-600 leading-relaxed">${processedLine}</p>`;
             }
         }
     }
-    
+
     if (ulOpen) html += '</ul>';
     if (olOpen) html += '</ol>';
-    
-    return html;
+
+    return sanitizeHtml(html);
 }
 
 import { Suspense, lazy, useState, useRef, useEffect, useMemo } from "react";
@@ -1655,7 +1668,7 @@ function ThreadView({ post, comments, onBack, onComment, commentText, setComment
                         ) : (
                             <div
                                 className="text-slate-600 font-medium leading-relaxed text-sm [&_strong]:font-black [&_strong]:text-foreground [&_em]:italic [&_ul]:list-disc [&_ol]:list-decimal [&_li]:ml-2"
-                                dangerouslySetInnerHTML={{ __html: renderPostContent(post.content, resolveUrl) }}
+                                dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderPostContent(post.content, resolveUrl)) }}
                             />
                         )}
                     </div>

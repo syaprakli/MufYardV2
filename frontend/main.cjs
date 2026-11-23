@@ -99,106 +99,43 @@ function killPortProcess(port) {
 }
 
 async function startBackend() {
-    const backendExe = getBackendPath();
     if (app.isPackaged) {
+        // Paketli masaüstü uygulamasında yerel backend başlatılmaz; merkezi Railway backend kullanılır.
         app.setLoginItemSettings({ openAtLogin: true, path: process.execPath, args: [] });
-
-        const logDir = getLogDir();
-        const crashLog = path.join(logDir, 'backend_crash.log');
-        const logStream = fs.createWriteStream(crashLog, { flags: 'a' });
-        logStream.write(`\n\n=== Backend kontrolü: ${new Date().toISOString()} ===\n`);
-        logStream.write(`Exe path: ${backendExe}\n`);
-        logStream.write(`CWD: ${path.dirname(backendExe)}\n\n`);
-
-        // Port 8000 zaten aktifse ve servis çalışıyorsa tekrar başlatmaya çalışma (çakışmayı önle)
-        const alreadyRunning = await isPortReachable(8000);
-        if (alreadyRunning) {
-            logStream.write('[INFO] Port 8000 zaten aktif ve yanıt veriyor. Mevcut servis kullanılacak.\n');
-            return;
-        }
-
-        // Port aktif değilse, kalıntı süreçleri temizleyip başlat
-        await killPortProcess(8000);
-
-        backendProcess = spawn(backendExe, [], {
-            cwd: path.dirname(backendExe),
-            stdio: ['ignore', 'pipe', 'pipe'],
-            windowsHide: true,
-        });
-
-        if (backendProcess.stdout) backendProcess.stdout.on('data', d => logStream.write('[OUT] ' + d));
-        if (backendProcess.stderr) backendProcess.stderr.on('data', d => logStream.write('[ERR] ' + d));
-
-        backendProcess.on('error', (err) => logStream.write('[SPAWN_ERR] ' + err.message + '\n'));
-
-        backendProcess.on('exit', async (code, signal) => {
-            logStream.write(`[EXIT] Kod: ${code}, Sinyal: ${signal}\n`);
-            if (code !== 0 && code !== null) {
-                // Eğer çıkış koduna rağmen port 8000 çalışıyorsa (örn. başka bir süreç zaten yürütüyorsa)
-                // kullanıcıya gereksiz hata bildirimi gönderme.
-                const isWorking = await isPortReachable(8000);
-                if (isWorking) {
-                    logStream.write('[INFO] Çıkış koduna rağmen port 8000 aktif çalışıyor. Bildirim atlandı.\n');
-                    return;
-                }
-
-                if (NativeNotification.isSupported()) {
-                    new NativeNotification({
-                        title: 'MufYARD - Servis Hatası',
-                        body: `Arka plan servisi beklenmedik şekilde kapandı (kod: ${code}). Lütfen uygulamayı yeniden başlatın.`,
-                    }).show();
-                }
-            }
-        });
-
-        // Wait for port 8000 to be ready, notify if it never comes up
-        try {
-            await waitForPort(8000, 25, 2000);
-            logStream.write('[INFO] Backend port 8000 hazır.\n');
-        } catch (err) {
-            logStream.write('[FATAL] ' + err.message + '\n');
-            const isWorking = await isPortReachable(8000);
-            if (!isWorking && NativeNotification.isSupported()) {
-                new NativeNotification({
-                    title: 'MufYARD - Bağlantı Hatası',
-                    body: `Arka plan servisi başlatılamadı. Log: ${crashLog}`,
-                }).show();
-            }
-        }
-    } else {
-        const backendPath = getBackendPath();
-        const backendAlreadyRunning = await isPortReachable(8000);
-
-        if (backendAlreadyRunning) {
-            console.log('[DEV] Port 8000 aktif. Eski backend süreci sonlandırılıp güncel backend başlatılacak.');
-            await killPortProcess(8000);
-        }
-
-        // Use venv python if available, fallback to system python
-        const venvPython = path.join(backendPath, '.venv', 'Scripts', 'python.exe');
-        const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python';
-        const args = ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8000', '--reload'];
-        
-        console.log(`[DEV] Backend başlatılıyor: ${pythonCmd} ${args.join(' ')}`);
-        console.log(`[DEV] CWD: ${backendPath}`);
-        
-        backendProcess = spawn(pythonCmd, args, {
-            cwd: backendPath,
-            stdio: ['ignore', 'pipe', 'pipe'],
-            windowsHide: true,
-        });
-        
-        backendProcess.stdout.on('data', (d) => console.log('[BACKEND]', d.toString().trim()));
-        backendProcess.stderr.on('data', (d) => console.error('[BACKEND]', d.toString().trim()));
-        
-        backendProcess.on('error', (error) => {
-            console.error('[DEV] Backend başlatılamadı:', error.message);
-        });
-        
-        backendProcess.on('exit', (code) => {
-            console.log(`[DEV] Backend kapandı (kod: ${code})`);
-        });
+        return;
     }
+
+    const backendPath = getBackendPath();
+    const backendAlreadyRunning = await isPortReachable(8000);
+
+    if (backendAlreadyRunning) {
+        console.log('[DEV] Port 8000 aktif. Eski backend süreci sonlandırılıp güncel backend başlatılacak.');
+        await killPortProcess(8000);
+    }
+
+    const venvPython = path.join(backendPath, '.venv', 'Scripts', 'python.exe');
+    const pythonCmd = fs.existsSync(venvPython) ? venvPython : 'python';
+    const args = ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8000', '--reload'];
+
+    console.log(`[DEV] Backend başlatılıyor: ${pythonCmd} ${args.join(' ')}`);
+    console.log(`[DEV] CWD: ${backendPath}`);
+
+    backendProcess = spawn(pythonCmd, args, {
+        cwd: backendPath,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+    });
+
+    backendProcess.stdout.on('data', (d) => console.log('[BACKEND]', d.toString().trim()));
+    backendProcess.stderr.on('data', (d) => console.error('[BACKEND]', d.toString().trim()));
+
+    backendProcess.on('error', (error) => {
+        console.error('[DEV] Backend başlatılamadı:', error.message);
+    });
+
+    backendProcess.on('exit', (code) => {
+        console.log(`[DEV] Backend kapandı (kod: ${code})`);
+    });
 }
 
 function stopBackend() {
@@ -309,7 +246,16 @@ function createWindow() {
     
     // Dış bağlantıları (ve window.open çağrılarını) varsayılan sistem tarayıcısında aç
     win.webContents.setWindowOpenHandler(({ url }) => {
-        require('electron').shell.openExternal(url);
+        try {
+            const parsed = new URL(url);
+            if (parsed.protocol === 'https:') {
+                shell.openExternal(parsed.href);
+            } else {
+                console.warn('[ELECTRON] Blocked non-https external URL:', parsed.protocol);
+            }
+        } catch {
+            console.warn('[ELECTRON] Blocked invalid external URL');
+        }
         return { action: 'deny' };
     });
 
@@ -460,6 +406,9 @@ ipcMain.handle('download-file-with-dialog', async (_event, { url, fileName }) =>
         }
 
         const parsed = new URL(url);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return { ok: false, error: 'Yalnızca http/https adreslerine izin verilir.' };
+        }
         const client = parsed.protocol === 'https:' ? https : http;
 
         await new Promise((resolve, reject) => {
@@ -493,12 +442,33 @@ ipcMain.handle('download-file-with-dialog', async (_event, { url, fileName }) =>
     }
 });
 
+function getSafeMufyardRoot() {
+    const rootDir = path.resolve(os.homedir(), 'Documents', 'MufYARD');
+    if (!fs.existsSync(rootDir)) {
+        fs.mkdirSync(rootDir, { recursive: true });
+    }
+    return rootDir;
+}
+
+function resolveSafeMufyardPath(inputPath, defaultSubdir = 'Mevzuat') {
+    const rootDir = getSafeMufyardRoot();
+    if (!inputPath || typeof inputPath !== 'string' || !inputPath.trim()) {
+        return path.join(rootDir, defaultSubdir);
+    }
+    const raw = inputPath.trim();
+    const resolved = path.isAbsolute(raw)
+        ? path.resolve(raw)
+        : path.resolve(rootDir, raw.replace(/^[/\\]+/, ''));
+    const rel = path.relative(rootDir, resolved);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+        throw new Error('Geçersiz yol: yalnızca Documents/MufYARD altındaki yollara izin verilir.');
+    }
+    return resolved;
+}
+
 ipcMain.handle('open-folder', async (_event, folderPath) => {
     try {
-        let fullPath = folderPath || '';
-        if (!fullPath || !path.isAbsolute(fullPath)) {
-            fullPath = path.join(os.homedir(), 'Documents', 'MufYARD', fullPath || 'Mevzuat');
-        }
+        const fullPath = resolveSafeMufyardPath(folderPath, 'Mevzuat');
         if (!fs.existsSync(fullPath)) {
             fs.mkdirSync(fullPath, { recursive: true });
         }
@@ -520,25 +490,23 @@ ipcMain.handle('show-item-in-folder', async (_event, filePath) => {
         console.log('[ELECTRON] show-item-in-folder requested:', filePath);
         const isWebUrl = typeof filePath === 'string' && (filePath.startsWith('http://') || filePath.startsWith('https://'));
         if (!filePath || isWebUrl) {
-            const defaultDir = path.join(os.homedir(), 'Documents', 'MufYARD', 'Mevzuat');
+            const defaultDir = resolveSafeMufyardPath('', 'Mevzuat');
             if (!fs.existsSync(defaultDir)) fs.mkdirSync(defaultDir, { recursive: true });
             await shell.openPath(defaultDir);
-            return { ok: true, type: 'folder', path: defaultDir, message: isWebUrl ? "Bu mevzuat web üzerinden eklenmiş; genel mevzuat klasörü açıldı." : undefined };
+            return { ok: true, type: 'folder', path: defaultDir, message: isWebUrl ? "Bu mevzuat web ?zerinden eklenmi?; genel mevzuat klas?r? a??ld?." : undefined };
         }
 
-        let fullPath = filePath;
-        if (!path.isAbsolute(fullPath)) {
-            let clean = filePath.replace(/^[/\\]+/, '').replace(/^Mevzuat[/\\]+/i, '');
-            const cand = path.join(os.homedir(), 'Documents', 'MufYARD', 'Mevzuat', clean);
+        let fullPath;
+        if (path.isAbsolute(filePath)) {
+            fullPath = resolveSafeMufyardPath(filePath, 'Mevzuat');
+        } else {
+            const clean = String(filePath).replace(/^[/\\]+/, '').replace(/^Mevzuat[/\\]+/i, '');
+            const cand = resolveSafeMufyardPath(path.join('Mevzuat', clean), 'Mevzuat');
             if (fs.existsSync(cand)) {
                 fullPath = cand;
             } else {
-                const cand2 = path.join(os.homedir(), 'Documents', 'MufYARD', filePath);
-                if (fs.existsSync(cand2)) {
-                    fullPath = cand2;
-                } else {
-                    fullPath = cand;
-                }
+                const cand2 = resolveSafeMufyardPath(filePath, 'Mevzuat');
+                fullPath = fs.existsSync(cand2) ? cand2 : cand;
             }
         }
 
@@ -554,10 +522,10 @@ ipcMain.handle('show-item-in-folder', async (_event, filePath) => {
                 return { ok: true, type: 'file', path: fullPath };
             }
         } else {
-            const parentDir = path.dirname(fullPath);
+            const parentDir = resolveSafeMufyardPath(path.dirname(fullPath), 'Mevzuat');
             if (!fs.existsSync(parentDir)) fs.mkdirSync(parentDir, { recursive: true });
             await shell.openPath(parentDir);
-            return { ok: true, type: 'folder', path: parentDir, message: "Dosya yerel klasörde bulunamadı, ilgili klasör açıldı." };
+            return { ok: true, type: 'folder', path: parentDir, message: "Dosya yerel klas?rde bulunamad?, ilgili klas?r a??ld?." };
         }
     } catch (e) {
         console.error('[ELECTRON] show-item-in-folder hatasi:', e);
@@ -587,6 +555,9 @@ function downloadUrlToFile(fileUrl, destPath, maxRedirects = 5) {
             }
             try {
                 const parsed = new URL(currentUrl);
+                if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+                    return reject(new Error('Yalnızca http/https adreslerine izin verilir.'));
+                }
                 const client = parsed.protocol === 'https:' ? https : http;
                 const req = client.get(parsed, (res) => {
                     if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {

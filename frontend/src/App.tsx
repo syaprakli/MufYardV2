@@ -45,6 +45,7 @@ const About = lazy(() => import("./pages/About"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Messages = lazy(() => import("./pages/Messages"));
 const Feedback = lazy(() => import("./pages/Feedback"));
+const Reminders = lazy(() => import("./pages/Reminders"));
 const ReportAnalytics = lazy(() => import("./pages/ReportAnalytics"));
 const FounderHub = lazy(() => import("./pages/FounderHub"));
 const AdminFeedback = lazy(() => import("./pages/AdminFeedback"));
@@ -95,6 +96,13 @@ function App() {
   useEffect(() => {
     if (user?.uid) {
       refreshAll(user.uid, user.email || undefined, user.displayName || undefined);
+      import("./lib/api/reminders").then(({ fetchReminders }) => {
+        fetchReminders(user.uid).then((reminders) => {
+          import("./utils/reminderNotifications").then(({ checkAndNotifyExpiringReminders }) => {
+            checkAndNotifyExpiringReminders(reminders, true);
+          });
+        }).catch((err) => console.warn("Zamanaşımı kontrolü ertelendi:", err));
+      });
     }
   }, [user?.uid, user?.email, user?.displayName, refreshAll]);
 
@@ -226,6 +234,7 @@ function App() {
                         <Route path="settings" element={<Settings />} />
                         <Route path="settings/billing" element={<Settings initialTab="Lisans & Abonelik" />} />
                         <Route path="calendar" element={<Calendar />} />
+                        <Route path="reminders" element={<Reminders />} />
                         <Route path="audit/:id/report" element={<ReportEditor />} />
                         <Route path="public-space" element={<PublicSpace />} />
                         <Route path="about" element={<About />} />

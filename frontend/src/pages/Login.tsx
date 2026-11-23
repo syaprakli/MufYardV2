@@ -86,8 +86,7 @@ export default function Login() {
                             full_name: match.name,
                             title: match.title,
                             institution: match.unit || "Gençlik ve Spor Bakanlığı",
-                            email: match.email,
-                            verified: true
+                            email: match.email
                         });
                         // Eşleşme bulunduysa, localStorage'a da not düş
                         localStorage.setItem(`id_skip_${userUid}`, "true");

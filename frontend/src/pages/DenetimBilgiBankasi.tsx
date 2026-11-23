@@ -906,7 +906,7 @@ export default function DenetimBilgiBankasi() {
                                         {mode === "editor" ? "Rapora Ekle" : "Nota Ekle"}
                                     </Button>
                                 </div>
-                                <div className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-3 bg-slate-50 dark:bg-slate-950/5 p-2 rounded font-medium border border-slate-100 dark:border-slate-800/20" dangerouslySetInnerHTML={{ __html: item.standard_remark }} />
+                                <div className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-3 bg-slate-50 dark:bg-slate-950/5 p-2 rounded font-medium border border-slate-100 dark:border-slate-800/20" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.standard_remark || "") }} />
                             </div>
                         ))
                     )}
@@ -1355,7 +1355,7 @@ export default function DenetimBilgiBankasi() {
 
                                         <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800/50">
                                             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">Resmi Tenkit Metni</p>
-                                            <div className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed" dangerouslySetInnerHTML={{ __html: item.standard_remark }} />
+                                            <div className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.standard_remark || "") }} />
                                         </div>
                                     </div>
 

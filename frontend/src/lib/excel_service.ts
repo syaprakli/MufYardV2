@@ -1,4 +1,5 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { worksheetToMatrix } from './excelHelpers';
 import type { InspectorCreate } from './api/inspectors';
 
 export interface ExcelImportResult {
@@ -18,15 +19,25 @@ export async function parseInspectorsExcel(file: File): Promise<ExcelImportResul
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        
-        // Raw JSON conversion
-        const rawRows = XLSX.utils.sheet_to_json<any>(worksheet);
+        const buffer = e.target?.result as ArrayBuffer;
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer);
+        const worksheet = workbook.worksheets[0];
+        if (!worksheet) {
+          resolve({ data: [], summary: { total: 0, valid: 0, invalid: 0 } });
+          return;
+        }
+        const matrix = worksheetToMatrix(worksheet);
+        const headers = (matrix[0] || []).map((h: any) => String(h ?? '').trim());
+        const rawRows: Record<string, any>[] = matrix.slice(1).map((vals) => {
+          const obj: Record<string, any> = {};
+          headers.forEach((h, idx) => {
+            if (h) obj[h] = vals[idx] ?? '';
+          });
+          return obj;
+        });
         
         const validDocs: InspectorCreate[] = [];
         let invalidCount = 0;

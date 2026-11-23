@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Loader2, Sparkles, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../ui/Button";
+import { sanitizeHtml } from "../../lib/sanitize";
 
 type SavedAiPromptPreset = {
     id: string;
@@ -330,7 +331,7 @@ export default function ReportEditorAiSuggestionPanel({
                                     {slides.length > 0 && viewMode === "slides" ? (
                                         <div className="bg-slate-950 text-white rounded-3xl border border-slate-850/80 shadow-2xl p-8 relative min-h-[300px] flex flex-col justify-between animate-in fade-in zoom-in-95 duration-200">
                                             {/* Slide Content */}
-                                            <div className="flex-1 overflow-y-auto font-semibold leading-relaxed" dangerouslySetInnerHTML={{ __html: slides[activeSlideIndex] }} />
+                                            <div className="flex-1 overflow-y-auto font-semibold leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeHtml(slides[activeSlideIndex] || "") }} />
                                             
                                             {/* Slide Footer / Carousel Navigation */}
                                             <div className="flex items-center justify-between mt-6 border-t border-slate-800/50 pt-4 flex-shrink-0">
@@ -357,7 +358,7 @@ export default function ReportEditorAiSuggestionPanel({
                                         </div>
                                     ) : (
                                         <div className="rounded-2xl border border-slate-200/60 dark:border-slate-850 bg-white dark:bg-slate-900 p-5 prose max-w-none prose-slate dark:prose-invert text-xs">
-                                            <div dangerouslySetInnerHTML={{ __html: aiSuggestedHtml }} />
+                                            <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(aiSuggestedHtml || "") }} />
                                         </div>
                                     )}
                                     <div className="rounded-2xl border border-slate-200/60 dark:border-slate-850 bg-white dark:bg-slate-900 overflow-hidden">

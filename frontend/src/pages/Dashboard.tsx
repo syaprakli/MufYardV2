@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { API_URL } from "../lib/config";
 import { cn } from "../lib/utils";
+import DOMPurify from "dompurify";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
 import { useAuth } from "../lib/hooks/useAuth";
 import { useTheme } from "../lib/context/ThemeContext";
@@ -157,6 +158,9 @@ export default function Dashboard() {
     const [analysisText, setAnalysisText] = useState("");
     const [shouldShowBirthdayModal, setShouldShowBirthdayModal] = useState(false);
     const [urgentNotesCount, setUrgentNotesCount] = useState(0);
+    const [criticalRemindersCount, setCriticalRemindersCount] = useState(0);
+    const [nearestExpiringReminder, setNearestExpiringReminder] = useState<any>(null);
+    const [nearestExpiringDays, setNearestExpiringDays] = useState<number>(0);
     const [showArchivedReports, setShowArchivedReports] = useState(false);
     const [summaryRoleFilter, setSummaryRoleFilter] = useState<string>("Tümü");
     const [showSummaryRoleFilters, setShowSummaryRoleFilters] = useState(false);
@@ -250,6 +254,33 @@ export default function Dashboard() {
             isMounted = false;
         };
     }, [effectiveUid, currentUser?.email]);
+
+    useEffect(() => {
+        if (!effectiveUid) return;
+        let isMounted = true;
+        import("../lib/api/reminders").then(({ fetchReminders, getDaysRemaining }) => {
+            fetchReminders(effectiveUid).then((reminders) => {
+                if (!isMounted) return;
+                const active = reminders.filter((r) => r.status === "active");
+                const critical = active.filter((r) => {
+                    const days = getDaysRemaining(r.expiration_date);
+                    return days <= (r.notify_before_months || 2) * 30;
+                });
+                setCriticalRemindersCount(critical.length);
+                if (critical.length > 0) {
+                    const sorted = [...critical].sort((a, b) => getDaysRemaining(a.expiration_date) - getDaysRemaining(b.expiration_date));
+                    setNearestExpiringReminder(sorted[0]);
+                    setNearestExpiringDays(getDaysRemaining(sorted[0].expiration_date));
+                } else {
+                    setNearestExpiringReminder(null);
+                    setNearestExpiringDays(0);
+                }
+            }).catch(() => {});
+        });
+        return () => {
+            isMounted = false;
+        };
+    }, [effectiveUid]);
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -387,8 +418,8 @@ export default function Dashboard() {
 
     // ─── Excel'e Aktar ───
     const handleExportExcel = () => {
-        import("xlsx")
-            .then((XLSX) => {
+        import("../lib/excelHelpers")
+            .then(async ({ exportJsonToExcel }) => {
                 const exportData = filteredTasks.map(task => {
                     const start = new Date(task.baslama_tarihi);
                     const end = new Date(start);
@@ -404,11 +435,12 @@ export default function Dashboard() {
                         "Durum": (task as any).rapor_durumu,
                     };
                 });
-                const ws = XLSX.utils.json_to_sheet(exportData);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Görevler");
-                ws["!cols"] = [{ wch: 18 }, { wch: 35 }, { wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 16 }];
-                XLSX.writeFile(wb, `MufYard_Gorevler_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                await exportJsonToExcel(
+                    exportData,
+                    "Görevler",
+                    `MufYard_Gorevler_${new Date().toISOString().slice(0, 10)}.xlsx`,
+                    [18, 35, 18, 14, 10, 10, 16]
+                );
                 toast.success("Excel dosyası indirildi!");
             })
             .catch((err) => {
@@ -476,10 +508,11 @@ Lütfen şunları analiz et:
     };
 
     const sanitizeAnalysisHtml = (text: string) => {
-        const markdownToStrong = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-        const removeScriptBlocks = markdownToStrong.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "");
-        const keepSafeTagsOnly = removeScriptBlocks.replace(/<(?!\/?(strong|br)\b)[^>]*>/gi, "");
-        return keepSafeTagsOnly;
+        const markdownToStrong = String(text || "").replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+        return DOMPurify.sanitize(markdownToStrong, {
+            ALLOWED_TAGS: ["strong", "br"],
+            ALLOWED_ATTR: [],
+        });
     };
 
     const stripTags = (text: string) => text.replace(/<[^>]*>/g, "");
@@ -579,6 +612,37 @@ Lütfen şunları analiz et:
                         className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl px-5 h-11 shrink-0 font-bold text-xs"
                     >
                         Ayarlara Git
+                    </Button>
+                </div>
+            )}
+
+            {criticalRemindersCount > 0 && (
+                <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 rounded-3xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm mb-6 animate-in slide-in-from-top-4 duration-500 font-inter">
+                    <div className="flex gap-4 items-center">
+                        <div className="p-3 bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 rounded-2xl shrink-0">
+                            <Clock size={24} className="animate-pulse" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <span className="bg-rose-600 text-white text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full">
+                                    Kritik Zamanaşımı
+                                </span>
+                                <h4 className="font-bold text-rose-900 dark:text-rose-200 text-sm">
+                                    {criticalRemindersCount} Dosyada Zamanaşımına 2 Ay veya Daha Az Kaldı!
+                                </h4>
+                            </div>
+                            <p className="text-xs text-rose-700 dark:text-rose-400 mt-1">
+                                {nearestExpiringReminder
+                                    ? `En yakın dosya: "${nearestExpiringReminder.title}" (${nearestExpiringDays <= 0 ? "Süresi doldu/bugün" : `${nearestExpiringDays} gün kaldı`}). Disiplin veya ceza düşmemesi için işlemleri tamamlayınız.`
+                                    : "Süresi yaklaşan soruşturma ve inceleme dosyalarınızı lütfen kontrol edin."}
+                            </p>
+                        </div>
+                    </div>
+                    <Button 
+                        onClick={() => navigate("/calendar?tab=hatirlatici")} 
+                        className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-5 h-11 shrink-0 font-bold text-xs"
+                    >
+                        Hatırlatıcılara Git
                     </Button>
                 </div>
             )}
@@ -1243,8 +1307,7 @@ Lütfen şunları analiz et:
                                         if (line.startsWith('##')) return <h2 key={i}>{stripTags(line.replace(/^##\s*/, ''))}</h2>;
                                         if (line.startsWith('#')) return <h1 key={i}>{stripTags(line.replace(/^#\s*/, ''))}</h1>;
                                         if (line.startsWith('- ') || line.startsWith('* ')) {
-                                            const cleanLine = sanitizeAnalysisHtml(line.replace(/^[-*]\s*/, ''));
-                                            return <p key={i} dangerouslySetInnerHTML={{ __html: `• ${cleanLine}` }} />;
+                                            return <p key={i} dangerouslySetInnerHTML={{ __html: sanitizeAnalysisHtml(`• ${line.replace(/^[-*]\s*/, '')}`) }} />;
                                         }
                                         if (line.trim() === '') return <br key={i} />;
                                         return <p key={i} dangerouslySetInnerHTML={{ __html: sanitizeAnalysisHtml(line) }} />;

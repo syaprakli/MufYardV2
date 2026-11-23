@@ -15,7 +15,6 @@
     "build:web": "tsc -b && vite build --mode web",
     "dist:win": "npm run build && electron-builder --win nsis"
   },
-  "dependencies": {},
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@tinymce/tinymce-react": "^6.3.0",
@@ -55,7 +54,6 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.57.0",
     "vite": "^8.0.1",
-    "xlsx": "^0.18.5",
     "y-quill": "^1.0.0",
     "y-websocket": "^3.0.0",
     "yjs": "^13.6.30"
@@ -75,36 +73,7 @@
       "public/favicon.ico",
       "package.json"
     ],
-    "extraResources": [
-      {
-        "from": "../backend/dist/mufyard-backend",
-        "to": "backend-dist"
-      },
-      {
-        "from": "../backend/firebase-credentials.json",
-        "to": "backend-dist/firebase-credentials.json"
-      },
-      {
-        "from": "../backend/.env",
-        "to": "backend-dist/.env"
-      },
-      {
-        "from": "../backend/rehber.xlsx",
-        "to": "backend-dist/rehber.xlsx"
-      },
-      {
-        "from": "../backend/Mevzuat",
-        "to": "backend-dist/Mevzuat"
-      },
-      {
-        "from": "../backend/Raporlar",
-        "to": "backend-dist/Raporlar"
-      },
-      {
-        "from": "../backend/uploads",
-        "to": "backend-dist/uploads"
-      }
-    ],
+    "extraResources": [],
     "win": {
       "target": "nsis",
       "icon": "public/favicon.ico",

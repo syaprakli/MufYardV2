@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import * as XLSX from "xlsx";
+import { worksheetToMatrix } from "./excelHelpers";
 
 // 1- SPORCU SAYILARI SATIRLARI
 export const SPORCU_ROW_DEFS = [
@@ -347,29 +347,42 @@ export const exportAuditSummaryExcel = async (
     // 3-4. HAKEM VE KULÜP SAYILARI
     // ==========================================
     const wsHakemKulup = wb.addWorksheet("3-4-HAKEM-KULUP");
-    addSheetTitleBlock(wsHakemKulup, ilAdi, startYear, endYear, "3-4- HAKEM VE SPOR KULÜBÜ SAYILARI", 2);
-    wsHakemKulup.columns = [{ width: 45 }, { width: 22 }];
+    const hkCols = 1 + years.length;
+    addSheetTitleBlock(wsHakemKulup, ilAdi, startYear, endYear, "3-4- HAKEM VE SPOR KULÜBÜ SAYILARI", hkCols);
+    wsHakemKulup.columns = [{ width: 45 }, ...years.map(() => ({ width: 15 }))];
 
     // Bölüm 3 Başlığı
-    const rHkSec3 = wsHakemKulup.addRow(["3- HAKEM DURUMU (KATEGORİLERİNE GÖRE)", "SAYI"]);
-    styleHeaderRow(rHkSec3, 1, 2);
+    const rHkSec3 = wsHakemKulup.addRow(["3- HAKEM DURUMU (KATEGORİLERİNE GÖRE)", ...years]);
+    styleHeaderRow(rHkSec3, 1, hkCols);
 
     HAKEM_ROW_DEFS.forEach((r, idx) => {
-        const val = isBlankTemplate ? "" : (tables?.hakemDurumu?.[r.key] ?? "");
-        const dRow = wsHakemKulup.addRow([r.label, val]);
-        styleDataRow(dRow, idx % 2 === 1, r.key === "toplam", 2, 2);
+        const rowVals = isBlankTemplate ? {} : (tables?.hakemDurumu?.[r.key] || {});
+        const dRow = wsHakemKulup.addRow([
+            r.label,
+            ...years.map(y => {
+                if (typeof rowVals === "object" && rowVals !== null) return rowVals[y] ?? "";
+                return y === years[years.length - 1] ? (rowVals ?? "") : "";
+            })
+        ]);
+        styleDataRow(dRow, idx % 2 === 1, r.key === "toplam", 2, hkCols);
     });
 
     wsHakemKulup.addRow([]); // Boşluk
 
     // Bölüm 4 Başlığı
-    const rHkSec4 = wsHakemKulup.addRow(["4- KULÜP SAYILARI", "DEĞER"]);
-    styleHeaderRow(rHkSec4, 1, 2);
+    const rHkSec4 = wsHakemKulup.addRow(["4- KULÜP SAYILARI", ...years]);
+    styleHeaderRow(rHkSec4, 1, hkCols);
 
     KULUP_ROW_DEFS.forEach((r, idx) => {
-        const val = isBlankTemplate ? "" : (tables?.kulupSayilari?.[r.key] ?? "");
-        const dRow = wsHakemKulup.addRow([r.label, val]);
-        styleDataRow(dRow, idx % 2 === 1, false, 2, 2);
+        const rowVals = isBlankTemplate ? {} : (tables?.kulupSayilari?.[r.key] || {});
+        const dRow = wsHakemKulup.addRow([
+            r.label,
+            ...years.map(y => {
+                if (typeof rowVals === "object" && rowVals !== null) return rowVals[y] ?? "";
+                return y === years[years.length - 1] ? (rowVals ?? "") : "";
+            })
+        ]);
+        styleDataRow(dRow, idx % 2 === 1, false, 2, hkCols);
     });
 
     // ==========================================
@@ -681,21 +694,20 @@ export const parseAuditSummaryExcel = async (
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
 
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
-                const data = new Uint8Array(e.target?.result as ArrayBuffer);
-                const wb = XLSX.read(data, { type: "array" });
+                const buffer = e.target?.result as ArrayBuffer;
+                const wb = new ExcelJS.Workbook();
+                await wb.xlsx.load(buffer);
 
                 const updated: any = JSON.parse(JSON.stringify(currentTables || {}));
                 let matchedSheetsCount = 0;
                 const changeLogs: string[] = [];
 
-                wb.SheetNames.forEach((sheetName) => {
+                wb.worksheets.forEach((sheet) => {
+                    const sheetName = sheet.name || "";
                     const normSheet = normalizeMatchText(sheetName);
-                    const sheet = wb.Sheets[sheetName];
-                    if (!sheet) return;
-
-                    const rawRows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+                    const rawRows: any[][] = worksheetToMatrix(sheet);
                     if (!rawRows || rawRows.length === 0) return;
 
                     // 1- SPORCU

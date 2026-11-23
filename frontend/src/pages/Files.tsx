@@ -14,8 +14,8 @@ import React, { useState, useEffect, useMemo, useRef, type DragEvent } from "rea
 import { useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
+import { exportAoaToExcel, parseCsvMatrix, worksheetToMatrix } from "../lib/excelHelpers";
 
 const saveExcelWorkbook = async (wb: ExcelJS.Workbook, filename: string) => {
     const buffer = await wb.xlsx.writeBuffer();
@@ -33,7 +33,7 @@ import { fetchFileTree, uploadFile, createFolder, deleteItem, openFolder, openFi
 import { aiSearch } from "../lib/api/ai";
 import { cn } from "../lib/utils";
 import { isElectron } from "../lib/firebase";
-import { API_URL, LOCAL_API_URL, IS_ELECTRON } from "../lib/config";
+import { API_URL } from "../lib/config";
 import { useAuth } from "../lib/hooks/useAuth";
 import { fetchAllProfiles, type Profile } from "../lib/api/profiles";
 import { sendDirectMessage } from "../lib/api/collaboration";
@@ -594,7 +594,7 @@ const calculateYollukValues = () => {
     });
 
     // Masaüstünde yerel dosyalara (Belgelerim/MufYARD), Web'de Bulut'a (Railway) odaklan
-    const CURRENT_API_URL = IS_ELECTRON ? LOCAL_API_URL : API_URL;
+    const CURRENT_API_URL = API_URL;
     const BACKEND_BASE_URL = CURRENT_API_URL.replace(/\/api\/?$/, "");
 
     const resolveFileUrl = (url?: string) => {
@@ -729,16 +729,16 @@ const calculateYollukValues = () => {
                     let rows: string[][] = [];
                     if (ext === 'csv') {
                         const text = await res.text();
-                        const wb = XLSX.read(text, { type: 'string' });
-                        const firstSheet = wb.SheetNames[0];
-                        const matrix = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1, raw: false }) as any[];
-                        rows = matrix.map((r: any) => (Array.isArray(r) ? r : [String(r ?? '')]).map((c: any) => String(c ?? '')));
+                        rows = parseCsvMatrix(text);
+                    } else if (ext === 'xls') {
+                        throw new Error('Eski .xls formatı tarayıcıda önizlenemiyor; lütfen indirerek açın veya .xlsx formatına dönüştürün.');
                     } else {
                         const buffer = await res.arrayBuffer();
-                        const wb = XLSX.read(buffer, { type: 'array' });
-                        const firstSheet = wb.SheetNames[0];
-                        const matrix = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1, raw: false }) as any[];
-                        rows = matrix.map((r: any) => (Array.isArray(r) ? r : [String(r ?? '')]).map((c: any) => String(c ?? '')));
+                        const wb = new ExcelJS.Workbook();
+                        await wb.xlsx.load(buffer);
+                        const firstWs = wb.worksheets[0];
+                        const matrix = firstWs ? worksheetToMatrix(firstWs) : [];
+                        rows = matrix.map((r: any[]) => r.map((c: any) => String(c ?? '')));
                     }
 
                     if (!cancelled) setSpreadsheetPreview({ loading: false, error: null, rows: rows.slice(0, 200) });
@@ -887,7 +887,7 @@ const calculateYollukValues = () => {
                     };
                     const result = await generateDegerlendirmeDocx(data);
                     if (result.status === "success") {
-                        const fileUrl = "/Diğer İşlem ve Belgeler/" + result.filename;
+                        const fileUrl = result.url || ("/Diğer İşlem ve Belgeler/" + result.filename);
                         const resolvedUrl = resolveFileUrl(fileUrl);
                         const link = document.createElement("a");
                         link.href = resolvedUrl;
@@ -1197,7 +1197,7 @@ const calculateYollukValues = () => {
             };
             const result = await generateDiziDocx(data);
             if (result.status === "success") {
-                const fileUrl = "/Diğer İşlem ve Belgeler/" + result.filename;
+                const fileUrl = result.url || ("/Diğer İşlem ve Belgeler/" + result.filename);
                 const resolvedUrl = resolveFileUrl(fileUrl);
                 const link = document.createElement("a");
                 link.href = resolvedUrl;
@@ -1259,7 +1259,7 @@ const calculateYollukValues = () => {
             };
             const result = await generateKapakDocx(data);
             if (result.status === "success") {
-                const fileUrl = "/Diğer İşlem ve Belgeler/" + result.filename;
+                const fileUrl = result.url || ("/Diğer İşlem ve Belgeler/" + result.filename);
                 const resolvedUrl = resolveFileUrl(fileUrl);
                 const link = document.createElement("a");
                 link.href = resolvedUrl;
@@ -2681,7 +2681,6 @@ const calculateYollukValues = () => {
             ortakAlanRate
         } = calculateLojmanValues();
 
-        const wb = XLSX.utils.book_new();
         const data = [
             ["LOJMAN KİRA HESAPLAMA RAPORU"],
             ["Tarih", new Date().toLocaleDateString("tr-TR")],
@@ -2714,9 +2713,7 @@ const calculateYollukValues = () => {
             ["Aylık Toplam Lojman Kirası", "", { t: "n", f: "C29", z: "#,##0.00" }],
             ["Günlük Lojman Kirası (30 Gün Üzerinden)", "", { t: "n", f: "C30/30", z: "#,##0.00" }]
         ];
-        const ws = XLSX.utils.aoa_to_sheet(data as any[][]);
-        XLSX.utils.book_append_sheet(wb, ws, "Lojman Kira Raporu");
-        XLSX.writeFile(wb, `Lojman_Kira_Hesaplama_${lojmanYear}_${lojmanCity}.xlsx`);
+        void exportAoaToExcel(data as any[][], "Lojman Kira Raporu", `Lojman_Kira_Hesaplama_${lojmanYear}_${lojmanCity}.xlsx`);
         toast.success("Excel belgesi indirildi.");
     };
 
@@ -2769,7 +2766,6 @@ const calculateYollukValues = () => {
             tableTitle
         } = calculateGorevValues();
 
-        const wb = XLSX.utils.book_new();
         const data = [
             ["GÖREVLENDİRME ÜCRET HESAPLAMA RAPORU"],
             ["Tarih", new Date().toLocaleDateString("tr-TR")],
@@ -2790,9 +2786,7 @@ const calculateYollukValues = () => {
             ["Net Ödenecek Tutar", "", { t: "n", f: "C13-C16", z: "#,##0.00" }]
         ];
 
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, "Görev Ücreti Hesaplama");
-        XLSX.writeFile(wb, `Gorevlendirme_Ucreti_Hesabi_${gorevYear}.xlsx`);
+        void exportAoaToExcel(data as any[][], "Görev Ücreti Hesaplama", `Gorevlendirme_Ucreti_Hesabi_${gorevYear}.xlsx`);
         toast.success("Excel belgesi indirildi.");
     };
 
@@ -2856,8 +2850,6 @@ const calculateYollukValues = () => {
             emekliNet
         } = calculateYollukValues();
 
-        const wb = XLSX.utils.book_new();
-        
         if (yollukActiveTab === "memur") {
             const data = [
                 ["SÜREKLİ GÖREV YOLLUĞU HESAPLAMA RAPORU (MEMUR)"],
@@ -2905,9 +2897,7 @@ const calculateYollukValues = () => {
             data.push(["Aile Fertleri Yolluğu Toplamı", "", formatYollukCurrency(familyTotal) + " TL"]);
             data.push(["Net Ödenecek Toplam Yolluk (Vergisiz)", "", formatYollukCurrency(activeGrandTotal) + " TL"]);
 
-            const ws = XLSX.utils.aoa_to_sheet(data);
-            XLSX.utils.book_append_sheet(wb, ws, "Memur Tayin Yolluğu");
-            XLSX.writeFile(wb, `Memur_Sürekli_Görev_Yolluğu_${yollukYear}.xlsx`);
+            void exportAoaToExcel(data as any[][], "Memur Tayin Yolluğu", `Memur_Sürekli_Görev_Yolluğu_${yollukYear}.xlsx`);
         } else {
             const data = [
                 ["EMEKLİLİK SÜREKLİ GÖREV YOLLUĞU (TAZMİNATI) RAPORU"],
@@ -2926,9 +2916,7 @@ const calculateYollukValues = () => {
                 ["Ödenecek Net Tutar", formatYollukCurrency(emekliNet) + " TL"]
             ];
 
-            const ws = XLSX.utils.aoa_to_sheet(data);
-            XLSX.utils.book_append_sheet(wb, ws, "Emeklilik Yolluğu");
-            XLSX.writeFile(wb, `Emeklilik_Yolluğu_Tazminatı_${yollukEmekliYear}.xlsx`);
+            void exportAoaToExcel(data as any[][], "Emeklilik Yolluğu", `Emeklilik_Yolluğu_Tazminatı_${yollukEmekliYear}.xlsx`);
         }
         
         toast.success("Excel belgesi indirildi.");
@@ -7901,7 +7889,6 @@ const renderPratikModal = () => {
             ? `Özel Binde ${effectiveDamgaBinde.toFixed(2).replace('.', ',')}` 
             : (selectedDamgaOpt ? selectedDamgaOpt.label : "Kira Sözleşmeleri");
 
-        const wb = XLSX.utils.book_new();
         const data: any[][] = [
             ["BAZ İSTASYONU YER KULLANIM BEDELİ & YASAL TAVAN DENETİM RAPORU"],
             ["Tarih", new Date().toLocaleDateString("tr-TR")],
@@ -7952,9 +7939,7 @@ const renderPratikModal = () => {
             ["    bedel içeren her karar için Binde 5,69 karar pulu ödenir. Otomatik uzayan sözleşmelerde ise yeni karar pulu doğmaz.'"]
         ];
         
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, "Baz İstasyonu Tavan Raporu");
-        XLSX.writeFile(wb, `Baz_Istasyonu_Tavan_Denetim_Raporu_${bazYil}.xlsx`);
+        void exportAoaToExcel(data, "Baz İstasyonu Tavan Raporu", `Baz_Istasyonu_Tavan_Denetim_Raporu_${bazYil}.xlsx`);
         toast.success("Excel raporu indirildi.");
     };
 

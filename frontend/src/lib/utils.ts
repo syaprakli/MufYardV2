@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { BASE_URL, IS_ELECTRON } from "./config";
+import { BASE_URL, IS_ELECTRON, IS_PROD } from "./config";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -60,7 +60,7 @@ export const getSafeImageUrl = (url?: string): string => {
         // If it points to localhost/127.0.0.1
         if (trimmed.includes("localhost:8000") || trimmed.includes("127.0.0.1:8000")) {
             // On external Web or Mobile APK (not localhost/electron), redirect to Railway
-            if (!IS_ELECTRON && !isLocalClient) {
+            if (IS_PROD || (!IS_ELECTRON && !isLocalClient)) {
                 const pathPart = trimmed.split(":8000")[1] || "";
                 const clean = pathPart.startsWith("/") ? pathPart : `/${pathPart}`;
                 return `${REMOTE_STATIC_BASE}${clean}`;
@@ -77,7 +77,7 @@ export const getSafeImageUrl = (url?: string): string => {
     const cleanPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 
     // In Electron or local dev browser -> use local backend first
-    if (IS_ELECTRON || isLocalClient) {
+    if (!IS_PROD && isLocalClient) {
         return `${LOCAL_STATIC_BASE}${cleanPath}`;
     }
 

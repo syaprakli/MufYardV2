@@ -80,7 +80,19 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
         if (!user?.uid || !profile) return;
         setSaving(true);
         try {
-            const { uid: _u, role: _r, verified: _v, ...payload } = profile as any;
+            const {
+                uid: _u,
+                role: _r,
+                verified: _v,
+                has_premium_ai: _hp,
+                premium_type: _pt,
+                premium_until: _pu,
+                two_factor_enabled: _tfe,
+                two_factor_secret: _tfs,
+                created_at: _ca,
+                updated_at: _ua,
+                ...payload
+            } = profile as any;
             payload.report_prefix = raporOnek;
             const updated = await updateProfile(user.uid, payload);
             setProfile(updated);

@@ -309,21 +309,14 @@ export function Header({ toggleSidebar }: HeaderProps) {
                                     className="w-full h-full rounded-2xl object-cover"
                                     onError={(e) => {
                                         const target = e.target as HTMLImageElement;
-                                        // Eğer Railway başarısız olursa Localhost'u dene
-                                        if (target.src.includes('railway.app')) {
-                                            const LOCAL_URL = "http://127.0.0.1:8000";
-                                            const path = target.src.split('railway.app')[1];
-                                            target.src = `${LOCAL_URL}${path}`;
-                                        } else {
-                                            // İkisi de yoksa Baş Harflere dön
-                                            target.style.display = 'none';
-                                            const parent = target.parentElement;
-                                            if (parent && !parent.querySelector('.avatar-fallback')) {
-                                                const span = document.createElement('span');
-                                                span.className = 'avatar-fallback';
-                                                span.innerText = initials;
-                                                parent.appendChild(span);
-                                            }
+                                        // Yüklenemezse Baş Harflere dön
+                                        target.style.display = 'none';
+                                        const parent = target.parentElement;
+                                        if (parent && !parent.querySelector('.avatar-fallback')) {
+                                            const span = document.createElement('span');
+                                            span.className = 'avatar-fallback';
+                                            span.innerText = initials;
+                                            parent.appendChild(span);
                                         }
                                     }}
                                 />

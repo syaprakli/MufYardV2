@@ -23,12 +23,14 @@ import {
     Upload,
     ChevronDown,
     AlertTriangle,
-    LayoutGrid
+    LayoutGrid,
+    Sparkles
 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { toast } from "react-hot-toast";
 import { generateOzetTablolarDocx } from "../../lib/api/files";
 import { exportAuditSummaryExcel, parseAuditSummaryExcel } from "../../lib/auditExcelHelper";
+import { TenkitHavuzuModal } from "./TenkitHavuzuModal";
 
 // 6- PERSONEL DURUMU SABİTLERİ (4 ALT TABLO)
 const IDARI_PERSONEL_ROWS = [
@@ -182,6 +184,7 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
     const [isImportingExcel, setIsImportingExcel] = useState(false);
     const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
     const [showResetModal, setShowResetModal] = useState(false);
+    const [showTenkitModal, setShowTenkitModal] = useState(false);
     const [viewMode, setViewMode] = useState<"auto" | "table" | "card">("auto");
     const excelFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1017,6 +1020,17 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                             )}
                         </div>
 
+                        {/* Otomatik Tenkit / Bulgu Analizi Yap */}
+                        <Button
+                            size="sm"
+                            onClick={() => setShowTenkitModal(true)}
+                            className="rounded-xl h-8 text-[11px] font-bold bg-gradient-to-r from-indigo-600 via-indigo-700 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-sm shadow-indigo-600/30 px-3 justify-center gap-1.5"
+                            title="Tablolardaki 5 yıllık verileri 6 resmi kural grubuna göre analiz eder ve tenkit öneri havuzunu açar"
+                        >
+                            <Sparkles size={13} className="shrink-0 text-amber-300 animate-pulse" />
+                            <span>Tenkit Analizi Yap</span>
+                        </Button>
+
                         {/* Doldurulan Excel'i Yükle */}
                         <Button
                             size="sm"
@@ -1131,6 +1145,19 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                     );
                 })}
             </div>
+
+            {/* OTOMATİK TENKİT HAVUZU MODALI */}
+            <TenkitHavuzuModal
+                isOpen={showTenkitModal}
+                onClose={() => setShowTenkitModal(false)}
+                tables={tables}
+                years={years}
+                ilAdi={ilAdi}
+                selectedReport={selectedReport}
+                onSaveAuditData={onSave}
+                localAuditData={localAuditData}
+                setLocalAuditData={setLocalAuditData}
+            />
 
             {/* SIFIRLAMA ONAY MODALI */}
             {showResetModal && (
@@ -1637,13 +1664,13 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
 
             {/* 3-4 HAKEM & KULÜP */}
             {isSectionVisible("hakem_kulup") && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="flex flex-col gap-5">
                     {/* 3- HAKEM DURUMU */}
                     <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
                         <div className="flex items-center justify-between mb-3 border-b border-slate-100 dark:border-slate-800 pb-2.5">
                             <h4 className="text-sm font-bold text-slate-850 dark:text-white flex items-center gap-2">
                                 <span className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/50 text-blue-600 text-xs font-black flex items-center justify-center">3</span>
-                                HAKEM DURUMU
+                                HAKEM DURUMU (Yıllar İtibarıyla)
                             </h4>
                             <div className="flex items-center gap-2">
                                 <span className="text-[11px] text-slate-400 italic">Ek 2</span>
@@ -1661,109 +1688,129 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                             </div>
                         </div>
 
-                        <table className="w-full text-xs text-left border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300">
-                                    <th className="p-2.5 font-bold border border-slate-200 dark:border-slate-700">HAKEM KATEGORİSİ</th>
-                                    <th className="p-2.5 font-bold text-center border border-slate-200 dark:border-slate-700 w-32">SAYI</th>
-                                    <th className="p-2.5 font-bold text-center border border-slate-200 dark:border-slate-700 w-12">İŞLEM</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {[
-                                    { key: "aday", label: "Aday (1)" },
-                                    { key: "bolge", label: "Bölge (1)" },
-                                    { key: "milli", label: "Milli (1)" },
-                                    { key: "ulusal", label: "Ulusal (1)" },
-                                    { key: "uluslararasi", label: "Uluslararası (1)" },
-                                    { key: "toplam", label: "TOPLAM" }
-                                ].map(r => (
-                                    <tr key={r.key} className={r.key === "toplam" ? "bg-blue-50/50 dark:bg-blue-950/20 font-bold" : ""}>
-                                        <td className="p-2 border border-slate-200 dark:border-slate-700">{r.label}</td>
-                                        <td className="p-1 border border-slate-200 dark:border-slate-700 text-center">
-                                            <input
-                                                type="text"
-                                                value={tables?.hakemDurumu?.[r.key] || ""}
-                                                onChange={(e) => updateTableField(["hakemDurumu", r.key], e.target.value)}
-                                                onBlur={() => onSave()}
-                                                className="w-full text-center py-1 rounded bg-transparent font-medium text-xs"
-                                                placeholder="-"
-                                            />
-                                        </td>
-                                        <td className="border border-slate-200 dark:border-slate-700"></td>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-xs text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300">
+                                        <th className="p-2.5 font-bold border border-slate-200 dark:border-slate-700 min-w-[200px]">HAKEM KATEGORİSİ</th>
+                                        {years.map(y => (
+                                            <th key={y} className="p-2.5 font-bold text-center border border-slate-200 dark:border-slate-700 min-w-[65px]">{y}</th>
+                                        ))}
+                                        <th className="p-2.5 font-bold text-center border border-slate-200 dark:border-slate-700 w-12">İŞLEM</th>
                                     </tr>
-                                ))}
-                                {(tables?.customHakemRows || []).map((cRow: string) => (
-                                    <tr key={cRow}>
-                                        <td className="p-2 border border-slate-200 dark:border-slate-700 font-medium">{cRow}</td>
-                                        <td className="p-1 border border-slate-200 dark:border-slate-700 text-center">
+                                </thead>
+                                <tbody>
+                                    {[
+                                        { key: "aday", label: "Aday (1)" },
+                                        { key: "bolge", label: "Bölge (1)" },
+                                        { key: "milli", label: "Milli (1)" },
+                                        { key: "ulusal", label: "Ulusal (1)" },
+                                        { key: "uluslararasi", label: "Uluslararası (1)" },
+                                        { key: "toplam", label: "TOPLAM" }
+                                    ].map(r => (
+                                        <tr key={r.key} className={r.key === "toplam" ? "bg-blue-50/50 dark:bg-blue-950/20 font-bold" : ""}>
+                                            <td className="p-2 border border-slate-200 dark:border-slate-700">{r.label}</td>
+                                            {years.map(y => {
+                                                const rData = tables?.hakemDurumu?.[r.key];
+                                                const val = typeof rData === "object" && rData !== null 
+                                                    ? (rData[y] || "") 
+                                                    : (typeof rData === "string" && y === years[years.length - 1] ? rData : "");
+                                                return (
+                                                    <td key={y} className="p-1 border border-slate-200 dark:border-slate-700 text-center">
+                                                        <input
+                                                            type="text"
+                                                            value={val}
+                                                            onChange={(e) => updateTableField(["hakemDurumu", r.key, y], e.target.value)}
+                                                            onBlur={() => onSave()}
+                                                            className="w-full text-center py-1 px-1 rounded bg-transparent font-medium text-xs focus:bg-white dark:focus:bg-slate-800"
+                                                            placeholder="-"
+                                                        />
+                                                    </td>
+                                                );
+                                            })}
+                                            <td className="border border-slate-200 dark:border-slate-700"></td>
+                                        </tr>
+                                    ))}
+                                    {(tables?.customHakemRows || []).map((cRow: string) => (
+                                        <tr key={cRow}>
+                                            <td className="p-2 border border-slate-200 dark:border-slate-700 font-medium">{cRow}</td>
+                                            {years.map(y => {
+                                                const rData = tables?.hakemDurumu?.[cRow];
+                                                const val = typeof rData === "object" && rData !== null 
+                                                    ? (rData[y] || "") 
+                                                    : (typeof rData === "string" && y === years[years.length - 1] ? rData : "");
+                                                return (
+                                                    <td key={y} className="p-1 border border-slate-200 dark:border-slate-700 text-center">
+                                                        <input
+                                                            type="text"
+                                                            value={val}
+                                                            onChange={(e) => updateTableField(["hakemDurumu", cRow, y], e.target.value)}
+                                                            onBlur={() => onSave()}
+                                                            className="w-full text-center py-1 px-1 rounded bg-transparent font-medium text-xs focus:bg-white dark:focus:bg-slate-800"
+                                                            placeholder="-"
+                                                        />
+                                                    </td>
+                                                );
+                                            })}
+                                            <td className="p-1 border border-slate-200 dark:border-slate-700 text-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveCustomRow("customHakemRows", cRow)}
+                                                    className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                                                    title={`"${cRow}" kaldır`}
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="bg-blue-50/80 dark:bg-blue-950/40 border-t-2 border-blue-400 dark:border-blue-600">
+                                        <td className="p-1.5 border border-slate-200 dark:border-slate-700">
                                             <input
                                                 type="text"
-                                                value={tables?.hakemDurumu?.[cRow] || ""}
-                                                onChange={(e) => updateTableField(["hakemDurumu", cRow], e.target.value)}
-                                                onBlur={() => onSave()}
-                                                className="w-full text-center py-1 rounded bg-transparent font-medium text-xs"
-                                                placeholder="-"
+                                                value={newHakemInput}
+                                                onChange={(e) => setNewHakemInput(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") {
+                                                        handleAddCustomRow("customHakemRows", newHakemInput);
+                                                        setNewHakemInput("");
+                                                    }
+                                                }}
+                                                placeholder="Yeni kategori yazınız..."
+                                                className="w-full px-2 py-1 text-xs rounded border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-900 font-medium outline-none focus:ring-1 focus:ring-blue-500"
                                             />
                                         </td>
-                                        <td className="p-1 border border-slate-200 dark:border-slate-700 text-center">
+                                        <td colSpan={years.length} className="p-1.5 border border-slate-200 dark:border-slate-700 text-center">
                                             <button
                                                 type="button"
-                                                onClick={() => handleRemoveCustomRow("customHakemRows", cRow)}
-                                                className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                                                title={`"${cRow}" kaldır`}
+                                                onClick={() => {
+                                                    handleAddCustomRow("customHakemRows", newHakemInput);
+                                                    setNewHakemInput("");
+                                                }}
+                                                className="w-full py-1 rounded text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center justify-center gap-1 cursor-pointer"
                                             >
-                                                <Trash2 size={13} />
+                                                <Plus size={13} /> Ekle
+                                            </button>
+                                        </td>
+                                        <td className="p-1.5 border border-slate-200 dark:border-slate-700 text-center">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    handleAddCustomRow("customHakemRows", newHakemInput);
+                                                    setNewHakemInput("");
+                                                }}
+                                                className="w-6 h-6 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center mx-auto cursor-pointer shadow-sm"
+                                                title="Ekle"
+                                            >
+                                                <Plus size={13} />
                                             </button>
                                         </td>
                                     </tr>
-                                ))}
-                            </tbody>
-                            <tfoot>
-                                <tr className="bg-blue-50/80 dark:bg-blue-950/40 border-t-2 border-blue-400 dark:border-blue-600">
-                                    <td className="p-1.5 border border-slate-200 dark:border-slate-700">
-                                        <input
-                                            type="text"
-                                            value={newHakemInput}
-                                            onChange={(e) => setNewHakemInput(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === "Enter") {
-                                                    handleAddCustomRow("customHakemRows", newHakemInput);
-                                                    setNewHakemInput("");
-                                                }
-                                            }}
-                                            placeholder="Yeni kategori yazınız..."
-                                            className="w-full px-2 py-1 text-xs rounded border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-900 font-medium outline-none focus:ring-1 focus:ring-blue-500"
-                                        />
-                                    </td>
-                                    <td className="p-1.5 border border-slate-200 dark:border-slate-700 text-center">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                handleAddCustomRow("customHakemRows", newHakemInput);
-                                                setNewHakemInput("");
-                                            }}
-                                            className="w-full py-1 rounded text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center justify-center gap-1 cursor-pointer"
-                                        >
-                                            <Plus size={13} /> Ekle
-                                        </button>
-                                    </td>
-                                    <td className="p-1.5 border border-slate-200 dark:border-slate-700 text-center">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                handleAddCustomRow("customHakemRows", newHakemInput);
-                                                setNewHakemInput("");
-                                            }}
-                                            className="w-6 h-6 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center mx-auto cursor-pointer shadow-sm"
-                                            title="Ekle"
-                                        >
-                                            <Plus size={13} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
+                                </tfoot>
+                            </table>
+                        </div>
                     </div>
 
                     {/* 4- KULÜP SAYILARI */}
@@ -1771,7 +1818,7 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                         <div className="flex items-center justify-between mb-3 border-b border-slate-100 dark:border-slate-800 pb-2.5">
                             <h4 className="text-sm font-bold text-slate-850 dark:text-white flex items-center gap-2">
                                 <span className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/50 text-blue-600 text-xs font-black flex items-center justify-center">4</span>
-                                KULÜP SAYILARI
+                                KULÜP SAYILARI (Yıllar İtibarıyla)
                             </h4>
                             <div className="flex items-center gap-2">
                                 <span className="text-[11px] text-slate-400 italic">Ek 3</span>
@@ -1789,105 +1836,125 @@ export const DenetimOzetTablolar: React.FC<DenetimOzetTablolarProps> = ({
                             </div>
                         </div>
 
-                        <table className="w-full text-xs text-left border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300">
-                                    <th className="p-2.5 font-bold border border-slate-200 dark:border-slate-700">KULÜP GÖSTERGESİ</th>
-                                    <th className="p-2.5 font-bold text-center border border-slate-200 dark:border-slate-700 w-32">SAYI</th>
-                                    <th className="p-2.5 font-bold text-center border border-slate-200 dark:border-slate-700 w-12">İŞLEM</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {[
-                                    { key: "faalKulup", label: "Faal Kulüp Sayısı" },
-                                    { key: "faalBrans", label: "Faal Branş Sayısı (1)" }
-                                ].map(r => (
-                                    <tr key={r.key}>
-                                        <td className="p-2 border border-slate-200 dark:border-slate-700 font-medium">{r.label}</td>
-                                        <td className="p-1 border border-slate-200 dark:border-slate-700 text-center">
-                                            <input
-                                                type="text"
-                                                value={tables?.kulupSayilari?.[r.key] || ""}
-                                                onChange={(e) => updateTableField(["kulupSayilari", r.key], e.target.value)}
-                                                onBlur={() => onSave()}
-                                                className="w-full text-center py-1 rounded bg-transparent font-medium text-xs"
-                                                placeholder="-"
-                                            />
-                                        </td>
-                                        <td className="border border-slate-200 dark:border-slate-700"></td>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-xs text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300">
+                                        <th className="p-2.5 font-bold border border-slate-200 dark:border-slate-700 min-w-[240px]">KULÜP GÖSTERGESİ</th>
+                                        {years.map(y => (
+                                            <th key={y} className="p-2.5 font-bold text-center border border-slate-200 dark:border-slate-700 min-w-[65px]">{y}</th>
+                                        ))}
+                                        <th className="p-2.5 font-bold text-center border border-slate-200 dark:border-slate-700 w-12">İŞLEM</th>
                                     </tr>
-                                ))}
-                                {(tables?.customKulupRows || []).map((cRow: string) => (
-                                    <tr key={cRow}>
-                                        <td className="p-2 border border-slate-200 dark:border-slate-700 font-medium">{cRow}</td>
-                                        <td className="p-1 border border-slate-200 dark:border-slate-700 text-center">
+                                </thead>
+                                <tbody>
+                                    {[
+                                        { key: "faalKulup", label: "Faal Kulüp Sayısı" },
+                                        { key: "faalBrans", label: "Faal Branş Sayısı (1)" }
+                                    ].map(r => (
+                                        <tr key={r.key}>
+                                            <td className="p-2 border border-slate-200 dark:border-slate-700 font-medium">{r.label}</td>
+                                            {years.map(y => {
+                                                const rData = tables?.kulupSayilari?.[r.key];
+                                                const val = typeof rData === "object" && rData !== null 
+                                                    ? (rData[y] || "") 
+                                                    : (typeof rData === "string" && y === years[years.length - 1] ? rData : "");
+                                                return (
+                                                    <td key={y} className="p-1 border border-slate-200 dark:border-slate-700 text-center">
+                                                        <input
+                                                            type="text"
+                                                            value={val}
+                                                            onChange={(e) => updateTableField(["kulupSayilari", r.key, y], e.target.value)}
+                                                            onBlur={() => onSave()}
+                                                            className="w-full text-center py-1 px-1 rounded bg-transparent font-medium text-xs focus:bg-white dark:focus:bg-slate-800"
+                                                            placeholder="-"
+                                                        />
+                                                    </td>
+                                                );
+                                            })}
+                                            <td className="border border-slate-200 dark:border-slate-700"></td>
+                                        </tr>
+                                    ))}
+                                    {(tables?.customKulupRows || []).map((cRow: string) => (
+                                        <tr key={cRow}>
+                                            <td className="p-2 border border-slate-200 dark:border-slate-700 font-medium">{cRow}</td>
+                                            {years.map(y => {
+                                                const rData = tables?.kulupSayilari?.[cRow];
+                                                const val = typeof rData === "object" && rData !== null 
+                                                    ? (rData[y] || "") 
+                                                    : (typeof rData === "string" && y === years[years.length - 1] ? rData : "");
+                                                return (
+                                                    <td key={y} className="p-1 border border-slate-200 dark:border-slate-700 text-center">
+                                                        <input
+                                                            type="text"
+                                                            value={val}
+                                                            onChange={(e) => updateTableField(["kulupSayilari", cRow, y], e.target.value)}
+                                                            onBlur={() => onSave()}
+                                                            className="w-full text-center py-1 px-1 rounded bg-transparent font-medium text-xs focus:bg-white dark:focus:bg-slate-800"
+                                                            placeholder="-"
+                                                        />
+                                                    </td>
+                                                );
+                                            })}
+                                            <td className="p-1 border border-slate-200 dark:border-slate-700 text-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveCustomRow("customKulupRows", cRow)}
+                                                    className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                                                    title={`"${cRow}" kaldır`}
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="bg-blue-50/80 dark:bg-blue-950/40 border-t-2 border-blue-400 dark:border-blue-600">
+                                        <td className="p-1.5 border border-slate-200 dark:border-slate-700">
                                             <input
                                                 type="text"
-                                                value={tables?.kulupSayilari?.[cRow] || ""}
-                                                onChange={(e) => updateTableField(["kulupSayilari", cRow], e.target.value)}
-                                                onBlur={() => onSave()}
-                                                className="w-full text-center py-1 rounded bg-transparent font-medium text-xs"
-                                                placeholder="-"
+                                                value={newKulupInput}
+                                                onChange={(e) => setNewKulupInput(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") {
+                                                        handleAddCustomRow("customKulupRows", newKulupInput);
+                                                        setNewKulupInput("");
+                                                    }
+                                                }}
+                                                placeholder="Yeni gösterge yazınız..."
+                                                className="w-full px-2 py-1 text-xs rounded border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-900 font-medium outline-none focus:ring-1 focus:ring-blue-500"
                                             />
                                         </td>
-                                        <td className="p-1 border border-slate-200 dark:border-slate-700 text-center">
+                                        <td colSpan={years.length} className="p-1.5 border border-slate-200 dark:border-slate-700 text-center">
                                             <button
                                                 type="button"
-                                                onClick={() => handleRemoveCustomRow("customKulupRows", cRow)}
-                                                className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                                                title={`"${cRow}" kaldır`}
+                                                onClick={() => {
+                                                    handleAddCustomRow("customKulupRows", newKulupInput);
+                                                    setNewKulupInput("");
+                                                }}
+                                                className="w-full py-1 rounded text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center justify-center gap-1 cursor-pointer"
                                             >
-                                                <Trash2 size={13} />
+                                                <Plus size={13} /> Ekle
+                                            </button>
+                                        </td>
+                                        <td className="p-1.5 border border-slate-200 dark:border-slate-700 text-center">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    handleAddCustomRow("customKulupRows", newKulupInput);
+                                                    setNewKulupInput("");
+                                                }}
+                                                className="w-6 h-6 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center mx-auto cursor-pointer shadow-sm"
+                                                title="Ekle"
+                                            >
+                                                <Plus size={13} />
                                             </button>
                                         </td>
                                     </tr>
-                                ))}
-                            </tbody>
-                            <tfoot>
-                                <tr className="bg-blue-50/80 dark:bg-blue-950/40 border-t-2 border-blue-400 dark:border-blue-600">
-                                    <td className="p-1.5 border border-slate-200 dark:border-slate-700">
-                                        <input
-                                            type="text"
-                                            value={newKulupInput}
-                                            onChange={(e) => setNewKulupInput(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === "Enter") {
-                                                    handleAddCustomRow("customKulupRows", newKulupInput);
-                                                    setNewKulupInput("");
-                                                }
-                                            }}
-                                            placeholder="Yeni gösterge yazınız..."
-                                            className="w-full px-2 py-1 text-xs rounded border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-900 font-medium outline-none focus:ring-1 focus:ring-blue-500"
-                                        />
-                                    </td>
-                                    <td className="p-1.5 border border-slate-200 dark:border-slate-700 text-center">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                handleAddCustomRow("customKulupRows", newKulupInput);
-                                                setNewKulupInput("");
-                                            }}
-                                            className="w-full py-1 rounded text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center justify-center gap-1 cursor-pointer"
-                                        >
-                                            <Plus size={13} /> Ekle
-                                        </button>
-                                    </td>
-                                    <td className="p-1.5 border border-slate-200 dark:border-slate-700 text-center">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                handleAddCustomRow("customKulupRows", newKulupInput);
-                                                setNewKulupInput("");
-                                            }}
-                                            className="w-6 h-6 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center mx-auto cursor-pointer shadow-sm"
-                                            title="Ekle"
-                                        >
-                                            <Plus size={13} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
+                                </tfoot>
+                            </table>
+                        </div>
                         <p className="text-[11px] text-slate-400 italic mt-3">
                             * Kulüplerin faal oldukları branşlar ek çizelgede belirtilecektir.
                         </p>

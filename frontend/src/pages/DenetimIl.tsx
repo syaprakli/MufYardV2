@@ -8,7 +8,7 @@ import {
     Copy, Printer, Download, Table, Building2, MapPin, ChevronDown
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
-import { API_URL, LOCAL_API_URL, IS_ELECTRON } from "../lib/config";
+import { API_URL } from "../lib/config";
 import { toast } from "react-hot-toast";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
 import { useConfirm } from "../lib/context/ConfirmContext";
@@ -610,7 +610,7 @@ export default function DenetimIl() {
             }
 
             const targetAuditId = activeAudit?.id || selectedTask?.id || "temp_audit";
-            const targetApi = IS_ELECTRON ? LOCAL_API_URL : API_URL;
+            const targetApi = API_URL;
             const uploadedUrls: string[] = [];
 
             for (const file of files) {
@@ -1905,7 +1905,7 @@ export default function DenetimIl() {
                                         {mode === "editor" ? "Rapora Ekle" : "Nota Ekle"}
                                     </Button>
                                 </div>
-                                <div className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-3 bg-slate-50 dark:bg-slate-955/5 p-2 rounded font-medium border border-slate-100 dark:border-slate-800/20" dangerouslySetInnerHTML={{ __html: item.standard_remark }} />
+                                <div className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-3 bg-slate-50 dark:bg-slate-955/5 p-2 rounded font-medium border border-slate-100 dark:border-slate-800/20" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.standard_remark || "") }} />
                             </div>
                         ))
                     )}
@@ -2543,7 +2543,7 @@ export default function DenetimIl() {
 
                                         <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800/50">
                                             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">Resmi Tenkit Metni</p>
-                                            <div className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed" dangerouslySetInnerHTML={{ __html: item.standard_remark }} />
+                                            <div className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.standard_remark || "") }} />
                                         </div>
                                     </div>
 

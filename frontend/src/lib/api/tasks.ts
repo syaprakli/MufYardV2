@@ -13,6 +13,7 @@ export interface Task {
     rapor_adi: string;
     rapor_turu: string;
     baslama_tarihi: string;
+    olur_tarihi?: string;
     sure_gun: number;
     rapor_durumu: string;
     steps: TaskStep[];
@@ -41,6 +42,7 @@ export interface TaskCreate {
     rapor_adi: string;
     rapor_turu: string;
     baslama_tarihi: string;
+    olur_tarihi?: string;
     sure_gun: number;
     rapor_durumu?: string;
     steps?: TaskStep[];

@@ -56,8 +56,7 @@ export function IdentitySelectionModal({ uid, onComplete }: IdentitySelectionMod
                 title: inspector.title,
                 institution: "Gençlik ve Spor Bakanlığı",
                 email: inspector.email,
-                emails: mergedEmails,
-                verified: true
+                emails: mergedEmails
             });
             localStorage.setItem(`id_skip_${uid}`, "true");
             toast.success(`Kimlik doğrulandı: ${inspector.name}`);
