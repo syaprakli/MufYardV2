@@ -98,10 +98,63 @@ function killPortProcess(port) {
     });
 }
 
+/**
+ * Kurulu uygulama: bilgisayarda "yerel dosya servisi" (docs/PLAN-yerel-dosya-modu.md).
+ * - Görev klasörleri, raporlar ve Word belgeleri Belgeler\MufYARD altında tutulur.
+ * - Servis Firebase yönetici anahtarı ve .env taşımaz; ortak veriler (görev, denetim, sohbet) Railway'den gelir.
+ * - Yalnızca 127.0.0.1:8000 dinlenir (run_backend.py).
+ */
+async function startLocalFilesService() {
+    const exePath = getBackendPath();
+    const logStream = fs.createWriteStream(path.join(getLogDir(), 'backend_crash.log'), { flags: 'a' });
+    logStream.write(`\n\n=== Yerel dosya servisi: ${new Date().toISOString()} ===\nExe: ${exePath}\n`);
+
+    if (!fs.existsSync(exePath)) {
+        logStream.write('[HATA] Yerel dosya servisi paketin içinde bulunamadı.\n');
+        return;
+    }
+
+    // Eski sürümlerden kalan bir servis (yönetici anahtarı içeren eski kurulum) çalışıyorsa kapat.
+    if (await isPortReachable(8000)) {
+        logStream.write('[BILGI] Port 8000 dolu; eski servis kapatılıyor.\n');
+        await killPortProcess(8000);
+    }
+
+    const env = {
+        ...process.env,
+        MUFYARD_LOCAL_FILES: '1',
+        MUFYARD_DESKTOP: 'true',
+        // Ortamdan yanlışlıkla kimlik bilgisi devralınmasın:
+        FIREBASE_SERVICE_ACCOUNT_JSON: '',
+        GOOGLE_APPLICATION_CREDENTIALS: '',
+        PYTHONIOENCODING: 'utf-8',
+    };
+    delete env.DATA_DIR; // varsayılan: Belgeler\MufYARD
+
+    backendProcess = spawn(exePath, [], {
+        cwd: path.dirname(exePath),
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+    });
+    if (backendProcess.stdout) backendProcess.stdout.on('data', d => logStream.write('[OUT] ' + d));
+    if (backendProcess.stderr) backendProcess.stderr.on('data', d => logStream.write('[ERR] ' + d));
+    backendProcess.on('error', err => logStream.write('[SPAWN_ERR] ' + err.message + '\n'));
+    backendProcess.on('exit', (code, signal) => {
+        logStream.write(`[EXIT] Kod: ${code}, Sinyal: ${signal}\n`);
+        if (code !== 0 && code !== null && NativeNotification.isSupported()) {
+            new NativeNotification({
+                title: 'MufYARD - Dosya servisi durdu',
+                body: `Bilgisayardaki dosya servisi kapandı (kod: ${code}). Görev klasörleri için uygulamayı yeniden başlatın.`,
+            }).show();
+        }
+    });
+}
+
 async function startBackend() {
     if (app.isPackaged) {
-        // Paketli masaüstü uygulamasında yerel backend başlatılmaz; merkezi Railway backend kullanılır.
         app.setLoginItemSettings({ openAtLogin: true, path: process.execPath, args: [] });
+        startLocalFilesService();
         return;
     }
 

@@ -74,7 +74,20 @@
       "public/favicon.ico",
       "package.json"
     ],
-    "extraResources": [],
+    "extraResources": [
+      {
+        "from": "../backend/dist/mufyard-backend",
+        "to": "backend-dist",
+        "filter": [
+          "**/*",
+          "!**/.env",
+          "!**/.env.*",
+          "!**/firebase-credentials*.json",
+          "!**/credentials.json",
+          "!**/service-account*.json"
+        ]
+      }
+    ],
     "win": {
       "target": "nsis",
       "icon": "public/favicon.ico",

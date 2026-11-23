@@ -1,6 +1,7 @@
 import { API_URL as API_BASE_URL } from "../config";
 import { fetchWithTimeout, getAuthHeaders } from "./utils";
 import { addToQueue } from "./syncQueue";
+import { syncLocalTaskFolderQuietly } from "./files";
 
 export interface TaskStep {
     text: string;
@@ -146,7 +147,9 @@ export async function createTask(task: TaskCreate): Promise<Task> {
     });
     if (!response.ok) throw new Error("Görev oluşturulamadı.");
     taskCache = {}; // Invalidate
-    return response.json();
+    const created = await response.json();
+    syncLocalTaskFolderQuietly(created); // kurulu masaüstü: klasör bilgisayarda açılır
+    return created;
 }
 
 export async function updateTask(id: string, update: Partial<TaskCreate & { steps: TaskStep[], rapor_durumu: string, shared_with: string[] }>): Promise<Task> {
@@ -159,7 +162,10 @@ export async function updateTask(id: string, update: Partial<TaskCreate & { step
         });
         if (!response.ok) throw new Error("Görev güncellenemedi.");
         taskCache = {}; // Invalidate
-        return response.json();
+        const updated = await response.json();
+        // Kurulu masaüstü: kod/ad/tür/tarih değiştiyse (sunucunun ürettiği kalıcı rapor kodu dahil) yerel klasörü taşı
+        syncLocalTaskFolderQuietly(updated);
+        return updated;
     } catch (error) {
         // Check if it's a network error
         if (!navigator.onLine || error instanceof Error && (error.message.includes("Failed to fetch") || error.message.includes("timeout"))) {

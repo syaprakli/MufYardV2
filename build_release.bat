@@ -23,6 +23,8 @@ echo [2/4] Guncer backend kodu derleniyor (PyInstaller)...
     --paths "%~dp0backend" ^
     "%~dp0backend\run_backend.py" || goto :fail
 echo [2/4] Backend exe guncellendi.
+REM Paketlenecek yerel dosya servisinde gizli anahtar / .env olmamali
+"%PYTHON_EXE%" "%~dp0scripts\check_release_secrets.py" "%~dp0backend\dist\mufyard-backend" || goto :fail
 
 REM --- [3/4] Frontend build ---
 echo [3/4] Frontend derleniyor...
@@ -34,6 +36,8 @@ REM --- [4/4] Windows installer ---
 echo [4/4] Windows installer (NSIS) uretiliyor...
 echo       NOT: Kod imzalama sertifikasi gerekmiyor, installer imzasiz olacak.
 call npx electron-builder --win nsis --config.win.forceCodeSigning=false || goto :fail
+REM Uretilen kurulum paketinde gizli anahtar / .env olmamali
+"%PYTHON_EXE%" "%~dp0scripts\check_release_secrets.py" "%~dp0frontend\release\win-unpacked\resources" || goto :fail
 
 echo.
 echo ===================================================

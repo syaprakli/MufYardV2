@@ -34,4 +34,11 @@ const PUBLIC_BACKEND_URL = API_URL_OVERRIDE || (
 export const BASE_URL = PUBLIC_BACKEND_URL;
 export const API_URL = `${PUBLIC_BACKEND_URL}/api`;
 export const LOCAL_API_URL = `${LOCAL_URL}/api`;
+
+// Kurulu masaüstü uygulaması (sayfa file:// adresinden yüklenir). Geliştirme modu (localhost:5173) ve web hariç.
+export const IS_PACKAGED_DESKTOP = IS_ELECTRON && typeof window !== 'undefined' && window.location.protocol === 'file:';
+// Dosya işlemleri (Raporlar / Diğer İşlem ve Belgeler, Word üretimi): kurulu masaüstünde bilgisayardaki
+// yerel dosya servisine, diğer durumlarda API_URL'e gider. Ortak veriler her zaman API_URL'den gelir.
+// Plan: docs/PLAN-yerel-dosya-modu.md
+export const FILES_API_URL = IS_PACKAGED_DESKTOP ? LOCAL_API_URL : API_URL;
 export const WS_URL = PUBLIC_BACKEND_URL.replace("https", "wss").replace("http", "ws");

@@ -33,7 +33,7 @@ import { fetchFileTree, uploadFile, createFolder, deleteItem, openFolder, openFi
 import { aiSearch } from "../lib/api/ai";
 import { cn } from "../lib/utils";
 import { isElectron } from "../lib/firebase";
-import { API_URL } from "../lib/config";
+import { FILES_API_URL } from "../lib/config";
 import { useAuth } from "../lib/hooks/useAuth";
 import { fetchAllProfiles, type Profile } from "../lib/api/profiles";
 import { sendDirectMessage } from "../lib/api/collaboration";
@@ -594,7 +594,7 @@ const calculateYollukValues = () => {
     });
 
     // Masaüstünde yerel dosyalara (Belgelerim/MufYARD), Web'de Bulut'a (Railway) odaklan
-    const CURRENT_API_URL = API_URL;
+    const CURRENT_API_URL = FILES_API_URL;
     const BACKEND_BASE_URL = CURRENT_API_URL.replace(/\/api\/?$/, "");
 
     const resolveFileUrl = (url?: string) => {

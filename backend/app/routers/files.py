@@ -1,4 +1,5 @@
 import os
+import json
 import re
 import uuid
 import shutil
@@ -660,6 +661,90 @@ async def open_task_folder(
     except Exception as e:
         _FILES_LOGGER.error(f"OPEN TASK FOLDER ERROR: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Görev klasörü açılırken bir hata oluştu.")
+
+
+_LOCAL_TASK_FOLDERS_FILE = os.path.join(DATA_DIR, "local_task_folders.json")
+
+
+def _load_local_task_folders() -> dict:
+    try:
+        with open(_LOCAL_TASK_FOLDERS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (FileNotFoundError, ValueError):
+        return {}
+
+
+def _save_local_task_folders(data: dict) -> None:
+    import tempfile
+    fd, tmp = tempfile.mkstemp(prefix=".local_task_folders.", suffix=".tmp", dir=DATA_DIR)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, _LOCAL_TASK_FOLDERS_FILE)
+
+
+def _sync_local_task_folder(task_id: str, metadata: "TaskFolderMetadata", uid: str) -> dict:
+    """Görev klasörünü bilgisayarda oluşturur; görevin kodu/adı/türü/tarihi değiştiyse eski klasörü yeni adına taşır.
+
+    Görev kimliği -> klasör yolu eşlemesi DATA_DIR/local_task_folders.json'da tutulur; böylece değişiklik
+    nereden gelirse gelsin (düzenleme, sunucunun ürettiği kalıcı rapor kodu) yerel klasör izlenir.
+    """
+    year = FolderManager.extract_year(metadata.baslama_tarihi)
+    audit_type = metadata.rapor_turu or "Diger"
+    audit_code = metadata.rapor_kodu or "Kodsuz"
+    audit_title = metadata.rapor_adi or "Basliksiz"
+    new_rel = FolderManager.get_audit_relative_path(year, audit_type, audit_code, audit_title)
+    new_abs = FolderManager.get_audit_path(year, audit_type, audit_code, audit_title)
+
+    mapping = _load_local_task_folders()
+    old_rel = mapping.get(task_id)
+    renamed = False
+    if old_rel and old_rel != new_rel:
+        old_abs = os.path.join(BASE_REPORTS_DIR, *old_rel.split("/"))
+        base = os.path.realpath(BASE_REPORTS_DIR)
+        inside = os.path.commonpath([base, os.path.realpath(old_abs)]) == base
+        if inside and os.path.isdir(old_abs) and not os.path.exists(new_abs):
+            os.makedirs(os.path.dirname(new_abs), exist_ok=True)
+            os.replace(old_abs, new_abs)
+            renamed = True
+
+            def _move(perms: dict) -> dict:
+                moved = {}
+                for key, meta in perms.items():
+                    if key == old_rel:
+                        moved[new_rel] = meta
+                    elif key.startswith(old_rel + "/"):
+                        moved[new_rel + key[len(old_rel):]] = meta
+                    else:
+                        moved[key] = meta
+                return moved
+
+            FolderManager.update_permissions(_move)
+
+    FolderManager.ensure_audit_folders(year, audit_type, audit_code, audit_title)
+    FolderManager.set_permission(new_rel, uid, [uid], {"read": [uid], "write": [uid], "delete": [uid]})
+    if mapping.get(task_id) != new_rel:
+        mapping[task_id] = new_rel
+        _save_local_task_folders(mapping)
+    return {"status": "success", "path": new_abs, "rel_path": f"Raporlar/{new_rel}", "renamed": renamed}
+
+
+@router.post("/sync-task-folder/{task_id}")
+async def sync_task_folder(
+    task_id: str,
+    metadata: TaskFolderMetadata,
+    current_user: dict = Depends(get_current_user)
+):
+    """Yalnızca yerel dosya modu: görev klasörünü bilgisayarda oluşturur / yeniden adlandırır."""
+    if not LOCAL_FILES_MODE:
+        raise HTTPException(status_code=404, detail="Bu işlem yalnızca masaüstü uygulamasında kullanılabilir.")
+    if not (metadata.rapor_adi or metadata.rapor_kodu):
+        raise HTTPException(status_code=400, detail="Görev bilgisi eksik.")
+    try:
+        return await asyncio.to_thread(_sync_local_task_folder, task_id, metadata, current_user["uid"])
+    except Exception as e:
+        _FILES_LOGGER.error(f"SYNC TASK FOLDER ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Görev klasörü hazırlanamadı.")
 
 
 @router.post("/create-task-folder/{task_id}")

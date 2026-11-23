@@ -1,6 +1,6 @@
 # PLAN — Masaüstünde Yerel Dosyalar ("Yerel Dosya Modu")
 
-> Durum: **taslak, onay bekliyor** · 23.11.2026
+> Durum: **1–4 tamamlandı, 5–6 bekliyor** · 23.11.2026
 > Kullanıcı kararı: *"Eski düzende bilgisayarda dursun, istenirse sunucuya gitsin."*
 
 ## 1. Sorun
@@ -48,14 +48,19 @@ Mevzuat dosya uç noktaları (open-folder, open-file-location, sync-folder, uplo
 
 ## 4. Aşamalar
 
-| # | İş | Not |
+| # | İş | Durum |
 |---|---|---|
-| 1 | Backend "yerel dosya modu": `MUFYARD_LOCAL_FILES=1` ile Firebase yönetici anahtarı olmadan açılır, yalnızca dosya uç noktaları etkin, token doğrulama proje kimliğiyle | Testlerle |
-| 2 | Görev klasörü uç noktaları görev bilgisini istekten alır (Firestore okumaz) | Testlerle |
-| 3 | Arayüz: iki adres — veri → Railway, dosya → yerel servis (Electron) / Railway (web). Görev oluşturma/yeniden adlandırmadan sonra yerel klasör oluşturma çağrısı | Geliştirme modunda denenir |
-| 4 | Kurulum paketi: yerel servis tekrar pakete girer, **anahtar ve .env olmadan**; paket içeriği CI'da kontrol edilir (anahtar varsa derleme düşer) | |
-| 5 | "Sunucuya gönder": Dosyalar ekranında seçili dosya/klasörü Railway'e yükleme | Kullanıcıyla tasarlanacak |
-| 6 | Yeni kurulum dosyası + kullanıcı testi | Kullanıcı |
+| 1 | Backend "yerel dosya modu" (`MUFYARD_LOCAL_FILES=1`): yönetici anahtarı okunmaz, token Google'ın açık sertifikalarıyla doğrulanır, yalnızca `/api/files` açık, X-User-Id arka kapısı kapalı | ✅ testli + gerçek çalıştırma |
+| 2 | Görev klasörü: yerel `sync-task-folder` (oluştur / kod-ad değişince taşı; görev→klasör eşlemesi `local_task_folders.json`). **Güvenlik:** sunucuda istemcinin gönderdiği görev bilgisine artık güvenilmiyor (başkasının klasörüne sahip olunabiliyordu) | ✅ testli |
+| 3 | Arayüz: `FILES_API_URL` (kurulu masaüstü → 127.0.0.1:8000, diğerleri → API_URL); görev oluştur/güncelle sonrası yerel klasör eşitleme; "Klasörü Aç" yolu yerel servisten; Dosyalar önizleme adresleri; `files.ts` bozuk Türkçe metinler düzeltildi | ✅ |
+| 4 | Paket: `main.cjs` kurulu uygulamada yerel servisi anahtarsız başlatır (eski anahtarlı servis port 8000'de ise kapatılır); `extraResources` backend'i `.env`/kimlik dosyası filtresiyle ekler; `build_release.bat` iki noktada `scripts/check_release_secrets.py` ile denetler | ✅ |
+| 5 | "Sunucuya gönder": Dosyalar ekranında seçili dosya/klasörü Railway'e yükleme (paylaşım) | ⬜ kullanıcıyla tasarlanacak |
+| 6 | Yeni kurulum dosyası + kullanıcı testi | ⬜ |
+
+Notlar:
+- Denetim fotoğrafları, Kamusal Alan, tesisler, harita yüklemeleri bilerek **sunucuda** kalır (ortak veri, web'de de görünür).
+- Mevzuat kütüphanesi sunucuda kalır (ortak).
+- Dosya paylaşımı (`share-to-user`) yerel dosyalar için 5. aşamaya kadar çalışmaz.
 
 ## 5. Riskler / açık sorular
 

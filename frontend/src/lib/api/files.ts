@@ -1,8 +1,8 @@
-import { API_URL, IS_ELECTRON } from "../config";
+import { API_URL, IS_ELECTRON, IS_PACKAGED_DESKTOP, FILES_API_URL } from "../config";
 import { fetchWithTimeout, getAuthHeaders } from "./utils";
 
-// Masaüstündeysen yerel backend'i (Belgelerim/MufYARD), Web'deysen Railway'i kullan
-const CURRENT_FILES_API = API_URL;
+// Kurulu masaüstünde yerel dosya servisi (Belgeler/MufYARD), web ve geliştirme modunda API_URL
+const CURRENT_FILES_API = FILES_API_URL;
 
 function buildSafeLocalTaskFolderRelPath(metadata?: any): string {
     const clean = (v: unknown, fallback: string) => {
@@ -106,11 +106,11 @@ export const deleteItem = async (id: string, scope?: string): Promise<any> => {
 
 export const openFolder = async (id: string, scope?: string): Promise<any> => {
     if (IS_ELECTRON && typeof window !== "undefined" && (window as any).electronAPI?.openFolder) {
-        const prefix = scope === "other" ? "Di?er ??lem ve Belgeler" : "Raporlar";
+        const prefix = scope === "other" ? "Diğer İşlem ve Belgeler" : "Raporlar";
         const cleanId = id ? id.replace(/^[/\\]+/, "") : "";
         const relPath = cleanId ? `${prefix}/${cleanId}` : prefix;
         const res = await (window as any).electronAPI.openFolder(relPath);
-        if (!res?.ok) throw new Error(res?.error || "Klas?r a??lamad?");
+        if (!res?.ok) throw new Error(res?.error || "Klasör açılamadı");
         return { status: "success", path: res.path };
     }
     const safeId = id.split('/').map(part => encodeURIComponent(part)).join('/');
@@ -122,17 +122,17 @@ export const openFolder = async (id: string, scope?: string): Promise<any> => {
         headers
     });
 
-    if (!response.ok) throw new Error("Klas?r a??lamad?");
+    if (!response.ok) throw new Error("Klasör açılamadı");
     return response.json();
 };
 
 export const openFile = async (id: string, scope?: string): Promise<any> => {
     if (IS_ELECTRON && typeof window !== "undefined" && (window as any).electronAPI?.showItemInFolder) {
-        const prefix = scope === "other" ? "Di?er ??lem ve Belgeler" : "Raporlar";
+        const prefix = scope === "other" ? "Diğer İşlem ve Belgeler" : "Raporlar";
         const cleanId = id ? id.replace(/^[/\\]+/, "") : "";
         const relPath = cleanId ? `${prefix}/${cleanId}` : prefix;
         const res = await (window as any).electronAPI.showItemInFolder(relPath);
-        if (!res?.ok) throw new Error(res?.error || "Dosya a??lamad?");
+        if (!res?.ok) throw new Error(res?.error || "Dosya açılamadı");
         return { status: "success", path: res.path };
     }
     const safeId = id.split('/').map(part => encodeURIComponent(part)).join('/');
@@ -144,15 +144,57 @@ export const openFile = async (id: string, scope?: string): Promise<any> => {
         headers
     });
 
-    if (!response.ok) throw new Error("Dosya a??lamad?");
+    if (!response.ok) throw new Error("Dosya açılamadı");
     return response.json();
 };
 
+
+export interface TaskFolderInfo {
+    rapor_turu?: string;
+    rapor_kodu?: string;
+    rapor_adi?: string;
+    baslama_tarihi?: string;
+}
+
+/**
+ * Kurulu masaüstü: görev klasörünü bilgisayarda (Belgeler/MufYARD/Raporlar) oluşturur; görevin kodu, adı,
+ * türü veya tarihi değiştiyse eski klasörü yeni adına taşır. Yol yerel servis tarafından hesaplanır.
+ */
+export const syncLocalTaskFolder = async (taskId: string, info: TaskFolderInfo): Promise<{ rel_path: string; path: string; renamed: boolean }> => {
+    const headers = await getAuthHeaders({ "Content-Type": "application/json" });
+    const response = await fetchWithTimeout(`${FILES_API_URL}/files/sync-task-folder/${encodeURIComponent(taskId)}`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+            rapor_turu: info.rapor_turu,
+            rapor_kodu: info.rapor_kodu,
+            rapor_adi: info.rapor_adi,
+            baslama_tarihi: info.baslama_tarihi
+        })
+    });
+    if (!response.ok) throw new Error("Görev klasörü hazırlanamadı");
+    return response.json();
+};
+
+/** Görev oluşturma/güncelleme sonrası: yalnızca kurulu masaüstünde, hatayı kullanıcıya yansıtmadan eşitler. */
+export const syncLocalTaskFolderQuietly = (task: any): void => {
+    if (!IS_PACKAGED_DESKTOP || !task?.id) return;
+    if (!task.rapor_adi && !task.rapor_kodu) return;
+    syncLocalTaskFolder(task.id, task).catch(err => console.warn("Yerel görev klasörü eşitlenemedi:", err));
+};
+
 export const openTaskFolder = async (taskId: string, metadata?: any): Promise<any> => {
+    if (IS_PACKAGED_DESKTOP && (window as any).electronAPI?.openFolder && metadata) {
+        // Yolu yerel servis hesaplar (klasör yoksa oluşturur, adı değiştiyse taşır)
+        const { rel_path } = await syncLocalTaskFolder(taskId, metadata);
+        const res = await (window as any).electronAPI.openFolder(rel_path);
+        if (!res?.ok) throw new Error(res?.error || "Görev klasörü açılamadı");
+        return { status: "success", path: res.path };
+    }
     if (IS_ELECTRON && typeof window !== "undefined" && (window as any).electronAPI?.openFolder) {
         const relPath = buildSafeLocalTaskFolderRelPath(metadata);
         const res = await (window as any).electronAPI.openFolder(relPath);
-        if (!res?.ok) throw new Error(res?.error || "G?rev klas?r? a??lamad?");
+        if (!res?.ok) throw new Error(res?.error || "Görev klasörü açılamadı");
         return { status: "success", path: res.path };
     }
     const headers = await getAuthHeaders({ "Content-Type": "application/json" });
@@ -162,11 +204,14 @@ export const openTaskFolder = async (taskId: string, metadata?: any): Promise<an
         body: metadata ? JSON.stringify(metadata) : undefined
     });
 
-    if (!response.ok) throw new Error("G?rev klas?r? a??lamad?");
+    if (!response.ok) throw new Error("Görev klasörü açılamadı");
     return response.json();
 };
 
 export const createTaskFolder = async (taskId: string, metadata?: any): Promise<any> => {
+    if (IS_PACKAGED_DESKTOP && metadata) {
+        return syncLocalTaskFolder(taskId, metadata);
+    }
     const headers = await getAuthHeaders({ "Content-Type": "application/json" });
     const response = await fetchWithTimeout(`${API_URL}/files/create-task-folder/${taskId}`, {
         method: "POST",
@@ -174,7 +219,7 @@ export const createTaskFolder = async (taskId: string, metadata?: any): Promise<
         body: metadata ? JSON.stringify(metadata) : undefined
     });
 
-    if (!response.ok) throw new Error("G?rev klas?r? olu?turulamad?");
+    if (!response.ok) throw new Error("Görev klasörü oluşturulamadı");
     return response.json();
 };
 
