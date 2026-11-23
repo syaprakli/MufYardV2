@@ -1,14 +1,14 @@
 import { API_URL as API_BASE_URL } from "../config";
-import { fetchWithTimeout, getAuthHeaders } from "./utils";
+import { fetchWithTimeout, getAuthHeaders, isNetworkError } from "./utils";
 import { addToQueue } from "./syncQueue";
 
 export type ReminderType = 'zamanasimi' | 'genel';
 
-export type ReminderCategory = 
-    | 'disiplin_657' 
-    | 'ceza_tck' 
-    | 'mali_denetim' 
-    | 'genel_gorev' 
+export type ReminderCategory =
+    | 'disiplin_657'
+    | 'ceza_tck'
+    | 'mali_denetim'
+    | 'genel_gorev'
     | 'ozel'
     | 'toplanti'
     | 'evrak_yazi'
@@ -134,7 +134,7 @@ export function calculateExpirationDate(incidentDateStr: string, category: strin
 
     const expiration = new Date(incidentDate);
     expiration.setFullYear(expiration.getFullYear() + yearsToAdd);
-    
+
     return expiration.toISOString().split("T")[0];
 }
 
@@ -147,7 +147,7 @@ export function getDaysRemaining(expirationDateStr: string): number {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const exp = new Date(expirationDateStr);
     const expDay = new Date(exp.getFullYear(), exp.getMonth(), exp.getDate());
-    
+
     const diffMs = expDay.getTime() - today.getTime();
     return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 }
@@ -188,7 +188,7 @@ export async function createReminder(reminder: ReminderCreate): Promise<Reminder
         }
         return await response.json();
     } catch (error) {
-        if (!navigator.onLine || (error instanceof Error && (error.message.includes("Failed to fetch") || error.message.includes("timeout")))) {
+        if (isNetworkError(error)) {
             console.warn("Offline detected in createReminder, queueing action.");
             addToQueue('createReminder', [reminder]);
             return {

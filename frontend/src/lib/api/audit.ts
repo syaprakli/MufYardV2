@@ -1,5 +1,5 @@
 import { API_URL as API_BASE_URL } from "../config";
-import { fetchWithTimeout, getAuthHeaders } from "./utils";
+import { fetchWithTimeout, getAuthHeaders, isNetworkError } from "./utils";
 import { addToQueue } from "./syncQueue";
 
 export interface Audit {
@@ -61,7 +61,7 @@ export async function fetchAudits(userId?: string, userEmail?: string, forceRefr
     const key = `${userId || 'anon'}_${userEmail || 'anon'}`;
     const storageKey = `mufyard_audits_cache_${userId || 'guest'}`;
     const now = Date.now();
-    
+
     if (!forceRefresh && auditCache[key] && (now - auditCache[key].timestamp < CACHE_DURATION)) {
         return filterTestAudits(auditCache[key].data, userId, userEmail);
     }
@@ -69,25 +69,25 @@ export async function fetchAudits(userId?: string, userEmail?: string, forceRefr
     try {
         const url = `${API_BASE_URL}/audit/`;
         const headers = await getAuthHeaders();
-        
+
         const response = await fetchWithTimeout(url, { headers });
         if (!response.ok) {
             throw new Error("Denetimler yüklenemedi.");
         }
         const rawData = await response.json();
         const data = filterTestAudits(rawData, userId, userEmail);
-        
+
         // Update both memory and persistent cache
         auditCache[key] = { data, timestamp: now };
         localStorage.setItem(storageKey, JSON.stringify({
             data,
             timestamp: now
         }));
-        
+
         return data;
     } catch (error) {
         console.warn("Network error fetching audits, attempting local fallback:", error);
-        
+
         const localData = localStorage.getItem(storageKey);
         if (localData) {
             try {
@@ -98,7 +98,7 @@ export async function fetchAudits(userId?: string, userEmail?: string, forceRefr
                 console.error("Error parsing local audits cache:", e);
             }
         }
-        
+
         throw error;
     }
 }
@@ -109,7 +109,7 @@ export function invalidateAuditCache(): void {
 
 export async function fetchAuditById(id: string): Promise<Audit> {
     const storageKey = `mufyard_audit_detail_${id}`;
-    
+
     try {
         const headers = await getAuthHeaders();
         const response = await fetchWithTimeout(`${API_BASE_URL}/audit/${id}`, { headers });
@@ -117,17 +117,17 @@ export async function fetchAuditById(id: string): Promise<Audit> {
             throw new Error("Denetim bulunamadı.");
         }
         const data = await response.json();
-        
+
         // Cache the individual audit report
         localStorage.setItem(storageKey, JSON.stringify({
             data,
             timestamp: Date.now()
         }));
-        
+
         return data;
     } catch (error) {
         console.warn(`Network error fetching audit ${id}, attempting local fallback:`, error);
-        
+
         const localData = localStorage.getItem(storageKey);
         if (localData) {
             try {
@@ -138,7 +138,7 @@ export async function fetchAuditById(id: string): Promise<Audit> {
                 console.error("Error parsing local audit detail cache:", e);
             }
         }
-        
+
         throw error;
     }
 }
@@ -188,13 +188,8 @@ export async function updateAudit(
         return response.json();
     } catch (error) {
         // Sunucu hatası (fatura/kota, 500, 402, 503) veya bağlantı kesintisinde kuyruğa alıp koru
-        const isNetworkOrServerError = !navigator.onLine || 
-            (error instanceof Error && (
-                error.message.includes("Failed to fetch") || 
-                error.message.includes("timeout") ||
-                error.message.includes("başarısız") ||
-                error.message.includes("NetworkError")
-            ));
+        const isNetworkOrServerError = isNetworkError(error) ||
+            (error instanceof Error && error.message.includes("başarısız"));
 
         if (isNetworkOrServerError) {
             console.warn("Server/Network issue detected in updateAudit, queuing action for safe offline recovery:", error);

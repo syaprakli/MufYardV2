@@ -1,5 +1,5 @@
 import { API_URL as API_BASE_URL } from "../config";
-import { fetchWithTimeout, getAuthHeaders } from "./utils";
+import { fetchWithTimeout, getAuthHeaders, isNetworkError } from "./utils";
 import { addToQueue } from "./syncQueue";
 
 export interface Note {
@@ -52,7 +52,7 @@ export async function createNote(note: NoteCreate): Promise<Note> {
         }
         return response.json();
     } catch (error) {
-        if (!navigator.onLine || error instanceof Error && (error.message.includes("Failed to fetch") || error.message.includes("timeout"))) {
+        if (isNetworkError(error)) {
             console.warn("Offline detected in createNote, queueing action.");
             addToQueue('createNote', [note]);
             return { id: `temp_${Date.now()}`, ...note, created_at: new Date().toISOString() } as any;
@@ -104,7 +104,7 @@ export async function updateNote(id: string, update: Partial<NoteCreate>): Promi
 
         return response.json();
     } catch (error) {
-        if (!navigator.onLine || error instanceof Error && (error.message.includes("Failed to fetch") || error.message.includes("timeout"))) {
+        if (isNetworkError(error)) {
             console.warn("Offline detected in updateNote, queueing action.");
             addToQueue('updateNote', [id, update]);
             return { id, ...update } as any;

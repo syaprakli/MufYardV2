@@ -5,34 +5,48 @@ import { auth } from "../firebase";
  */
 export async function fetchWithTimeout(resource: RequestInfo | URL, options: RequestInit & { timeout?: number } = {}) {
     const { timeout = 15000 } = options; // Default 15s timeout
-    
+
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
-  
+
     try {
         const response = await fetch(resource, {
             ...options,
-            signal: controller.signal  
+            signal: controller.signal
         });
         clearTimeout(id);
         return response;
     } catch (error: any) {
         clearTimeout(id);
-        
+
         // Handle Timeout specially
         if (error.name === 'AbortError' || error.message?.includes('aborted')) {
             const err = new Error('İstek zaman aşımına uğradı. Sunucu çok meşgul olabilir veya bağlantınız yavaş.');
             err.name = 'TimeoutError';
             throw err;
         }
-        
+
         // General error handling (Network errors, etc.)
-        if (error.message === 'Failed to fetch') {
-            throw new Error('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin veya servislerin çalıştığından emin olun.');
+        if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+            const err = new Error('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin veya servislerin çalıştığından emin olun.');
+            err.name = 'NetworkError';
+            throw err;
         }
-        
+
         throw error;
     }
+}
+
+/**
+ * Bağlantı kaynaklı hata mı? (Cihaz çevrimdışı, sunucuya ulaşılamadı veya zaman aşımı.)
+ * Sahada sinyal zayıfken `navigator.onLine` true kalır; bu yüzden hata türüne de bakılır.
+ * fetchWithTimeout hataları Türkçe mesajla yeniden fırlattığı için mesaj metnine güvenilmez.
+ */
+export function isNetworkError(error: unknown): boolean {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+    if (!(error instanceof Error)) return false;
+    if (error.name === 'NetworkError' || error.name === 'TimeoutError' || error.name === 'AbortError') return true;
+    return /Failed to fetch|NetworkError|Load failed|timeout|zaman aşımı|Sunucuya bağlanılamadı/i.test(error.message);
 }
 
 /**

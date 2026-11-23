@@ -49,17 +49,34 @@ export const haritaAdresi = (m?: Partial<FotoMeta>) =>
         ? `https://www.openstreetmap.org/?mlat=${m.enlem}&mlon=${m.boylam}#map=18/${m.enlem}/${m.boylam}`
         : "";
 
+// EXIF okuyucu ayrı bir parça olarak yüklenir. Sayfa açılır açılmaz (internet varken) indirilir;
+// aksi halde sahada internet yokken ilk fotoğrafta indirilemez ve tarih/konum okunamaz.
+let exifrSozu: Promise<typeof import("exifr")> | null = null;
+const exifrYukle = () => {
+    if (!exifrSozu) {
+        exifrSozu = import("exifr");
+        exifrSozu.catch(() => { exifrSozu = null; }); // başarısızsa sonra yeniden denensin
+    }
+    return exifrSozu;
+};
+if (typeof window !== "undefined") void exifrYukle().catch(() => undefined);
+
 async function exifOku(file: Blob): Promise<{ tarih?: Date; enlem?: number; boylam?: number }> {
     try {
-        const { default: exifr } = await import("exifr");
-        const veri: any = await exifr.parse(file, { gps: true, pick: ["DateTimeOriginal", "CreateDate", "latitude", "longitude"] });
-        if (!veri) return {};
-        const tarih = veri.DateTimeOriginal instanceof Date ? veri.DateTimeOriginal : veri.CreateDate instanceof Date ? veri.CreateDate : undefined;
-        const gecerli = (n: unknown) => typeof n === "number" && Number.isFinite(n) && !(veri.latitude === 0 && veri.longitude === 0);
+        const { default: exifr } = await exifrYukle();
+        // Not: "latitude/longitude" hesaplanan alanlardır; `pick` ile istenemez, konum ayrıca exifr.gps ile okunur.
+        const [veri, gps]: any[] = await Promise.all([
+            exifr.parse(file, { pick: ["DateTimeOriginal", "CreateDate"] }).catch(() => null),
+            exifr.gps(file).catch(() => null),
+        ]);
+        const tarihHam = veri?.DateTimeOriginal instanceof Date ? veri.DateTimeOriginal : veri?.CreateDate instanceof Date ? veri.CreateDate : undefined;
+        const enlem = gps?.latitude, boylam = gps?.longitude;
+        const konumVar = typeof enlem === "number" && typeof boylam === "number" && Number.isFinite(enlem) && Number.isFinite(boylam)
+            && !(enlem === 0 && boylam === 0);
         return {
-            tarih: tarih && !Number.isNaN(tarih.getTime()) ? tarih : undefined,
-            enlem: gecerli(veri.latitude) ? veri.latitude : undefined,
-            boylam: gecerli(veri.longitude) ? veri.longitude : undefined,
+            tarih: tarihHam && !Number.isNaN(tarihHam.getTime()) ? tarihHam : undefined,
+            enlem: konumVar ? enlem : undefined,
+            boylam: konumVar ? boylam : undefined,
         };
     } catch {
         return {};

@@ -1,5 +1,5 @@
 import { API_URL as API_BASE_URL } from "../config";
-import { fetchWithTimeout, getAuthHeaders } from "./utils";
+import { fetchWithTimeout, getAuthHeaders, isNetworkError } from "./utils";
 import { addToQueue } from "./syncQueue";
 import { syncLocalTaskFolderQuietly } from "./files";
 
@@ -96,7 +96,7 @@ export function clearTaskCache() {
 export async function fetchTasks(userId?: string, userEmail?: string, forceRefresh: boolean = false): Promise<Task[]> {
     const cacheKey = `${userId || ""}|${userEmail || ""}`;
     const storageKey = `mufyard_tasks_cache_${userId || 'guest'}`;
-    
+
     // 1. Memory Cache Check
     const cached = taskCache[cacheKey];
     if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
@@ -107,21 +107,21 @@ export async function fetchTasks(userId?: string, userEmail?: string, forceRefre
         const headers = await getAuthHeaders();
         const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/`, { headers });
         if (!response.ok) throw new Error("Görevler yüklenemedi.");
-        
+
         const rawData = await response.json();
         const data = filterTestTasks(rawData, userId, userEmail);
-        
+
         // Update both memory and persistent cache
         taskCache[cacheKey] = { data, timestamp: Date.now() };
         localStorage.setItem(storageKey, JSON.stringify({
             data,
             timestamp: Date.now()
         }));
-        
+
         return data;
     } catch (error) {
         console.warn("Network error fetching tasks, attempting to load from local storage:", error);
-        
+
         // 2. Persistent Cache Fallback (Offline Mode)
         const localData = localStorage.getItem(storageKey);
         if (localData) {
@@ -133,7 +133,7 @@ export async function fetchTasks(userId?: string, userEmail?: string, forceRefre
                 console.error("Error parsing local tasks cache:", e);
             }
         }
-        
+
         throw error;
     }
 }
@@ -168,10 +168,10 @@ export async function updateTask(id: string, update: Partial<TaskCreate & { step
         return updated;
     } catch (error) {
         // Check if it's a network error
-        if (!navigator.onLine || error instanceof Error && (error.message.includes("Failed to fetch") || error.message.includes("timeout"))) {
+        if (isNetworkError(error)) {
             console.warn("Offline detected in updateTask, queueing action.");
             addToQueue('updateTask', [id, update]);
-            
+
             // Return a partial object so UI can update immediately (Optimistic UI)
             return { id, ...update } as any;
         }
@@ -215,19 +215,19 @@ export async function rejectTask(id: string, _userId: string, _userEmail?: strin
 export async function importTasksFromExcel(_userId: string, file: File): Promise<any> {
     const formData = new FormData();
     formData.append("file", file);
-    
+
     const headers = await getAuthHeaders();
     const response = await fetchWithTimeout(`${API_BASE_URL}/tasks/import`, {
         method: "POST",
         headers,
         body: formData
     });
-    
+
     if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || "İçe aktarma başarısız oldu.");
     }
-    
+
     taskCache = {}; // Invalidate
     return response.json();
 }

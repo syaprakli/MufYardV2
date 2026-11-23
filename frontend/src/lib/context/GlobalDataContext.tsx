@@ -5,12 +5,16 @@ import { fetchContacts } from '../api/contacts';
 import * as tasksApi from '../api/tasks';
 import * as auditsApi from '../api/audit';
 import * as notesApi from '../api/notes';
+import * as remindersApi from '../api/reminders';
 import { getQueue, processQueue } from '../api/syncQueue';
 
 const API_MAP = {
     'updateTask': tasksApi.updateTask,
     'updateAudit': auditsApi.updateAudit,
     'createNote': notesApi.createNote,
+    // Çevrimdışıyken kuyruğa alınan ama daha önce burada eksik olduğu için hiç gönderilmeyen işlemler
+    'updateNote': notesApi.updateNote,
+    'createReminder': remindersApi.createReminder,
     // Add more as needed
 };
 
@@ -58,14 +62,14 @@ function sanitizeForUser<T extends Record<string, any>>(list: T[], isTest: boole
     return list.filter(item => {
         const owner = (item.owner_id || "").toString().toLowerCase().trim();
         const itemEmail = (item.email || "").toString().toLowerCase().trim();
-        const assigned = Array.isArray(item.assigned_to) 
-            ? item.assigned_to.map((a: any) => String(a).toLowerCase().trim()) 
+        const assigned = Array.isArray(item.assigned_to)
+            ? item.assigned_to.map((a: any) => String(a).toLowerCase().trim())
             : [];
-        const shared = Array.isArray(item.shared_with) 
-            ? item.shared_with.map((s: any) => String(s).toLowerCase().trim()) 
+        const shared = Array.isArray(item.shared_with)
+            ? item.shared_with.map((s: any) => String(s).toLowerCase().trim())
             : [];
-        const accepted = Array.isArray(item.accepted_collaborators) 
-            ? item.accepted_collaborators.map((s: any) => String(s).toLowerCase().trim()) 
+        const accepted = Array.isArray(item.accepted_collaborators)
+            ? item.accepted_collaborators.map((s: any) => String(s).toLowerCase().trim())
             : [];
 
         const testIds = [TEST_UID.toLowerCase(), TEST_EMAIL];
@@ -155,10 +159,10 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 profile: persisted.profile || null,
             }));
         }
-        
-        if (!force && 
-            lastFetchedRef.current && 
-            (Date.now() - lastFetchedRef.current < CACHE_TIME) && 
+
+        if (!force &&
+            lastFetchedRef.current &&
+            (Date.now() - lastFetchedRef.current < CACHE_TIME) &&
             currentUidRef.current === uid
         ) {
             return;
@@ -178,7 +182,7 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             const now = Date.now();
             const profileData = profileRes.status === 'fulfilled' ? profileRes.value : null;
             const isTest = isTestAccount(uid, email || profileData?.email);
-            
+
             // Current user identity keys for filtering
             const myUid = uid;
             const myEmail = (email || profileData?.email || "").toLowerCase().trim();
@@ -193,7 +197,7 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                     return !itemKeys.some(k => myKeys.includes(k));
                 });
             };
-            
+
             // Trial akisi kapatildi: tum kullanicilar icin deneme kisitlari pasif.
             const daysLeft = 9999;
             const finalExpired = false;
@@ -202,7 +206,7 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             const rawAudits = auditsRes.status === 'fulfilled' ? auditsRes.value : [];
             const rawCorp = contactsCorpRes.status === 'fulfilled' ? contactsCorpRes.value : [];
             const rawPers = contactsPersRes.status === 'fulfilled' ? contactsPersRes.value : [];
-            
+
             if (profileData) {
                 setData({
                     stats: statsRes.status === 'fulfilled' ? statsRes.value : { stats: [], news: [], forum_posts: [] },
@@ -232,7 +236,7 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         } finally {
             setLoading(false);
         }
-    }, []); 
+    }, []);
 
     // Sync queue processing handled by triggerQueueSync listeners above
 
@@ -353,18 +357,18 @@ export const GlobalDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }, []);
 
     return (
-        <GlobalDataContext.Provider value={{ 
-            data, 
-            loading, 
-            isOffline, 
+        <GlobalDataContext.Provider value={{
+            data,
+            loading,
+            isOffline,
             trialDaysLeft: data.trialDaysLeft,
             isTrialExpired: data.isTrialExpired,
-            refreshAll, 
-            refreshProfile, 
-            refreshTasks, 
-            refreshAudits, 
-            refreshContactsCorporate, 
-            refreshContactsPersonal 
+            refreshAll,
+            refreshProfile,
+            refreshTasks,
+            refreshAudits,
+            refreshContactsCorporate,
+            refreshContactsPersonal
         }}>
             {children}
         </GlobalDataContext.Provider>

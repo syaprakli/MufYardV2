@@ -152,7 +152,7 @@ function TenkitKarti({ tenkit, photos, photoDescriptions, onChange, onDelete }: 
                     <div className="md:col-span-2 flex items-center justify-between gap-2 pt-1">
                         <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
                             <History size={12} />
-                            {(tenkit.gecmis || []).map(g => `${DURUM_ETIKETLERI[g.durum]} (${(g.tarih || "").slice(0, 10)})`).join(" → ") || "—"}
+                            {(tenkit.gecmis || []).map(g => `${DURUM_ETIKETLERI[g.durum]} (${g.tarih ? new Date(g.tarih).toLocaleDateString("tr-TR") : ""})`).join(" → ") || "—"}
                         </div>
                         <div className="flex items-center gap-2">
                             <Button size="sm" variant="ghost" className="h-8 text-rose-500 hover:text-rose-600" onClick={() => onDelete(tenkit.id)}>
