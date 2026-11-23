@@ -15,6 +15,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import get_settings, get_founder_emails, BASE_DIR, DATA_DIR
 from app.lib.rate_limiter import limiter
 from app.lib.body_limit import BodySizeLimitMiddleware
+from app.lib.log_redaction import install_log_redaction
+
+# Uvicorn bağlantı/erişim loglarındaki ?token= ve ?dl_token= değerlerini gizle.
+install_log_redaction()
 from app.lib.auth import get_current_user
 from typing import Any, Dict
 

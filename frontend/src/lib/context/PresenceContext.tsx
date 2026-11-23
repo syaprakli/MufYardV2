@@ -372,7 +372,8 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 
             user.getIdToken().then((token) => {
                 const wsUrl = `${baseWsUrl}/ws?token=${encodeURIComponent(token)}&name=${encodeURIComponent(activeName)}&room_id=global`;
-                console.log("Connecting to WS:", wsUrl);
+                // Token URL'de taşındığı için adres loglanmaz (konsol çıktısı paylaşılınca oturum sızardı).
+                console.log("Connecting to WS:", `${baseWsUrl}/ws (room=global)`);
 
                 const ws = new WebSocket(wsUrl);
                 wsRef.current = ws;
