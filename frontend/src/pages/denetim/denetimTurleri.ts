@@ -37,9 +37,11 @@ export interface DenetimTuruAyari {
     /** Spor / Federasyon: pano sekmesi ve evrak talep yazısı */
     pano: boolean;
     /** Bulguları rapora aktarırken kullanılan şablon */
-    raporSablonu: "liste" | "spor" | "federasyon";
+    raporSablonu: "liste" | "spor" | "federasyon" | "il";
+    /** Son seçilen görevi tarayıcıda hatırlama anahtarı (İl) */
+    sonGorevAnahtari: string | null;
     /** Rapor sekmesinde dinamik yapılandırıcı (ReportDynamicBuilder) */
-    raporOlusturucu: null | { varsayilanBaslik: string; templateId: string; kapakAnahtari: string; yapilandiriciEtiketi: string };
+    raporOlusturucu: null | { varsayilanBaslik: string; templateId: string; kapakAnahtari: string; yapilandiriciEtiketi: string; kapakId?: string };
 }
 
 export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
@@ -59,6 +61,7 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         pano: false,
         raporSablonu: "liste",
         raporOlusturucu: null,
+        sonGorevAnahtari: null,
     },
     kyk: {
         key: "kyk",
@@ -76,6 +79,7 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         pano: false,
         raporSablonu: "liste",
         raporOlusturucu: null,
+        sonGorevAnahtari: null,
     },
     il: {
         key: "il",
@@ -91,8 +95,9 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         ilAltGorevleri: false,
         ozetKartiTasarimi: false,
         pano: false,
-        raporSablonu: "liste",
-        raporOlusturucu: null,
+        raporSablonu: "il",
+        raporOlusturucu: { varsayilanBaslik: "İl Müdürlüğü Genel Teftiş Raporu", templateId: "2-_i̇l_müdürlüğü_genel_teftiş_raporu_taslağı_docx", kapakAnahtari: "", yapilandiriciEtiketi: "14 Başlık", kapakId: "1-_genel_teftiş_rapor_kapağı_taslağı_docx" },
+        sonGorevAnahtari: "mufyard_last_task_il",
     },
     spor: {
         key: "spor",
@@ -110,6 +115,7 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         pano: true,
         raporSablonu: "spor",
         raporOlusturucu: { varsayilanBaslik: "Spor Kulüpleri Genel Teftiş Raporu", templateId: "6-_spor_kulüpleri_genel_teftiş_raporu_taslağı_docx", kapakAnahtari: "kulüp", yapilandiriciEtiketi: "Kulüp Başlıkları" },
+        sonGorevAnahtari: null,
     },
     federasyon: {
         key: "federasyon",
@@ -127,5 +133,6 @@ export const DENETIM_TURLERI: Record<DenetimTuruKey, DenetimTuruAyari> = {
         pano: true,
         raporSablonu: "federasyon",
         raporOlusturucu: { varsayilanBaslik: "Federasyon Genel Teftiş Raporu", templateId: "4-_federasyonlar_genel_teftiş_raporu_taslağı_docx", kapakAnahtari: "federasyon", yapilandiriciEtiketi: "8 Başlık" },
+        sonGorevAnahtari: null,
     },
 };

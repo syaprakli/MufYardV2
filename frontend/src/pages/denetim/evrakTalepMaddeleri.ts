@@ -71,3 +71,24 @@ export const FEDERASYON_EVRAK_TALEP_MADDELERI: string[] = [
     "Denetim dönemi ({yillar}) itibariyle Muhasebe İzleme Merkezi ile yapılan yazışma dosyaları.",
     "Denetim dönemi ({yillar}) itibariyle düzenlenen antrenör ve hakem eğitim seminerleri (yeri, tarihi, katılımcı sayıları vs.) (tablo) (dijital ortamda)."
 ];
+
+export const IL_EVRAK_TALEP_MADDELERI: string[] = [
+    "{donem} tarihleri arasında klasör bazındaki işlem ve faaliyetlerin teftişe hazır halde bulundurulması.",
+    "Teşkilatımızın (İl Müdürlüğünün) mülkiyetinde bulunan yurt, spor tesisleri, arsalar ve diğer gayrimenkullerin listesi (Gerekli açıklama yapılan bu tesislerin adet, m2, mevki ve kapasitesi de belirtilmelidir).",
+    "Teşkilatımızca (İl Müdürlüğünce) intifa hakkı alınan ya da devredilen tesis ve arsaların ayrıntılı listesi (Gerekli açıklama yapılan bu tesislerin adet, m2, mevki ve kapasitesi de belirtilecek).",
+    "İl Müdürlüğünce {donem} tarihleri arasında kiraya verilen büfe, arsa, bina, lokal, otopark, vb. tesislerin listesi.",
+    "Kiraya verilen tesislere ait; kira, tahsis, reklam, ATM ve baz istasyonlarının dosyaları.",
+    "İl Müdürlüğünce {donem} tarihleri arasında kiralanan veya kirası halen ödenen yurt binalarının listesi.",
+    "İl Müdürlüğünce {donem} tarihleri arasında yapılan ihalelerin listelenmesi.",
+    "İl Müdürlüğünce {donem} tarihleri arasında yapılan doğrudan teminlerin listelenmesi.",
+    "{donem} tarihleri arasındaki; Mutemet makbuzları ve Mutemet Defteri, Avans Defteri, varsa bilet ve Bilet Defterinin hazır halde bulundurulması.",
+    "{donemMusabaka} tarihleri arasındaki müsabaka (Amatör futbol dahil) görev ücretleri evrakının ilgili klasörden çıkarılıp yıllık bazda sıralanarak hazır halde bulundurulması.",
+    "İl Müdürlüğü personelinin eş bilgisinin sistemden çekilerek, Sosyal Güvenlik İl Müdürlüğünden bir yazı ile çalışıp çalışmadıkları sorgusunun yapılması.",
+    "Sosyal Güvenlik İl Müdürlüğüne bir yazı yazılarak, il sicil sayılı dosyada işlem görmüş iş yerine ait {donem} tarihleri arasında tahakkuk edip ödenmeyen idari para cezası (İPC) borcunun bulunup bulunmadığı sorgusunun yapılması.",
+    "Belediye ve enerji dağıtımı yapan firmalara bir yazı yazılarak, {donem} tarihleri arasında tahakkuk edip ödenmeyen gecikme cezası/faizi borcunun bulunup bulunmadığı sorgusunun yapılması.",
+    "2016 yılından 2019 yılına kadar olan dönem için Esas Defter ve Emanet Fark; 2019 yılı ve sonrası için ise mizan, yevmiye ve yardımcı defterlerin dijital ortamdaki Excel dökümleri.",
+    "{yillar} yılları arasındaki aylık bazda hizmet binası, yurt binaları ve spor tesislerinin elektrik, su ve doğalgaz fatura dökümleri.",
+    "Özel barınma hizmeti veren yükseköğrenim yurtlarının denetimlerinin yapılıp yapılmadığı, yapıldıysa denetim formlarının/raporlarının ve dosyalarının hazır halde bulundurulması.",
+    "Denetim Dönemini kapsayan yıllara ({yillar}) ait ücret tahsis cetvellerinin hazır hale getirilmesi.",
+    "Spor Dalı Temsilcilerinin yönetmeliğe uygun atanıp atanmadığına dair onaylar ile yıllık faaliyet programlarının ilgili federasyonlarca tasdik edildiğine ilişkin belgelerin hazır edilmesi."
+];
