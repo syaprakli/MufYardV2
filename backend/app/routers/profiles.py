@@ -148,6 +148,8 @@ async def update_profile(
         logger.warning(f"PROFILE UPDATE FAILED: user_id={current_user.get('uid')}, target_uid={uid}")
         raise HTTPException(status_code=404, detail="Profil güncellenemedi.")
     if profile_update.role is not None:
+        from app.lib.auth import invalidate_user_cache
+        invalidate_user_cache(uid)  # yeni rol bir sonraki istekte geçerli olsun
         await _log_role_change_event(
             request,
             actor=current_user,
@@ -168,6 +170,8 @@ async def delete_profile(uid: str, current_user: Dict[str, Any] = Depends(get_cu
     success = await ProfileService.delete_profile(uid)
     if not success:
         raise HTTPException(status_code=404, detail="Profil bulunamadı.")
+    from app.lib.auth import invalidate_user_cache
+    invalidate_user_cache(uid)
     return {"status": "success"}
 
 @router.post("/{uid}/avatar")

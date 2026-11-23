@@ -259,7 +259,7 @@ from fastapi import WebSocket, WebSocketDisconnect, Query
 from app.routers.collaboration import chat_manager, CollaborationService, DirectMessageCreate, NotificationService, NotificationCreate
 from app.lib.firebase_admin import db
 from firebase_admin import auth as firebase_auth
-from app.lib.auth import is_email_verified
+from app.lib.auth import is_account_active, is_email_verified
 
 
 async def _authenticate_websocket_identity(websocket: WebSocket) -> tuple[str, str | None, str, bool]:
@@ -294,7 +294,7 @@ async def _authenticate_websocket_identity(websocket: WebSocket) -> tuple[str, s
         raise WebSocketDisconnect(code=1008)
 
     uid = decoded.get("uid")
-    if not uid or not is_email_verified(decoded):
+    if not uid or not is_email_verified(decoded) or not await is_account_active(decoded):
         await websocket.close(code=1008)
         raise WebSocketDisconnect(code=1008)
 

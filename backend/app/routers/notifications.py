@@ -47,7 +47,8 @@ async def _authenticate_notification_ws_identity(websocket: WebSocket, requested
                 raise WebSocketDisconnect(code=1008)
 
             uid = decoded.get("uid")
-            if not uid or uid != requested_user_id or not decoded.get("email_verified", False):
+            from app.lib.auth import is_account_active
+            if not uid or uid != requested_user_id or not decoded.get("email_verified", False)                     or not await is_account_active(decoded):
                 await websocket.close(code=1008)
                 raise WebSocketDisconnect(code=1008)
             return uid

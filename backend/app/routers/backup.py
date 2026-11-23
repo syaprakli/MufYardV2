@@ -99,6 +99,8 @@ async def import_data(file: UploadFile = File(...), current_user: Dict[str, Any]
                 await asyncio.to_thread(batch.commit)
             results[coll_name] = len(items)
             
+        from app.lib.auth import invalidate_user_cache
+        invalidate_user_cache()  # geri yüklenen profillerdeki roller hemen geçerli olsun
         return {"status": "success", "imported_counts": results}
         
     except Exception:

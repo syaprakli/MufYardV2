@@ -454,10 +454,10 @@ async def resolve_report_collab_access(token: Optional[str], audit_id: str) -> O
         return None
 
     uid = decoded.get("uid")
-    if not uid or not decoded.get("email_verified", False):
+    from app.lib.auth import _get_role_for_uid, is_account_active
+    if not uid or not decoded.get("email_verified", False) or not await is_account_active(decoded):
         return None
 
-    from app.lib.auth import _get_role_for_uid
     from app.routers.audit import _resolve_audit_role
     from app.services.audit_service import AuditService
 

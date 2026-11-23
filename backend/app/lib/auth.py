@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import time
 from typing import Any, Callable, Dict, Optional
 
 from fastapi import Depends, Header, HTTPException
@@ -7,7 +9,17 @@ from firebase_admin import auth as firebase_auth
 from app.lib.firebase_admin import db, is_mock
 
 
+_logger = logging.getLogger(__name__)
+
 _ROLE_CACHE: Dict[str, tuple[str, float]] = {} # uid -> (role, timestamp)
+# uid -> (disabled, tokens_valid_after_seconds, fetched_at)
+_STATUS_CACHE: Dict[str, tuple[bool, float, float]] = {}
+# Yetkisi alınan / devre dışı bırakılan kullanıcının erişimi en geç bu kadar saniye sürer
+# (rol değişikliğinde önbellek ayrıca anında temizlenir).
+_CACHE_TTL = 60
+_STATUS_CACHE_TTL = 60
+
+ACCOUNT_INACTIVE_DETAIL = "Oturumunuz sonlandırılmış veya hesabınız devre dışı bırakılmış. Lütfen tekrar giriş yapın."
 
 # İstemci bu metni tanıyıp kullanıcıyı doğrulama ekranına yönlendirir.
 EMAIL_NOT_VERIFIED_DETAIL = "E-posta adresiniz doğrulanmamış. Lütfen e-postanıza gönderilen doğrulama bağlantısına tıklayıp tekrar giriş yapın."
@@ -16,10 +28,58 @@ EMAIL_NOT_VERIFIED_DETAIL = "E-posta adresiniz doğrulanmamış. Lütfen e-posta
 def is_email_verified(decoded_token: Dict[str, Any]) -> bool:
     """Firebase ID token'ındaki email_verified bayrağı. Tüm kullanıcılar için zorunludur (alan adı istisnası yok)."""
     return bool((decoded_token or {}).get("email_verified", False))
-_CACHE_TTL = 300 # 5 dakika cache
+
+
+def invalidate_user_cache(uid: Optional[str] = None) -> None:
+    """Rol veya hesap durumu değiştiğinde çağrılır; uid verilmezse tüm önbellek temizlenir."""
+    if uid is None:
+        _ROLE_CACHE.clear()
+        _STATUS_CACHE.clear()
+    else:
+        _ROLE_CACHE.pop(uid, None)
+        _STATUS_CACHE.pop(uid, None)
+
+
+def _fetch_account_status(uid: str) -> tuple[bool, float]:
+    user = firebase_auth.get_user(uid)
+    valid_after_ms = getattr(user, "tokens_valid_after_timestamp", None) or 0
+    return bool(user.disabled), valid_after_ms / 1000.0
+
+
+async def is_account_active(decoded_token: Dict[str, Any]) -> bool:
+    """Hesap devre dışıysa veya token oturum iptalinden önce alınmışsa False.
+
+    verify_id_token(check_revoked=True) her istekte Firebase Auth'a gider; bunun yerine durum
+    uid başına 60 sn önbelleğe alınır. Auth servisine ulaşılamazsa erişim kesilmez (fail-open).
+    """
+    if is_mock:
+        return True
+    uid = (decoded_token or {}).get("uid")
+    if not uid:
+        return False
+    now = time.monotonic()
+    cached = _STATUS_CACHE.get(uid)
+    if cached and now - cached[2] < _STATUS_CACHE_TTL:
+        disabled, valid_after = cached[0], cached[1]
+    else:
+        try:
+            disabled, valid_after = await asyncio.to_thread(_fetch_account_status, uid)
+        except firebase_auth.UserNotFoundError:
+            return False
+        except Exception as e:
+            _logger.warning(f"Hesap durumu alınamadı (uid={uid}), erişime izin veriliyor: {e}")
+            return True
+        _STATUS_CACHE[uid] = (disabled, valid_after, now)
+    if disabled:
+        return False
+    issued_at = decoded_token.get("iat") or 0
+    if valid_after and issued_at < valid_after:
+        return False
+    return True
+
 
 async def _get_role_for_uid(uid: str) -> str:
-    now = asyncio.get_event_loop().time()
+    now = time.monotonic()
     if uid in _ROLE_CACHE:
         role, ts = _ROLE_CACHE[uid]
         if now - ts < _CACHE_TTL:
@@ -77,6 +137,8 @@ async def get_current_user(
             if not email_verified:
                 # Doğrulanmamış hesaplar (ör. başkasının e-postasıyla açılmış) hiçbir veriye erişemez.
                 raise HTTPException(status_code=403, detail=EMAIL_NOT_VERIFIED_DETAIL)
+            if not await is_account_active(decoded):
+                raise HTTPException(status_code=401, detail=ACCOUNT_INACTIVE_DETAIL)
             role = await _get_role_for_uid(uid)
             return {"uid": uid, "email": email, "email_verified": email_verified, "role": role}
         except HTTPException:
