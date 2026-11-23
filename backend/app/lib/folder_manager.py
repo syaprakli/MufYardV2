@@ -1,6 +1,10 @@
 import os
 import json
-from typing import Optional
+import logging
+import shutil
+import tempfile
+import threading
+from typing import Callable, Optional
 from datetime import datetime
 from app.config import get_settings
 settings = get_settings()
@@ -11,6 +15,28 @@ BASE_OTHER_DIR = settings.OTHER_DIR
 
 # Dosya izinleri metadata dosyasının yolu
 PERMISSIONS_FILE = settings.PERMISSIONS_FILE
+
+_logger = logging.getLogger(__name__)
+# Okuma-değiştir-yaz işlemleri thread'ler ve event loop arasında seri hâle getirilir.
+_perm_lock = threading.RLock()
+# (mtime_ns, size) -> parse edilmiş içerik; her izin kontrolünde JSON yeniden okunmaz.
+_perm_cache: dict = {"key": None, "data": None, "corrupt": False}
+
+
+class PermissionsCorruptError(RuntimeError):
+    """İzin dosyası ve yedeği okunamıyor; boş içerikle üzerine yazmak tüm izinleri silerdi."""
+
+
+def _permissions_backup_path() -> str:
+    return PERMISSIONS_FILE + ".bak"
+
+
+def _read_permissions_file(path: str) -> dict:
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        raise ValueError("izin dosyası bir JSON nesnesi değil")
+    return data
 
 # Standard subfolders
 STANDARD_SUBFOLDERS = [
@@ -104,20 +130,80 @@ class FolderManager:
 
     @staticmethod
     def load_permissions() -> dict:
-        """file_permissions.json dosyasını yükler."""
-        if not os.path.exists(PERMISSIONS_FILE):
-            return {}
-        with open(PERMISSIONS_FILE, "r", encoding="utf-8") as f:
-            try:
-                return json.load(f)
-            except Exception:
+        """file_permissions.json dosyasını yükler (önbellekli).
+
+        Dosya bozuksa yedekten okunur; ikisi de okunamazsa {} döner (erişim reddedilir) ve
+        bozuk durum işaretlenir, böylece save_permissions boş içerikle üzerine yazmaz.
+        Dönen sözlük üst seviyede kopyadır; çağıran değiştirebilir.
+        """
+        with _perm_lock:
+            if not os.path.exists(PERMISSIONS_FILE):
+                if os.path.exists(_permissions_backup_path()):
+                    try:
+                        data = _read_permissions_file(_permissions_backup_path())
+                        _logger.error("İzin dosyası yok, yedekten okundu: %s", _permissions_backup_path())
+                        return dict(data)
+                    except Exception:
+                        pass
+                _perm_cache.update(key=None, data=None, corrupt=False)
                 return {}
+            st = os.stat(PERMISSIONS_FILE)
+            key = (st.st_mtime_ns, st.st_size)
+            if _perm_cache["key"] == key and _perm_cache["data"] is not None:
+                return dict(_perm_cache["data"])
+            try:
+                data = _read_permissions_file(PERMISSIONS_FILE)
+            except Exception as main_err:
+                try:
+                    data = _read_permissions_file(_permissions_backup_path())
+                    _logger.error("İzin dosyası bozuk (%s); yedekten okundu.", main_err)
+                except Exception:
+                    _logger.critical("İzin dosyası ve yedeği okunamıyor (%s). Erişimler reddedilecek.", main_err)
+                    _perm_cache.update(key=key, data={}, corrupt=True)
+                    return {}
+            _perm_cache.update(key=key, data=data, corrupt=False)
+            return dict(data)
 
     @staticmethod
     def save_permissions(permissions: dict):
-        """file_permissions.json dosyasını kaydeder."""
-        with open(PERMISSIONS_FILE, "w", encoding="utf-8") as f:
-            json.dump(permissions, f, ensure_ascii=False, indent=2)
+        """file_permissions.json dosyasını atomik kaydeder (geçici dosya + os.replace; önceki sürüm .bak)."""
+        if not isinstance(permissions, dict):
+            raise TypeError("permissions bir dict olmalı")
+        with _perm_lock:
+            FolderManager.load_permissions()  # bozukluk durumunu güncelle
+            if _perm_cache.get("corrupt"):
+                raise PermissionsCorruptError(
+                    "İzin dosyası ve yedeği okunamıyor; veri kaybını önlemek için kayıt yapılmadı."
+                )
+            target_dir = os.path.dirname(PERMISSIONS_FILE) or "."
+            os.makedirs(target_dir, exist_ok=True)
+            fd, tmp_path = tempfile.mkstemp(prefix=".file_permissions.", suffix=".tmp", dir=target_dir)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(permissions, f, ensure_ascii=False, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                if os.path.exists(PERMISSIONS_FILE):
+                    shutil.copy2(PERMISSIONS_FILE, _permissions_backup_path())
+                os.replace(tmp_path, PERMISSIONS_FILE)
+            except BaseException:
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+                raise
+            st = os.stat(PERMISSIONS_FILE)
+            _perm_cache.update(key=(st.st_mtime_ns, st.st_size), data=dict(permissions), corrupt=False)
+
+    @staticmethod
+    def update_permissions(mutator: Callable[[dict], Optional[dict]]) -> dict:
+        """Kilit altında oku-değiştir-yaz. mutator sözlüğü yerinde değiştirebilir veya yeni sözlük dönebilir."""
+        with _perm_lock:
+            perms = FolderManager.load_permissions()
+            result = mutator(perms)
+            new_perms = perms if result is None else result
+            FolderManager.save_permissions(new_perms)
+            return new_perms
 
     @staticmethod
     def check_permission(file_id: str, user_id: str, action: str) -> bool:
@@ -158,8 +244,7 @@ class FolderManager:
         """
         Dosya/klasör için izinleri ayarlar veya günceller.
         """
-        perms = FolderManager.load_permissions()
-        perms[file_id] = {
+        entry = {
             "owner_id": owner_id,
             "allowed_users": allowed_users or [owner_id],
             "permissions": permissions or {
@@ -168,7 +253,11 @@ class FolderManager:
                 "delete": [owner_id]
             }
         }
-        FolderManager.save_permissions(perms)
+
+        def _apply(perms: dict) -> None:
+            perms[file_id] = entry
+
+        FolderManager.update_permissions(_apply)
     @staticmethod
     def format_safe_name(name: str) -> str:
         """Removes illegal characters for folder names."""

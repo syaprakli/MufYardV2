@@ -13,6 +13,19 @@ _rapor_kodu_lock = asyncio.Lock()
 _recently_issued_codes: Dict[str, datetime] = {}
 _RECENT_CODE_TTL = timedelta(minutes=2)
 
+def _rename_permission_prefix(perms: Dict[str, Any], old_prefix: str, new_prefix: str) -> Dict[str, Any]:
+    """Klasör yeniden adlandırıldığında izin anahtarlarını yeni yola taşır."""
+    updated: Dict[str, Any] = {}
+    for file_id, meta in perms.items():
+        if file_id == old_prefix:
+            updated[new_prefix] = meta
+        elif file_id.startswith(old_prefix + "/"):
+            updated[new_prefix + file_id[len(old_prefix):]] = meta
+        else:
+            updated[file_id] = meta
+    return updated
+
+
 class TaskService:
     @staticmethod
     def _extract_rapor_seq(rapor_kodu: str, year: int, prefix: str = "S.Y.64") -> Optional[int]:
@@ -332,18 +345,9 @@ class TaskService:
                     old_rel_prefix = FolderManager.get_audit_relative_path(old_year, old_type, old_code, old_title)
                     new_rel_prefix = FolderManager.get_audit_relative_path(new_year, new_type, new_code, new_title)
 
-                    perms = FolderManager.load_permissions()
-                    updated_perms = {}
-                    for file_id, meta in perms.items():
-                        if file_id == old_rel_prefix:
-                            updated_perms[new_rel_prefix] = meta
-                        elif file_id.startswith(old_rel_prefix + "/"):
-                            new_file_id = new_rel_prefix + file_id[len(old_rel_prefix):]
-                            updated_perms[new_file_id] = meta
-                        else:
-                            updated_perms[file_id] = meta
-
-                    FolderManager.save_permissions(updated_perms)
+                    FolderManager.update_permissions(
+                        lambda perms: _rename_permission_prefix(perms, old_rel_prefix, new_rel_prefix)
+                    )
                 except Exception as fe:
                     print(f"Failed to rename folder: {fe}")
                     from fastapi import HTTPException
@@ -525,17 +529,9 @@ class TaskService:
                             child_old_rel = FolderManager.get_audit_relative_path(child_year, child_type, child_code, child_title)
                             child_new_rel = FolderManager.get_audit_relative_path(child_year, child_type, new_rapor_kodu, child_title)
 
-                            perms = FolderManager.load_permissions()
-                            updated_perms = {}
-                            for file_id, meta in perms.items():
-                                if file_id == child_old_rel:
-                                    updated_perms[child_new_rel] = meta
-                                elif file_id.startswith(child_old_rel + "/"):
-                                    new_file_id = child_new_rel + file_id[len(child_old_rel):]
-                                    updated_perms[new_file_id] = meta
-                                else:
-                                    updated_perms[file_id] = meta
-                            FolderManager.save_permissions(updated_perms)
+                            FolderManager.update_permissions(
+                                lambda perms: _rename_permission_prefix(perms, child_old_rel, child_new_rel)
+                            )
                         except Exception as cfe:
                             print(f"Failed to rename child folder: {cfe}")
 
