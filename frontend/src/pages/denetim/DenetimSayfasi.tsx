@@ -8,7 +8,7 @@ import {
     BookOpen, ClipboardCheck, Bot, Plus, Edit2, Trash2, Search,
     Tag, ChevronRight, X, Check, Loader2, Database, Sparkles, FileText,
     ArrowRight, Info, AlertCircle, Save, ExternalLink, Play, ArrowLeft,
-    Download, Building2, Printer, Copy, Camera, Table, MapPin, ChevronDown
+    Download, Building2, Printer, Copy, Camera, Table, MapPin, ChevronDown, Gavel
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { API_URL } from "../../lib/config";
@@ -40,6 +40,7 @@ import { generateEvrakTalebiDocx } from "../../lib/api/files";
 import ReportDynamicBuilder from "../../components/report/ReportDynamicBuilder";
 import { compileStructuredReportToHtml } from "../../lib/reportSectionManager";
 import { REPORT_TEMPLATES } from "../../lib/reportTemplates";
+import { TenkitTakibi } from "../../components/audit/TenkitTakibi";
 
 const PRESET_CATEGORIES = [
     "Yurt İşlemleri", "Spor Tesisi", "Federasyon", "Denetim Genel",
@@ -317,7 +318,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
     const [customItemText, setCustomItemText] = useState("");
     const [isTaskDropdownOpen, setIsTaskDropdownOpen] = useState(false);
     const [isSelectCityModalOpen, setIsSelectCityModalOpen] = useState(false);
-    const [activeDetailTab, setActiveDetailTab] = useState<"hub" | "info" | "notes" | "photos" | "tesisler" | "checklist" | "editor" | "dashboard" | "evrak_talebi" | "ozet_tablolar" | "ozel_beden_egitimi">("hub");
+    const [activeDetailTab, setActiveDetailTab] = useState<"hub" | "info" | "notes" | "photos" | "tesisler" | "checklist" | "editor" | "dashboard" | "evrak_talebi" | "ozet_tablolar" | "ozel_beden_egitimi" | "tenkit_takibi">("hub");
     const [localAuditData, setLocalAuditData] = useState<any>({
         info: {},
         generalNotes: "",
@@ -4850,6 +4851,15 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                                     badge: "Resmi Yazı",
                                                     badgeColor: "bg-purple-500/10 text-purple-600 border-purple-500/20",
                                                     highlight: false
+                                                },
+                                                {
+                                                    id: "tenkit_takibi",
+                                                    title: "Tenkit Takibi",
+                                                    subtitle: "Tenkitleri, birim cevaplarını ve önceki denetimlerde verilen tenkitlerin akıbetini izleyin",
+                                                    icon: Gavel,
+                                                    badge: "Takip",
+                                                    badgeColor: "bg-rose-500/10 text-rose-600 border-rose-500/20",
+                                                    highlight: false
                                                 }
                                             ];
 
@@ -4974,6 +4984,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                                         { id: "photos", label: "Fotoğraflar" },
                                                         { id: "tesisler", label: "Tesisler" },
                                                         { id: "checklist", label: "Kontrol Listesi" },
+                                                        { id: "tenkit_takibi", label: "Tenkitler" },
                                                         { id: "ozet_tablolar", label: "İstenecek Tablolar" },
                                                         { id: "editor", label: "Rapor" },
                                                         { id: "evrak_talebi", label: "Evrak Talebi" }
@@ -5022,6 +5033,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                                             {activeDetailTab === "checklist" && "Kontrol Listesi"}
                                                             {activeDetailTab === "editor" && "Rapor Editörü"}
                                                             {activeDetailTab === "evrak_talebi" && "Evrak Talebi"}
+                                                            {activeDetailTab === "tenkit_takibi" && "Tenkit Takibi"}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -5033,6 +5045,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                                         { id: "notes", label: "Notlar" },
                                                         { id: "photos", label: "Fotoğraflar" },
                                                         { id: "checklist", label: "Kontrol Listesi" },
+                                                        { id: "tenkit_takibi", label: "Tenkitler" },
                                                         { id: "editor", label: "Rapor" }
                                                     ].map(tab => (
                                                         <button
@@ -5060,6 +5073,9 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                             {activeDetailTab === "notes" && renderNotesTab()}
                                             {activeDetailTab === "photos" && renderPhotosTab()}
                                             {activeDetailTab === "checklist" && renderChecklistTab()}
+                                            {activeDetailTab === "tenkit_takibi" && (
+                                                <TenkitTakibi auditId={selectedReport?.id} questions={AUDIT_TEMPLATES[taskTabId] || []} form={localAuditData.form || {}} />
+                                            )}
                                             {panoEkleri && activeDetailTab === "dashboard" && panoEkleri.renderDashboardTab()}
                                             {panoEkleri && activeDetailTab === "evrak_talebi" && panoEkleri.renderEvrakTalebiTab()}
                                             {ilEk && activeDetailTab === "tesisler" && ilEk.renderTesislerTab()}

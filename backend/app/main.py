@@ -51,7 +51,7 @@ from app.routers import (
     dashboard, audit, tasks, contacts, 
     inspectors, profiles, legislation, 
     notes, ai_knowledge, backup, files,
-    calendar, notifications, ai, collaboration, feedback, online, settings as settings_router, licenses, search, audit_trail, reminders
+    calendar, notifications, ai, collaboration, feedback, online, settings as settings_router, licenses, search, audit_trail, reminders, tenkitler
 )
 
 from app.services.contact_service import ContactService
@@ -260,6 +260,7 @@ if not LOCAL_FILES_MODE:
     app.include_router(search.router, prefix="/api/search", tags=["Search"])
     app.include_router(audit_trail.router, prefix="/api/audit-trail", tags=["AuditTrail"])
     app.include_router(reminders.router, prefix="/api/reminders", tags=["Reminders"])
+    app.include_router(tenkitler.router, prefix="/api/tenkitler", tags=["Tenkitler"])
 
 # --- WEBSOCKET CHAT ENDPOINT ---
 # Moved here to avoid 404 issues with router prefixes in production
