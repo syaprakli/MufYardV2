@@ -1,6 +1,6 @@
 # PLAN — Masaüstünde Yerel Dosyalar ("Yerel Dosya Modu")
 
-> Durum: **1–4 tamamlandı, 5–6 bekliyor** · 23.11.2026
+> Durum: **1–5 tamamlandı, 6 (kurulum testi) bekliyor** · 23.11.2026
 > Kullanıcı kararı: *"Eski düzende bilgisayarda dursun, istenirse sunucuya gitsin."*
 
 ## 1. Sorun
@@ -54,17 +54,17 @@ Mevzuat dosya uç noktaları (open-folder, open-file-location, sync-folder, uplo
 | 2 | Görev klasörü: yerel `sync-task-folder` (oluştur / kod-ad değişince taşı; görev→klasör eşlemesi `local_task_folders.json`). **Güvenlik:** sunucuda istemcinin gönderdiği görev bilgisine artık güvenilmiyor (başkasının klasörüne sahip olunabiliyordu) | ✅ testli |
 | 3 | Arayüz: `FILES_API_URL` (kurulu masaüstü → 127.0.0.1:8000, diğerleri → API_URL); görev oluştur/güncelle sonrası yerel klasör eşitleme; "Klasörü Aç" yolu yerel servisten; Dosyalar önizleme adresleri; `files.ts` bozuk Türkçe metinler düzeltildi | ✅ |
 | 4 | Paket: `main.cjs` kurulu uygulamada yerel servisi anahtarsız başlatır (eski anahtarlı servis port 8000'de ise kapatılır); `extraResources` backend'i `.env`/kimlik dosyası filtresiyle ekler; `build_release.bat` iki noktada `scripts/check_release_secrets.py` ile denetler | ✅ |
-| 5 | "Sunucuya gönder": Dosyalar ekranında seçili dosya/klasörü Railway'e yükleme (paylaşım) | ⬜ kullanıcıyla tasarlanacak |
+| 5 | "Sunucuya Gönder" — **tek seferlik kopya** (kullanıcı kararı): Dosyalar ekranında dosyanın o anki hâli sunucuda aynı klasör yoluna yüklenir; yerel dosya paylaşılırken önce otomatik gönderilir, sonra paylaşılır | ✅ |
 | 6 | Yeni kurulum dosyası + kullanıcı testi | ⬜ |
 
 Notlar:
 - Denetim fotoğrafları, Kamusal Alan, tesisler, harita yüklemeleri bilerek **sunucuda** kalır (ortak veri, web'de de görünür).
 - Mevzuat kütüphanesi sunucuda kalır (ortak).
-- Dosya paylaşımı (`share-to-user`) yerel dosyalar için 5. aşamaya kadar çalışmaz.
+- Klasör olarak toplu gönderme yok (dosya dosya); gerekirse eklenir.
 
 ## 5. Riskler / açık sorular
 
 - Yerel servis yalnızca `127.0.0.1`'i dinlemeli; başka bilgisayarlardan erişilemez.
 - AI'ın dosya okuması (Raporlar) yerel dosyalarla nasıl çalışacak? (AI yeniden tasarımında ele alınacak)
-- "Sunucuya gönder" edilen dosyanın sonraki değişiklikleri: tek seferlik kopya mı, eşitleme mi? (Kullanıcı kararı; öneri: tek seferlik kopya, basit)
+- "Sunucuya Gönder": tek seferlik kopya seçildi; sonraki değişiklikler için yeniden gönderilir.
 - Bu plan tamamlanana kadar **yeni bir .exe kurulum dosyası çıkarılmamalı** (çıkarılırsa klasörler bilgisayarda oluşmaz).

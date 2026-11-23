@@ -29,11 +29,11 @@ const saveExcelWorkbook = async (wb: ExcelJS.Workbook, filename: string) => {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
 };
-import { fetchFileTree, uploadFile, createFolder, deleteItem, openFolder, openFile, shareFileToUser, generateKapakDocx, generateDiziDocx, generateDegerlendirmeDocx, type FileItem } from "../lib/api/files";
+import { fetchFileTree, uploadFile, createFolder, deleteItem, openFolder, openFile, shareFileToUser, generateKapakDocx, generateDiziDocx, generateDegerlendirmeDocx, type FileItem, sendFileToServer } from "../lib/api/files";
 import { aiSearch } from "../lib/api/ai";
 import { cn } from "../lib/utils";
 import { isElectron } from "../lib/firebase";
-import { FILES_API_URL } from "../lib/config";
+import { FILES_API_URL, IS_PACKAGED_DESKTOP } from "../lib/config";
 import { useAuth } from "../lib/hooks/useAuth";
 import { fetchAllProfiles, type Profile } from "../lib/api/profiles";
 import { sendDirectMessage } from "../lib/api/collaboration";
@@ -1082,6 +1082,16 @@ const calculateYollukValues = () => {
         document.body.removeChild(link);
     };
 
+    const handleSendToServer = async (item: FileItem) => {
+        const loadingToast = toast.loading(`${item.name} sunucuya gönderiliyor...`);
+        try {
+            const result = await sendFileToServer(item, scope === "other" ? "other" : undefined);
+            toast.success(`${result.name} sunucuya gönderildi (o anki kopyası). Sonraki değişiklikler için yeniden gönderin.`, { id: loadingToast, duration: 6000 });
+        } catch (error: any) {
+            toast.error(error?.message || "Dosya sunucuya gönderilemedi.", { id: loadingToast });
+        }
+    };
+
     const handleShareToInspector = async (recipient: Profile) => {
         if (!sharingFile || !user) return;
 
@@ -1096,8 +1106,11 @@ const calculateYollukValues = () => {
         try {
             const senderName = profile?.full_name || user.displayName || user.email?.split('@')[0] || "Müfettiş";
 
+            // Kurulu masaüstü: dosya bilgisayarda; önce o anki kopyası sunucuya gönderilir (tek seferlik kopya).
+            const shareScope = scope === "other" ? "other" : undefined;
+            const serverCopy = await sendFileToServer(sharingFile, shareScope);
             // Dosyanın alıcıya ait gerçek bir kopyasını backend üzerinde oluştur.
-            const sharedCopy = await shareFileToUser(sharingFile.id, recipient.uid);
+            const sharedCopy = await shareFileToUser(serverCopy.id, recipient.uid, shareScope);
 
             const success = await sendDirectMessage(
                 recipient.uid,
@@ -1105,7 +1118,7 @@ const calculateYollukValues = () => {
                 {
                     type: 'file',
                     name: sharedCopy?.name || sharingFile.name,
-                    url: sharedCopy?.url || sharingFile.url,
+                    url: sharedCopy?.url || serverCopy.url || sharingFile.url,
                     size: 0 // Size already formatted in name or can be parsed
                 },
                 user.uid,
@@ -8950,6 +8963,17 @@ const renderPratikModal = () => {
                                                 >
                                                     <Share2 size={14} />
                                                 </Button>
+                                                {IS_PACKAGED_DESKTOP && item.type !== "folder" && (
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        onClick={(e) => { e.stopPropagation(); handleSendToServer(item); }}
+                                                        className="h-8 w-8 rounded-xl text-slate-400 hover:text-blue-500 hidden sm:flex"
+                                                        title="Sunucuya Gönder (o anki kopyası; paylaşım ve yedek için)"
+                                                    >
+                                                        <Upload size={14} />
+                                                    </Button>
+                                                )}
                                                 <Button 
                                                     size="icon" 
                                                     variant="ghost" 

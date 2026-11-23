@@ -223,6 +223,43 @@ export const createTaskFolder = async (taskId: string, metadata?: any): Promise<
     return response.json();
 };
 
+/**
+ * "Sunucuya Gönder" (tek seferlik kopya): kurulu masaüstünde bilgisayardaki dosyanın o anki hâlini
+ * sunucuda aynı klasör yoluna yükler. Sonraki değişiklikler otomatik gitmez; gerekirse yeniden gönderilir.
+ * Web / geliştirme modunda dosya zaten sunucudadır; olduğu gibi döner.
+ */
+export const sendFileToServer = async (item: FileItem, scope?: string): Promise<{ id: string; url: string; name: string }> => {
+    if (!IS_PACKAGED_DESKTOP) return { id: item.id, url: item.url || "", name: item.name };
+    if (!item.url) throw new Error("Dosya bağlantısı bulunamadı");
+
+    const localBase = FILES_API_URL.replace(/\/api\/?$/, "");
+    const localUrl = /^https?:\/\//i.test(item.url)
+        ? item.url
+        : encodeURI(`${localBase}${item.url.startsWith("/") ? "" : "/"}${item.url}`);
+    const fileRes = await fetchWithTimeout(localUrl, { headers: await getAuthHeaders(), timeout: 60000 });
+    if (!fileRes.ok) throw new Error("Dosya bilgisayardan okunamadı");
+    const blob = await fileRes.blob();
+
+    const folder = item.id.includes("/") ? item.id.slice(0, item.id.lastIndexOf("/")) : "";
+    const formData = new FormData();
+    formData.append("file", new File([blob], item.name, { type: blob.type || "application/octet-stream" }));
+    const url = new URL(`${API_URL}/files/upload`);
+    if (folder) url.searchParams.append("path", folder);
+    if (scope) url.searchParams.append("scope", scope);
+    const response = await fetchWithTimeout(url.toString(), {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: formData,
+        timeout: 120000
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({ detail: "" }));
+        throw new Error(err.detail || "Dosya sunucuya gönderilemedi");
+    }
+    const data = await response.json();
+    return { id: data.path, url: data.url, name: data.name };
+};
+
 export const shareFileToUser = async (fileId: string, recipientId: string, scope?: string): Promise<any> => {
     const url = new URL(`${API_URL}/files/share-to-user`);
     if (scope) url.searchParams.append("scope", scope);
