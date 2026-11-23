@@ -97,3 +97,17 @@
 2. D6 — masaüstünde yerel dosyalar (`docs/PLAN-yerel-dosya-modu.md`)
 3. Q5 — `google.genai` geçişi (AI yeniden tasarımıyla birlikte)
 4. P6/Q4 — veri modeli (büyüme öncesi)
+
+## 8. Müfettiş özellikleri (23.11.2026'da sıraya alındı)
+
+Harcırah (e-Yolluk) ve süre uzatma (EBYS) kapsam dışı.
+
+| # | Özellik | Durum |
+|---|---|---|
+| F1 | Tenkit takibi: birim cevabı, durum geçmişi, kontrol listesinden aktarım, aynı birimin önceki denetim tenkitleri (`/api/tenkitler`, Firestore `tenkitler`) | ✅ Canlıda, kullanıcı testi bekleniyor |
+| F2 | Tespit → kanıt → tenkit zinciri | ⏳ Sırada |
+| F3 | Sahada internetsiz çalışma + fotoğraf tarih/konum damgası | ⏳ |
+| F4 | Rapor öncesi kalite kontrol + kişisel veri karartma | ⏳ |
+| F5 | İfade/tutanak modülü (ses → metin ile) | ⏳ |
+| F6 | Mali denetim yardımcıları (mizan → kırmızı bayrak, örneklem, 7405 borçlanma sınırı) | ⏳ |
+| F7 | Eski raporlarda arama (emsal) | ⏳ |
