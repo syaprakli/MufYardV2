@@ -7,6 +7,7 @@ import threading
 from typing import Callable, Optional
 from datetime import datetime
 from app.config import get_settings
+from app.lib.timeutil import utcnow
 settings = get_settings()
 
 # Root directory for reports
@@ -54,11 +55,11 @@ class FolderManager:
     def extract_year(date_str: Optional[str]) -> str:
         """Robustly extracts the 4-digit year from any date format string."""
         if not date_str:
-            return str(datetime.utcnow().year)
+            return str(utcnow().year)
         
         date_str = str(date_str).strip()
         if not date_str:
-            return str(datetime.utcnow().year)
+            return str(utcnow().year)
 
         # 1. Try dot notation (DD.MM.YYYY)
         if '.' in date_str:
@@ -105,7 +106,7 @@ class FolderManager:
         if matches:
             return matches[0]
 
-        return str(datetime.utcnow().year)
+        return str(utcnow().year)
 
     @staticmethod
     def detect_file_type(file_name: str) -> str:

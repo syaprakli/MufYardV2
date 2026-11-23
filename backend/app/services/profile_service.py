@@ -9,6 +9,7 @@ from fastapi import UploadFile, HTTPException
 import secrets
 import urllib.parse
 import os
+from app.lib.timeutil import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +205,7 @@ class ProfileService:
                 "institution": (base_profile.get('institution') or '').strip() or "Gençlik ve Spor Bakanlığı",
                 "birthday": base_profile.get('birthday'),  # Preserve saved birthday
                 "verified": True,
-                "updated_at": datetime.utcnow()
+                "updated_at": utcnow()
             }
 
             # Admin & Premium role enforcement (only when email is verified)
@@ -220,7 +221,7 @@ class ProfileService:
                     "ai_model": "Gemini 2.0 Flash",
                     "ai_temperature": 0.7,
                     "notifications_enabled": True,
-                    "created_at": datetime.utcnow(),
+                    "created_at": utcnow(),
                     "has_premium_ai": is_verified_founder,
                     "trial_started": is_verified_founder,
                     "role": "admin" if is_verified_founder else "user"
@@ -250,7 +251,7 @@ class ProfileService:
                         "message": "MufYard platformuna başarıyla kayıt oldunuz. Dijital denetim süreçlerinizi buradan yönetebilirsiniz.",
                         "type": "system",
                         "read": False,
-                        "created_at": datetime.utcnow()
+                        "created_at": utcnow()
                     })
             except: pass # Quota exceeded
                 
@@ -265,7 +266,7 @@ class ProfileService:
                     search_email,
                 )
                 if current_emails != profile_data.get('emails', []):
-                    await asyncio.to_thread(lambda: doc_ref.update({"emails": current_emails, "updated_at": datetime.utcnow()}))
+                    await asyncio.to_thread(lambda: doc_ref.update({"emails": current_emails, "updated_at": utcnow()}))
                     profile_data['emails'] = current_emails
 
                 # Admin & Premium enforcement for existing verified profiles
@@ -278,7 +279,7 @@ class ProfileService:
                             "role": "admin",
                             "has_premium_ai": True,
                             "premium_type": "Sınırsız",
-                            "updated_at": datetime.utcnow()
+                            "updated_at": utcnow()
                         }))
                         profile_data['role'] = 'admin'
                         profile_data['has_premium_ai'] = True
@@ -311,8 +312,8 @@ class ProfileService:
             "notifications_enabled": True,
             "role": _fallback_role,
             "verified": False,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": utcnow(),
+            "updated_at": utcnow()
         }
         
         try:
@@ -325,7 +326,7 @@ class ProfileService:
                 "message": "MufYard platformuna başarıyla kayıt oldunuz. Hesabınızı kişiselleştirmek için ayarlar menüsünü kullanabilirsiniz.",
                 "type": "system",
                 "read": False,
-                "created_at": datetime.utcnow()
+                "created_at": utcnow()
             })
         except: pass
         
@@ -343,7 +344,7 @@ class ProfileService:
             await ProfileService.get_profile(uid) # Initialize if not exists
             
         update_data = {
-            k: v for k, v in profile_update.dict(exclude_unset=True).items()
+            k: v for k, v in profile_update.model_dump(exclude_unset=True).items()
             if v is not None and (allow_privileged or k not in PRIVILEGED_PROFILE_FIELDS)
         }
         current_doc = await asyncio.to_thread(doc_ref.get)
@@ -358,7 +359,7 @@ class ProfileService:
         if merged_emails:
             update_data['emails'] = merged_emails
 
-        update_data['updated_at'] = datetime.utcnow()
+        update_data['updated_at'] = utcnow()
         
         # Eğer has_premium_ai False yapılıyorsa, kullanılan lisansı boşa çıkar
         if update_data.get('has_premium_ai') == False:
@@ -425,7 +426,7 @@ class ProfileService:
             duration_months = license_data.get('duration_months', 0)
             expires_at = None
             if duration_months > 0:
-                expires_at = datetime.utcnow() + timedelta(days=duration_months * 30)
+                expires_at = utcnow() + timedelta(days=duration_months * 30)
 
             # 2. Lisans anahtarını kullanıldı olarak işaretle
             logger.info("[ProfileService] Anahtar kullanıldı olarak işaretleniyor...")
@@ -434,7 +435,7 @@ class ProfileService:
                 'used_by': uid,
                 'used_by_email': user_email,
                 'used_by_name': user_name,
-                'used_at': datetime.utcnow().isoformat(),
+                'used_at': utcnow().isoformat(),
                 'expires_at': expires_at.isoformat() if expires_at else None
             })
             
@@ -445,7 +446,7 @@ class ProfileService:
                 'trial_started': True,
                 'premium_until': expires_at.isoformat() if expires_at else None,
                 'premium_type': license_data.get('duration_label', 'Sınırsız'),
-                'updated_at': datetime.utcnow()
+                'updated_at': utcnow()
             }
             await asyncio.to_thread(doc_ref.set, update_data, merge=True)
             
@@ -458,7 +459,7 @@ class ProfileService:
                     "message": "Lisans anahtarınız başarıyla doğrulandı. Artık sınırsız kullanım hakkına sahipsiniz.",
                     "type": "success",
                     "read": False,
-                    "created_at": datetime.utcnow()
+                    "created_at": utcnow()
                 })
             except Exception as e:
                 logger.warning(f"[ProfileService] Bildirim gönderilemedi (işlem devam ediyor): {e}")
@@ -480,10 +481,10 @@ class ProfileService:
             update_data = {
                 'has_premium_ai': False,
                 'trial_started': True,
-                'account_created_at': datetime.utcnow(),
+                'account_created_at': utcnow(),
                 'premium_until': None,
                 'premium_type': None,
-                'updated_at': datetime.utcnow()
+                'updated_at': utcnow()
             }
             await asyncio.to_thread(doc_ref.update, update_data)
             logger.info(f"[ProfileService] Kullanıcı deneme sürümüne SIFIRLANDI: {uid}")
@@ -504,7 +505,7 @@ class ProfileService:
                 'has_premium_ai': False,
                 'premium_until': None,
                 'premium_type': None,
-                'updated_at': datetime.utcnow()
+                'updated_at': utcnow()
             }
             await asyncio.to_thread(doc_ref.update, update_data)
             logger.info(f"[ProfileService] Kullanıcı Pro üyeliği İPTAL EDİLDİ: {uid}")
@@ -519,7 +520,7 @@ class ProfileService:
             query = db.collection('profiles').limit(500)
             docs = await asyncio.to_thread(lambda: list(query.stream()))
             profiles = []
-            now = datetime.utcnow()
+            now = utcnow()
             for doc in docs:
                 p = doc.to_dict()
                 if not p: continue

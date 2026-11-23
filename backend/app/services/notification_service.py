@@ -5,12 +5,13 @@ from app.lib.firebase_admin import db
 from app.schemas.notification import NotificationCreate
 from app.services.email_service import EmailService
 from app.services.profile_service import ProfileService
+from app.lib.timeutil import utcnow
 
 class NotificationService:
     @staticmethod
     async def create_notification(notification: NotificationCreate) -> Dict[str, Any]:
-        notif_data = notification.dict()
-        notif_data['created_at'] = datetime.utcnow()
+        notif_data = notification.model_dump()
+        notif_data['created_at'] = utcnow()
         notif_data['read'] = False
         
         doc_ref = await asyncio.to_thread(db.collection('notifications').add, notif_data)
@@ -40,7 +41,7 @@ class NotificationService:
             return await NotificationService.create_notification(notification)
 
         notifs_ref = db.collection('notifications')
-        since = datetime.utcnow() - timedelta(minutes=cooldown_minutes)
+        since = utcnow() - timedelta(minutes=cooldown_minutes)
         
         # Firestore üzerinden son cooldown süresindeki benzer bildirimi kontrol et
         try:

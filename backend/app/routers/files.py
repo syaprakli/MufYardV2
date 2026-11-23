@@ -15,6 +15,7 @@ from app.config import BASE_DIR, settings, DATA_DIR
 from app.lib.auth import get_current_user
 from app.lib.security import create_signed_token, verify_signed_token
 from app.lib.rate_limiter import limiter
+from app.lib.timeutil import utcnow
 
 _FILES_LOGGER = logging.getLogger("app.files")
 
@@ -556,7 +557,7 @@ async def open_task_folder(
         task_data = {}
         if metadata and (metadata.rapor_adi or metadata.rapor_kodu):
             task_data = {
-                'baslama_tarihi': metadata.baslama_tarihi or datetime.utcnow().isoformat().split('T')[0],
+                'baslama_tarihi': metadata.baslama_tarihi or utcnow().isoformat().split('T')[0],
                 'rapor_turu': metadata.rapor_turu or 'Diger',
                 'rapor_kodu': metadata.rapor_kodu or 'Kodsuz',
                 'rapor_adi': metadata.rapor_adi or 'Basliksiz',
@@ -670,7 +671,7 @@ async def create_task_folder_endpoint(
         task_data = {}
         if metadata and (metadata.rapor_adi or metadata.rapor_kodu):
             task_data = {
-                'baslama_tarihi': metadata.baslama_tarihi or datetime.utcnow().isoformat().split('T')[0],
+                'baslama_tarihi': metadata.baslama_tarihi or utcnow().isoformat().split('T')[0],
                 'rapor_turu': metadata.rapor_turu or 'Diger',
                 'rapor_kodu': metadata.rapor_kodu or 'Kodsuz',
                 'rapor_adi': metadata.rapor_adi or 'Basliksiz',
@@ -844,7 +845,7 @@ async def generate_docx_kapak_endpoint(
         filename = f"Rapor_Kapagi_{int(datetime.now().timestamp())}.docx"
         output_path = os.path.join(output_dir, filename)
         
-        await asyncio.to_thread(generate_kapak_docx, template_path, output_path, req.dict())
+        await asyncio.to_thread(generate_kapak_docx, template_path, output_path, req.model_dump())
         
         if req.openAfterGenerate and IS_DESKTOP and os.name == 'nt':
             await asyncio.to_thread(os.startfile, output_path)
@@ -873,7 +874,7 @@ async def generate_docx_dizi_endpoint(
         filename = f"Dizi_Pusulasi_{int(datetime.now().timestamp())}.docx"
         output_path = os.path.join(output_dir, filename)
         
-        await asyncio.to_thread(generate_dizi_docx, template_path, output_path, req.dict())
+        await asyncio.to_thread(generate_dizi_docx, template_path, output_path, req.model_dump())
         
         if IS_DESKTOP and os.name == 'nt':
             await asyncio.to_thread(os.startfile, output_path)
@@ -901,7 +902,7 @@ async def generate_docx_hazirlik_endpoint(
         filename = f"Evrak_Talebi_{int(datetime.now().timestamp())}.docx"
         output_path = os.path.join(output_dir, filename)
         
-        await asyncio.to_thread(generate_evrak_talebi_docx, template_path, output_path, req.dict())
+        await asyncio.to_thread(generate_evrak_talebi_docx, template_path, output_path, req.model_dump())
         
         if IS_DESKTOP and os.name == 'nt':
             await asyncio.to_thread(os.startfile, output_path)
@@ -938,7 +939,7 @@ async def generate_docx_degerlendirme_endpoint(
         filename = f"Degerlendirme_Formu_{int(datetime.now().timestamp())}.docx"
         output_path = os.path.join(output_dir, filename)
         
-        await asyncio.to_thread(generate_degerlendirme_docx, output_path, req.dict())
+        await asyncio.to_thread(generate_degerlendirme_docx, output_path, req.model_dump())
         
         if IS_DESKTOP and os.name == 'nt':
             await asyncio.to_thread(os.startfile, output_path)
@@ -975,7 +976,7 @@ async def generate_docx_ozet_tablolar_endpoint(
         filename = f"Ozet_Bilgiler_Tablolari_{int(datetime.now().timestamp())}.docx"
         output_path = os.path.join(output_dir, filename)
         
-        await asyncio.to_thread(generate_ozet_tablolar_docx, output_path, req.dict())
+        await asyncio.to_thread(generate_ozet_tablolar_docx, output_path, req.model_dump())
         
         if IS_DESKTOP and os.name == 'nt':
             await asyncio.to_thread(os.startfile, output_path)

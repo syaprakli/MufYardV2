@@ -6,6 +6,7 @@ import uuid
 from app.lib.firebase_admin import db
 from app.schemas.inspector import InspectorCreate
 import hashlib
+from app.lib.timeutil import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class InspectorService:
         try:
             docs = await asyncio.to_thread(lambda: list(db.collection('inspectors').limit(300).stream()))
             inspectors = []
-            now = datetime.utcnow().isoformat()
+            now = utcnow().isoformat()
             
             for doc in docs:
                 data = doc.to_dict()
@@ -98,10 +99,10 @@ class InspectorService:
 
     @staticmethod
     async def add_inspector(inspector: InspectorCreate) -> Dict[str, Any]:
-        data = inspector.dict()
+        data = inspector.model_dump()
         if data.get('email'):
             data['email'] = data['email'].lower()
-        data['created_at'] = datetime.utcnow().isoformat()
+        data['created_at'] = utcnow().isoformat()
         try:
             res = await asyncio.to_thread(db.collection('inspectors').add, data)
             data['id'] = res[1].id
@@ -115,11 +116,11 @@ class InspectorService:
         """Adds multiple inspectors using a Firestore batch operation."""
         batch = db.batch()
         count = 0
-        now = datetime.utcnow().isoformat()
+        now = utcnow().isoformat()
         
         for inspector in inspectors:
             doc_ref = db.collection('inspectors').document()
-            data = inspector.dict()
+            data = inspector.model_dump()
             if data.get('email'):
                 data['email'] = data['email'].lower()
             data['created_at'] = now
@@ -140,7 +141,7 @@ class InspectorService:
     @staticmethod
     async def update_inspector(inspector_id: str, inspector: InspectorCreate) -> Optional[Dict[str, Any]]:
         try:
-            data = inspector.dict()
+            data = inspector.model_dump()
             if data.get('email'):
                 data['email'] = data['email'].lower()
             await asyncio.to_thread(db.collection('inspectors').document(inspector_id).update, data)
@@ -175,7 +176,7 @@ class InspectorService:
             sync_count = 0
             batch = db.batch()
             inspectors_ref = db.collection('inspectors')
-            now = datetime.utcnow().isoformat()
+            now = utcnow().isoformat()
             
             for _, row in df.iterrows():
                 if pd.isna(row.get('AD/SOYAD')) or pd.isna(row.get('UNVAN')):
@@ -241,7 +242,7 @@ class InspectorService:
             sync_count = 0
             batch = db.batch()
             inspectors_ref = db.collection('inspectors')
-            now = datetime.utcnow().isoformat()
+            now = utcnow().isoformat()
             
             # Helper to process a record
             def process_record(name_val, title_val, phone_val, ext_val, room_val):
@@ -329,7 +330,7 @@ class InspectorService:
 
             batch = db.batch()
             inspectors_ref = db.collection("inspectors")
-            now = datetime.utcnow().isoformat()
+            now = utcnow().isoformat()
             sync_count = 0
 
             for doc in contacts_docs:

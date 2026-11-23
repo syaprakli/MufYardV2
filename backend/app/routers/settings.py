@@ -27,7 +27,7 @@ async def get_roles_settings(current_user: Dict[str, Any] = Depends(require_foun
 async def update_roles_settings(update: RolesUpdate, current_user: Dict[str, Any] = Depends(require_founder_admin)):
     try:
         ref = db.collection("system_settings").document("roles")
-        await asyncio.to_thread(ref.set, update.dict(), merge=True)
+        await asyncio.to_thread(ref.set, update.model_dump(), merge=True)
         return {"status": "success"}
     except Exception:
         raise HTTPException(status_code=500, detail="Rol ayarları güncellenirken bir hata oluştu.")

@@ -6,6 +6,7 @@ from app.lib.firebase_admin import db
 from app.schemas.task import TaskCreate, TaskUpdate
 import pandas as pd
 import io
+from app.lib.timeutil import utcnow
 
 _task_creation_lock = asyncio.Lock()
 # Rapor kodu üretimi: tek instance için yarış koruması (çoklu instance'ta Firestore sayacına taşınmalı)
@@ -68,7 +69,7 @@ class TaskService:
     @staticmethod
     def _recently_issued_seqs(prefix: str) -> set:
         """Üretilmiş ama henüz Firestore'a yazılmamış olabilecek kodları döner (yarış koruması)."""
-        now = datetime.utcnow()
+        now = utcnow()
         for code, ts in list(_recently_issued_codes.items()):
             if now - ts > _RECENT_CODE_TTL:
                 _recently_issued_codes.pop(code, None)
@@ -91,7 +92,7 @@ class TaskService:
             while count in used:
                 count += 1
             code = f"{prefix}{count}"
-            _recently_issued_codes[code] = datetime.utcnow()
+            _recently_issued_codes[code] = utcnow()
             return code
 
     @staticmethod
@@ -101,7 +102,7 @@ class TaskService:
         Var olan kodlar icinde en kucuk bos numarayi (gap filling) verir.
         """
         if year is None:
-            year = datetime.utcnow().year
+            year = utcnow().year
         return await TaskService._next_code(f"S.Y.64/{year}-")
 
     @staticmethod
@@ -176,8 +177,8 @@ class TaskService:
 
     @staticmethod
     async def create_task(task: TaskCreate) -> Dict[str, Any]:
-        task_data = task.dict()
-        task_data['created_at'] = datetime.utcnow().isoformat()
+        task_data = task.model_dump()
+        task_data['created_at'] = utcnow().isoformat()
 
         owner_id = task_data.get('owner_id')
         assigned = task_data.get('assigned_to', [])
@@ -262,7 +263,7 @@ class TaskService:
     async def update_task(task_id: str, task_update: TaskUpdate) -> Optional[Dict[str, Any]]:
         try:
             doc_ref = db.collection('tasks').document(task_id)
-            update_data = {k: v for k, v in task_update.dict().items() if v is not None}
+            update_data = {k: v for k, v in task_update.model_dump().items() if v is not None}
             if not update_data:
                 return None
 
@@ -446,7 +447,7 @@ class TaskService:
                                     try:
                                         from datetime import datetime
                                         dt = datetime.strptime(bt, "%Y-%m-%d")
-                                        if (datetime.utcnow() - dt).days > 730:
+                                        if (utcnow() - dt).days > 730:
                                             is_old = True
                                     except Exception:
                                         pass
@@ -772,7 +773,7 @@ class TaskService:
                     "rapor_adi": str(row['rapor_adi']),
                     "rapor_kodu": str(row.get('rapor_kodu')) if not pd.isna(row.get('rapor_kodu')) else None,
                     "rapor_turu": str(row.get('rapor_turu', 'Genel Denetim')),
-                    "baslama_tarihi": str(row.get('baslama_tarihi')) if not pd.isna(row.get('baslama_tarihi')) else datetime.utcnow().isoformat().split('T')[0],
+                    "baslama_tarihi": str(row.get('baslama_tarihi')) if not pd.isna(row.get('baslama_tarihi')) else utcnow().isoformat().split('T')[0],
                     "sure_gun": int(row.get('sure_gun', 30)),
                     "rapor_durumu": str(row.get('durum', 'Tamamlandı')), # İçe aktarılanlar genelde tamamlanmıştır
                     "owner_id": owner_id,

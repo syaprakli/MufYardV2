@@ -8,6 +8,7 @@ from app.services.extractor_service import ExtractorService
 from app.services.legislation_crawler import LegislationCrawlerService
 from app.lib.auth import get_current_user, require_roles
 from app.config import get_settings
+from app.lib.timeutil import utcnow
 settings = get_settings()
 
 MEVZUAT_DIR = settings.MEVZUAT_DIR
@@ -271,7 +272,7 @@ async def sync_legislation_folder(
                     "is_approved": True,
                     "is_archived": False,
                     "created_by_name": current_user.get("displayName") or current_user.get("email") or "Yerel Klasör",
-                    "created_at": datetime.utcnow()
+                    "created_at": utcnow()
                 }
 
                 await asyncio.to_thread(db.collection('legislations').add, leg_data)
@@ -378,7 +379,7 @@ async def create_legislation(legislation: LegislationCreate, current_user: Dict[
 
         payload = legislation
         if not is_admin:
-            payload = legislation.copy(update={"owner_id": caller_uid if not legislation.is_public else None})
+            payload = legislation.model_copy(update={"owner_id": caller_uid if not legislation.is_public else None})
 
         return await LegislationService.create_legislation(payload, is_admin)
     except HTTPException:

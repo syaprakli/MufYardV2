@@ -96,7 +96,7 @@ async def update_profile(
     if caller_uid != uid and not is_admin and not is_founder:
         raise HTTPException(status_code=403, detail="Başka bir kullanıcının profilini güncelleyemezsiniz.")
 
-    requested_fields = profile_update.dict(exclude_unset=True)
+    requested_fields = profile_update.model_dump(exclude_unset=True)
     attempted_privileged = [k for k in requested_fields.keys() if k in PRIVILEGED_PROFILE_FIELDS]
 
     # Rol degistirme sadece kurucu hesaplara aciktir.

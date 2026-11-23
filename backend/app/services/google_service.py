@@ -6,6 +6,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
+from app.lib.timeutil import utcnow
 
 SCOPES = [
     'https://www.googleapis.com/auth/calendar',
@@ -117,7 +118,7 @@ class GoogleCalendarService:
         service = await self.authenticate()
         if not service: return []
         
-        now = datetime.datetime.utcnow().isoformat() + 'Z'
+        now = utcnow().isoformat() + 'Z'
         
         events_op = service.events().list(calendarId='primary', timeMin=now,
                                           maxResults=max_results, singleEvents=True,

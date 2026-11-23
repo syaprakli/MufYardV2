@@ -3,6 +3,7 @@ import asyncio
 from typing import List, Optional, Dict, Any
 from app.lib.firebase_admin import db
 from app.schemas.reminder import ReminderCreate, ReminderUpdate
+from app.lib.timeutil import utcnow
 
 class ReminderService:
     @staticmethod
@@ -25,9 +26,9 @@ class ReminderService:
     @staticmethod
     async def create_reminder(reminder: ReminderCreate, user_id: str) -> Dict[str, Any]:
         reminders_ref = db.collection('reminders')
-        now_iso = datetime.utcnow().isoformat()
+        now_iso = utcnow().isoformat()
         
-        data = reminder.dict()
+        data = reminder.model_dump()
         data['owner_id'] = user_id
         data['created_at'] = now_iso
         data['updated_at'] = now_iso
@@ -53,8 +54,8 @@ class ReminderService:
             if current_data.get('owner_id') != user_id:
                 return None
 
-            update_dict = {k: v for k, v in reminder_update.dict(exclude_unset=True).items() if v is not None}
-            update_dict['updated_at'] = datetime.utcnow().isoformat()
+            update_dict = {k: v for k, v in reminder_update.model_dump(exclude_unset=True).items() if v is not None}
+            update_dict['updated_at'] = utcnow().isoformat()
             
             doc_ref.update(update_dict)
             current_data.update(update_dict)

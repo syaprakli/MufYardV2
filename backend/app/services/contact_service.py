@@ -4,6 +4,7 @@ import re
 from typing import List, Optional, Dict, Any
 from app.lib.firebase_admin import db
 from app.schemas.contact import ContactCreate, ContactUpdate
+from app.lib.timeutil import utcnow
 
 class ContactService:
     @staticmethod
@@ -176,8 +177,8 @@ class ContactService:
 
     @staticmethod
     async def create_contact(contact: ContactCreate) -> Dict[str, Any]:
-        contact_data = contact.dict()
-        contact_data['created_at'] = datetime.utcnow()
+        contact_data = contact.model_dump()
+        contact_data['created_at'] = utcnow()
         
         owner_id = contact_data.get('owner_id')
         shared = contact_data.get('shared_with', [])
@@ -233,8 +234,8 @@ class ContactService:
             return None
         current_data = doc.to_dict() or {}
             
-        update_data = {k: v for k, v in contact_update.dict().items() if v is not None}
-        update_data['updated_at'] = datetime.utcnow()
+        update_data = {k: v for k, v in contact_update.model_dump().items() if v is not None}
+        update_data['updated_at'] = utcnow()
         
         await asyncio.to_thread(doc_ref.update, update_data)
         
@@ -290,7 +291,7 @@ class ContactService:
         if doc.to_dict().get('owner_id') != user_id:
             raise PermissionError("Sadece kendi eklediğiniz kişileri paylaşabilirsiniz.")
             
-        await asyncio.to_thread(doc_ref.update, {'is_shared': True, 'updated_at': datetime.utcnow()})
+        await asyncio.to_thread(doc_ref.update, {'is_shared': True, 'updated_at': utcnow()})
         return True
 
     @staticmethod
@@ -428,7 +429,7 @@ class ContactService:
             sync_count = 0
             batch = db.batch()
             contacts_ref = db.collection('contacts')
-            now = datetime.utcnow()
+            now = utcnow()
             
             current_category_title = "Personel"
 

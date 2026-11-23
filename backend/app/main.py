@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import os
 from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
@@ -51,6 +52,7 @@ from app.routers import (
 
 from app.services.contact_service import ContactService
 from app.services.inspector_service import InspectorService
+from app.lib.timeutil import utcnow
 
 # Security Headers Middleware
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -87,7 +89,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 settings = get_settings()
-app = FastAPI(title=settings.APP_NAME)
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    from app.lib.firebase_admin import is_mock
+    logger.info(f"Uygulama başlıyor. DATA_DIR: {DATA_DIR} | Firebase: {'MOCK' if is_mock else 'real'}")
+    if is_mock:
+        logger.warning("Firebase başlatılamadı; Mock DB kullanılıyor. Üretimde kimlik bilgilerini kontrol edin.")
+    yield
+
+
+app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 
 # --- Rate Limiting ---
 app.state.limiter = limiter
@@ -118,20 +129,6 @@ async def root():
 async def health_check():
     from app.lib.firebase_admin import is_mock
     return {"status": "healthy", "version": "1.0.4-antigravity", "firebase_mode": "mock" if is_mock else "real", "timestamp": asyncio.get_event_loop().time()}
-
-@app.on_event("startup")
-async def startup_event():
-    try:
-        logger.info("Startup süreci başladı (MINIMAL MODE)...")
-        # Tüm ağır işleri devre dışı bıraktık
-        logger.info("Ağır senkronizasyon görevleri geçici olarak devre dışı.")
-        
-        # Sadece kritik dosyaları kontrol et ama bir şey yapma
-        if not os.path.exists(settings.FIREBASE_SERVICE_ACCOUNT_PATH):
-             logger.warning("Firebase anahtarı yok, Mock DB kullanılabilir.")
-             
-    except Exception as e:
-        logger.error(f"KRİTİK STARTUP HATASI: {e}")
 
 async def sync_bundled_content():
     """Bundled folder'ları DATA_DIR içine kopyalar (eğer DATA_DIR farklı ve hedef boşsa)."""
@@ -466,7 +463,7 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                         else:
                             # Audit gibi oda bazlı sohbetler: dogrudan odaya yayinla.
                             data["id"] = data.get("id") or f"ws_{int(asyncio.get_event_loop().time() * 1000)}"
-                            data["timestamp"] = datetime.utcnow().isoformat() + "Z"
+                            data["timestamp"] = utcnow().isoformat() + "Z"
                             data["sender_id"] = uid
                             data["sender_name"] = name
                             data["content"] = msg_text

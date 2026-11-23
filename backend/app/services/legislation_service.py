@@ -9,6 +9,7 @@ from app.schemas.legislation import LegislationCreate, LegislationUpdate
 from fastapi import UploadFile
 
 from app.config import get_settings
+from app.lib.timeutil import utcnow
 settings = get_settings()
 MEVZUAT_DIR = settings.MEVZUAT_DIR
 
@@ -69,7 +70,7 @@ class LegislationService:
 
         file_path = os.path.join(target_dir, filename)
         if os.path.exists(file_path):
-            filename = f"{name}_{int(datetime.utcnow().timestamp())}{ext}"
+            filename = f"{name}_{int(utcnow().timestamp())}{ext}"
             file_path = os.path.join(target_dir, filename)
 
         # Always write to local disk
@@ -90,7 +91,7 @@ class LegislationService:
 
         # 2. If public, also attempt to upload to Firebase Storage
         if is_public:
-            timestamp = int(datetime.utcnow().timestamp())
+            timestamp = int(utcnow().timestamp())
             if doc_type:
                 blob_path = f"mevzuat/{category}/{doc_type}/{name}_{timestamp}{ext}"
             else:
@@ -123,8 +124,8 @@ class LegislationService:
 
     @staticmethod
     async def create_legislation(legislation: LegislationCreate, is_admin: bool = False) -> Dict[str, Any]:
-        leg_data = legislation.dict()
-        leg_data['created_at'] = datetime.utcnow()
+        leg_data = legislation.model_dump()
+        leg_data['created_at'] = utcnow()
         if 'is_archived' not in leg_data:
             leg_data['is_archived'] = False
         
@@ -151,8 +152,8 @@ class LegislationService:
         await asyncio.to_thread(doc_ref.update, {
             'is_approved': True,
             'approved_by': admin_name,
-            'approved_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow()
+            'approved_at': utcnow(),
+            'updated_at': utcnow()
         })
         return True
 
@@ -185,8 +186,8 @@ class LegislationService:
         if not exists:
             return None
             
-        update_data = {k: v for k, v in leg_update.dict().items() if v is not None}
-        update_data['updated_at'] = datetime.utcnow()
+        update_data = {k: v for k, v in leg_update.model_dump().items() if v is not None}
+        update_data['updated_at'] = utcnow()
         
         await asyncio.to_thread(doc_ref.update, update_data)
         
@@ -206,7 +207,7 @@ class LegislationService:
         
         # IF PUBLIC: archive instead of delete
         if leg_data.get('is_public', True):
-            await asyncio.to_thread(doc_ref.update, {'is_archived': True, 'updated_at': datetime.utcnow()})
+            await asyncio.to_thread(doc_ref.update, {'is_archived': True, 'updated_at': utcnow()})
             return True
         
         # IF PRIVATE: hard delete from Firestore
@@ -233,7 +234,7 @@ class LegislationService:
             'is_public': True,
             'owner_id': None, # Now owned by the organization
             'last_updated_by_name': user_name,
-            'updated_at': datetime.utcnow()
+            'updated_at': utcnow()
         }
         
         # 2. (Optional) In a real system, we would move the physical file from Kisisel/ to Genel/

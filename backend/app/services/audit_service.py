@@ -5,6 +5,7 @@ import uuid
 from app.lib.firebase_admin import db
 from app.lib.folder_manager import FolderManager
 from app.schemas.audit import AuditCreate, AuditUpdate
+from app.lib.timeutil import utcnow
 
 
 def _count_docs(collection_ref) -> int:
@@ -129,8 +130,8 @@ class AuditService:
 
     @staticmethod
     async def create_audit(audit: AuditCreate) -> Dict[str, Any]:
-        audit_data = audit.dict()
-        audit_data['created_at'] = datetime.utcnow().isoformat() + "Z"
+        audit_data = audit.model_dump()
+        audit_data['created_at'] = utcnow().isoformat() + "Z"
         
         try:
             # Add to Firestore (returns (update_time, doc_ref) tuple)
@@ -156,8 +157,8 @@ class AuditService:
             return None
         current_data = current_doc.to_dict()
             
-        update_data = {k: v for k, v in audit.dict().items() if v is not None}
-        now = datetime.utcnow()
+        update_data = {k: v for k, v in audit.model_dump().items() if v is not None}
+        now = utcnow()
         update_data['updated_at'] = now.isoformat() + "Z"
         
 
@@ -269,7 +270,7 @@ class AuditService:
         
         await asyncio.to_thread(audit_ref.update, {
             "report_content": restore_content,
-            "updated_at": datetime.utcnow().isoformat() + "Z"
+            "updated_at": utcnow().isoformat() + "Z"
         })
         
         return await AuditService.get_audit(audit_id)

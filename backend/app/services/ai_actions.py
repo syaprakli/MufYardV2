@@ -40,6 +40,7 @@ from app.schemas.contact import ContactCreate
 from app.schemas.post import PostCreate
 from app.schemas.messaging import MessageCreate
 from app.schemas.note import NoteCreate
+from app.lib.timeutil import utcnow
 
 
 # ─── Gemini Tool Tanımları ───────────────────────────────────────
@@ -418,7 +419,7 @@ async def execute_action(
                 "date_key": date_key,
                 "text": text,
                 "time": time_val,
-                "created_at": datetime.utcnow(),
+                "created_at": utcnow(),
             }
             doc_ref = await asyncio.to_thread(db.collection("calendar_notes").add, data)
             return {

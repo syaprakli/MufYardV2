@@ -86,7 +86,7 @@ async def update_audit(
         raise HTTPException(status_code=404, detail="Denetim güncellenemedi.")
 
     role = _resolve_audit_role(current, current_user.get("uid"), current_user.get("email"), current_user.get("role"))
-    incoming = audit.dict(exclude_none=True)
+    incoming = audit.model_dump(exclude_none=True)
     if incoming and role == "none":
         raise HTTPException(status_code=403, detail="Bu denetimi güncelleme yetkiniz yok.")
     if incoming and role == "view":
@@ -108,7 +108,7 @@ async def update_audit(
             action = "Sürüm Oluşturuldu"
         
         details = ""
-        incoming = audit.dict(exclude_none=True)
+        incoming = audit.model_dump(exclude_none=True)
         if "report_content" in incoming:
             details = "Rapor metni düzenlendi."
         elif "title" in incoming:

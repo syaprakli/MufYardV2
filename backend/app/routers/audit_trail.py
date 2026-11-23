@@ -3,6 +3,7 @@ from typing import Any, Dict, List
 from datetime import datetime
 from app.lib.firebase_admin import db
 from app.lib.auth import get_current_user
+from app.lib.timeutil import utcnow
 
 router = APIRouter()
 
@@ -31,5 +32,5 @@ def log_audit_change(audit_id: str, user: str, action: str, diff: str = ""):
         "user": user,
         "action": action,
         "diff": diff,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": utcnow().isoformat()
     })

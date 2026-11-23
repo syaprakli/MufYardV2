@@ -3,6 +3,7 @@ import asyncio
 from typing import List, Optional, Dict, Any
 from app.lib.firebase_admin import db
 from app.schemas.note import NoteCreate, NoteUpdate
+from app.lib.timeutil import utcnow
 
 
 def _fetch_profile_names(uids: List[str]) -> Dict[str, str]:
@@ -92,8 +93,8 @@ class NoteService:
 
     @staticmethod
     async def create_note(note: NoteCreate) -> Dict[str, Any]:
-        note_data = note.dict()
-        note_data['created_at'] = datetime.utcnow()
+        note_data = note.model_dump()
+        note_data['created_at'] = utcnow()
         
         owner_id = note_data.get('owner_id')
         shared = note_data.get('shared_with', [])
@@ -148,7 +149,7 @@ class NoteService:
             return None
         current_data = doc.to_dict() or {}
             
-        update_data = {k: v for k, v in note_update.dict().items() if v is not None}
+        update_data = {k: v for k, v in note_update.model_dump().items() if v is not None}
         await asyncio.to_thread(doc_ref.update, update_data)
         
         updated_doc_res = await asyncio.to_thread(doc_ref.get)

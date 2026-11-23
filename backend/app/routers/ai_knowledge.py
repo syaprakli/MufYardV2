@@ -6,6 +6,7 @@ from app.lib.auth import get_current_user, require_roles
 import asyncio
 import logging
 from datetime import datetime
+from app.lib.timeutil import utcnow
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -42,9 +43,9 @@ async def create_ai_knowledge(
 ):
     """Creates a new AI knowledge item (Tenkit Maddesi)."""
     try:
-        data = item.dict()
-        data['created_at'] = datetime.utcnow()
-        data['updated_at'] = datetime.utcnow()
+        data = item.model_dump()
+        data['created_at'] = utcnow()
+        data['updated_at'] = utcnow()
         
         doc_ref = await asyncio.to_thread(db.collection('ai_knowledge').add, data)
         new_doc = await asyncio.to_thread(doc_ref[1].get)
@@ -69,8 +70,8 @@ async def update_ai_knowledge(
         if not exists:
             raise HTTPException(status_code=404, detail="Bilgi maddesi bulunamadı.")
             
-        update_data = {k: v for k, v in update.dict().items() if v is not None}
-        update_data['updated_at'] = datetime.utcnow()
+        update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+        update_data['updated_at'] = utcnow()
         
         await asyncio.to_thread(doc_ref.update, update_data)
         updated_doc = await asyncio.to_thread(doc_ref.get)

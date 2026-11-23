@@ -16,6 +16,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from app.services.google_service import GoogleCalendarService, SCOPES
 from app.lib.firebase_admin import db
 from app.lib.auth import get_current_user
+from app.lib.timeutil import utcnow
 
 router = APIRouter(tags=["calendar"])
 
@@ -65,7 +66,7 @@ async def create_calendar_note(note: CalendarNoteCreate, current_user: dict = De
             "date_key": note.date_key,
             "text": note.text,
             "time": note.time,
-            "created_at": datetime.utcnow(),
+            "created_at": utcnow(),
         }
         doc_ref = await asyncio.to_thread(db.collection("calendar_notes").add, data)
         new_doc = await asyncio.to_thread(doc_ref[1].get)

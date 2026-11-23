@@ -5,6 +5,7 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 from app.lib.firebase_admin import db
 from app.schemas.messaging import MessageCreate, DirectMessageCreate
 from app.schemas.post import PostCreate, PostUpdate
+from app.lib.timeutil import utcnow
 
 class CollaborationService:
     @staticmethod
@@ -42,8 +43,8 @@ class CollaborationService:
 
     @staticmethod
     async def save_message(message: MessageCreate) -> Dict[str, Any]:
-        msg_data = message.dict()
-        msg_data['timestamp'] = datetime.utcnow()
+        msg_data = message.model_dump()
+        msg_data['timestamp'] = utcnow()
         
         # .add() and .get() are blocking
         doc_ref = await asyncio.to_thread(db.collection('messages').add, msg_data)
@@ -101,10 +102,10 @@ class CollaborationService:
     async def save_private_message(sender_id: str, sender_name: str, message: DirectMessageCreate) -> Dict[str, Any]:
         """Özel mesaj kaydeder."""
         room_id = "_".join(sorted([sender_id, message.recipient_id]))
-        msg_data = message.dict()
+        msg_data = message.model_dump()
         msg_data['sender_id'] = sender_id
         msg_data['sender_name'] = sender_name
-        msg_data['timestamp'] = datetime.utcnow()
+        msg_data['timestamp'] = utcnow()
         msg_data['is_deleted'] = False
         
         doc_ref = await asyncio.to_thread(db.collection('private_messages').document(room_id).collection('chats').add, msg_data)
@@ -148,7 +149,7 @@ class CollaborationService:
         if data.get('sender_id') != requester_uid:
             return None
 
-        now = datetime.utcnow()
+        now = utcnow()
         await asyncio.to_thread(doc_ref.update, {
             'content': content,
             'edited': True,
@@ -170,7 +171,7 @@ class CollaborationService:
         normalized_room_id = CollaborationService._normalize_dm_room_id(room_id)
         room_ref = db.collection('private_messages').document(normalized_room_id)
         
-        now_str = datetime.utcnow().isoformat()
+        now_str = utcnow().isoformat()
         
         # Room dokümanını güncelle (veya yoksa oluştur)
         doc = await asyncio.to_thread(room_ref.get)
@@ -255,8 +256,8 @@ class CollaborationService:
 
     @staticmethod
     async def create_post(post: PostCreate, is_admin: bool = False) -> Dict[str, Any]:
-        post_data = post.dict()
-        post_data['created_at'] = datetime.utcnow()
+        post_data = post.model_dump()
+        post_data['created_at'] = utcnow()
         post_data['likes_count'] = 0
         
         # Herkesin paylaştığı doğrudan onaylı olacak
@@ -278,8 +279,8 @@ class CollaborationService:
         await asyncio.to_thread(doc_ref.update, {
             'is_approved': True,
             'approved_by': admin_name,
-            'approved_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow()
+            'approved_at': utcnow(),
+            'updated_at': utcnow()
         })
         return True
 
@@ -326,7 +327,7 @@ class CollaborationService:
 
     @staticmethod
     async def add_comment(post_id: str, comment_data: Dict[str, Any]) -> Dict[str, Any]:
-        comment_data['created_at'] = datetime.utcnow()
+        comment_data['created_at'] = utcnow()
         doc_ref = await asyncio.to_thread(db.collection('posts').document(post_id).collection('comments').add, comment_data)
         
         new_doc = await asyncio.to_thread(doc_ref[1].get)
@@ -383,7 +384,7 @@ class CollaborationService:
         update_data = {
             'text': text,
             'edited': True,
-            'updated_at': datetime.utcnow(),
+            'updated_at': utcnow(),
         }
         await asyncio.to_thread(doc_ref.update, update_data)
 
@@ -420,10 +421,10 @@ class CollaborationService:
     async def update_post(post_id: str, post_update: PostUpdate) -> Optional[Dict[str, Any]]:
         try:
             doc_ref = db.collection('posts').document(post_id)
-            update_data = {k: v for k, v in post_update.dict().items() if v is not None}
+            update_data = {k: v for k, v in post_update.model_dump().items() if v is not None}
             if not update_data: return None
             
-            update_data['updated_at'] = datetime.utcnow()
+            update_data['updated_at'] = utcnow()
             await asyncio.to_thread(doc_ref.update, update_data)
             
             updated_doc = await asyncio.to_thread(doc_ref.get)
@@ -442,7 +443,7 @@ class CollaborationService:
             
             update_data = {
                 'content': content,
-                'updated_at': datetime.utcnow()
+                'updated_at': utcnow()
             }
             await asyncio.to_thread(doc_ref.update, update_data)
             
@@ -498,7 +499,7 @@ class CollaborationService:
             if len(existing) > 0:
                 return True
             
-            await asyncio.to_thread(db.collection('collaboration_categories').add, {'name': name, 'created_at': datetime.utcnow()})
+            await asyncio.to_thread(db.collection('collaboration_categories').add, {'name': name, 'created_at': utcnow()})
             return True
         except Exception:
             return False

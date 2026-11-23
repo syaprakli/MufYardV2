@@ -5,6 +5,7 @@ from app.lib.firebase_admin import db
 from app.lib.auth import get_current_user, require_roles
 from datetime import datetime
 from pydantic import BaseModel
+from app.lib.timeutil import utcnow
 
 router = APIRouter(prefix="", tags=["feedback"])
 
@@ -29,7 +30,7 @@ async def submit_feedback(fb: FeedbackCreate, current_user: Dict[str, Any] = Dep
             "user_email": current_user.get("email") or "",
             "user_name": (current_user.get("email") or "kullanici").split("@")[0],
         }
-        fb_data['created_at'] = datetime.utcnow()
+        fb_data['created_at'] = utcnow()
         import asyncio
         await asyncio.to_thread(db.collection('feedbacks').add, fb_data)
         return {"status": "success"}
