@@ -294,7 +294,7 @@ class ContactService:
         return True
 
     @staticmethod
-    async def delete_contact(contact_id: str, user_id: str) -> bool:
+    async def delete_contact(contact_id: str, user_id: str, is_admin: bool = False) -> bool:
         doc_ref = db.collection('contacts').document(contact_id)
         doc = await asyncio.to_thread(doc_ref.get)
         if not doc.exists:
@@ -311,11 +311,7 @@ class ContactService:
             user_email = (profile_doc.to_dict().get('email') or "").strip().lower()
             
         identity_keys = [v for v in [user_id, user_email] if v]
-        admin_id = "sefa.yaprakli@gsb.gov.tr"
-        
-        is_owner_or_admin = (
-            any(identity in [owner_id, admin_id, "admin"] for identity in identity_keys)
-        )
+        is_owner_or_admin = is_admin or bool(owner_id and owner_id in identity_keys)
             
         # Check ownership
         if is_owner_or_admin:

@@ -8,17 +8,31 @@ logger = logging.getLogger(__name__)
 
 class LegislationCrawlerService:
     @staticmethod
+    def is_allowed_mevzuat_url(url: str) -> bool:
+        from urllib.parse import urlparse
+        if not url or not isinstance(url, str):
+            return False
+        parsed = urlparse(url.strip())
+        if parsed.scheme not in {"http", "https"}:
+            return False
+        if parsed.username or parsed.password:
+            return False
+        hostname = (parsed.hostname or "").lower().rstrip(".")
+        return hostname == "mevzuat.gov.tr" or hostname.endswith(".mevzuat.gov.tr")
+
+    @staticmethod
     async def fetch_from_mevzuat_gov_tr(url: str) -> Optional[Dict[str, Any]]:
         """
         mevzuat.gov.tr URL'sinden mevzuat bilgilerini ceker.
         """
-        if "mevzuat.gov.tr" not in url:
+        if not LegislationCrawlerService.is_allowed_mevzuat_url(url):
+            logger.warning(f"Rejected disallowed crawler URL: {url}")
             return None
 
         # Clean and auto-complete the URL parameters
-        from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+        from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse, urljoin
         try:
-            parsed = urlparse(url)
+            parsed = urlparse(url.strip())
             qsl = parse_qsl(parsed.query)
             params = {k: v for k, v in qsl}
             
@@ -34,13 +48,25 @@ class LegislationCrawlerService:
             logger.warning(f"Failed to clean URL: {e}")
 
         try:
-            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, verify=False) as client:
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
                     "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7"
                 }
-                response = await client.get(url, headers=headers)
+                current_url = url
+                response = None
+                for _ in range(5):
+                    if not LegislationCrawlerService.is_allowed_mevzuat_url(current_url):
+                        logger.warning(f"Blocked unsafe redirect target: {current_url}")
+                        return None
+                    response = await client.get(current_url, headers=headers)
+                    if response.status_code in (301, 302, 303, 307, 308) and response.headers.get("location"):
+                        current_url = urljoin(current_url, response.headers["location"])
+                        continue
+                    break
+                if response is None:
+                    return None
                 response.raise_for_status()
                 
                 html = response.text

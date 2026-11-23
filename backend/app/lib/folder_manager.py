@@ -126,12 +126,32 @@ class FolderManager:
         action: 'read', 'write', 'delete'
         """
         permissions = FolderManager.load_permissions()
-        file_meta = permissions.get(file_id)
+        norm_id = (file_id or "").replace("\\", "/").strip("/")
+        file_meta = permissions.get(norm_id) or permissions.get(file_id)
         if not file_meta:
             # Metadata yoksa erişim izni verilmez (daha güvenli varsayılan)
             return False
         allowed = file_meta.get("permissions", {}).get(action, [])
         return user_id in allowed or user_id == file_meta.get("owner_id")
+
+    @staticmethod
+    def check_permission_or_ancestor(file_id: str, user_id: str, action: str) -> bool:
+        """
+        Dosyanın kendisinde veya üst klasörlerinden birinde izin olup olmadığını kontrol eder.
+        """
+        norm_id = (file_id or "").replace("\\", "/").strip("/")
+        if not norm_id:
+            return False
+        permissions = FolderManager.load_permissions()
+        parts = [p for p in norm_id.split("/") if p]
+        for i in range(len(parts), 0, -1):
+            candidate = "/".join(parts[:i])
+            meta = permissions.get(candidate)
+            if meta:
+                allowed = meta.get("permissions", {}).get(action, [])
+                if user_id in allowed or user_id == meta.get("owner_id"):
+                    return True
+        return False
 
     @staticmethod
     def set_permission(file_id: str, owner_id: str, allowed_users: Optional[list] = None, permissions: Optional[dict] = None):

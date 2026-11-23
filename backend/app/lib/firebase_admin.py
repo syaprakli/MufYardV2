@@ -222,13 +222,14 @@ if is_mock:
                 def upload_from_file(self, *args, **kwargs): pass
                 def upload_from_string(self, *args, **kwargs): pass
                 def make_public(self): pass
+                def generate_signed_url(self, *args, **kwargs): return f"https://mock-storage.google.com/{name}"
                 @property
                 def public_url(self): return f"https://mock-storage.google.com/{name}"
             return MockBlob()
             
     class MockMessaging:
         def send(self, message):
-            logger.info(f"MOCK FCM: Notification sent to {message.token}")
+            logger.info("MOCK FCM: Notification sent.")
             return "mock-message-id"
             
     db = MockFirestore()

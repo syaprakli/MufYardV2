@@ -1,17 +1,120 @@
 import os
+import re
 import uuid
 import shutil
 import asyncio
 import logging
+import urllib.parse
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends, Request
+from fastapi.responses import FileResponse
 from typing import List, Optional
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.lib.folder_manager import FolderManager, BASE_REPORTS_DIR, BASE_OTHER_DIR, STANDARD_SUBFOLDERS
-from app.config import BASE_DIR
-from app.config import settings, DATA_DIR
+from app.config import BASE_DIR, settings, DATA_DIR
 from app.lib.auth import get_current_user
+from app.lib.security import create_signed_token, verify_signed_token
 from app.lib.rate_limiter import limiter
+
+_FILES_LOGGER = logging.getLogger("app.files")
+
+
+def _resolve_safe_path(base_dir: str, rel_path: Optional[str]) -> str:
+    """Resolve a user-supplied relative path safely within base_dir using realpath + commonpath."""
+    real_base = os.path.realpath(base_dir)
+    if not rel_path:
+        return real_base
+
+    normalized = rel_path.replace("\\", "/").strip()
+    if normalized.startswith("/") or os.path.isabs(rel_path) or (len(normalized) >= 2 and normalized[1] == ":"):
+        raise HTTPException(status_code=400, detail="Geçersiz dosya yolu.")
+
+    parts = [p for p in re.split(r"[/\\]+", normalized) if p and p != "."]
+    if any(p == ".." for p in parts):
+        raise HTTPException(status_code=400, detail="Geçersiz dosya yolu.")
+
+    real_target = os.path.realpath(os.path.join(real_base, *parts))
+    if os.path.commonpath([real_base, real_target]) != real_base:
+        raise HTTPException(status_code=400, detail="Geçersiz dosya yolu.")
+    return real_target
+
+
+def _root_dir_for_name(root_name: str) -> str:
+    mapping = {
+        "uploads": settings.UPLOADS_DIR,
+        "Raporlar": BASE_REPORTS_DIR,
+        "Diğer İşlem ve Belgeler": BASE_OTHER_DIR,
+        "Mevzuat": settings.MEVZUAT_DIR,
+    }
+    if root_name not in mapping:
+        raise HTTPException(status_code=404, detail="Klasör bulunamadı.")
+    return mapping[root_name]
+
+
+def _build_signed_file_url(root_name: str, rel_path: str, ttl_seconds: int = 3600) -> str:
+    normalized_rel = rel_path.replace("\\", "/").strip("/")
+    encoded_root = urllib.parse.quote(root_name, safe="")
+    encoded_rel = "/".join(urllib.parse.quote(seg, safe="") for seg in normalized_rel.split("/") if seg)
+    token = create_signed_token(
+        {"purpose": "file_access", "root": root_name, "path": normalized_rel},
+        ttl_seconds=ttl_seconds,
+    )
+    return f"/{encoded_root}/{encoded_rel}?dl_token={urllib.parse.quote(token, safe='')}"
+
+
+def _build_signed_url_from_data_rel(data_rel_path: str, ttl_seconds: int = 3600) -> str:
+    clean = data_rel_path.replace("\\", "/").strip("/")
+    if "/" not in clean:
+        return f"/{clean}"
+    root_name, sub_rel = clean.split("/", 1)
+    return _build_signed_file_url(root_name, sub_rel, ttl_seconds=ttl_seconds)
+
+
+async def serve_authenticated_file(
+    root_name: str,
+    file_path: str,
+    request: Request,
+    dl_token: Optional[str] = None,
+):
+    """Serve static user/report/legislation files only after verifying auth or signed URL token."""
+    root_dir = _root_dir_for_name(root_name)
+    full_path = _resolve_safe_path(root_dir, file_path)
+    normalized_rel = os.path.relpath(full_path, os.path.realpath(root_dir)).replace("\\", "/")
+
+    token_authorized = False
+    if dl_token:
+        payload = verify_signed_token(dl_token)
+        if (
+            payload
+            and payload.get("purpose") == "file_access"
+            and payload.get("root") == root_name
+            and payload.get("path") == normalized_rel
+        ):
+            token_authorized = True
+
+    if not token_authorized:
+        current_user = await get_current_user(
+            authorization=request.headers.get("authorization"),
+            x_user_id=request.headers.get("x-user-id"),
+            x_user_email=request.headers.get("x-user-email"),
+        )
+        uid = current_user["uid"]
+        is_admin = current_user.get("role") == "admin"
+
+        if root_name in ("Raporlar", "Diğer İşlem ve Belgeler"):
+            if not (is_admin or FolderManager.check_permission_or_ancestor(normalized_rel, uid, "read")):
+                raise HTTPException(status_code=403, detail="Bu dosyaya erişim yetkiniz yok.")
+        elif root_name == "uploads":
+            parts = normalized_rel.split("/")
+            if parts[0] == "shared" and len(parts) >= 2:
+                recipient_uid = parts[1]
+                if not (is_admin or uid == recipient_uid or FolderManager.check_permission_or_ancestor(normalized_rel, uid, "read")):
+                    raise HTTPException(status_code=403, detail="Bu dosyaya erişim yetkiniz yok.")
+
+    if not await asyncio.to_thread(os.path.isfile, full_path):
+        raise HTTPException(status_code=404, detail="Dosya bulunamadı.")
+
+    return FileResponse(full_path)
 
 
 router = APIRouter(tags=["files"])
@@ -72,14 +175,7 @@ async def upload_file(
         user_id = current_user["uid"]
         logger.info(f"UPLOAD ATTEMPT: user_id={user_id}, filename={file.filename}, ip=UPLOAD_IP_PLACEHOLDER")
         base_dir = BASE_OTHER_DIR if scope == "other" else BASE_REPORTS_DIR
-        # Path traversal koruması
-        target_dir = base_dir
-        if path:
-            safe_path = os.path.normpath(path).replace("..", "").lstrip(os.sep)
-            target_dir = os.path.join(base_dir, safe_path)
-            # Kök dizin dışına çıkış engeli
-            if not os.path.abspath(target_dir).startswith(os.path.abspath(base_dir)):
-                raise HTTPException(status_code=400, detail="Geçersiz hedef dizin.")
+        target_dir = _resolve_safe_path(base_dir, path)
 
         if not await asyncio.to_thread(os.path.exists, target_dir):
             await asyncio.to_thread(os.makedirs, target_dir, exist_ok=True)
@@ -90,19 +186,23 @@ async def upload_file(
             raise HTTPException(status_code=413, detail=f"Dosya boyutu çok büyük (max {MAX_UPLOAD_SIZE // (1024*1024)}MB).")
         await file.seek(0)
 
+        safe_filename = os.path.basename((file.filename or "dosya").replace("\\", "/")).strip()
+        if not safe_filename or safe_filename in (".", ".."):
+            raise HTTPException(status_code=400, detail="Geçersiz dosya adı.")
+
         # Dosya uzantı kontrolü
-        _, ext = os.path.splitext(file.filename or "")
+        _, ext = os.path.splitext(safe_filename)
         if ext.lower() not in ALLOWED_EXTENSIONS:
             raise HTTPException(status_code=400, detail=f"Bu dosya türü desteklenmiyor: {ext}")
 
-        file_path = os.path.join(target_dir, file.filename)
-        # Kök dizin dışına çıkış engeli
-        if not os.path.abspath(file_path).startswith(os.path.abspath(base_dir)):
+        file_path = os.path.join(target_dir, safe_filename)
+        real_base = os.path.realpath(base_dir)
+        if os.path.commonpath([real_base, os.path.realpath(file_path)]) != real_base:
             raise HTTPException(status_code=400, detail="Geçersiz dosya yolu.")
 
         # If file exists, add a suffix
         if await asyncio.to_thread(os.path.exists, file_path):
-            base, ext = os.path.splitext(file.filename)
+            base, ext = os.path.splitext(safe_filename)
             file_path = os.path.join(target_dir, f"{base}_{int(datetime.now().timestamp())}{ext}")
 
         # Binary type detection (simplified)
@@ -120,11 +220,10 @@ async def upload_file(
 
         await asyncio.to_thread(save_file, file, file_path)
 
-        from app.config import DATA_DIR
         relative_path_from_data = os.path.relpath(file_path, DATA_DIR).replace("\\", "/")
-        relative_url = f"/{relative_path_from_data}"
+        relative_url = _build_signed_url_from_data_rel(relative_path_from_data)
 
-        # Try to upload to Firebase Storage for permanent cloud access across all devices
+        # Try to upload to Firebase Storage with private signed URLs
         cloud_url = None
         try:
             from app.lib.firebase_admin import bucket
@@ -139,14 +238,14 @@ async def upload_file(
                         file_bytes,
                         content_type=mime_type,
                     )
-                    try:
-                        blob.make_public()
-                    except Exception:
-                        pass
-                    return blob.public_url
+                    return blob.generate_signed_url(
+                        version="v4",
+                        expiration=timedelta(days=7),
+                        method="GET",
+                    )
                     
                 cloud_url = await asyncio.to_thread(_upload)
-                logger.info(f"Firebase Storage upload successful: {cloud_url}")
+                logger.info("Firebase Storage upload successful.")
         except Exception as fb_err:
             logger.warning(f"Firebase Storage upload failed, using local url: {fb_err}")
 
@@ -171,6 +270,8 @@ async def upload_file(
             "type": media_type,
             "path": os.path.relpath(file_path, base_dir).replace("\\", "/")
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"UPLOAD ERROR: user_id={user_id}, filename={file.filename}, error={str(e)}")
         raise HTTPException(status_code=500, detail="Dosya yükleme sırasında hata oluştu.")
@@ -183,9 +284,12 @@ async def get_file_tree(scope: str = Query("reports"), current_user: dict = Depe
         is_admin = current_user.get("role") == "admin"
         start_path = BASE_OTHER_DIR if scope == "other" else BASE_REPORTS_DIR
         all_items = await asyncio.to_thread(FolderManager.get_tree, start_path)
+        root_name = "Diğer İşlem ve Belgeler" if scope == "other" else "Raporlar"
         visible_items = []
         for item in all_items:
-            if is_admin or IS_DESKTOP or item["type"] == "folder" or FolderManager.check_permission(item["id"], user_id, "read"):
+            if is_admin or item["type"] == "folder" or FolderManager.check_permission_or_ancestor(item["id"], user_id, "read"):
+                if item["type"] == "file":
+                    item["url"] = _build_signed_file_url(root_name, item["id"])
                 visible_items.append(item)
         return visible_items
     except Exception as e:
@@ -200,19 +304,18 @@ async def create_folder(
     try:
         user_id = current_user["uid"]
         base_dir = BASE_OTHER_DIR if scope == "other" else BASE_REPORTS_DIR
-        base = base_dir
-        if req.parentId:
-            safe_parent = os.path.normpath(req.parentId).replace("..", "").lstrip(os.sep)
-            base = os.path.join(base_dir, safe_parent)
-            if not os.path.abspath(base).startswith(os.path.abspath(base_dir)):
-                raise HTTPException(status_code=400, detail="Geçersiz üst klasör yolu.")
+        base = _resolve_safe_path(base_dir, req.parentId)
+        safe_folder_name = os.path.basename((req.name or "").replace("\\", "/")).strip()
+        if not safe_folder_name or safe_folder_name in (".", ".."):
+            raise HTTPException(status_code=400, detail="Geçersiz klasör adı.")
 
-        new_path = os.path.join(base, req.name)
-        if not os.path.abspath(new_path).startswith(os.path.abspath(base_dir)):
+        new_path = os.path.realpath(os.path.join(base, safe_folder_name))
+        real_base = os.path.realpath(base_dir)
+        if os.path.commonpath([real_base, new_path]) != real_base:
             raise HTTPException(status_code=400, detail="Geçersiz klasör yolu.")
 
         await asyncio.to_thread(os.makedirs, new_path, exist_ok=True)
-        rel_folder_id = os.path.relpath(new_path, base_dir).replace("\\", "/")
+        rel_folder_id = os.path.relpath(new_path, real_base).replace("\\", "/")
         FolderManager.set_permission(
             file_id=rel_folder_id,
             owner_id=user_id,
@@ -223,8 +326,11 @@ async def create_folder(
                 "delete": [user_id]
             }
         )
-        return {"id": rel_folder_id, "name": req.name}
+        return {"id": rel_folder_id, "name": safe_folder_name}
+    except HTTPException:
+        raise
     except Exception as e:
+        _FILES_LOGGER.error(f"CREATE FOLDER ERROR: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Klasör oluşturulurken hata oluştu.")
 
 @router.post("/share-to-user", response_model=UploadResponse)
@@ -239,23 +345,28 @@ async def share_file_to_user(
     """Paylasilan dosyayi aliciya ait klasore fiziksel olarak kopyalar."""
     try:
         user_id = current_user["uid"]
-        safe_item_path = req.file_id.replace("..", "").strip("/")
+        is_admin = current_user.get("role") == "admin"
         logger.info(f"SHARE ATTEMPT: user_id={user_id}, file_id={req.file_id}, recipient_id={req.recipient_id}")
         base_dir = BASE_OTHER_DIR if scope == "other" else BASE_REPORTS_DIR
-        source_path = os.path.normpath(os.path.join(base_dir, safe_item_path))
-
-        if not source_path.startswith(os.path.normpath(base_dir)):
-            raise HTTPException(status_code=400, detail="Invalid file path")
+        source_path = _resolve_safe_path(base_dir, req.file_id)
+        rel_source = os.path.relpath(source_path, os.path.realpath(base_dir)).replace("\\", "/")
 
         if not await asyncio.to_thread(os.path.exists, source_path):
-            raise HTTPException(status_code=404, detail="Source file not found")
+            raise HTTPException(status_code=404, detail="Kaynak dosya bulunamadı.")
+
+        if not (is_admin or FolderManager.check_permission_or_ancestor(rel_source, user_id, "read")):
+            raise HTTPException(status_code=403, detail="Bu dosyayı paylaşma yetkiniz yok.")
 
         if await asyncio.to_thread(os.path.isdir, source_path):
-            raise HTTPException(status_code=400, detail="Folder sharing is not supported via this endpoint")
+            raise HTTPException(status_code=400, detail="Bu uç nokta ile klasör paylaşımı desteklenmiyor.")
 
         filename = os.path.basename(source_path)
-        recipient_safe = req.recipient_id.replace("..", "").replace("/", "_").replace("\\", "_").strip()
-        target_dir = os.path.join(settings.UPLOADS_DIR, "shared", recipient_safe)
+        recipient_safe = re.sub(r"[^A-Za-z0-9._-]", "_", req.recipient_id.strip())
+        if not recipient_safe or recipient_safe in (".", ".."):
+            raise HTTPException(status_code=400, detail="Geçersiz alıcı kimliği.")
+
+        shared_root = os.path.realpath(os.path.join(settings.UPLOADS_DIR, "shared"))
+        target_dir = _resolve_safe_path(shared_root, recipient_safe)
         await asyncio.to_thread(os.makedirs, target_dir, exist_ok=True)
 
         target_path = os.path.join(target_dir, filename)
@@ -265,20 +376,32 @@ async def share_file_to_user(
 
         await asyncio.to_thread(shutil.copy2, source_path, target_path)
 
+        shared_rel_id = f"shared/{recipient_safe}/{os.path.basename(target_path)}"
+        FolderManager.set_permission(
+            file_id=shared_rel_id,
+            owner_id=user_id,
+            allowed_users=list({user_id, req.recipient_id}),
+            permissions={
+                "read": list({user_id, req.recipient_id}),
+                "write": [user_id],
+                "delete": [user_id],
+            },
+        )
+
         relative_path_from_data = os.path.relpath(target_path, DATA_DIR).replace("\\", "/")
-        relative_url = f"/{relative_path_from_data}"
+        signed_url = _build_signed_url_from_data_rel(relative_path_from_data)
 
         return {
-            "url": relative_url,
+            "url": signed_url,
             "name": os.path.basename(target_path),
             "type": "file",
-            "path": os.path.relpath(target_path, base_dir).replace("\\", "/")
+            "path": shared_rel_id
         }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"SHARE ERROR: user_id={user_id}, file_id={req.file_id}, recipient_id={req.recipient_id}, error={str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"SHARE ERROR: user_id={user_id}, file_id={req.file_id}, recipient_id={req.recipient_id}, error={str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Dosya paylaşılırken bir hata oluştu.")
 
 @router.delete("/delete-item/{file_id:path}")
 async def delete_item(
@@ -294,19 +417,19 @@ async def delete_item(
     try:
         logger.info(f"SİLME TALEBİ: {file_id} (UID: {user_id})")
         
-        safe_item_path = file_id.replace("..", "").strip("/")
         base_dir = BASE_OTHER_DIR if scope == "other" else BASE_REPORTS_DIR
-        full_path = os.path.normpath(os.path.join(base_dir, safe_item_path))
-        
+        full_path = _resolve_safe_path(base_dir, file_id)
+        rel_item_path = os.path.relpath(full_path, os.path.realpath(base_dir)).replace("\\", "/")
+
+        # Yetki kontrolü (Admin bypass dahil)
+        is_admin = current_user.get("role") == "admin"
+        if not (is_admin or FolderManager.check_permission_or_ancestor(rel_item_path, user_id, "delete")):
+            logger.warning(f"SİLME REDDEDİLDİ: Yetki yok -> {user_id}")
+            raise HTTPException(status_code=403, detail="Bu dosyayı silme yetkiniz yok.")
+
         if not os.path.exists(full_path):
             logger.error(f"SİLME HATASI: Yol bulunamadı -> {full_path}")
             return {"status": "success", "message": "Dosya zaten mevcut değil."}
-            
-        # Yetki kontrolü (Admin bypass dahil)
-        is_admin = current_user.get("role") == "admin"
-        if not (is_admin or IS_DESKTOP or FolderManager.check_permission(safe_item_path, user_id, "delete")):
-            logger.warning(f"SİLME REDDEDİLDİ: Yetki yok -> {user_id}")
-            raise HTTPException(status_code=403, detail="Bu dosyayı silme yetkiniz yok.")
             
         if os.path.isdir(full_path):
             # Klasörü ve içindekileri (kilitli/salt okunur olsa bile) sil
@@ -332,9 +455,8 @@ async def delete_item(
     except HTTPException:
         raise
     except Exception as e:
-        error_msg = str(e)
-        logger.error(f"SİLME KRİTİK HATA: {error_msg}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Silme Hatası: {error_msg}")
+        logger.error(f"SİLME KRİTİK HATA: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Dosya veya klasör silinirken bir hata oluştu.")
 
 @router.post("/open-file/{file_id:path}")
 async def open_file(
@@ -344,13 +466,12 @@ async def open_file(
 ):
     """Opens the specified file with the default OS application."""
     try:
-        # Prevent traversal attacks
-        safe_item_path = file_id.replace("..", "").strip("/")
         base_dir = BASE_OTHER_DIR if scope == "other" else BASE_REPORTS_DIR
-        full_path = os.path.normpath(os.path.join(base_dir, safe_item_path))
+        full_path = _resolve_safe_path(base_dir, file_id)
+        rel_item_path = os.path.relpath(full_path, os.path.realpath(base_dir)).replace("\\", "/")
 
         is_admin = current_user.get("role") == "admin"
-        if not (is_admin or IS_DESKTOP or FolderManager.check_permission(safe_item_path, current_user["uid"], "read")):
+        if not (is_admin or FolderManager.check_permission_or_ancestor(rel_item_path, current_user["uid"], "read")):
             raise HTTPException(status_code=403, detail="Bu dosyayı açma yetkiniz yok.")
         
         if not await asyncio.to_thread(os.path.exists, full_path):
@@ -387,13 +508,12 @@ async def open_folder(
 ):
     """Opens the specified folder (or the parent folder of a file) in the OS explorer."""
     try:
-        # Prevent traversal attacks
-        safe_item_path = file_id.replace("..", "").strip("/")
         base_dir = BASE_OTHER_DIR if scope == "other" else BASE_REPORTS_DIR
-        full_path = os.path.normpath(os.path.join(base_dir, safe_item_path))
+        full_path = _resolve_safe_path(base_dir, file_id)
+        rel_item_path = os.path.relpath(full_path, os.path.realpath(base_dir)).replace("\\", "/")
 
         is_admin = current_user.get("role") == "admin"
-        if not (is_admin or IS_DESKTOP or FolderManager.check_permission(safe_item_path, current_user["uid"], "read")):
+        if not (is_admin or FolderManager.check_permission_or_ancestor(rel_item_path, current_user["uid"], "read")):
             raise HTTPException(status_code=403, detail="Bu klasoru açma yetkiniz yok.")
         
         if not await asyncio.to_thread(os.path.exists, full_path):
@@ -533,7 +653,8 @@ async def open_task_folder(
     except HTTPException as he:
         raise he
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _FILES_LOGGER.error(f"OPEN TASK FOLDER ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Görev klasörü açılırken bir hata oluştu.")
 
 
 @router.post("/create-task-folder/{task_id}")
@@ -565,6 +686,16 @@ async def create_task_folder_endpoint(
             if not task_doc.exists:
                 raise HTTPException(status_code=404, detail="Göreve ait klasör bilgisi bulunamadı.")
             task_data = task_doc.to_dict() or {}
+            uid = current_user["uid"]
+            is_member = (
+                uid == task_data.get("owner_id")
+                or uid in (task_data.get("assigned_to") or [])
+                or uid in (task_data.get("accepted_collaborators") or [])
+                or uid in (task_data.get("shared_with") or [])
+                or current_user.get("role") == "admin"
+            )
+            if not is_member:
+                raise HTTPException(status_code=403, detail="Bu görev klasörünü oluşturma yetkiniz yok.")
         
         # Calculate year, type, code, title
         start_date_str = task_data.get('baslama_tarihi')
@@ -625,7 +756,8 @@ async def create_task_folder_endpoint(
     except HTTPException as he:
         raise he
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _FILES_LOGGER.error(f"CREATE TASK FOLDER ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Görev klasörü oluşturulurken bir hata oluştu.")
 
 
 # New DOCX generation endpoints
@@ -679,6 +811,23 @@ class EvrakTalebiDocxRequest(BaseModel):
     scope: Optional[str] = "reports"
     path: Optional[str] = ""
 
+def _register_generated_docx(output_path: str, base_dir: str, user_id: str) -> dict:
+    rel_path = os.path.relpath(output_path, os.path.realpath(base_dir)).replace("\\", "/")
+    FolderManager.set_permission(
+        file_id=rel_path,
+        owner_id=user_id,
+        allowed_users=[user_id],
+        permissions={"read": [user_id], "write": [user_id], "delete": [user_id]},
+    )
+    rel_from_data = os.path.relpath(output_path, os.path.realpath(DATA_DIR)).replace("\\", "/")
+    return {
+        "status": "success",
+        "filename": os.path.basename(output_path),
+        "path": rel_path,
+        "url": _build_signed_url_from_data_rel(rel_from_data),
+    }
+
+
 @router.post("/generate-docx-kapak")
 async def generate_docx_kapak_endpoint(
     req: KapakDocxRequest,
@@ -689,10 +838,7 @@ async def generate_docx_kapak_endpoint(
         template_path = os.path.join(project_root, "frontend", "public", "kapak.docx")
         
         base_dir = BASE_OTHER_DIR if req.scope == "other" else BASE_REPORTS_DIR
-        output_dir = base_dir
-        if req.path:
-            safe_path = os.path.normpath(req.path).replace("..", "").lstrip(os.sep)
-            output_dir = os.path.join(base_dir, safe_path)
+        output_dir = _resolve_safe_path(base_dir, req.path)
             
         await asyncio.to_thread(os.makedirs, output_dir, exist_ok=True)
         filename = f"Rapor_Kapagi_{int(datetime.now().timestamp())}.docx"
@@ -703,12 +849,12 @@ async def generate_docx_kapak_endpoint(
         if req.openAfterGenerate and IS_DESKTOP and os.name == 'nt':
             await asyncio.to_thread(os.startfile, output_path)
             
-        rel_path = os.path.relpath(output_path, base_dir).replace("\\", "/")
-        return {"status": "success", "filename": filename, "path": rel_path}
+        return _register_generated_docx(output_path, base_dir, current_user["uid"])
+    except HTTPException:
+        raise
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        _FILES_LOGGER.error(f"DOCX KAPAK ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Kapak belgesi oluşturulurken bir hata oluştu.")
 
 @router.post("/generate-docx-dizi")
 async def generate_docx_dizi_endpoint(
@@ -721,10 +867,7 @@ async def generate_docx_dizi_endpoint(
         template_path = os.path.join(project_root, "frontend", "public", template_name)
         
         base_dir = BASE_OTHER_DIR if req.scope == "other" else BASE_REPORTS_DIR
-        output_dir = base_dir
-        if req.path:
-            safe_path = os.path.normpath(req.path).replace("..", "").lstrip(os.sep)
-            output_dir = os.path.join(base_dir, safe_path)
+        output_dir = _resolve_safe_path(base_dir, req.path)
             
         await asyncio.to_thread(os.makedirs, output_dir, exist_ok=True)
         filename = f"Dizi_Pusulasi_{int(datetime.now().timestamp())}.docx"
@@ -735,12 +878,12 @@ async def generate_docx_dizi_endpoint(
         if IS_DESKTOP and os.name == 'nt':
             await asyncio.to_thread(os.startfile, output_path)
             
-        rel_path = os.path.relpath(output_path, base_dir).replace("\\", "/")
-        return {"status": "success", "filename": filename, "path": rel_path}
+        return _register_generated_docx(output_path, base_dir, current_user["uid"])
+    except HTTPException:
+        raise
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        _FILES_LOGGER.error(f"DOCX DIZI ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Dizi pusulası oluşturulurken bir hata oluştu.")
 
 @router.post("/generate-docx-hazirlik")
 async def generate_docx_hazirlik_endpoint(
@@ -752,10 +895,7 @@ async def generate_docx_hazirlik_endpoint(
         template_path = os.path.join(project_root, "frontend", "public", "Teftiş Öncesi Hazırlanılması İstenilen Hususlar.docx")
         
         base_dir = BASE_OTHER_DIR if req.scope == "other" else BASE_REPORTS_DIR
-        output_dir = base_dir
-        if req.path:
-            safe_path = os.path.normpath(req.path).replace("..", "").lstrip(os.sep)
-            output_dir = os.path.join(base_dir, safe_path)
+        output_dir = _resolve_safe_path(base_dir, req.path)
             
         await asyncio.to_thread(os.makedirs, output_dir, exist_ok=True)
         filename = f"Evrak_Talebi_{int(datetime.now().timestamp())}.docx"
@@ -766,12 +906,12 @@ async def generate_docx_hazirlik_endpoint(
         if IS_DESKTOP and os.name == 'nt':
             await asyncio.to_thread(os.startfile, output_path)
             
-        rel_path = os.path.relpath(output_path, base_dir).replace("\\", "/")
-        return {"status": "success", "filename": filename, "path": rel_path}
+        return _register_generated_docx(output_path, base_dir, current_user["uid"])
+    except HTTPException:
+        raise
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        _FILES_LOGGER.error(f"DOCX HAZIRLIK ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Hazırlık belgesi oluşturulurken bir hata oluştu.")
 
 class DegerlendirmeDocxRequest(BaseModel):
     date: Optional[str] = ""
@@ -792,10 +932,7 @@ async def generate_docx_degerlendirme_endpoint(
 ):
     try:
         base_dir = BASE_OTHER_DIR if req.scope == "other" else BASE_REPORTS_DIR
-        output_dir = base_dir
-        if req.path:
-            safe_path = os.path.normpath(req.path).replace("..", "").lstrip(os.sep)
-            output_dir = os.path.join(base_dir, safe_path)
+        output_dir = _resolve_safe_path(base_dir, req.path)
             
         await asyncio.to_thread(os.makedirs, output_dir, exist_ok=True)
         filename = f"Degerlendirme_Formu_{int(datetime.now().timestamp())}.docx"
@@ -806,12 +943,12 @@ async def generate_docx_degerlendirme_endpoint(
         if IS_DESKTOP and os.name == 'nt':
             await asyncio.to_thread(os.startfile, output_path)
             
-        rel_path = os.path.relpath(output_path, base_dir).replace("\\", "/")
-        return {"status": "success", "filename": filename, "path": rel_path}
+        return _register_generated_docx(output_path, base_dir, current_user["uid"])
+    except HTTPException:
+        raise
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        _FILES_LOGGER.error(f"DOCX DEGERLENDIRME ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Değerlendirme formu oluşturulurken bir hata oluştu.")
 
 
 class OzetTablolarDocxRequest(BaseModel):
@@ -832,10 +969,7 @@ async def generate_docx_ozet_tablolar_endpoint(
 ):
     try:
         base_dir = BASE_OTHER_DIR if req.scope == "other" else BASE_REPORTS_DIR
-        output_dir = base_dir
-        if req.path:
-            safe_path = os.path.normpath(req.path).replace("..", "").lstrip(os.sep)
-            output_dir = os.path.join(base_dir, safe_path)
+        output_dir = _resolve_safe_path(base_dir, req.path)
             
         await asyncio.to_thread(os.makedirs, output_dir, exist_ok=True)
         filename = f"Ozet_Bilgiler_Tablolari_{int(datetime.now().timestamp())}.docx"
@@ -846,10 +980,10 @@ async def generate_docx_ozet_tablolar_endpoint(
         if IS_DESKTOP and os.name == 'nt':
             await asyncio.to_thread(os.startfile, output_path)
             
-        rel_path = os.path.relpath(output_path, base_dir).replace("\\", "/")
-        return {"status": "success", "filename": filename, "path": rel_path}
+        return _register_generated_docx(output_path, base_dir, current_user["uid"])
+    except HTTPException:
+        raise
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        _FILES_LOGGER.error(f"DOCX OZET ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Özet tablolar belgesi oluşturulurken bir hata oluştu.")
 

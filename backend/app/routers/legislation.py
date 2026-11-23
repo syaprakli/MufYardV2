@@ -62,8 +62,12 @@ async def open_legislation_folder(
         else:
             await asyncio.to_thread(subprocess.run, ['xdg-open', abs_p])
         return {"status": "success", "path": abs_p}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"open_folder error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Klasör açılırken bir hata oluştu.")
 
 @router.post("/open-file-location")
 async def open_file_location(
@@ -155,8 +159,12 @@ async def open_file_location(
             "path": abs_dir,
             "message": msg
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"open_file_location error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Dosya konumu açılırken bir hata oluştu.")
 
 @router.post("/sync-folder")
 async def sync_legislation_folder(
@@ -279,8 +287,12 @@ async def sync_legislation_folder(
             "folder_path": os.path.abspath(MEVZUAT_DIR),
             "message": f"{imported_count} yeni mevzuat belgesi klasörden başarıyla kütüphaneye eklendi." if imported_count > 0 else "Mevzuat klasörü taranmıştır, yeni eklenecek dosya bulunamadı."
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Klasör senkronizasyon hatası: {str(e)}")
+        import logging
+        logging.getLogger(__name__).error(f"sync_legislation_folder error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Klasör senkronizasyonu sırasında bir hata oluştu.")
 
 from app.schemas.legislation import LegislationCreate, LegislationUpdate, LegislationResponse
 
@@ -315,8 +327,12 @@ async def upload_legislation_file(
 
         file_url, local_path = await LegislationService.save_legislation_file(file, category, doc_type, target_uid, is_public)
         return {"file_url": file_url, "local_path": local_path}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"upload_legislation_file error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Mevzuat dosyası yüklenirken bir hata oluştu.")
 
 @router.post("/extract-text")
 async def extract_text(file: UploadFile = File(...), current_user: Dict[str, Any] = Depends(get_current_user)):
@@ -324,10 +340,12 @@ async def extract_text(file: UploadFile = File(...), current_user: Dict[str, Any
     try:
         text = await ExtractorService.extract_text(file)
         return {"text": text}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Desteklenmeyen veya geçersiz dosya içeriği.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Metin ayıklama sırasında hata oluştu: {str(e)}")
+        import logging
+        logging.getLogger(__name__).error(f"extract_text error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Metin ayıklama sırasında bir hata oluştu.")
 
 @router.get("/", response_model=List[LegislationResponse])
 async def get_legislations(
@@ -341,8 +359,12 @@ async def get_legislations(
         if uid and not is_admin and uid != caller_uid:
             raise HTTPException(status_code=403, detail="Başka kullanıcının özel mevzuatına erişemezsiniz.")
         return await LegislationService.get_legislations(uid, category, is_admin)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"get_legislations error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Mevzuat listesi alınırken bir hata oluştu.")
 
 
 @router.post("/", response_model=LegislationResponse)
@@ -359,8 +381,12 @@ async def create_legislation(legislation: LegislationCreate, current_user: Dict[
             payload = legislation.copy(update={"owner_id": caller_uid if not legislation.is_public else None})
 
         return await LegislationService.create_legislation(payload, is_admin)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"create_legislation error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Mevzuat kaydedilirken bir hata oluştu.")
 
 @router.post("/{leg_id}/approve")
 async def approve_legislation(

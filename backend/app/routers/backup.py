@@ -1,9 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from fastapi.responses import FileResponse
 from app.lib.firebase_admin import db
-from app.lib.auth import get_current_user
+from app.lib.auth import require_founder_admin
 from app.services.google_service import GoogleDriveService
-from app.services.profile_service import ProfileService
 import json
 import os
 import asyncio
@@ -15,17 +14,11 @@ from typing import Any, Dict
 router = APIRouter()
 
 
-def _ensure_founder(current_user: Dict[str, Any]) -> None:
-    caller_email = (current_user.get("email") or "").strip().lower()
-    founder_emails = {email.strip().lower() for email in ProfileService.FOUNDER_EMAILS}
-    if caller_email not in founder_emails:
-        raise HTTPException(status_code=403, detail="Bu işlem yalnızca kurucu hesaplara açıktır.")
 
 @router.post("/export")
-async def export_data(current_user: Dict[str, Any] = Depends(get_current_user)):
+async def export_data(current_user: Dict[str, Any] = Depends(require_founder_admin)):
     """Exports all system data to a JSON file for local backup."""
     try:
-        _ensure_founder(current_user)
         data = await _get_full_backup_data()
         
         # Create a temporary file
@@ -43,10 +36,9 @@ async def export_data(current_user: Dict[str, Any] = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Veri dışa aktarılırken bir hata oluştu.")
 
 @router.post("/drive-backup")
-async def drive_backup(current_user: Dict[str, Any] = Depends(get_current_user)):
+async def drive_backup(current_user: Dict[str, Any] = Depends(require_founder_admin)):
     """Uploads system backup to Google Drive."""
     try:
-        _ensure_founder(current_user)
         data = await _get_full_backup_data()
         drive_service = GoogleDriveService()
         
@@ -69,10 +61,9 @@ async def drive_backup(current_user: Dict[str, Any] = Depends(get_current_user))
         raise HTTPException(status_code=500, detail="Google Drive'a yedek alınırken bir hata oluştu.")
 
 @router.post("/import")
-async def import_data(file: UploadFile = File(...), current_user: Dict[str, Any] = Depends(get_current_user)):
+async def import_data(file: UploadFile = File(...), current_user: Dict[str, Any] = Depends(require_founder_admin)):
     """Imports system data from a JSON file."""
     try:
-        _ensure_founder(current_user)
         contents = await file.read()
         import_data = json.loads(contents)
         

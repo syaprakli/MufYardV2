@@ -68,6 +68,7 @@ class Settings(BaseSettings):
 
     # CORS - Virgülle ayrılmış izinli originler. Boşsa sadece localhost izinli.
     CORS_ORIGINS: str = ""
+    FOUNDER_EMAILS: str = "sefa.yaprakli@gsb.gov.tr,syaprakli@gmail.com,sefayaprakli@hotmail.com"
 
     # Path Helpers (Always in DATA_DIR)
     @property
@@ -104,3 +105,7 @@ def get_settings():
     return Settings()
 
 settings = get_settings()
+
+def get_founder_emails() -> set[str]:
+    raw = settings.FOUNDER_EMAILS or ""
+    return {e.strip().lower() for e in raw.split(",") if e and e.strip()}

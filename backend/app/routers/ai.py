@@ -200,7 +200,6 @@ async def chat_with_assistant(
         logger.error(f"[AI CHAT] Exception type={type(e).__name__}: {e}")
         logger.error(f"[AI CHAT] Traceback:\n{traceback.format_exc()}")
         status_code, message = _normalize_gemini_error(e)
-        message = f"HATA DETAYI: {type(e).__name__} - {str(e)} | Lütfen bu mesajı kopyalayıp bana ilet."
         raise HTTPException(status_code=status_code, detail=message)
 
 
@@ -283,8 +282,11 @@ async def set_gemini_key(
         return {"status": "success", "message": "API anahtarınız bilgisayarınıza (yerel) kaydedildi."}
     except HTTPException:
         raise
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"set_gemini_key error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="AI ayarları kaydedilirken bir hata oluştu.")
 
 @router.get("/test-connection")
 async def test_gemini_connection(
@@ -332,7 +334,6 @@ async def test_gemini_connection(
         logger.error(f"[AI TEST] Connection test failed for user {current_user.get('uid')}: {e}")
         logger.error(traceback.format_exc())
         status_code, message = _normalize_gemini_error(e)
-        message = f"HATA DETAYI: {type(e).__name__} - {str(e)}"
         return {"connected": False, "message": message, "code": status_code}
 
 @router.post("/transcribe")
@@ -492,8 +493,11 @@ async def get_report_examples(
         return await ai_service.get_report_examples(current_user, report_type)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"get_report_examples error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Örnek raporlar alınırken bir hata oluştu.")
 
 @router.post("/report-examples")
 async def create_report_example(
@@ -528,8 +532,11 @@ async def create_report_example(
         raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Örnek rapor kaydedilirken hata oluştu: {str(e)}")
+        logger.error(f"create_report_example error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Örnek rapor kaydedilirken bir hata oluştu.")
 
 @router.delete("/report-examples/{example_id}")
 async def delete_report_example(
@@ -542,8 +549,11 @@ async def delete_report_example(
         return {"status": "success", "message": "Örnek rapor başarıyla silindi."}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"delete_report_example error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Örnek rapor silinirken bir hata oluştu.")
 
 @router.post("/generate-wizard-report")
 @limiter.limit("2/minute")

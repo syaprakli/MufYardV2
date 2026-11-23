@@ -16,8 +16,12 @@ async def sync_inspectors(current_user: Dict[str, Any] = Depends(require_roles("
         if result["status"] == "error":
             raise HTTPException(status_code=400, detail=result["message"])
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"sync_inspectors error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Müfettiş senkronizasyonu sırasında bir hata oluştu.")
 
 @router.post("/sync-from-contacts")
 async def sync_inspectors_from_contacts(current_user: Dict[str, Any] = Depends(require_roles("admin", "moderator"))):
@@ -27,8 +31,12 @@ async def sync_inspectors_from_contacts(current_user: Dict[str, Any] = Depends(r
         if result["status"] == "error":
             raise HTTPException(status_code=400, detail=result["message"])
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"sync_inspectors_from_contacts error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Rehber senkronizasyonu sırasında bir hata oluştu.")
 
 @router.post("/upload-and-sync")
 async def upload_and_sync_inspectors(
@@ -60,8 +68,12 @@ async def upload_and_sync_inspectors(
         if result["status"] == "error":
             raise HTTPException(status_code=400, detail=result["message"])
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"upload_and_sync_inspectors error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Dosya yükleme ve senkronizasyon sırasında bir hata oluştu.")
 
 @router.get("/", response_model=List[InspectorResponse])
 async def get_inspectors(current_user: Dict[str, Any] = Depends(get_current_user)):
@@ -128,4 +140,6 @@ async def link_inspector_to_profile(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"link_profile error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Profil eşleştirme sırasında bir hata oluştu.")

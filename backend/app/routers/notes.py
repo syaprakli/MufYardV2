@@ -95,8 +95,7 @@ async def delete_note(note_id: str, current_user: Dict[str, Any] = Depends(get_c
     note_data = doc.to_dict() or {}
     owner_id = note_data.get("owner_id")
     
-    admin_id = "sefa.yaprakli@gsb.gov.tr"
-    can_delete = role in ["admin", "moderator"] or any(identity in [owner_id, admin_id, "admin"] for identity in identity_keys)
+    can_delete = role in ["admin", "moderator"] or bool(owner_id and owner_id in identity_keys)
     
     if can_delete:
         success = await NoteService.delete_note(note_id)

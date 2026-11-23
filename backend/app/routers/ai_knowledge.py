@@ -4,8 +4,10 @@ from app.schemas.ai_knowledge import AIKnowledgeBase, AIKnowledgeCreate, AIKnowl
 from app.lib.firebase_admin import db
 from app.lib.auth import get_current_user, require_roles
 import asyncio
+import logging
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/", response_model=List[AIKnowledgeResponse])
@@ -30,8 +32,8 @@ async def get_ai_knowledge(
         items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
         return items
     except Exception as e:
-
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"get_ai_knowledge error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Bilgi bankası kayıtları alınırken hata oluştu.")
 
 @router.post("/", response_model=AIKnowledgeResponse)
 async def create_ai_knowledge(
@@ -51,7 +53,8 @@ async def create_ai_knowledge(
         res['id'] = new_doc.id
         return res
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"create_ai_knowledge error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Bilgi maddesi oluşturulurken hata oluştu.")
 
 @router.patch("/{item_id}", response_model=AIKnowledgeResponse)
 async def update_ai_knowledge(
@@ -75,8 +78,11 @@ async def update_ai_knowledge(
         res = updated_doc.to_dict()
         res['id'] = updated_doc.id
         return res
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"update_ai_knowledge error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Bilgi maddesi güncellenirken hata oluştu.")
 
 @router.delete("/{item_id}")
 async def delete_ai_knowledge(
@@ -92,5 +98,8 @@ async def delete_ai_knowledge(
             
         await asyncio.to_thread(doc_ref.delete)
         return {"status": "success", "message": "Tenkit maddesi silindi."}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"delete_ai_knowledge error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Bilgi maddesi silinirken hata oluştu.")

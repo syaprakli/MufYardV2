@@ -133,7 +133,8 @@ async def update_contact(contact_id: str, contact_update: ContactUpdate, current
 @router.delete("/{contact_id}")
 async def delete_contact(contact_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     try:
-        success = await ContactService.delete_contact(contact_id, current_user.get("uid"))
+        is_admin = (current_user.get("role") or "user").strip().lower() == "admin"
+        success = await ContactService.delete_contact(contact_id, current_user.get("uid"), is_admin=is_admin)
         if not success:
             raise HTTPException(status_code=404, detail="Kişi bulunamadı.")
         return {"status": "success", "message": "Kişi rehberden silindi."}

@@ -1074,7 +1074,7 @@ def generate_ozet_tablolar_docx(output_path, data):
     set_cell_run_text(t2.cell(last_r, 3), str(tot_sozlesmeli) if tot_sozlesmeli else "", bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
     set_cell_run_text(t2.cell(last_r, 4), str(tot_all) if tot_all else "", bold=True, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
 
-    # 3- HAKEM DURUMU
+        # 3- HAKEM DURUMU
     add_section_header("3- HAKEM DURUMU:")
     hakem_data = tables_data.get("hakemDurumu", {})
     h_rows = [
@@ -1084,13 +1084,21 @@ def generate_ozet_tablolar_docx(output_path, data):
     for c_row in tables_data.get("customHakemRows", []):
         h_rows.append((c_row, c_row))
     h_rows.append(("toplam", "Toplam"))
-    t3 = doc.add_table(rows=len(h_rows) + 1, cols=2)
-    apply_table_style(t3, [Cm(10.0), Cm(6.0)])
-    set_cell_run_text(t3.cell(0, 0), "KATEGORİ", bold=True, font_size=9)
-    set_cell_run_text(t3.cell(0, 1), "SAYI", bold=True, font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+    num_years = len(years) if len(years) > 0 else 1
+    t3 = doc.add_table(rows=len(h_rows) + 1, cols=num_years + 1)
+    apply_table_style(t3, [Cm(5.5)] + [Cm(10.5 / num_years) for _ in range(num_years)])
+    set_cell_run_text(t3.cell(0, 0), "HAKEM KATEGORİSİ", bold=True, font_size=9)
+    for y_idx, y_str in enumerate(years):
+        set_cell_run_text(t3.cell(0, y_idx + 1), y_str, bold=True, font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
     for idx, (hk, hlbl) in enumerate(h_rows):
         set_cell_run_text(t3.cell(idx + 1, 0), hlbl, bold=(hk == "toplam"), font_size=8.5)
-        set_cell_run_text(t3.cell(idx + 1, 1), str(hakem_data.get(hk, "")), bold=(hk == "toplam"), font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+        h_val = hakem_data.get(hk, {})
+        for y_idx, y_str in enumerate(years):
+            if isinstance(h_val, dict):
+                v_str = str(h_val.get(y_str, ""))
+            else:
+                v_str = str(h_val) if (y_idx == len(years) - 1 and str(h_val)) else ""
+            set_cell_run_text(t3.cell(idx + 1, y_idx + 1), v_str, bold=(hk == "toplam"), font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
     add_note("Branşları belirtilecektir. Ek 2")
 
     # 4- KULÜP SAYILARI
@@ -1099,13 +1107,20 @@ def generate_ozet_tablolar_docx(output_path, data):
     k_rows = [("faalKulup", "Faal Kulüp Sayısı"), ("faalBrans", "Faal Branş Sayısı (1)")]
     for c_row in tables_data.get("customKulupRows", []):
         k_rows.append((c_row, c_row))
-    t4 = doc.add_table(rows=len(k_rows) + 1, cols=2)
-    apply_table_style(t4, [Cm(10.0), Cm(6.0)])
+    t4 = doc.add_table(rows=len(k_rows) + 1, cols=num_years + 1)
+    apply_table_style(t4, [Cm(5.5)] + [Cm(10.5 / num_years) for _ in range(num_years)])
     set_cell_run_text(t4.cell(0, 0), "GÖSTERGE", bold=True, font_size=9)
-    set_cell_run_text(t4.cell(0, 1), "DEĞER", bold=True, font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+    for y_idx, y_str in enumerate(years):
+        set_cell_run_text(t4.cell(0, y_idx + 1), y_str, bold=True, font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
     for idx, (kk, klbl) in enumerate(k_rows):
         set_cell_run_text(t4.cell(idx + 1, 0), klbl, font_size=8.5)
-        set_cell_run_text(t4.cell(idx + 1, 1), str(kulup_data.get(kk, "")), font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+        k_val = kulup_data.get(kk, {})
+        for y_idx, y_str in enumerate(years):
+            if isinstance(k_val, dict):
+                v_str = str(k_val.get(y_str, ""))
+            else:
+                v_str = str(k_val) if (y_idx == len(years) - 1 and str(k_val)) else ""
+            set_cell_run_text(t4.cell(idx + 1, y_idx + 1), v_str, font_size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
     add_note("(1) Kulüplerin faal oldukları branşlar belirtilecektir. Ek 3")
 
     # 5- GENÇLİK HİZMET VE FAALİYETLERİ

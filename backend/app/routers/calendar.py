@@ -1,9 +1,14 @@
 import os
 import json
 import asyncio
-import base64
+import secrets
+import logging
+import urllib.parse
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, Request, Depends
+from app.lib.security import create_signed_token, verify_signed_token
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import RedirectResponse, HTMLResponse
 from pydantic import BaseModel
 from typing import List, Any, Optional
@@ -160,10 +165,12 @@ async def get_auth_url(return_url: str | None = Query(default=None), current_use
     flow.redirect_uri = f"{backend_url}/api/calendar/callback"
     
     state_payload = {
+        "purpose": "google_oauth",
         "uid": current_user.get("uid"),
-        "return_url": return_url
+        "return_url": return_url,
+        "nonce": secrets.token_urlsafe(16),
     }
-    encoded_state = base64.urlsafe_b64encode(json.dumps(state_payload).encode("utf-8")).decode("utf-8")
+    encoded_state = create_signed_token(state_payload, ttl_seconds=600)
 
     auth_url, _ = flow.authorization_url(
         access_type='offline',
@@ -190,18 +197,27 @@ async def oauth_callback(
     if not code or not state:
         return _popup_result_page(frontend_url, "error=auth_failed")
 
-    uid = state
-    frontend_from_state = None
-    try:
-        decoded = base64.urlsafe_b64decode(state.encode("utf-8")).decode("utf-8")
-        payload = json.loads(decoded)
-        uid = payload.get("uid", state)
-        frontend_from_state = payload.get("return_url")
-    except Exception:
-        # Backward compatibility: old state was plain uid
-        uid = state
+    payload = verify_signed_token(state)
+    if not payload or payload.get("purpose") != "google_oauth" or not payload.get("uid"):
+        logger.warning("Google OAuth callback rejected due to invalid or expired state.")
+        return _popup_result_page(frontend_url, "error=invalid_state")
 
-    frontend_url = (frontend_from_state or frontend_url or "http://localhost:3000").rstrip("/")
+    uid = payload["uid"]
+    frontend_from_state = payload.get("return_url")
+    allowed_prefixes = (
+        "http://localhost",
+        "http://127.0.0.1",
+        "app://",
+        "https://mufyardv2.web.app",
+        "https://mufyardv2.firebaseapp.com",
+    )
+    safe_return_url = None
+    if isinstance(frontend_from_state, str):
+        parsed_ret = urllib.parse.urlparse(frontend_from_state)
+        if frontend_from_state.startswith(allowed_prefixes) and parsed_ret.scheme in {"http", "https", "app"}:
+            safe_return_url = frontend_from_state
+
+    frontend_url = (safe_return_url or frontend_url or "http://localhost:3000").rstrip("/")
     backend_url = os.getenv("VITE_API_URL", "http://localhost:8000").rstrip("/")
     redirect_uri = f"{backend_url}/api/calendar/callback"
     

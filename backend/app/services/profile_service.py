@@ -3,19 +3,36 @@ import asyncio
 import logging
 from typing import Optional, Dict, Any, List
 from app.lib.firebase_admin import db, bucket, messenger, messaging
-from app.schemas.profile import ProfileUpdate
-from app.config import BASE_DIR
-from fastapi import UploadFile
+from app.schemas.profile import ProfileUpdate, ProfileSelfUpdate, PRIVILEGED_PROFILE_FIELDS
+from app.config import BASE_DIR, get_founder_emails
+from fastapi import UploadFile, HTTPException
+import secrets
+import urllib.parse
 import os
 
 logger = logging.getLogger(__name__)
 
 class ProfileService:
-    FOUNDER_EMAILS = [
-        "sefa.yaprakli@gsb.gov.tr",
-        "syaprakli@gmail.com",
-        "sefayaprakli@hotmail.com"
-    ]
+    @staticmethod
+    def _get_founder_emails() -> set[str]:
+        return get_founder_emails()
+
+    @staticmethod
+    def _sign_profile_avatar(profile: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not profile:
+            return profile
+        avatar_url = profile.get("avatar_url")
+        if isinstance(avatar_url, str) and avatar_url.startswith("/uploads/") and "dl_token=" not in avatar_url:
+            from app.lib.security import create_signed_token
+            rel_path = avatar_url[len("/uploads/"):].lstrip("/")
+            token = create_signed_token(
+                {"purpose": "file_access", "root": "uploads", "path": rel_path},
+                ttl_seconds=86400,
+            )
+            encoded_rel = "/".join(urllib.parse.quote(seg, safe="") for seg in rel_path.split("/") if seg)
+            signed = f"/uploads/{encoded_rel}?dl_token={urllib.parse.quote(token, safe='')}"
+            return {**profile, "avatar_url": signed}
+        return profile
 
     @staticmethod
     def _normalize_email(value: Optional[str]) -> str:
@@ -46,38 +63,37 @@ class ProfileService:
     @staticmethod
     async def upload_avatar(uid: str, file: UploadFile) -> str:
         """Uploads an avatar to LOCAL storage and returns the local URL."""
-        # Setup local paths
-        ext = file.filename.split('.')[-1]
-        relative_path = os.path.join("profiles", uid)
-        
-        # Absolute path for the backend system
+        # Validate image extension and prevent traversal in uid/filename
+        raw_ext = (file.filename or "png").rsplit(".", 1)[-1].lower().strip()
+        if raw_ext not in {"png", "jpg", "jpeg", "webp", "gif"}:
+            raise HTTPException(status_code=400, detail="Yalnızca PNG, JPG, WEBP veya GIF görselleri yüklenebilir.")
+
+        safe_uid = os.path.basename(uid.replace("\\", "/")).strip()
+        relative_path = os.path.join("profiles", safe_uid)
+
         from app.config import get_settings
         settings = get_settings()
         upload_dir = os.path.join(settings.UPLOADS_DIR, relative_path)
-        
-        # Ensure directory exists
         os.makedirs(upload_dir, exist_ok=True)
-        
-        file_name = f"avatar.{ext}"
+
+        file_name = f"avatar.{raw_ext}"
         file_path = os.path.join(upload_dir, file_name)
-        
-        # Save file
+
         content = await file.read()
+        if len(content) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="Avatar dosyası en fazla 5MB olabilir.")
         with open(file_path, "wb") as f:
             f.write(content)
-            
-        # Standardized relative URL for both local and production
-        # Frontend resolveUrl will append BASE_URL (https://mufyardv2.up.railway.app)
-        public_url = f"/uploads/profiles/{uid}/{file_name}"
-        
-        # Update profile URL in Firestore
+
+        public_url = f"/uploads/profiles/{safe_uid}/{file_name}"
         await ProfileService.update_profile(uid, ProfileUpdate(avatar_url=public_url))
-        
-        logger.info(f"Avatar saved locally for user {uid}: {public_url}")
-        return public_url
+
+        signed_url = (ProfileService._sign_profile_avatar({"avatar_url": public_url}) or {}).get("avatar_url", public_url)
+        logger.info(f"Avatar saved locally for user {uid}")
+        return signed_url
 
     @staticmethod
-    async def get_profile(uid: str, email: Optional[str] = None, full_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def get_profile(uid: str, email: Optional[str] = None, full_name: Optional[str] = None, email_verified: bool = False) -> Optional[Dict[str, Any]]:
         try:
             doc_ref = db.collection('profiles').document(uid)
             doc = await asyncio.to_thread(doc_ref.get)
@@ -96,7 +112,7 @@ class ProfileService:
             # Eğer profil zaten doğrulanmışsa ve ismi genel değilse direkt döndür
             is_generic = profile_data.get('full_name') in ["Kullanıcı", "İsimsiz Kullanıcı", "Kullanici", "İsimsiz"]
             if profile_data.get('verified') == True and not is_generic:
-                return profile_data
+                return ProfileService._sign_profile_avatar(profile_data)
             
             # Doğrulanmamışsa veya ismi genel ise aşağıda 'Discovery' mantığına devam et
 
@@ -191,13 +207,13 @@ class ProfileService:
                 "updated_at": datetime.utcnow()
             }
 
-            # Admin & Premium role enforcement (Whitelisted emails)
-            _premium_emails = ProfileService.FOUNDER_EMAILS
+            # Admin & Premium role enforcement (only when email is verified)
+            _premium_emails = ProfileService._get_founder_emails()
             user_email_normalized = (email or search_email or "").lower().strip()
+            is_verified_founder = (email_verified and user_email_normalized in _premium_emails)
             
             # Add defaults for new profiles
             if not profile_data:
-                is_premium = user_email_normalized in _premium_emails or uid in _premium_emails
                 new_data.update({
                     "theme": "navy",
                     "ai_enabled": True,
@@ -205,12 +221,12 @@ class ProfileService:
                     "ai_temperature": 0.7,
                     "notifications_enabled": True,
                     "created_at": datetime.utcnow(),
-                    "has_premium_ai": is_premium,
-                    "trial_started": is_premium, # Premium ise zaten başlamış sayılır
-                    "role": "admin" if is_premium else "user"
+                    "has_premium_ai": is_verified_founder,
+                    "trial_started": is_verified_founder,
+                    "role": "admin" if is_verified_founder else "user"
                 })
             
-            if user_email_normalized in _premium_emails or uid in _premium_emails:
+            if is_verified_founder:
                 new_data["role"] = "admin"
                 new_data["has_premium_ai"] = True
             else:
@@ -238,7 +254,7 @@ class ProfileService:
                     })
             except: pass # Quota exceeded
                 
-            return new_data
+            return ProfileService._sign_profile_avatar(new_data)
 
         if profile_data:
             profile_data['uid'] = uid
@@ -252,11 +268,11 @@ class ProfileService:
                     await asyncio.to_thread(lambda: doc_ref.update({"emails": current_emails, "updated_at": datetime.utcnow()}))
                     profile_data['emails'] = current_emails
 
-                # Admin & Premium enforcement for existing profiles
-                _premium_emails = ProfileService.FOUNDER_EMAILS
+                # Admin & Premium enforcement for existing verified profiles
+                _premium_emails = ProfileService._get_founder_emails()
                 user_email_normalized = (profile_data.get('email') or search_email or '').lower().strip()
                 
-                if user_email_normalized in _premium_emails:
+                if email_verified and user_email_normalized in _premium_emails:
                     if profile_data.get('role') != 'admin' or profile_data.get('has_premium_ai') != True:
                         await asyncio.to_thread(lambda: doc_ref.update({
                             "role": "admin",
@@ -268,12 +284,13 @@ class ProfileService:
                         profile_data['has_premium_ai'] = True
                         profile_data['premium_type'] = "Sınırsız"
             except: pass 
-            return profile_data
+            return ProfileService._sign_profile_avatar(profile_data)
 
         # Final Fallback (New Account Creation)
-        _premium_emails = ProfileService.FOUNDER_EMAILS + ["VKV8SfuNkWf9WeTYeSCTizd4oG83"]
+        _premium_emails = ProfileService._get_founder_emails()
         user_email_normalized = (search_email or "").lower().strip()
-        is_premium_email = user_email_normalized in _premium_emails or uid in _premium_emails
+        is_premium_email = (email_verified and user_email_normalized in _premium_emails)
+
         
         _fallback_role = "admin" if is_premium_email else "user"
         _has_premium = True if is_premium_email else False
@@ -283,8 +300,8 @@ class ProfileService:
             "full_name": "Kullanıcı (Mod-Dışı)",
             "title": "Müfettiş",
             "institution": "Gençlik ve Spor Bakanlığı",
-            "email": search_email or "sefa.yaprakli@gsb.gov.tr",
-            "emails": ProfileService._merge_emails(search_email or "sefa.yaprakli@gsb.gov.tr"),
+            "email": search_email or "",
+            "emails": ProfileService._merge_emails(search_email or ""),
             "theme": "navy",
             "ai_enabled": True,
             "has_premium_ai": _has_premium,
@@ -312,16 +329,23 @@ class ProfileService:
             })
         except: pass
         
-        return default_profile
+        return ProfileService._sign_profile_avatar(default_profile)
 
     @staticmethod
-    async def update_profile(uid: str, profile_update: ProfileUpdate) -> Optional[Dict[str, Any]]:
+    async def update_profile(
+        uid: str,
+        profile_update: ProfileSelfUpdate | ProfileUpdate,
+        allow_privileged: bool = False,
+    ) -> Optional[Dict[str, Any]]:
         doc_ref = db.collection('profiles').document(uid)
         exists = await asyncio.to_thread(lambda: doc_ref.get().exists)
         if not exists:
             await ProfileService.get_profile(uid) # Initialize if not exists
             
-        update_data = {k: v for k, v in profile_update.dict().items() if v is not None}
+        update_data = {
+            k: v for k, v in profile_update.dict(exclude_unset=True).items()
+            if v is not None and (allow_privileged or k not in PRIVILEGED_PROFILE_FIELDS)
+        }
         current_doc = await asyncio.to_thread(doc_ref.get)
         current = current_doc.to_dict() or {}
 
@@ -385,17 +409,17 @@ class ProfileService:
             logger.info(f"[ProfileService] Kullanıcı teyit edildi: {user_name} ({user_email})")
             
             # 1. Lisans anahtarını koleksiyonda ara
-            logger.info(f"[ProfileService] Anahtar sorgulanıyor: {license_key.strip().upper()}")
+            logger.info("[ProfileService] Lisans anahtarı sorgulanıyor.")
             license_ref = db.collection('license_keys').document(license_key.strip().upper())
             doc = await asyncio.to_thread(license_ref.get)
             
             if not doc.exists:
-                logger.warning(f"[ProfileService] Anahtar veritabanında yok: {license_key}")
+                logger.warning("[ProfileService] Girilen lisans anahtarı veritabanında bulunamadı.")
                 return False
                 
             license_data = doc.to_dict()
             if license_data.get('is_used'):
-                logger.warning(f"[ProfileService] Anahtar zaten kullanılmış: {license_key} (used_by={license_data.get('used_by')})")
+                logger.warning(f"[ProfileService] Lisans anahtarı zaten kullanılmış (used_by={license_data.get('used_by')})")
                 return False
                 
             duration_months = license_data.get('duration_months', 0)
@@ -519,7 +543,7 @@ class ProfileService:
                 if 'created_at' not in p: p['created_at'] = p.get('updated_at', now)
                 if 'updated_at' not in p: p['updated_at'] = now
                 
-                profiles.append(p)
+                profiles.append(ProfileService._sign_profile_avatar(p))
             return profiles
         except Exception as e:
             logger.error(f"Error getting all profiles: {e}")
@@ -528,12 +552,12 @@ class ProfileService:
     @staticmethod
     async def generate_license_key(duration_months: int = 0):
         """Generates a unique license key and stores it in Firestore."""
-        import random
         import string
         from datetime import datetime, timezone
         
-        # Generate a key like MUFYARD-XXXX-XXXX-XXXX
-        suffix = '-'.join([''.join(random.choices(string.ascii_uppercase + string.digits, k=4)) for _ in range(3)])
+        # Generate a cryptographically strong key like MUFYARD-XXXX-XXXX-XXXX
+        alphabet = string.ascii_uppercase + string.digits
+        suffix = '-'.join([''.join(secrets.choice(alphabet) for _ in range(4)) for _ in range(3)])
         key = f"MUFYARD-{suffix}"
         
         # Duration label for humans

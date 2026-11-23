@@ -3,8 +3,9 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 import asyncio
 from app.services.profile_service import ProfileService
-from app.schemas.profile import ProfileUpdate, ProfileResponse
+from app.schemas.profile import ProfileUpdate, ProfileSelfUpdate, ProfileResponse, PRIVILEGED_PROFILE_FIELDS
 from app.services.email_service import EmailService
+from app.config import get_founder_emails
 from app.lib.auth import get_current_user
 from app.lib.rate_limiter import limiter
 from app.lib.firebase_admin import db
@@ -66,7 +67,9 @@ async def get_profile(
     full_name: str = None,
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
-    profile = await ProfileService.get_profile(uid, email, full_name)
+    caller_email_verified = bool(current_user.get("email_verified", False)) if current_user.get("uid") == uid else False
+    verified_email = current_user.get("email") if (current_user.get("uid") == uid and current_user.get("email")) else email
+    profile = await ProfileService.get_profile(uid, verified_email, full_name, email_verified=caller_email_verified)
     if not profile:
         raise HTTPException(status_code=404, detail="Profil bulunamadı.")
     return profile
@@ -84,14 +87,20 @@ async def update_profile(
     caller_uid = (current_user.get("uid") or "").strip()
     caller_role = (current_user.get("role") or "user").strip().lower()
     caller_email = (current_user.get("email") or "").strip().lower()
-    founder_emails = {email.strip().lower() for email in ProfileService.FOUNDER_EMAILS}
-    is_founder = caller_email in founder_emails
+    founder_emails = get_founder_emails()
+    is_founder = bool(current_user.get("email_verified", False)) and caller_email in founder_emails
+
+    is_admin = caller_role == "admin"
 
     # Sahiplik kontrolü: Sadece kendi profilini veya admin/kurucu başkasının profilini güncelleyebilir
-    if caller_uid != uid and caller_role != "admin" and not is_founder:
+    if caller_uid != uid and not is_admin and not is_founder:
         raise HTTPException(status_code=403, detail="Başka bir kullanıcının profilini güncelleyemezsiniz.")
 
+    requested_fields = profile_update.dict(exclude_unset=True)
+    attempted_privileged = [k for k in requested_fields.keys() if k in PRIVILEGED_PROFILE_FIELDS]
+
     # Rol degistirme sadece kurucu hesaplara aciktir.
+    old_role = None
     if profile_update.role is not None:
         target_profile_before = await ProfileService.get_profile(uid)
         old_role = (target_profile_before or {}).get("role")
@@ -106,8 +115,25 @@ async def update_profile(
                 reason="founder_only_guard",
             )
             raise HTTPException(status_code=403, detail="Rol değiştirme yetkisi yalnızca kurucu hesaplara aittir.")
-    logger.info(f"PROFILE UPDATE ATTEMPT: user_id={current_user.get('uid')}, target_uid={uid}, changes={profile_update.dict(exclude_unset=True)}")
-    updated = await ProfileService.update_profile(uid, profile_update)
+
+    # Diğer ayrıcalıklı alanlar (has_premium_ai, premium_*, verified, two_factor_*) sadece admin/kurucu tarafından güncellenebilir.
+    if attempted_privileged and not (is_admin or is_founder):
+        logger.warning(
+            f"PRIVILEGED PROFILE UPDATE DENIED: user_id={caller_uid}, target_uid={uid}, fields={attempted_privileged}"
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Lisans, doğrulama ve güvenlik alanlarını değiştirme yetkiniz bulunmuyor.",
+        )
+
+    sanitized_update = (
+        profile_update
+        if (is_admin or is_founder)
+        else ProfileSelfUpdate(**{k: v for k, v in requested_fields.items() if k not in PRIVILEGED_PROFILE_FIELDS})
+    )
+
+    logger.info(f"PROFILE UPDATE ATTEMPT: user_id={current_user.get('uid')}, target_uid={uid}, fields={list(requested_fields.keys())}")
+    updated = await ProfileService.update_profile(uid, sanitized_update, allow_privileged=(is_admin or is_founder))
     if not updated:
         if profile_update.role is not None:
             await _log_role_change_event(
@@ -156,10 +182,12 @@ async def upload_avatar(
             raise HTTPException(status_code=403, detail="Başka bir kullanıcının avatarını güncelleyemezsiniz.")
         url = await ProfileService.upload_avatar(uid, file)
         return {"avatar_url": url}
+    except HTTPException:
+        raise
     except Exception as e:
-        if isinstance(e, HTTPException):
-            raise
-        raise HTTPException(status_code=500, detail=f"Fotoğraf yüklenemedi: {str(e)}")
+        import logging
+        logging.getLogger("app.profiles").error(f"AVATAR UPLOAD ERROR: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Fotoğraf yüklenemedi.")
 
 @router.post("/{uid}/test-email")
 async def send_test_email(uid: str, current_user: Dict[str, Any] = Depends(get_current_user)):

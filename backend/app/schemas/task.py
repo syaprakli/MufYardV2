@@ -12,7 +12,9 @@ class TaskBase(BaseModel):
     rapor_kodu: Optional[str] = None          # S.Y.64/2026-1 (otomatik)
     rapor_adi: str                            # Bolu Genel Denetimi
     rapor_turu: str = "Genel Denetim"         # Genel Denetim / Soruşturma / İnceleme / Ön İnceleme / Spor Kulüpleri
-    baslama_tarihi: Optional[str] = None      # 2026-03-15
+    baslama_tarihi: Optional[str] = None
+    olur_tarihi: Optional[str] = None      # 2026-03-15
+    olur_tarihi: Optional[str] = None         # 2026-03-15 (Zamanaşımı için)
     sure_gun: Optional[int] = 30             # Verilen süre (gün)
     rapor_durumu: str = "Başlanmadı"        # Başlanmadı / Devam Ediyor / Evrak Bekleniyor / İncelemede / Tamamlandı
     steps: List[Any] = Field(default_factory=list)  # İş adımları [{text, done}]
@@ -36,6 +38,7 @@ class TaskUpdate(BaseModel):
     rapor_adi: Optional[str] = None
     rapor_turu: Optional[str] = None
     baslama_tarihi: Optional[str] = None
+    olur_tarihi: Optional[str] = None
     sure_gun: Optional[int] = None
     rapor_durumu: Optional[str] = None
     steps: Optional[List[Any]] = None

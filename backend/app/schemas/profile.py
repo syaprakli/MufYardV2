@@ -35,7 +35,18 @@ class ProfileBase(BaseModel):
     verified: bool = Field(default=False)
     birthday: Optional[str] = None  # "MM-DD" formatında
 
-class ProfileUpdate(BaseModel):
+PRIVILEGED_PROFILE_FIELDS = {
+    "has_premium_ai",
+    "premium_type",
+    "premium_until",
+    "role",
+    "verified",
+    "two_factor_enabled",
+    "two_factor_secret",
+}
+
+
+class ProfileSelfUpdate(BaseModel):
     full_name: Optional[str] = None
     title: Optional[str] = None
     institution: Optional[str] = None
@@ -44,29 +55,35 @@ class ProfileUpdate(BaseModel):
     avatar_url: Optional[str] = None
     theme: Optional[str] = None
     ai_enabled: Optional[bool] = None
-    has_premium_ai: Optional[bool] = None
-    premium_type: Optional[str] = None
-    premium_until: Optional[str] = None
     notifications_enabled: Optional[bool] = None
     trial_started: Optional[bool] = None
     intro_seen: Optional[bool] = None
-    role: Optional[str] = None
     fcm_token: Optional[str] = None
     email_assignments: Optional[bool] = None
     email_approvals: Optional[bool] = None
     email_collaboration: Optional[bool] = None
-    two_factor_enabled: Optional[bool] = None
-    two_factor_secret: Optional[str] = None
     phone: Optional[str] = None
     ai_model: Optional[str] = None
     gemini_api_key: Optional[str] = None
     gemini_model: Optional[str] = None
     report_prefix: Optional[str] = None
-
     ai_temperature: Optional[float] = None
     ai_system_prompt: Optional[str] = None
-    verified: Optional[bool] = None
     birthday: Optional[str] = None
+
+
+class ProfileAdminUpdate(ProfileSelfUpdate):
+    has_premium_ai: Optional[bool] = None
+    premium_type: Optional[str] = None
+    premium_until: Optional[str] = None
+    role: Optional[str] = None
+    two_factor_enabled: Optional[bool] = None
+    two_factor_secret: Optional[str] = None
+    verified: Optional[bool] = None
+
+
+class ProfileUpdate(ProfileAdminUpdate):
+    pass
 
 class ProfileResponse(ProfileBase):
     uid: str

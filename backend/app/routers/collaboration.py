@@ -172,7 +172,9 @@ async def get_public_posts(
         effective_user_id = "admin" if role in ["admin", "moderator"] else current_user.get("uid")
         return await CollaborationService.get_posts(category, effective_user_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"get_public_posts error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Paylaşımlar alınırken bir hata oluştu.")
 
 @router.post("/posts", response_model=PostResponse)
 async def create_public_post(post: PostCreate, current_user: Dict[str, Any] = Depends(get_current_user)):
@@ -184,7 +186,9 @@ async def create_public_post(post: PostCreate, current_user: Dict[str, Any] = De
         post.author_role = role.upper()
         return await CollaborationService.create_post(post, is_admin)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"create_public_post error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Paylaşım oluşturulurken bir hata oluştu.")
 
 @router.post("/posts/{post_id}/approve")
 async def approve_post(
@@ -233,7 +237,9 @@ async def get_post_comments(post_id: str, current_user: Dict[str, Any] = Depends
     try:
         return await CollaborationService.get_comments(post_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"get_post_comments error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Yorumlar alınırken bir hata oluştu.")
 
 @router.post("/posts/{post_id}/comments")
 async def add_post_comment(post_id: str, comment: Dict[str, Any], current_user: Dict[str, Any] = Depends(get_current_user)):
@@ -242,7 +248,9 @@ async def add_post_comment(post_id: str, comment: Dict[str, Any], current_user: 
     try:
         return await CollaborationService.add_comment(post_id, comment)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"add_post_comment error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Yorum eklenirken bir hata oluştu.")
 
 @router.patch("/posts/{post_id}")
 async def update_public_post(post_id: str, post_update: PostUpdate, current_user: Dict[str, Any] = Depends(get_current_user)):
@@ -420,26 +428,72 @@ class DocumentConnectionManager:
 
 doc_manager = DocumentConnectionManager()
 
-@router.websocket("/report/{audit_id}")
-async def report_collab_endpoint(websocket: WebSocket, audit_id: str):
-    # Auth: token doğrulama
-    token = websocket.query_params.get("token")
+# y-protocols mesaj tipleri: [0=sync, 1=awareness], sync alt tipleri: [0=step1, 1=step2, 2=update]
+_YJS_MESSAGE_SYNC = 0
+_YJS_SYNC_STEP2 = 1
+_YJS_SYNC_UPDATE = 2
+
+
+def is_yjs_document_write(message: bytes) -> bool:
+    """Belgeyi değiştiren Yjs mesajlarını (sync step2 / update) tespit eder."""
+    return (
+        len(message) >= 2
+        and message[0] == _YJS_MESSAGE_SYNC
+        and message[1] in (_YJS_SYNC_STEP2, _YJS_SYNC_UPDATE)
+    )
+
+
+async def resolve_report_collab_access(token: Optional[str], audit_id: str) -> Optional[str]:
+    """Token'ı doğrular ve kullanıcının rapora erişim seviyesini döner: 'edit', 'read' veya None."""
     if not token:
-        await websocket.close(code=1008)
-        return
+        return None
     try:
         from firebase_admin import auth as firebase_auth
-        await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=60))
+        decoded = await asyncio.to_thread(lambda: firebase_auth.verify_id_token(token, clock_skew_seconds=60))
     except Exception:
+        return None
+
+    uid = decoded.get("uid")
+    if not uid:
+        return None
+
+    from app.lib.auth import _get_role_for_uid
+    from app.routers.audit import _resolve_audit_role
+    from app.services.audit_service import AuditService
+
+    audit = await AuditService.get_audit(audit_id)
+    if not audit:
+        return None
+
+    user_role = await _get_role_for_uid(uid)
+    access = _resolve_audit_role(audit, uid, decoded.get("email"), user_role)
+    if access == "edit":
+        return "edit"
+    if access in ("view", "comment") or user_role == "moderator":
+        return "read"
+    return None
+
+
+@router.websocket("/report/{audit_id}")
+async def report_collab_endpoint(websocket: WebSocket, audit_id: str):
+    # Auth: token doğrulama + denetim üzerinde yetki kontrolü
+    access = await resolve_report_collab_access(websocket.query_params.get("token"), audit_id)
+    if not access:
         await websocket.close(code=1008)
         return
+    read_only = access != "edit"
 
     await doc_manager.connect(websocket, audit_id)
     try:
         while True:
             data = await websocket.receive_bytes()
+            # Görüntüleme/yorum rolündekiler belgeyi değiştiremez; sadece senkron isteği ve imleç bilgisi iletilir.
+            if read_only and is_yjs_document_write(data):
+                continue
             await doc_manager.broadcast(data, sender=websocket, room_id=audit_id)
     except WebSocketDisconnect:
+        doc_manager.disconnect(websocket, audit_id)
+    except Exception:
         doc_manager.disconnect(websocket, audit_id)
 
 # --- CATEGORY MANAGEMENT ---
@@ -462,7 +516,9 @@ async def get_pending_collaboration_requests(current_user: Dict[str, Any] = Depe
     try:
         return await CollaborationService.get_pending_requests(current_user.get("uid"), current_user.get("email"))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"get_pending_requests error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Bekleyen istekler alınırken bir hata oluştu.")
 
 @router.post("/pending-requests/{resource_type}/{resource_id}/accept")
 async def accept_collaboration_request(

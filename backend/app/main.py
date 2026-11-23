@@ -5,13 +5,13 @@ import json
 import asyncio
 import logging
 import shutil
+import urllib.parse
 from datetime import datetime
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request, Query
 from slowapi.middleware import SlowAPIMiddleware
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
-from app.config import get_settings, BASE_DIR, DATA_DIR
+from app.config import get_settings, get_founder_emails, BASE_DIR, DATA_DIR
 from app.lib.rate_limiter import limiter
 from app.lib.auth import get_current_user
 from typing import Any, Dict
@@ -45,7 +45,7 @@ from app.routers import (
     dashboard, audit, tasks, contacts, 
     inspectors, profiles, legislation, 
     notes, ai_knowledge, backup, files,
-    calendar, notifications, ai, collaboration, feedback, online, settings as settings_router, licenses, search, audit_trail
+    calendar, notifications, ai, collaboration, feedback, online, settings as settings_router, licenses, search, audit_trail, reminders
 )
 
 from app.services.contact_service import ContactService
@@ -95,7 +95,8 @@ app.state.limiter = limiter
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request, exc):
     # Güvenlik logu: Rate limit ihlali
-    logger.warning(f"RATE LIMIT EXCEEDED: IP={request.client.host}, Path={request.url.path}, Headers={dict(request.headers)}")
+    client_ip = request.client.host if request.client else "unknown"
+    logger.warning(f"RATE LIMIT EXCEEDED: IP={client_ip}, Path={request.url.path}")
     return JSONResponse(
         status_code=429,
         content={"detail": "Çok fazla istek gönderdiniz. Lütfen daha sonra tekrar deneyin."}
@@ -116,21 +117,6 @@ async def root():
 async def health_check():
     from app.lib.firebase_admin import is_mock
     return {"status": "healthy", "version": "1.0.4-antigravity", "firebase_mode": "mock" if is_mock else "real", "timestamp": asyncio.get_event_loop().time()}
-
-@app.get("/api/debug/logs")
-async def get_debug_logs(key: str = "", limit: int = 300):
-    if key != "antigravity":
-        return JSONResponse(status_code=403, content={"detail": "Forbidden"})
-    try:
-        if os.path.exists(log_file):
-            with open(log_file, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-                if limit > 0:
-                    return {"logs": lines[-limit:]}
-                return {"logs": lines}
-        return {"logs": ["Log file not found"]}
-    except Exception as e:
-        return {"error": str(e)}
 
 @app.on_event("startup")
 async def startup_event():
@@ -192,17 +178,25 @@ async def sync_bundled_content():
 
     await asyncio.to_thread(_sync_logic)
 
-# Mount static files
-def mount_static_dir(path_name, route_path):
-    dir_path = os.path.join(DATA_DIR, path_name)
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path, exist_ok=True)
-    app.mount(route_path, StaticFiles(directory=dir_path), name=path_name)
+# Ensure static data directories exist without exposing unauthenticated StaticFiles mounts
+for _static_dir in ("uploads", "Raporlar", "Diğer İşlem ve Belgeler", "Mevzuat"):
+    os.makedirs(os.path.join(DATA_DIR, _static_dir), exist_ok=True)
 
-mount_static_dir("uploads", "/uploads")
-mount_static_dir("Raporlar", "/Raporlar")
-mount_static_dir("Diğer İşlem ve Belgeler", "/Diğer İşlem ve Belgeler")
-mount_static_dir("Mevzuat", "/Mevzuat")
+
+@app.get("/uploads/{file_path:path}")
+@app.get("/Raporlar/{file_path:path}")
+@app.get("/Diğer İşlem ve Belgeler/{file_path:path}")
+@app.get("/Mevzuat/{file_path:path}")
+async def authenticated_static_files(
+    file_path: str,
+    request: Request,
+    dl_token: str | None = Query(default=None),
+):
+    from app.routers.files import serve_authenticated_file
+
+    raw_path = urllib.parse.unquote(request.url.path)
+    root_name = raw_path.lstrip("/").split("/", 1)[0]
+    return await serve_authenticated_file(root_name, file_path, request, dl_token=dl_token)
 
 # Middleware
 
@@ -254,6 +248,7 @@ app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(audit_trail.router, prefix="/api/audit-trail", tags=["AuditTrail"])
+app.include_router(reminders.router, prefix="/api/reminders", tags=["Reminders"])
 
 # --- WEBSOCKET CHAT ENDPOINT ---
 # Moved here to avoid 404 issues with router prefixes in production
@@ -263,7 +258,7 @@ from app.lib.firebase_admin import db
 from firebase_admin import auth as firebase_auth
 
 
-async def _authenticate_websocket_identity(websocket: WebSocket) -> tuple[str, str | None, str]:
+async def _authenticate_websocket_identity(websocket: WebSocket) -> tuple[str, str | None, str, bool]:
     token = websocket.query_params.get("token")
     requested_name = websocket.query_params.get("name", "Müfettiş")
 
@@ -300,11 +295,12 @@ async def _authenticate_websocket_identity(websocket: WebSocket) -> tuple[str, s
         raise WebSocketDisconnect(code=1008)
 
     user_email = decoded.get("email")
+    email_verified = bool(decoded.get("email_verified", False))
     display_name = decoded.get("name") or requested_name or (user_email.split("@")[0] if user_email else "Müfettiş")
-    return uid, user_email, display_name
+    return uid, user_email, display_name, email_verified
 
 
-async def _resolve_audit_chat_role(audit_id: str, uid: str, user_email: str = None) -> str:
+async def _resolve_audit_chat_role(audit_id: str, uid: str, user_email: str = None, email_verified: bool = False) -> str:
     """audit chat room icin kullanici rolunu cozer: none/view/comment/edit."""
     doc_ref = db.collection('audits').document(audit_id)
     doc = await asyncio.to_thread(doc_ref.get)
@@ -315,7 +311,9 @@ async def _resolve_audit_chat_role(audit_id: str, uid: str, user_email: str = No
     owner_id = data.get("owner_id")
     identities = [value for value in [uid, user_email] if value]
 
-    if any(identity in [owner_id, "admin", "sefa.yaprakli@gsb.gov.tr"] for identity in identities):
+    founder_emails = get_founder_emails()
+    is_founder = bool(email_verified and user_email and user_email.strip().lower() in founder_emails)
+    if is_founder or bool(owner_id and owner_id in identities):
         return "edit"
 
     shared_roles = data.get("shared_roles") or {}
@@ -339,21 +337,26 @@ async def _resolve_audit_chat_role(audit_id: str, uid: str, user_email: str = No
 async def websocket_chat_endpoint(websocket: WebSocket):
     import logging
     ws_logger = logging.getLogger("app.websocket")
-    uid, user_email, name = await _authenticate_websocket_identity(websocket)
+    uid, user_email, name, email_verified = await _authenticate_websocket_identity(websocket)
     room_id = websocket.query_params.get("room_id", "global")
     audit_chat_role = "none"
+    dm_recipient_id = None
 
-    # DM Odası Normalizasyonu: dm_UID1_UID2 formatını alfabetik sırala
+    # DM Odası Yetki Kontrolü ve Normalizasyonu: yalnızca odadaki iki kullanıcı bağlanabilir
     if room_id.startswith("dm_"):
         parts = room_id.split("_")
-        if len(parts) >= 3:
-            uids = sorted(parts[1:])
-            room_id = f"dm_{'_'.join(uids)}"
-            ws_logger.info(f"DM Odası Normalize Edildi: {room_id}")
+        if len(parts) != 3 or not parts[1] or not parts[2] or uid not in (parts[1], parts[2]):
+            ws_logger.warning(f"YETKISIZ DM ERISIMI: uid={uid}, room_id={room_id}")
+            await websocket.close(code=1008)
+            return
+        uids = sorted(parts[1:])
+        room_id = f"dm_{'_'.join(uids)}"
+        dm_recipient_id = uids[1] if uids[0] == uid else uids[0]
+        ws_logger.info(f"DM Odası Normalize Edildi: {room_id}")
 
     if room_id.startswith("audit_"):
         audit_id = room_id.replace("audit_", "", 1)
-        audit_chat_role = await _resolve_audit_chat_role(audit_id, uid, user_email)
+        audit_chat_role = await _resolve_audit_chat_role(audit_id, uid, user_email, email_verified)
         if audit_chat_role == "none":
             ws_logger.warning(f"YETKISIZ CHAT ERISIMI: uid={uid}, email={user_email}, room_id={room_id}")
             await websocket.close(code=1008)
@@ -390,14 +393,13 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                             "room_id": room_id
                         }))
                         continue
-                    ws_logger.info(f"CHAT MESSAGE: uid={uid}, name={name}, room_id={room_id}, text={msg_text[:100]}")
+                    ws_logger.info(f"CHAT MESSAGE: uid={uid}, room_id={room_id}, length={len(msg_text)}")
                     if is_dm:
-                        recipient_id = data.get("recipient_id")
-                        # Fallback: room_id'den ayıkla
-                        if not recipient_id:
-                            parts = room_id.split("_")
-                            if len(parts) >= 3:
-                                recipient_id = parts[1] if parts[2] == uid else parts[2]
+                        requested_recipient = data.get("recipient_id")
+                        if requested_recipient and dm_recipient_id and requested_recipient != dm_recipient_id:
+                            ws_logger.warning(f"DM RECIPIENT MISMATCH: uid={uid}, room_id={room_id}, requested={requested_recipient}")
+                            continue
+                        recipient_id = dm_recipient_id
                         if not recipient_id:
                             ws_logger.error(f"Alıcı bulunamadı! Room: {room_id}, UID: {uid}")
                             continue

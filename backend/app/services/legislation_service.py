@@ -2,7 +2,7 @@ import os
 import shutil
 import asyncio
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from app.lib.firebase_admin import db, bucket
 from app.schemas.legislation import LegislationCreate, LegislationUpdate
@@ -104,8 +104,11 @@ class LegislationService:
                         file.file,
                         content_type=file.content_type or "application/octet-stream",
                     )
-                    blob.make_public()
-                    return blob.public_url
+                    return blob.generate_signed_url(
+                        version="v4",
+                        expiration=timedelta(days=7),
+                        method="GET",
+                    )
                 except Exception as e:
                     # If Firebase Storage fails or is unavailable, use local URL
                     return None

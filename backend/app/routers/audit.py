@@ -17,12 +17,19 @@ class ReportRequest(BaseModel):
     inspector: str
 
 
-def _resolve_audit_role(audit_data: Dict[str, Any], user_id: Optional[str], user_email: Optional[str]) -> str:
+def _resolve_audit_role(
+    audit_data: Dict[str, Any],
+    user_id: Optional[str],
+    user_email: Optional[str],
+    user_role: Optional[str] = None,
+) -> str:
     identities = [v for v in [user_id, user_email] if v]
     owner_id = audit_data.get("owner_id")
-    admin_id = "sefa.yaprakli@gsb.gov.tr"
 
-    if any(identity in [owner_id, admin_id, "admin"] for identity in identities):
+    # Admin yetkisi yalnızca doğrulanmış profil rolünden gelir (sabit e-posta ile değil).
+    if owner_id and owner_id in identities:
+        return "edit"
+    if (user_role or "").strip().lower() == "admin":
         return "edit"
 
     shared_roles = audit_data.get("shared_roles") or {}
@@ -61,7 +68,7 @@ async def get_audit(id: str, current_user: Dict[str, Any] = Depends(get_current_
     if not audit:
         raise HTTPException(status_code=404, detail="Denetim bulunamadı.")
 
-    role = _resolve_audit_role(audit, current_user.get("uid"), current_user.get("email"))
+    role = _resolve_audit_role(audit, current_user.get("uid"), current_user.get("email"), current_user.get("role"))
     user_role = (current_user.get("role") or "user").strip().lower()
     if role == "none" and user_role not in ["admin", "moderator"]:
         raise HTTPException(status_code=403, detail="Bu denetime erişim yetkiniz yok.")
@@ -78,7 +85,7 @@ async def update_audit(
     if not current:
         raise HTTPException(status_code=404, detail="Denetim güncellenemedi.")
 
-    role = _resolve_audit_role(current, current_user.get("uid"), current_user.get("email"))
+    role = _resolve_audit_role(current, current_user.get("uid"), current_user.get("email"), current_user.get("role"))
     incoming = audit.dict(exclude_none=True)
     if incoming and role == "none":
         raise HTTPException(status_code=403, detail="Bu denetimi güncelleme yetkiniz yok.")
@@ -148,10 +155,9 @@ async def delete_audit(id: str, current_user: Dict[str, Any] = Depends(get_curre
     identity_keys = [v for v in [uid, email] if v]
     
     owner_id = current.get("owner_id")
-    admin_id = "sefa.yaprakli@gsb.gov.tr"
-    
+
     is_owner_or_admin = (
-        any(identity in [owner_id, admin_id, "admin"] for identity in identity_keys) or
+        bool(owner_id and owner_id in identity_keys) or
         (current_user.get("role") or "user").strip().lower() == "admin"
     )
 
@@ -201,7 +207,7 @@ async def get_audit_versions(id: str, current_user: Dict[str, Any] = Depends(get
         current = await AuditService.get_audit(id)
         if not current:
             raise HTTPException(status_code=404, detail="Denetim bulunamadı.")
-        role = _resolve_audit_role(current, current_user.get("uid"), current_user.get("email"))
+        role = _resolve_audit_role(current, current_user.get("uid"), current_user.get("email"), current_user.get("role"))
         user_role = (current_user.get("role") or "user").strip().lower()
         if role == "none" and user_role not in ["admin", "moderator"]:
             raise HTTPException(status_code=403, detail="Bu denetime erişim yetkiniz yok.")
@@ -220,7 +226,7 @@ async def restore_audit_version(
     current = await AuditService.get_audit(id)
     if not current:
         raise HTTPException(status_code=404, detail="Sürüm geri yüklenemedi.")
-    role = _resolve_audit_role(current, current_user.get("uid"), current_user.get("email"))
+    role = _resolve_audit_role(current, current_user.get("uid"), current_user.get("email"), current_user.get("role"))
     user_role = (current_user.get("role") or "user").strip().lower()
     if role not in ["edit"] and user_role not in ["admin", "moderator"]:
         raise HTTPException(status_code=403, detail="Sürüm geri yükleme yetkiniz yok.")
@@ -243,7 +249,7 @@ async def delete_audit_version(id: str, version_id: str, current_user: Dict[str,
     current = await AuditService.get_audit(id)
     if not current:
         raise HTTPException(status_code=404, detail="Sürüm silinemedi veya bulunamadı.")
-    role = _resolve_audit_role(current, current_user.get("uid"), current_user.get("email"))
+    role = _resolve_audit_role(current, current_user.get("uid"), current_user.get("email"), current_user.get("role"))
     user_role = (current_user.get("role") or "user").strip().lower()
     if role not in ["edit"] and user_role not in ["admin", "moderator"]:
         raise HTTPException(status_code=403, detail="Sürüm silme yetkiniz yok.")
@@ -265,7 +271,9 @@ async def export_excel(current_user: Dict[str, Any] = Depends(get_current_user))
             headers={"Content-Disposition": "attachment; filename=Tüm_Denetimler.xlsx"}
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).error(f"Audit export excel error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Excel dışa aktarımı sırasında bir hata oluştu.")
 
 @router.get("/{id}/export/word")
 async def export_word(id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
@@ -273,7 +281,7 @@ async def export_word(id: str, current_user: Dict[str, Any] = Depends(get_curren
     audit = await AuditService.get_audit(id)
     if not audit:
         raise HTTPException(status_code=404, detail="Denetim bulunamadı.")
-    role = _resolve_audit_role(audit, current_user.get("uid"), current_user.get("email"))
+    role = _resolve_audit_role(audit, current_user.get("uid"), current_user.get("email"), current_user.get("role"))
     user_role = (current_user.get("role") or "user").strip().lower()
     if role == "none" and user_role not in ["admin", "moderator"]:
         raise HTTPException(status_code=403, detail="Bu denetime erişim yetkiniz yok.")

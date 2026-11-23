@@ -65,8 +65,9 @@ async def get_current_user(
                 raise HTTPException(status_code=401, detail="Token içinde kullanıcı kimliği bulunamadı.")
 
             email = decoded.get("email")
+            email_verified = bool(decoded.get("email_verified", False))
             role = await _get_role_for_uid(uid)
-            return {"uid": uid, "email": email, "role": role}
+            return {"uid": uid, "email": email, "email_verified": email_verified, "role": role}
         except HTTPException:
             raise
         except Exception as e:
@@ -77,7 +78,7 @@ async def get_current_user(
     # Dev fallback: only when backend runs with mock Firebase
     if is_mock and x_user_id:
         role = await _get_role_for_uid(x_user_id)
-        return {"uid": x_user_id, "email": x_user_email, "role": role}
+        return {"uid": x_user_id, "email": x_user_email, "email_verified": False, "role": role}
 
     raise HTTPException(status_code=401, detail="Bu işlem için giriş yapmanız gerekiyor.")
 
@@ -95,13 +96,14 @@ def require_roles(*allowed_roles: str) -> Callable:
 
 
 async def require_founder_admin(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    from app.config import get_founder_emails
+
     user_role = (current_user.get("role") or "user").strip().lower()
     user_email = (current_user.get("email") or "").strip().lower()
-    
-    from app.services.profile_service import ProfileService
-    founder_emails = {email.strip().lower() for email in ProfileService.FOUNDER_EMAILS}
-    
-    if user_role != "admin" or user_email not in founder_emails:
-        raise HTTPException(status_code=403, detail="Bu işlem yalnızca kurucu yönetici hesaplarına açıktır.")
+    email_verified = bool(current_user.get("email_verified", False))
+    founder_emails = get_founder_emails()
+
+    if user_role != "admin" or not email_verified or user_email not in founder_emails:
+        raise HTTPException(status_code=403, detail="Bu işlem yalnızca doğrulanmış kurucu yönetici hesaplarına açıktır.")
     return current_user
 
