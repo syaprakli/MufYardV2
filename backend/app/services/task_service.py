@@ -8,6 +8,10 @@ import pandas as pd
 import io
 
 _task_creation_lock = asyncio.Lock()
+# Rapor kodu üretimi: tek instance için yarış koruması (çoklu instance'ta Firestore sayacına taşınmalı)
+_rapor_kodu_lock = asyncio.Lock()
+_recently_issued_codes: Dict[str, datetime] = {}
+_RECENT_CODE_TTL = timedelta(minutes=2)
 
 class TaskService:
     @staticmethod
@@ -34,6 +38,50 @@ class TaskService:
         return True
 
     @staticmethod
+    async def _fetch_codes_with_prefix(prefix: str) -> List[str]:
+        """Verilen önekle başlayan tüm rapor kodlarını getirir (limit yok, yalnızca ilgili yıl).
+
+        Aralık sorgusu rapor_kodu alanının otomatik tek alan indeksini kullanır.
+        """
+        query = (
+            db.collection('tasks')
+            .where('rapor_kodu', '>=', prefix)
+            .where('rapor_kodu', '<', prefix + '')
+            .select(['rapor_kodu'])
+        )
+        docs = await asyncio.to_thread(lambda: list(query.stream()))
+        return [(d.to_dict() or {}).get('rapor_kodu', '') for d in docs]
+
+    @staticmethod
+    def _recently_issued_seqs(prefix: str) -> set:
+        """Üretilmiş ama henüz Firestore'a yazılmamış olabilecek kodları döner (yarış koruması)."""
+        now = datetime.utcnow()
+        for code, ts in list(_recently_issued_codes.items()):
+            if now - ts > _RECENT_CODE_TTL:
+                _recently_issued_codes.pop(code, None)
+        seqs = set()
+        for code in _recently_issued_codes:
+            if code.startswith(prefix) and code[len(prefix):].isdigit():
+                seqs.add(int(code[len(prefix):]))
+        return seqs
+
+    @staticmethod
+    async def _next_code(prefix: str) -> str:
+        """prefix + en küçük boş numara (gap filling). Hata olursa istisna fırlatır; asla tahmini numara vermez."""
+        async with _rapor_kodu_lock:
+            used = TaskService._recently_issued_seqs(prefix)
+            for kodu in await TaskService._fetch_codes_with_prefix(prefix):
+                tail = (kodu or '')[len(prefix):].strip()
+                if kodu.startswith(prefix) and tail.isdigit() and int(tail) > 0:
+                    used.add(int(tail))
+            count = 1
+            while count in used:
+                count += 1
+            code = f"{prefix}{count}"
+            _recently_issued_codes[code] = datetime.utcnow()
+            return code
+
+    @staticmethod
     async def _generate_rapor_kodu(year: Optional[int] = None) -> str:
         """Auto-generate S.Y.64/YYYY-N format rapor kodu.
 
@@ -41,64 +89,12 @@ class TaskService:
         """
         if year is None:
             year = datetime.utcnow().year
-
-        try:
-            # Sadece rapor_kodu alanini cek
-            docs = await asyncio.to_thread(
-                lambda: list(
-                    db.collection('tasks')
-                    .limit(1000)
-                    .select(['rapor_kodu'])
-                    .stream()
-                )
-            )
-
-            used_numbers = set()
-            for doc in docs:
-                kodu = (doc.to_dict() or {}).get('rapor_kodu', '')
-                seq = TaskService._extract_rapor_seq(kodu, year)
-                if seq is not None:
-                    used_numbers.add(seq)
-
-            count = 1
-            while count in used_numbers:
-                count += 1
-        except Exception as e:
-            print(f"rapor_kodu generate error: {e}")
-            count = 1
-
-        return f"S.Y.64/{year}-{count}"
+        return await TaskService._next_code(f"S.Y.64/{year}-")
 
     @staticmethod
     async def _generate_draft_rapor_kodu(year: int) -> str:
         """Auto-generate TASLAK-YYYY-N format draft code."""
-        try:
-            docs = await asyncio.to_thread(
-                lambda: list(
-                    db.collection('tasks')
-                    .limit(1000)
-                    .select(['rapor_kodu'])
-                    .stream()
-                )
-            )
-            used_seqs = set()
-            prefix = f"TASLAK-{year}-"
-            for doc in docs:
-                kodu = (doc.to_dict() or {}).get('rapor_kodu', '')
-                if kodu and kodu.startswith(prefix):
-                    tail = kodu[len(prefix):].strip()
-                    if tail.isdigit():
-                        used_seqs.add(int(tail))
-
-            count = 1
-            while count in used_seqs:
-                count += 1
-            return f"TASLAK-{year}-{count}"
-        except Exception as e:
-            print(f"draft_rapor_kodu generate error: {e}")
-            import uuid
-            unique_id = uuid.uuid4().hex[:8]
-            return f"TASLAK-{year}-{unique_id}"
+        return await TaskService._next_code(f"TASLAK-{year}-")
 
     @staticmethod
     async def get_tasks(user_id: Optional[str] = None, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
