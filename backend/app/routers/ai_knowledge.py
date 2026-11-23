@@ -21,7 +21,7 @@ async def get_ai_knowledge(
         if category:
             query = query.where('category', '==', category)
             
-        docs = await asyncio.to_thread(query.stream)
+        docs = await asyncio.to_thread(lambda: list(query.stream()))
         items = []
         for doc in docs:
             d = doc.to_dict()

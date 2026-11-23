@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Any
 from app.lib.firebase_admin import db
@@ -14,7 +15,7 @@ class RolesUpdate(BaseModel):
 @router.get("/roles")
 async def get_roles_settings(current_user: Dict[str, Any] = Depends(require_founder_admin)):
     try:
-        doc = db.collection("system_settings").document("roles").get()
+        doc = await asyncio.to_thread(db.collection("system_settings").document("roles").get)
         if doc.exists:
             return doc.to_dict()
         else:
@@ -26,7 +27,7 @@ async def get_roles_settings(current_user: Dict[str, Any] = Depends(require_foun
 async def update_roles_settings(update: RolesUpdate, current_user: Dict[str, Any] = Depends(require_founder_admin)):
     try:
         ref = db.collection("system_settings").document("roles")
-        ref.set(update.dict(), merge=True)
+        await asyncio.to_thread(ref.set, update.dict(), merge=True)
         return {"status": "success"}
     except Exception:
         raise HTTPException(status_code=500, detail="Rol ayarları güncellenirken bir hata oluştu.")

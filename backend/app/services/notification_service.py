@@ -103,7 +103,7 @@ class NotificationService:
         fetch_limit = min(limit * 3, 150)
         query = notifs_ref.where('user_id', '==', user_id).limit(fetch_limit)
         
-        docs = await asyncio.to_thread(query.stream)
+        docs = await asyncio.to_thread(lambda: list(query.stream()))
         
         notifications = []
         for doc in docs:
@@ -129,7 +129,7 @@ class NotificationService:
     async def mark_all_as_read(user_id: str) -> int:
         notifs_ref = db.collection('notifications')
         query = notifs_ref.where('user_id', '==', user_id).where('read', '==', False).limit(400)
-        docs = await asyncio.to_thread(query.stream)
+        docs = await asyncio.to_thread(lambda: list(query.stream()))
         doc_list = list(docs)
         if not doc_list:
             return 0
@@ -156,7 +156,7 @@ class NotificationService:
     async def delete_all(user_id: str) -> int:
         notifs_ref = db.collection('notifications')
         query = notifs_ref.where('user_id', '==', user_id).limit(400)
-        docs = await asyncio.to_thread(query.stream)
+        docs = await asyncio.to_thread(lambda: list(query.stream()))
         doc_list = list(docs)
         if not doc_list:
             return 0

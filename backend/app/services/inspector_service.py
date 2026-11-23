@@ -44,7 +44,7 @@ class InspectorService:
     @staticmethod
     async def get_inspectors() -> List[Dict[str, Any]]:
         try:
-            docs = await asyncio.to_thread(db.collection('inspectors').limit(300).stream)
+            docs = await asyncio.to_thread(lambda: list(db.collection('inspectors').limit(300).stream()))
             inspectors = []
             now = datetime.utcnow().isoformat()
             

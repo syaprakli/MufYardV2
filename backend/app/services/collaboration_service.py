@@ -482,7 +482,7 @@ class CollaborationService:
         # Varsayılan kategoriler
         default_cats = ["Hepsi", "Mevzuat", "Denetim İpuçları", "Soru-Cevap", "Duyurular", "Genel"]
         try:
-            docs = await asyncio.to_thread(db.collection('collaboration_categories').stream)
+            docs = await asyncio.to_thread(lambda: list(db.collection('collaboration_categories').stream()))
             db_cats = [doc.to_dict().get('name') for doc in docs if doc.to_dict().get('name')]
             # Birleştir ve unique yap
             return list(dict.fromkeys(default_cats + db_cats))
@@ -661,7 +661,7 @@ class CollaborationService:
                     else:
                         # Try as Email
                         if '@' in uid_or_email:
-                            q = db.collection('profiles').where('email', '==', uid_or_email.lower().trim()).limit(1).get()
+                            q = db.collection('profiles').where('email', '==', uid_or_email.lower().strip()).limit(1).get()
                             if q:
                                 name = q[0].to_dict().get('full_name')
                 except Exception as e:

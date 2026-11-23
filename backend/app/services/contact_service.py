@@ -56,7 +56,7 @@ class ContactService:
             
             if category == 'corporate':
                 query = contacts_ref.where('is_shared', '==', True).limit(500)
-                docs = await asyncio.to_thread(query.stream)
+                docs = await asyncio.to_thread(lambda: list(query.stream()))
                 contacts = []
                 for doc in docs:
                     contact_data = doc.to_dict()
@@ -207,7 +207,7 @@ class ContactService:
                     try:
                         target_uid = collaborator_id
                         if "@" in collaborator_id:
-                            profiles_query = db.collection('profiles').where('email', '==', collaborator_id.lower().trim()).limit(1)
+                            profiles_query = db.collection('profiles').where('email', '==', collaborator_id.lower().strip()).limit(1)
                             profiles = await asyncio.to_thread(lambda: list(profiles_query.stream()))
                             if profiles:
                                 target_uid = profiles[0].id
@@ -261,7 +261,7 @@ class ContactService:
                         try:
                             target_uid = collaborator_id
                             if "@" in collaborator_id:
-                                profiles_query = db.collection('profiles').where('email', '==', collaborator_id.lower().trim()).limit(1)
+                                profiles_query = db.collection('profiles').where('email', '==', collaborator_id.lower().strip()).limit(1)
                                 profiles = await asyncio.to_thread(lambda: list(profiles_query.stream()))
                                 if profiles:
                                     target_uid = profiles[0].id

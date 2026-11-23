@@ -53,7 +53,7 @@ async def remove_online(body: RemoveOnlineRequest, current_user: Dict[str, Any] 
 async def list_online(current_user: Dict[str, Any] = Depends(get_current_user)) -> List[dict]:
     try:
         import asyncio
-        docs = await asyncio.to_thread(db.collection("online_users").stream)
+        docs = await asyncio.to_thread(lambda: list(db.collection("online_users").stream()))
         now = datetime.now(timezone.utc)
         fresh_users: List[dict] = []
         stale_ids: List[str] = []

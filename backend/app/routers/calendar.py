@@ -43,7 +43,7 @@ async def get_calendar_notes(current_user: dict = Depends(get_current_user)):
     """Fetch all calendar notes for a given user."""
     try:
         query = db.collection("calendar_notes").where("owner_id", "==", current_user.get("uid"))
-        docs = await asyncio.to_thread(query.stream)
+        docs = await asyncio.to_thread(lambda: list(query.stream()))
         result = []
         for doc in docs:
             data = doc.to_dict()

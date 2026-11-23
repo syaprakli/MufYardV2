@@ -642,7 +642,7 @@ TALİMATLAR:
 
     async def _get_knowledge_context(self) -> str:
         query = db.collection('ai_knowledge').limit(50)
-        docs = await asyncio.to_thread(query.stream)
+        docs = await asyncio.to_thread(lambda: list(query.stream()))
         context = ""
         for doc in docs:
             d = doc.to_dict()
@@ -666,14 +666,14 @@ TALİMATLAR:
     async def _get_contacts_context(self, user: Dict[str, Any]) -> str:
         contacts_ref = db.collection('contacts')
         shared_query = contacts_ref.where('is_shared', '==', True).limit(20)
-        docs = await asyncio.to_thread(shared_query.stream)
+        docs = await asyncio.to_thread(lambda: list(shared_query.stream()))
         context_items = []
         for doc in docs:
             d = doc.to_dict()
             context_items.append(d)
 
         owner_query = contacts_ref.where('owner_id', '==', user.get("uid")).limit(10)
-        owner_docs = await asyncio.to_thread(owner_query.stream)
+        owner_docs = await asyncio.to_thread(lambda: list(owner_query.stream()))
         for doc in owner_docs:
             d = doc.to_dict()
             context_items.append(d)
