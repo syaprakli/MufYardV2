@@ -4,7 +4,16 @@ import { fetchWithTimeout, getAuthHeaders } from "./utils";
 export type TenkitDurumu = "acik" | "cevap_bekleniyor" | "giderildi" | "kismen_giderildi" | "giderilmedi";
 export type TenkitOnemi = "kritik" | "uyari" | "bilgi";
 
+export interface Kanit {
+    id: string;
+    tur: "foto" | "belge" | "not";
+    url?: string | null;
+    ad?: string | null;
+    aciklama?: string | null;
+}
+
 export interface Tenkit {
+    kanitlar?: Kanit[];
     id: string;
     audit_id: string;
     baslik: string;

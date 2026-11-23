@@ -5074,7 +5074,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                             {activeDetailTab === "photos" && renderPhotosTab()}
                                             {activeDetailTab === "checklist" && renderChecklistTab()}
                                             {activeDetailTab === "tenkit_takibi" && (
-                                                <TenkitTakibi auditId={selectedReport?.id} questions={AUDIT_TEMPLATES[taskTabId] || []} form={localAuditData.form || {}} />
+                                                <TenkitTakibi auditId={selectedReport?.id} questions={AUDIT_TEMPLATES[taskTabId] || []} form={localAuditData.form || {}} photos={localAuditData.photos || []} photoDescriptions={localAuditData.photo_descriptions || {}} />
                                             )}
                                             {panoEkleri && activeDetailTab === "dashboard" && panoEkleri.renderDashboardTab()}
                                             {panoEkleri && activeDetailTab === "evrak_talebi" && panoEkleri.renderEvrakTalebiTab()}

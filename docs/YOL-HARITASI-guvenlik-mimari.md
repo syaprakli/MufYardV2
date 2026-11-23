@@ -105,8 +105,8 @@ Harcırah (e-Yolluk) ve süre uzatma (EBYS) kapsam dışı.
 | # | Özellik | Durum |
 |---|---|---|
 | F1 | Tenkit takibi: birim cevabı, durum geçmişi, kontrol listesinden aktarım, aynı birimin önceki denetim tenkitleri (`/api/tenkitler`, Firestore `tenkitler`) | ✅ Canlıda, kullanıcı testi bekleniyor |
-| F2 | Tespit → kanıt → tenkit zinciri | ⏳ Sırada |
-| F3 | Sahada internetsiz çalışma + fotoğraf tarih/konum damgası | ⏳ |
+| F2 | Tespit → kanıt → tenkit zinciri: tenkite galeriden fotoğraf / belge / not bağlama, kanıtsız tenkit uyarısı, "Rapora kopyala" (numaralı tenkit + dayanak + "Fotoğraf N") | ✅ Canlıda, kullanıcı testi bekleniyor |
+| F3 | Sahada internetsiz çalışma + fotoğraf tarih/konum damgası | ⏳ Sırada |
 | F4 | Rapor öncesi kalite kontrol + kişisel veri karartma | ⏳ |
 | F5 | İfade/tutanak modülü (ses → metin ile) | ⏳ |
 | F6 | Mali denetim yardımcıları (mizan → kırmızı bayrak, örneklem, 7405 borçlanma sınırı) | ⏳ |

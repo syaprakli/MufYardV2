@@ -181,6 +181,26 @@ class TenkitTests(unittest.TestCase):
         self.assertEqual(basliklar, ["2024 tenkiti"])  # kendi denetimi hariç, erişilemeyen hariç
         self.assertEqual(r["tenkitler"][0]["denetim_basligi"], "Van 2024")
 
+    def test_kanitlar_saved_and_validated(self):
+        t = self.client.post("/api/tenkitler/", json={"audit_id": "a2026", "baslik": "Kayıt eksik"}).json()
+        self.assertEqual(t["kanitlar"], [])
+        kanitlar = [
+            {"id": "k1", "tur": "foto", "url": "https://firebasestorage.googleapis.com/x.jpg", "aciklama": "Depo"},
+            {"id": "k2", "tur": "belge", "ad": "Ek-3: 2025 mizanı"},
+            {"id": "k3", "tur": "foto", "url": "/uploads/audit/y.jpg"},
+        ]
+        r = self.client.patch(f"/api/tenkitler/{t['id']}", json={"kanitlar": kanitlar})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual([k["id"] for k in r.json()["kanitlar"]], ["k1", "k2", "k3"])
+        self.assertEqual([k["id"] for k in self.client.get("/api/tenkitler/?audit_id=a2026").json()[0]["kanitlar"]],
+                         ["k1", "k2", "k3"])
+        # Tehlikeli / şişirici adresler ve sınır aşımı reddedilir
+        for bad in ("javascript:alert(1)", "data:image/png;base64,AAAA", "//evil.example/x.png"):
+            r = self.client.patch(f"/api/tenkitler/{t['id']}", json={"kanitlar": [{"id": "x", "tur": "foto", "url": bad}]})
+            self.assertEqual(r.status_code, 422, bad)
+        cok = [{"id": f"n{i}", "tur": "not", "ad": "x"} for i in range(31)]
+        self.assertEqual(self.client.patch(f"/api/tenkitler/{t['id']}", json={"kanitlar": cok}).status_code, 422)
+
     def test_unknown_audit_and_tenkit(self):
         self.assertEqual(self.client.get("/api/tenkitler/?audit_id=yok").status_code, 404)
         self.assertEqual(self.client.patch("/api/tenkitler/yok", json={"durum": "acik"}).status_code, 404)

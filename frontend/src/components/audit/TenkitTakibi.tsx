@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
-import { AlertCircle, ChevronDown, ChevronUp, ClipboardCheck, History, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronUp, ClipboardCheck, ClipboardCopy, History, Loader2, Paperclip, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "../ui/Button";
 import {
     aktarTenkitler, createTenkit, deleteTenkit, DURUM_ETIKETLERI, fetchOncekiTenkitler, fetchTenkitler,
-    ONEM_ETIKETLERI, updateTenkit, type Tenkit, type TenkitDurumu, type TenkitOnemi,
+    ONEM_ETIKETLERI, updateTenkit, type Kanit, type Tenkit, type TenkitDurumu, type TenkitOnemi,
 } from "../../lib/api/tenkitler";
+import { kanitEtiketi, TenkitKanitlari } from "./TenkitKanitlari";
 
 interface ChecklistQuestion {
     id: string;
@@ -19,6 +20,9 @@ interface Props {
     /** Kontrol listesi soruları ve cevapları ("Hayır" denenler tenkit adayı) */
     questions: ChecklistQuestion[];
     form: Record<string, any>;
+    /** Denetim galerisindeki fotoğraflar (sıra = rapordaki "Fotoğraf N" numarası) */
+    photos?: string[];
+    photoDescriptions?: Record<string, string>;
     onDenetimBaslat?: () => void;
 }
 
@@ -37,8 +41,10 @@ const ONEM_RENK: Record<TenkitOnemi, string> = {
 const DURUMLAR = Object.keys(DURUM_ETIKETLERI) as TenkitDurumu[];
 const inputCls = "w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500/20";
 
-function TenkitKarti({ tenkit, onChange, onDelete }: {
+function TenkitKarti({ tenkit, photos, photoDescriptions, onChange, onDelete }: {
     tenkit: Tenkit;
+    photos: string[];
+    photoDescriptions: Record<string, string>;
     onChange: (t: Tenkit) => void;
     onDelete: (id: string) => void;
 }) {
@@ -53,7 +59,12 @@ function TenkitKarti({ tenkit, onChange, onDelete }: {
         try {
             const guncel = await updateTenkit(tenkit.id, degisiklik);
             onChange(guncel);
-            setTaslak({});
+            // Yalnızca kaydedilen alanları taslaktan düş; yazılmakta olan diğer alanlar kalsın
+            setTaslak(t => {
+                const kalan: Partial<Tenkit> = { ...t };
+                (Object.keys(degisiklik) as (keyof Tenkit)[]).forEach(k => { delete kalan[k]; });
+                return kalan;
+            });
         } catch (e: any) {
             toast.error(e?.message || "Tenkit güncellenemedi.");
         } finally {
@@ -71,6 +82,11 @@ function TenkitKarti({ tenkit, onChange, onDelete }: {
                         </span>
                         {tenkit.alan && <span className="text-[10px] font-bold text-slate-400">{tenkit.alan}</span>}
                         {tenkit.kaynak === "kontrol_listesi" && <span className="text-[10px] text-slate-400">• Kontrol listesi</span>}
+                        {(tenkit.kanitlar || []).length > 0 ? (
+                            <span className="text-[10px] font-bold text-blue-600 flex items-center gap-0.5"><Paperclip size={10} />{tenkit.kanitlar!.length} kanıt</span>
+                        ) : tenkit.onem !== "bilgi" && (
+                            <span className="text-[10px] font-bold text-amber-600">• Kanıt yok</span>
+                        )}
                     </div>
                     <p className="text-sm font-bold text-slate-900 dark:text-white leading-snug">{tenkit.baslik}</p>
                 </div>
@@ -114,6 +130,13 @@ function TenkitKarti({ tenkit, onChange, onDelete }: {
                             {(Object.keys(ONEM_ETIKETLERI) as TenkitOnemi[]).map(o => <option key={o} value={o}>{ONEM_ETIKETLERI[o]}</option>)}
                         </select>
                     </label>
+                    <TenkitKanitlari
+                        kanitlar={tenkit.kanitlar || []}
+                        photos={photos}
+                        photoDescriptions={photoDescriptions}
+                        kaydediliyor={kaydediliyor}
+                        onKaydet={(kanitlar: Kanit[]) => kaydet({ kanitlar })}
+                    />
                     <label className="space-y-1 md:col-span-2">
                         <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Birimin cevabı</span>
                         <textarea rows={3} className={inputCls} value={deger("birim_cevabi")} onChange={e => setTaslak(t => ({ ...t, birim_cevabi: e.target.value }))} placeholder="Cevaplı teftiş raporundaki birim cevabı" />
@@ -146,7 +169,26 @@ function TenkitKarti({ tenkit, onChange, onDelete }: {
     );
 }
 
-export function TenkitTakibi({ auditId, questions, form, onDenetimBaslat }: Props) {
+const kacis = (v: string) => v.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+
+/** Tenkit → tespit → dayanak → kanıt zincirini rapora yapıştırılabilir biçimde üretir. */
+function raporMetni(tenkitler: Tenkit[], photos: string[]) {
+    const html: string[] = [];
+    const duz: string[] = [];
+    tenkitler.forEach((t, i) => {
+        const no = i + 1;
+        const kanit = (t.kanitlar || []).map(k => kanitEtiketi(k, photos)).join(", ");
+        html.push(`<p><strong>${no}. ${kacis(t.baslik)}</strong></p>`);
+        duz.push(`${no}. ${t.baslik}`);
+        if (t.aciklama) { html.push(`<p>${kacis(t.aciklama).replace(/\n/g, "<br>")}</p>`); duz.push(t.aciklama); }
+        if (t.dayanak) { html.push(`<p><em>Dayanak:</em> ${kacis(t.dayanak)}</p>`); duz.push(`Dayanak: ${t.dayanak}`); }
+        if (kanit) { html.push(`<p><em>Kanıt:</em> ${kacis(kanit)}</p>`); duz.push(`Kanıt: ${kanit}`); }
+        duz.push("");
+    });
+    return { html: html.join("\n"), duz: duz.join("\n") };
+}
+
+export function TenkitTakibi({ auditId, questions, form, photos = [], photoDescriptions = {}, onDenetimBaslat }: Props) {
     const [tenkitler, setTenkitler] = useState<Tenkit[]>([]);
     const [onceki, setOnceki] = useState<{ birim_adi: string; tenkitler: Tenkit[] } | null>(null);
     const [yukleniyor, setYukleniyor] = useState(false);
@@ -178,6 +220,7 @@ export function TenkitTakibi({ auditId, questions, form, onDenetimBaslat }: Prop
     const sayac = useMemo(() => {
         const c: Record<string, number> = {};
         tenkitler.forEach(t => { c[t.durum] = (c[t.durum] || 0) + 1; });
+        c.kanitsiz = tenkitler.filter(t => t.onem !== "bilgi" && !(t.kanitlar || []).length).length;
         return c;
     }, [tenkitler]);
 
@@ -257,6 +300,23 @@ export function TenkitTakibi({ auditId, questions, form, onDenetimBaslat }: Prop
         }
     };
 
+    const raporaKopyala = async () => {
+        const { html, duz } = raporMetni(tenkitler, photos);
+        try {
+            if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+                await navigator.clipboard.write([new ClipboardItem({
+                    "text/html": new Blob([html], { type: "text/html" }),
+                    "text/plain": new Blob([duz], { type: "text/plain" }),
+                })]);
+            } else {
+                await navigator.clipboard.writeText(duz);
+            }
+            toast.success(`${tenkitler.length} tenkit kopyalandı. Rapor editörüne yapıştırabilirsiniz.`);
+        } catch {
+            toast.error("Panoya kopyalanamadı.");
+        }
+    };
+
     const sil = async (id: string) => {
         if (!window.confirm("Bu tenkit silinsin mi?")) return;
         try {
@@ -275,6 +335,18 @@ export function TenkitTakibi({ auditId, questions, form, onDenetimBaslat }: Prop
                 {DURUMLAR.filter(d => sayac[d]).map(d => (
                     <span key={d} className={`text-[10px] font-black px-2 py-1 rounded-lg border ${DURUM_RENK[d]}`}>{DURUM_ETIKETLERI[d]}: {sayac[d]}</span>
                 ))}
+                {sayac.kanitsiz > 0 && (
+                    <span className="text-[10px] font-black px-2 py-1 rounded-lg border bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20" title="Kritik/uyarı tenkitlerinden kanıt bağlanmamış olanlar">
+                        Kanıtsız: {sayac.kanitsiz}
+                    </span>
+                )}
+                {tenkitler.length > 0 && (
+                    <button type="button" onClick={raporaKopyala}
+                        className="ml-auto flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        title="Tenkitleri tespit, dayanak ve kanıtlarıyla numaralı olarak kopyalar">
+                        <ClipboardCopy size={13} /> Rapora kopyala
+                    </button>
+                )}
             </div>
 
             {/* Ekleme */}
@@ -312,7 +384,7 @@ export function TenkitTakibi({ auditId, questions, form, onDenetimBaslat }: Prop
             ) : (
                 <div className="flex flex-col gap-2.5">
                     {tenkitler.map(t => (
-                        <TenkitKarti key={t.id} tenkit={t} onDelete={sil}
+                        <TenkitKarti key={t.id} tenkit={t} onDelete={sil} photos={photos} photoDescriptions={photoDescriptions}
                             onChange={g => setTenkitler(prev => prev.map(x => (x.id === g.id ? g : x)))} />
                     ))}
                 </div>
