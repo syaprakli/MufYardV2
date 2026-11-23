@@ -25,7 +25,7 @@ class CollaborationService:
         messages_ref = db.collection('messages')
         # to_thread used for blocking .stream()
         docs = await asyncio.to_thread(
-            lambda: messages_ref.order_by('timestamp', direction='DESCENDING').limit(limit).stream()
+            lambda: list(messages_ref.order_by('timestamp', direction='DESCENDING').limit(limit).stream())
         )
         
         messages = []
@@ -73,7 +73,7 @@ class CollaborationService:
         
         # Mesajları çek
         docs = await asyncio.to_thread(
-            lambda: messages_ref.order_by('timestamp', direction='DESCENDING').limit(limit).stream()
+            lambda: list(messages_ref.order_by('timestamp', direction='DESCENDING').limit(limit).stream())
         )
         
         messages = []
@@ -198,7 +198,7 @@ class CollaborationService:
             
         posts = []
         try:
-            docs = await asyncio.to_thread(lambda: query.limit(200).stream())
+            docs = await asyncio.to_thread(lambda: list(query.limit(200).stream()))
             for doc in docs:
                 item = doc.to_dict()
                 item['id'] = doc.id
@@ -242,7 +242,7 @@ class CollaborationService:
             print(f"Error fetching posts: {e}")
             # Fallback: if category filter causes index error, try without filter
             try:
-                docs = await asyncio.to_thread(lambda: posts_ref.order_by('created_at', direction='DESCENDING').limit(20).stream())
+                docs = await asyncio.to_thread(lambda: list(posts_ref.order_by('created_at', direction='DESCENDING').limit(20).stream()))
                 for doc in docs:
                     item = doc.to_dict()
                     item['id'] = doc.id
@@ -312,7 +312,7 @@ class CollaborationService:
     async def get_comments(post_id: str) -> List[Dict[str, Any]]:
         comments_ref = db.collection('posts').document(post_id).collection('comments')
         # Order by creation date to show thread in sequence
-        docs = await asyncio.to_thread(lambda: comments_ref.order_by('created_at', direction='ASCENDING').limit(200).stream())
+        docs = await asyncio.to_thread(lambda: list(comments_ref.order_by('created_at', direction='ASCENDING').limit(200).stream()))
         
         comments = []
         for doc in docs:

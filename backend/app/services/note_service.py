@@ -4,6 +4,26 @@ from typing import List, Optional, Dict, Any
 from app.lib.firebase_admin import db
 from app.schemas.note import NoteCreate, NoteUpdate
 
+
+def _fetch_profile_names(uids: List[str]) -> Dict[str, str]:
+    """uid -> full_name; Firestore get_all ile tek seferde (e-posta gibi geçersiz ID'ler atlanır)."""
+    valid = [u for u in uids if u and "/" not in u]
+    if not valid:
+        return {}
+    refs = [db.collection('profiles').document(u) for u in valid]
+    names: Dict[str, str] = {}
+    try:
+        get_all = getattr(db, "get_all", None)
+        snapshots = get_all(refs, field_paths=['full_name']) if callable(get_all) else [r.get() for r in refs]
+        for snap in snapshots:
+            if snap.exists:
+                full_name = (snap.to_dict() or {}).get('full_name')
+                if full_name:
+                    names[snap.id] = full_name
+    except Exception:
+        pass
+    return names
+
 class NoteService:
     @staticmethod
     async def get_notes(user_id: str, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -46,19 +66,12 @@ class NoteService:
         
         # Resolve owner names
         def resolve_names():
+            # Tekil sahipler tek bir toplu okumayla çözülür (not başına ayrı okuma yok).
+            owner_ids = sorted({n.get('owner_id') for n in notes if n.get('owner_id')})
+            names = _fetch_profile_names(owner_ids)
             for n in notes:
                 oid = n.get('owner_id')
-                if oid:
-                    try:
-                        prof_doc = db.collection('profiles').document(oid).get()
-                        if prof_doc.exists:
-                            n['owner_name'] = prof_doc.to_dict().get('full_name') or oid
-                        else:
-                            n['owner_name'] = oid
-                    except Exception:
-                        n['owner_name'] = oid
-                else:
-                    n['owner_name'] = 'Bilinmeyen'
+                n['owner_name'] = (names.get(oid) or oid) if oid else 'Bilinmeyen'
 
         if notes:
             await asyncio.to_thread(resolve_names)

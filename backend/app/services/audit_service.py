@@ -6,6 +6,18 @@ from app.lib.firebase_admin import db
 from app.lib.folder_manager import FolderManager
 from app.schemas.audit import AuditCreate, AuditUpdate
 
+
+def _count_docs(collection_ref) -> int:
+    """Koleksiyondaki belge sayısı (Firestore count aggregation; mock DB için listeleme yedeği)."""
+    count_fn = getattr(collection_ref, "count", None)
+    if callable(count_fn):
+        try:
+            result = count_fn().get()
+            return int(result[0][0].value)
+        except Exception:
+            pass
+    return len(list(collection_ref.get()))
+
 class AuditService:
     @staticmethod
     async def _resolve_task_folder_context(task_id: Optional[str]) -> Optional[Dict[str, str]]:
@@ -49,7 +61,7 @@ class AuditService:
         if not user_id and not user_email:
             fields = ['title', 'date', 'status', 'inspector', 'location', 'owner_id', 
                       'assigned_to', 'shared_with', 'shared_roles', 'task_id', 'report_seq', 'is_public', 'created_at', 'audit_data', 'report_created']
-            docs = await asyncio.to_thread(lambda: audits_ref.where('is_public', '==', True).limit(200).select(fields).stream())
+            docs = await asyncio.to_thread(lambda: list(audits_ref.where('is_public', '==', True).limit(200).select(fields).stream()))
             return [ {**doc.to_dict(), 'id': doc.id} for doc in docs]
 
         test_uid = "tolEIwlWrHfWCQduDuXcnqBvWdo2"
@@ -175,8 +187,8 @@ class AuditService:
                 except Exception:
                     pass
             if should_create_version:
-                existing_versions = await asyncio.to_thread(lambda: list(versions_ref.get()))
-                v_num = len(existing_versions) + 1
+                # Sadece sayıyı almak için aggregation: sürüm belgelerinin (tam rapor HTML'i) okunmaz.
+                v_num = await asyncio.to_thread(_count_docs, versions_ref) + 1
                 version_data = {
                     "version_name": custom_version_name or f"v.{v_num:02d}",
                     "report_content": current_data.get('report_content', ''),
@@ -233,7 +245,7 @@ class AuditService:
     @staticmethod
     async def get_audit_versions(audit_id: str) -> List[Dict[str, Any]]:
         versions_ref = db.collection('audits').document(audit_id).collection('versions')
-        docs = await asyncio.to_thread(lambda: versions_ref.order_by('created_at', direction='DESCENDING').limit(50).stream())
+        docs = await asyncio.to_thread(lambda: list(versions_ref.order_by('created_at', direction='DESCENDING').limit(50).stream()))
         
         versions = []
         for doc in docs:

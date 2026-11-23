@@ -33,10 +33,21 @@ def _py_files():
 
 class StaticPatternTests(unittest.TestCase):
     def test_no_lazy_stream_inside_to_thread(self):
-        # to_thread(query.stream) yalnızca generator döndürür; ağ trafiği yine event loop'ta yapılır.
-        pat = re.compile(r"to_thread\(\s*[\w.()'\"]+\.stream\s*\)")
-        offenders = [f"{p.name}:{i}" for p in _py_files()
-                     for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1) if pat.search(line)]
+        # to_thread(q.stream) ve to_thread(lambda: q.stream()) yalnızca generator döndürür;
+        # Firestore ağ trafiği yine event loop'ta yapılır. Sonuç thread içinde list() ile alınmalı.
+        def is_stream_call(node):
+            return isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "stream"
+
+        offenders = []
+        for p in _py_files():
+            for n in ast.walk(ast.parse(p.read_text(encoding="utf-8"))):
+                if not (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "to_thread" and n.args):
+                    continue
+                target = n.args[0]
+                if isinstance(target, ast.Attribute) and target.attr == "stream":
+                    offenders.append(f"{p.name}:{n.lineno}")
+                elif isinstance(target, ast.Lambda) and is_stream_call(target.body):
+                    offenders.append(f"{p.name}:{n.lineno}")
         self.assertEqual(offenders, [])
 
     def test_no_js_style_trim(self):
