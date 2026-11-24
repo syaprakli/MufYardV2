@@ -59,7 +59,7 @@
 | D2 | Rapor kodu: sırasız `limit(1000)` + hata durumunda "1" → yinelenen resmi numara | ✅ Yıl önekli aralık sorgusu, kilit, hata fırlatır | 0adc468 |
 | D3 | `file_permissions.json` atomik değil; bozulunca tüm izinler silinebilirdi; eşzamanlı yazmalar kayboluyordu | ✅ Atomik yazma, `.bak`, bozuksa yazmayı reddet, kilitli güncelleme | ecc8429 |
 | D4 | E-postayla paylaşımda bildirim gitmiyordu (Python'da `.trim()` yok) | ✅ | e29487e |
-| D6 | Kurulu masaüstü uygulaması Railway'e bağlanıyor → görev klasörleri bilgisayarda değil sunucuda oluşuyordu | ✅ 1–4: yerel dosya servisi (anahtarsız). 5 "Sunucuya gönder" ve yeni kurulum testi bekliyor. `docs/PLAN-yerel-dosya-modu.md` | 1f4d1da+ |
+| D6 | Kurulu masaüstü uygulaması Railway'e bağlanıyor → görev klasörleri bilgisayarda değil sunucuda oluşuyordu | ✅ 1–5 tamam: yerel dosya servisi (anahtarsız), görev klasörü eşitleme, "Sunucuya Gönder" (tek seferlik kopya). 👤 Kalan: yeni kurulum dosyası testi (aşama 6). `docs/PLAN-yerel-dosya-modu.md` | 1f4d1da, 7c8be0f, 332cd09 |
 | S5 | `open/create-task-folder` istemcinin gönderdiği görev bilgisiyle başkasının klasör iznini ele geçirmeye izin veriyordu | ✅ HIGH — sunucuda görev her zaman veritabanından | 1f4d1da |
 | D5 | Yatay ölçek mümkün değil: süreç içi durum (WebSocket odaları, önbellekler, rate limit, rapor kodu kilidi), izinler yerel diskte | ⬜ 1000+ aktif kullanıcıda: izinler → Firestore, dosyalar → Storage, yayınlar/rate limit → Redis, rapor kodu → Firestore transaction sayacı | — |
 
@@ -85,18 +85,20 @@
 | K3 | 2019/12 Genelgesi: kamu verisinin yurt içi saklanması | 👤 Rapor verisinin bulutta tutulup tutulamayacağı kurumla netleşmeli; gerekirse raporlar masaüstünde / yurt içi sunucuda |
 | K4 | Firebase Storage bucket konumu | ⚠️ **US-EAST1 (ABD)** — 23.11.2026'da doğrulandı. Sunucuya yüklenen dosyalar (denetim fotoğrafları, Kamusal Alan, "Sunucuya Gönder") ABD'de. Bucket konumu değiştirilemez; AB'de yeni bucket + nesne göçü + adres güncellemesi gerekir. K2/K3 kurum kararına bağlı |
 
-## 6. Bekleyen kullanıcı aksiyonları
+## 6. Bekleyen kullanıcı / kurum aksiyonları
 
 - ✅ Yerel `firebase-credentials.json` güncellendi (kullanıcı).
-- 👤 Yeni kurulum dosyası testi (`docs/PLAN-yerel-dosya-modu.md` aşama 6).
-- 👤 K2/K3 için kurum görüşmesi.
+- 👤 Yeni kurulum dosyası (`build_release.bat`) + test: D6 aşama 6 ve A2 (masaüstü ayarları) bunu bekliyor.
+- 👤 K2/K3/K4 için kurum KVKK görüşmesi (yurt dışı aktarım, 2019/12, ABD'deki Storage bucket'ı).
 
-## 7. Önerilen sıradaki adımlar
+## 7. Kalan teknik işler (24.11.2026 gözden geçirme)
 
-1. AI yazma + rapor/tenkit yeniden tasarımı (C3, P4, Q3 birlikte)
-2. D6 — masaüstünde yerel dosyalar (`docs/PLAN-yerel-dosya-modu.md`)
-3. Q5 — `google.genai` geçişi (AI yeniden tasarımıyla birlikte)
-4. P6/Q4 — veri modeli (büyüme öncesi)
+| Grup | Maddeler | Ne zaman |
+|---|---|---|
+| AI + rapor yeniden tasarımı | C3 (AI araçları onaysız), P4 (rapor belge boyutu), Q3 (iki editör), Q5 (`google.genai`) | Kullanıcının yeniden tasarımıyla birlikte; şimdi dokunulmaz |
+| KVKK | K2, K3, K4 (bucket göçü) | Kurum kararından sonra |
+| Büyüme hazırlığı | P6 + Q4 (tek `participants` alanı, tek kimlik, veri göçü), D5 (çok sunucu: Redis, Firestore'da izin/sayaç) | ~1000 aktif kullanıcıdan önce; bugünkü ölçekte fayda yok, canlı veride göç riski var |
+| Bakım | Q2 (`Files.tsx` bölünmesi) | Dosyalar ekranında büyük bir değişiklik gerektiğinde birlikte |
 
 ## 8. Müfettiş özellikleri (23.11.2026'da sıraya alındı)
 
@@ -104,9 +106,9 @@ Harcırah (e-Yolluk) ve süre uzatma (EBYS) kapsam dışı.
 
 | # | Özellik | Durum |
 |---|---|---|
-| F1 | Tenkit takibi: birim cevabı, durum geçmişi, kontrol listesinden aktarım, aynı birimin önceki denetim tenkitleri (`/api/tenkitler`, Firestore `tenkitler`) | ✅ Canlıda, kullanıcı testi bekleniyor |
-| F2 | Tespit → kanıt → tenkit zinciri: tenkite galeriden fotoğraf / belge / not bağlama, kanıtsız tenkit uyarısı, "Rapora kopyala" (numaralı tenkit + dayanak + "Fotoğraf N") | ✅ Canlıda, kullanıcı testi bekleniyor |
-| F3 | Sahada internetsiz çalışma + fotoğraf tarih/konum damgası: çevrimdışı fotoğraf kuyruğu (IndexedDB, İl'deki base64 yedeği kaldırıldı), EXIF/cihaz tarih-konum damgası + `photo_meta`, kuyrukta denetim güncellemelerinin birleştirilmesi, senkron sırasında eklenenin kaybolma yarışı, bekleyen değişikliğin sayfa açılışında uygulanması | ✅ Canlıda, kullanıcı testi bekleniyor |
+| F1 | Tenkit takibi: birim cevabı, durum geçmişi, kontrol listesinden aktarım, aynı birimin önceki denetim tenkitleri (`/api/tenkitler`, Firestore `tenkitler`) | ✅ Canlıda; tarayıcıda uçtan uca test edildi |
+| F2 | Tespit → kanıt → tenkit zinciri: tenkite galeriden fotoğraf / belge / not bağlama, kanıtsız tenkit uyarısı, "Rapora kopyala" (numaralı tenkit + dayanak + "Fotoğraf N") | ✅ Canlıda; tarayıcıda uçtan uca test edildi |
+| F3 | Sahada internetsiz çalışma + fotoğraf tarih/konum damgası: çevrimdışı fotoğraf kuyruğu (IndexedDB, İl'deki base64 yedeği kaldırıldı), EXIF/cihaz tarih-konum damgası + `photo_meta`, kuyrukta denetim güncellemelerinin birleştirilmesi, senkron sırasında eklenenin kaybolma yarışı, bekleyen değişikliğin sayfa açılışında uygulanması | ✅ Canlıda; tarayıcıda uçtan uca test edildi |
 | F4 | Rapor öncesi kalite kontrol + kişisel veri karartma: işlenmemiş "Hayır" maddesi, kanıtsız/dayanaksız tenkit, raporda geçmeyen tenkit, olmayan fotoğrafa atıf, doldurulmamış şablon yeri, ileri tarih; TCKN (algoritmalı)/telefon/e-posta/IBAN tespiti ve karartılmış kopya (pano / Word). Uygulamadaki rapor değiştirilmez. Tarayıcı testi: 21/21 | ✅ Canlıda |
 | F5 | İfade tutanağı (tek tutanak türü; tespit/görüşme 24.11.2026 kaldırıldı) — **inceleme, soruşturma, ön inceleme, araştırma görevlerinde** (genel denetimde ifade alınmaz; 24.11.2026'da denetim sayfalarından Görevler sayfasına taşındı). İfade (SORULDU/CEVABEN), tespit, görüşme; cevaba mikrofonla ses → metin; internetsiz yazma; Word/yazdır. `tutanaklar` koleksiyonu `task_id` ile; yetki görevden (sahip/atanan/paylaşılan/yönetici düzenler, moderatör görür). Düzeltme: yeni ifadede boş ad 422 veriyordu; tarayıcının gönderdiği gövdeler artık gerçek şemadan geçirilerek test ediliyor | ✅ Canlıda |
 | F6 | Mali denetim yardımcıları (mizan → kırmızı bayrak, örneklem, 7405 borçlanma sınırı) | ➖ Kapsam dışı (24.11.2026): kullanıcı başka bir projeyle birleştirip ayrıca yapacak |
