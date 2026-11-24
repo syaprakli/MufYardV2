@@ -47,7 +47,7 @@ jobs:
       - name: Bağımlılıkları kur
         run: npm ci
       - name: Electron dosyaları sözdizimi kontrolü
-        run: node --check main.cjs && node --check preload.cjs
+        run: node --check main.cjs && node --check preload.cjs && node --check masaustuAyarlari.cjs
       - name: TypeScript ve web build
         run: npm run build:web
       - name: Bağımlılık güvenlik taraması

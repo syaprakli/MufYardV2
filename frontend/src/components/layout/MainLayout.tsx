@@ -5,6 +5,7 @@ import { Header } from "./Header";
 import { LayoutDashboard, CheckSquare, FileText, Settings, Shield } from "lucide-react";
 import { useGlobalData } from "../../lib/context/GlobalDataContext";
 import { cn } from "../../lib/utils";
+import { KisayolDinleyici } from "./Kisayollar";
 
 const DraggableRadioWidgetLazy = lazy(() => import("./DraggableRadioWidget").then((module) => ({ default: module.DraggableRadioWidget })));
 
@@ -30,6 +31,7 @@ export function MainLayout() {
             )}
 
             {!isFullScreen && <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />}
+            <KisayolDinleyici />
             
             {/* The main content area */}
             <main className={cn(

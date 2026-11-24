@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exportPhotosToComputer: (photos, folderName) => {
         return ipcRenderer.invoke('export-photos-to-computer', { photos, folderName });
     },
+    // Ayarlar > Masaüstü (açılışta başlat, arka planda çalış, genel kısayol)
+    masaustuAyarlariAl: () => ipcRenderer.invoke('masaustu-ayarlar-al'),
+    masaustuAyarlariKaydet: (degisiklik) => ipcRenderer.invoke('masaustu-ayarlar-kaydet', degisiklik),
     // Platform bilgisi
     platform: process.platform,
     isElectron: true,

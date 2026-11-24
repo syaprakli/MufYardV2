@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification: NativeNotification, Menu, dialog, shell, Tray } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification: NativeNotification, Menu, dialog, shell, Tray, globalShortcut } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -14,8 +14,53 @@ let isQuitting = false;
 let hasShownTrayBalloon = false;
 
 // Yetki hatalarını ve GPU cache hatalarını engellemek için ayarlar
-const userDataPath = path.join(os.homedir(), 'AppData', 'Local', 'MufYardV2');
+// Geliştirme/test: MUFYARD_USERDATA ile ayrı klasör (kurulu uygulamanın verisine dokunmaz). Paketli sürümde yok sayılır.
+const userDataPath = (!app.isPackaged && process.env.MUFYARD_USERDATA) || path.join(os.homedir(), 'AppData', 'Local', 'MufYardV2');
 app.setPath('userData', userDataPath);
+
+// Kullanıcının seçtiği masaüstü ayarları (Ayarlar > Masaüstü)
+const masaustu = require('./masaustuAyarlari.cjs');
+masaustu.yukle(userDataPath);
+// Windows açılışında, "gizli başlat" seçiliyse pencere açılmadan simge olarak bekler
+const gizliBaslat = process.argv.includes(masaustu.GIZLI_BASLATMA_ARGUMANI) && masaustu.al().acilistaGizliBaslat;
+
+function acilisAyariniUygula() {
+    if (!app.isPackaged) return; // geliştirme ortamında Windows başlangıcına eklenmez
+    const a = masaustu.al();
+    try {
+        app.setLoginItemSettings({
+            openAtLogin: a.acilistaBaslat,
+            path: process.execPath,
+            args: a.acilistaGizliBaslat ? [masaustu.GIZLI_BASLATMA_ARGUMANI] : [],
+        });
+    } catch (e) {
+        console.error('Açılış ayarı uygulanamadı:', e.message);
+    }
+}
+
+function pencereyiGosterGizle() {
+    if (!mainWindow) return;
+    if (mainWindow.isVisible() && mainWindow.isFocused() && !mainWindow.isMinimized()) {
+        mainWindow.hide();
+        return;
+    }
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+}
+
+/** Her yerden MufYARD'ı göster/gizle kısayolu. Başka uygulama kullanıyorsa kaydedilemez. */
+function genelKisayoluUygula() {
+    globalShortcut.unregisterAll();
+    const k = masaustu.al().genelKisayol;
+    if (!k) return { ok: true };
+    try {
+        const ok = globalShortcut.register(masaustu.hizlandirici(k), pencereyiGosterGizle);
+        return ok ? { ok: true } : { ok: false, hata: `${k} başka bir uygulama tarafından kullanılıyor.` };
+    } catch (e) {
+        return { ok: false, hata: `${k} kısayolu kaydedilemedi.` };
+    }
+}
 
 // GPU disk cache hatalarını susturmak için (Terminaldeki hataları giderir)
 app.commandLine.appendSwitch('disable-gpu-cache');
@@ -153,10 +198,13 @@ async function startLocalFilesService() {
 
 async function startBackend() {
     if (app.isPackaged) {
-        app.setLoginItemSettings({ openAtLogin: true, path: process.execPath, args: [] });
+        acilisAyariniUygula(); // eskiden her açılışta zorla "açık" yapılıyordu; artık Ayarlar'daki seçim
         startLocalFilesService();
         return;
     }
+
+    // Geliştirme/test: yerel backend başlatılmadan yalnızca pencere/masaüstü davranışı denenebilsin
+    if (process.env.MUFYARD_BACKEND_BASLATMA === '0') return;
 
     const backendPath = getBackendPath();
     const backendAlreadyRunning = await isPortReachable(8000);
@@ -277,6 +325,7 @@ function createWindow() {
     const win = new BrowserWindow({
         width: 1280,
         height: 800,
+        show: !gizliBaslat,
         title: "MufYARD",
         icon: getTrayIconPath(),
         webPreferences: {
@@ -291,8 +340,10 @@ function createWindow() {
 
     mainWindow = win;
 
-    // Pencereyi ekranı kaplayacak şekilde aç (başlık çubuğu görünür kalır)
-    win.maximize();
+    // Pencereyi ekranı kaplayacak şekilde aç (başlık çubuğu görünür kalır).
+    // Gizli başlatıldıysa ilk gösterildiğinde büyütülür (gizli pencereyi büyütmek onu görünür yapar).
+    if (gizliBaslat) win.once('show', () => win.maximize());
+    else win.maximize();
 
     // Menü çubuğunu gizle ama kısayolları (Ctrl+R, Ctrl+Shift+I) aktif bırak
     win.setMenuBarVisibility(false);
@@ -315,6 +366,13 @@ function createWindow() {
     // Kapatma (X) butonuna basıldığında uygulamayı tamamen kapatmak yerine sistem tepsisine (saatin yanına) gizle
     win.on('close', (event) => {
         if (!isQuitting) {
+            // Ayarlar > Masaüstü: "Kapatınca arka planda çalışsın" kapalıysa uygulama tamamen kapanır
+            if (!masaustu.al().arkaPlandaCalis) {
+                isQuitting = true;
+                stopBackend();
+                app.quit();
+                return;
+            }
             event.preventDefault();
             win.hide();
 
@@ -371,7 +429,7 @@ if (!gotTheLock) {
     app.whenReady().then(async () => {
         await startBackend();
         
-        if (!app.isPackaged) {
+        if (!app.isPackaged && process.env.MUFYARD_BACKEND_BASLATMA !== '0') {
             // Dev modda backend'in hazır olmasını bekle
             console.log('[DEV] Backend hazır olması bekleniyor...');
             try {
@@ -384,6 +442,12 @@ if (!gotTheLock) {
         
         createWindow();
         createTray();
+        const kisayol = genelKisayoluUygula();
+        if (!kisayol.ok) console.warn('[KISAYOL]', kisayol.hata);
+    });
+
+    app.on('will-quit', () => {
+        globalShortcut.unregisterAll();
     });
 
     app.on('window-all-closed', () => {
@@ -408,6 +472,42 @@ if (!gotTheLock) {
         }
     });
 }
+
+// Ayarlar > Masaüstü
+ipcMain.handle('masaustu-ayarlar-al', () => {
+    const a = masaustu.al();
+    let acilistaKayitli = null;
+    if (app.isPackaged) {
+        try {
+            acilistaKayitli = app.getLoginItemSettings({
+                path: process.execPath,
+                args: a.acilistaGizliBaslat ? [masaustu.GIZLI_BASLATMA_ARGUMANI] : [],
+            }).openAtLogin;
+        } catch { /* okunamadı */ }
+    }
+    return { ...a, paketli: app.isPackaged, acilistaKayitli };
+});
+
+ipcMain.handle('masaustu-ayarlar-kaydet', (_event, degisiklik) => {
+    if (!degisiklik || typeof degisiklik !== 'object' || Array.isArray(degisiklik)) {
+        return { ayarlar: masaustu.al(), hata: 'Geçersiz ayar.' };
+    }
+    const onceki = masaustu.al();
+    const yeni = masaustu.kaydet(degisiklik);
+    acilisAyariniUygula();
+    let hata = null;
+    if (yeni.genelKisayol !== onceki.genelKisayol) {
+        const sonuc = genelKisayoluUygula();
+        if (!sonuc.ok) {
+            hata = sonuc.hata;
+            masaustu.kaydet({ genelKisayol: onceki.genelKisayol });
+            genelKisayoluUygula();
+        }
+    } else if ('genelKisayol' in degisiklik && degisiklik.genelKisayol !== yeni.genelKisayol) {
+        hata = 'Kısayol geçersiz: en az Ctrl veya Alt ile bir harf, rakam ya da F tuşu olmalı.';
+    }
+    return { ayarlar: masaustu.al(), hata };
+});
 
 // Bildirim Köprüsü: Renderer sürecinden gelen talepleri dinle
 ipcMain.on('show-notification', (event, { title, body }) => {

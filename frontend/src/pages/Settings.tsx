@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { User, Bell, Shield, Wand2, Database, LogOut, FileText, Zap, Loader2 } from "lucide-react";
+import { User, Bell, Shield, Wand2, Database, LogOut, FileText, Zap, Loader2, Keyboard } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { KisayolBolumu, MasaustuBolumu } from "../components/settings/KisayolVeMasaustu";
 import { toast } from "react-hot-toast";
 import { Button } from "../components/ui/Button";
 import { useAuth } from "../lib/hooks/useAuth";
@@ -51,7 +53,8 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
     const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState(initialTab || "Profil");
+    const [searchParams] = useSearchParams();
+    const [activeTab, setActiveTab] = useState(initialTab || (searchParams.get("sekme") === "kisayollar" ? "Kısayollar" : "Profil"));
     const [raporOnek, setRaporOnek] = useState(() => localStorage.getItem('raporKoduOnek') || profile?.report_prefix || 'S.Y.64');
     
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -122,6 +125,7 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
                     <SettingsNav icon={FileText} label="Raporlar" active={activeTab === "Rapor Ayarları"} onClick={() => setActiveTab("Rapor Ayarları")} />
                     <SettingsNav icon={Wand2} label="AI" active={activeTab === "Yapay Zeka"} onClick={() => setActiveTab("Yapay Zeka")} />
                     <SettingsNav icon={Bell} label="Bildirim" active={activeTab === "Bildirimler"} onClick={() => setActiveTab("Bildirimler")} />
+                    <SettingsNav icon={Keyboard} label="Kısayol ve Masaüstü" active={activeTab === "Kısayollar"} onClick={() => setActiveTab("Kısayollar")} />
                     <SettingsNav icon={Shield} label="Güvenlik" active={activeTab === "Güvenlik"} onClick={() => setActiveTab("Güvenlik")} />
                     <SettingsNav icon={Zap} label="Lisans" active={activeTab === "Lisans"} onClick={() => setActiveTab("Lisans")} />
                     {profile?.role === 'admin' && <SettingsNav icon={Database} label="Veri" active={activeTab === "Veri"} onClick={() => setActiveTab("Veri")} />}
@@ -150,6 +154,12 @@ export default function Settings({ initialTab }: { initialTab?: string }) {
                     )}
                     {activeTab === "Rapor Ayarları" && <ReportSection raporOnek={raporOnek} setRaporOnek={setRaporOnek} handleSave={handleSave} saving={saving} />}
                     {activeTab === "Yapay Zeka" && <AISection profile={profile} setProfile={setProfile} />}
+                    {activeTab === "Kısayollar" && (
+                        <>
+                            <MasaustuBolumu />
+                            <KisayolBolumu />
+                        </>
+                    )}
                     {activeTab === "Bildirimler" && (
                         <NotificationSection 
                             profile={profile} setProfile={setProfile} isElectron={isElectron}

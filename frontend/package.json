@@ -71,6 +71,7 @@
       "dist/**/*",
       "main.cjs",
       "preload.cjs",
+      "masaustuAyarlari.cjs",
       "public/favicon.ico",
       "package.json"
     ],
