@@ -8,7 +8,7 @@ import {
     BookOpen, ClipboardCheck, Bot, Plus, Edit2, Trash2, Search,
     Tag, ChevronRight, X, Check, Loader2, Database, Sparkles, FileText,
     ArrowRight, Info, AlertCircle, Save, ExternalLink, Play, ArrowLeft,
-    Download, Building2, Printer, Copy, Camera, Table, MapPin, ChevronDown, Gavel, ShieldCheck, FileSignature
+    Download, Building2, Printer, Copy, Camera, Table, MapPin, ChevronDown, Gavel, ShieldCheck
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { API_URL } from "../../lib/config";
@@ -42,7 +42,6 @@ import { compileStructuredReportToHtml } from "../../lib/reportSectionManager";
 import { REPORT_TEMPLATES } from "../../lib/reportTemplates";
 import { TenkitTakibi } from "../../components/audit/TenkitTakibi";
 import { RaporKontrol } from "../../components/audit/RaporKontrol";
-import { Tutanaklar } from "../../components/audit/Tutanaklar";
 import { getPendingAuditUpdate } from "../../lib/api/syncQueue";
 import { fotoDamgala, fotoMetaOku, damgaTercihi, damgaTercihiKaydet, tarihMetni, konumMetni, haritaAdresi, type FotoMeta } from "../../lib/fotoDamga";
 import { bekleyenFotoEkle, bekleyenFotolar, bekleyenFotoSil, type BekleyenFoto } from "../../lib/offlinePhotos";
@@ -323,7 +322,7 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
     const [customItemText, setCustomItemText] = useState("");
     const [isTaskDropdownOpen, setIsTaskDropdownOpen] = useState(false);
     const [isSelectCityModalOpen, setIsSelectCityModalOpen] = useState(false);
-    const [activeDetailTab, setActiveDetailTab] = useState<"hub" | "info" | "notes" | "photos" | "tesisler" | "checklist" | "editor" | "dashboard" | "evrak_talebi" | "ozet_tablolar" | "ozel_beden_egitimi" | "tenkit_takibi" | "rapor_kontrol" | "tutanaklar">("hub");
+    const [activeDetailTab, setActiveDetailTab] = useState<"hub" | "info" | "notes" | "photos" | "tesisler" | "checklist" | "editor" | "dashboard" | "evrak_talebi" | "ozet_tablolar" | "ozel_beden_egitimi" | "tenkit_takibi" | "rapor_kontrol">("hub");
     const [localAuditData, setLocalAuditData] = useState<any>({
         info: {},
         generalNotes: "",
@@ -5003,15 +5002,6 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                                     highlight: false
                                                 },
                                                 {
-                                                    id: "tutanaklar",
-                                                    title: "İfade ve Tutanaklar",
-                                                    subtitle: "İfade, tespit ve görüşme tutanağı; cevapları sesle yazdırma, Word/yazdır",
-                                                    icon: FileSignature,
-                                                    badge: "Tutanak",
-                                                    badgeColor: "bg-violet-500/10 text-violet-600 border-violet-500/20",
-                                                    highlight: false
-                                                },
-                                                {
                                                     id: "rapor_kontrol",
                                                     title: "Rapor Öncesi Kontrol",
                                                     subtitle: "Eksik tenkit, kanıt, dayanak, şablon boşluğu ve kişisel veri taraması; karartılmış kopya",
@@ -5144,7 +5134,6 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                                         { id: "tesisler", label: "Tesisler" },
                                                         { id: "checklist", label: "Kontrol Listesi" },
                                                         { id: "tenkit_takibi", label: "Tenkitler" },
-                                                        { id: "tutanaklar", label: "Tutanaklar" },
                                                         { id: "rapor_kontrol", label: "Kontrol" },
                                                         { id: "ozet_tablolar", label: "İstenecek Tablolar" },
                                                         { id: "editor", label: "Rapor" },
@@ -5196,7 +5185,6 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                                             {activeDetailTab === "evrak_talebi" && "Evrak Talebi"}
                                                             {activeDetailTab === "tenkit_takibi" && "Tenkit Takibi"}
                                                             {activeDetailTab === "rapor_kontrol" && "Rapor Öncesi Kontrol"}
-                                                            {activeDetailTab === "tutanaklar" && "İfade ve Tutanaklar"}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -5209,7 +5197,6 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                                         { id: "photos", label: "Fotoğraflar" },
                                                         { id: "checklist", label: "Kontrol Listesi" },
                                                         { id: "tenkit_takibi", label: "Tenkitler" },
-                                                        { id: "tutanaklar", label: "Tutanaklar" },
                                                         { id: "rapor_kontrol", label: "Kontrol" },
                                                         { id: "editor", label: "Rapor" }
                                                     ].map(tab => (
@@ -5240,13 +5227,6 @@ export default function DenetimSayfasi({ tur }: { tur: DenetimTuruKey }) {
                                             {activeDetailTab === "checklist" && renderChecklistTab()}
                                             {activeDetailTab === "tenkit_takibi" && (
                                                 <TenkitTakibi auditId={selectedReport?.id} questions={AUDIT_TEMPLATES[taskTabId] || []} form={localAuditData.form || {}} photos={localAuditData.photos || []} photoDescriptions={localAuditData.photo_descriptions || {}} />
-                                            )}
-                                            {activeDetailTab === "tutanaklar" && (
-                                                <Tutanaklar
-                                                    auditId={selectedReport?.id}
-                                                    mufettisAdi={profile?.full_name || user?.displayName || ""}
-                                                    birimAdi={selectedTask?.rapor_adi || ""}
-                                                />
                                             )}
                                             {activeDetailTab === "rapor_kontrol" && (
                                                 <RaporKontrol

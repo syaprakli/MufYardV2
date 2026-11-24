@@ -3,7 +3,7 @@ import { Suspense, lazy, useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, ClipboardCheck, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History, ArrowUpDown, FolderOpen, WifiOff, AlertCircle
+    Search, FileText, Loader2, Trash2, Edit3, ClipboardList, ClipboardCheck, X, UserPlus, ChevronRight, Calendar, Shield, FileDigit, Upload, Download, History, ArrowUpDown, FolderOpen, WifiOff, AlertCircle, FileSignature
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -24,6 +24,9 @@ import { getFullReportHtmlWithCover } from "../lib/reportSectionManager";
 
 const ShareModalLazy = lazy(() => import("../components/ShareModal"));
 const TaskAnalysisModalLazy = lazy(() => import("../components/tasks/TaskAnalysisModal"));
+const TutanaklarLazy = lazy(() => import("../components/audit/Tutanaklar").then(m => ({ default: m.Tutanaklar })));
+// İfade ve tutanak inceleme/soruşturmada alınır; genel denetim görevlerinde gösterilmez
+const TUTANAK_GOREV_TURLERI = ["İnceleme", "Soruşturma", "Ön İnceleme", "Araştırma"];
 
 // Shared styles and sub-components
 function ActionBtn({ children, title, color, onClick }: { children: React.ReactNode; title: string; color: string; onClick: () => void }) {
@@ -273,6 +276,7 @@ export default function Tasks() {
     const legacyReportInputRef = useRef<HTMLInputElement>(null);
     const [isLegacyMode, setIsLegacyMode] = useState(false);
     const [analysisTask, setAnalysisTask] = useState<Task | null>(null);
+    const [tutanakGorevi, setTutanakGorevi] = useState<Task | null>(null);
     const [sortConfig, setSortConfig] = useState<{ key: "rapor_kodu" | "rapor_adi" | "rapor_turu" | "sure" | "rapor_durumu"; direction: "asc" | "desc" }>({
         key: "rapor_kodu",
         direction: "asc"
@@ -2074,9 +2078,15 @@ export default function Tasks() {
                                                 <ActionBtn title="Raporları Gör" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
                                                     <FileText size={14} />
                                                 </ActionBtn>
-                                                <ActionBtn title="Denetim Formu" color="#14b8a6" onClick={() => navigate("/denetim")}>
-                                                    <ClipboardCheck size={14} />
-                                                </ActionBtn>
+                                                {TUTANAK_GOREV_TURLERI.includes(task.rapor_turu || "") ? (
+                                                    <ActionBtn title="İfade ve Tutanaklar" color="#7c3aed" onClick={() => setTutanakGorevi(task)}>
+                                                        <FileSignature size={14} />
+                                                    </ActionBtn>
+                                                ) : (
+                                                    <ActionBtn title="Denetim Formu" color="#14b8a6" onClick={() => navigate("/denetim")}>
+                                                        <ClipboardCheck size={14} />
+                                                    </ActionBtn>
+                                                )}
                                                 <ActionBtn title="Düzenle" color="#f59e0b" onClick={() => isElectron ? setEditingTask(task) : toast.error("Düzenleme sadece masaüstü uygulamasında aktiftir.")}>
                                                     <Edit3 size={14} />
                                                 </ActionBtn>
@@ -2305,9 +2315,15 @@ export default function Tasks() {
                                                         <ActionBtn title="Raporları Gör" color="#10b981" onClick={() => handleOpenReportSelector(task)}>
                                                             <FileText size={16} />
                                                         </ActionBtn>
-                                                        <ActionBtn title="Denetim Formu" color="#14b8a6" onClick={() => navigate("/denetim")}>
-                                                            <ClipboardCheck size={16} />
-                                                        </ActionBtn>
+                                                        {TUTANAK_GOREV_TURLERI.includes(task.rapor_turu || "") ? (
+                                                            <ActionBtn title="İfade ve Tutanaklar" color="#7c3aed" onClick={() => setTutanakGorevi(task)}>
+                                                                <FileSignature size={16} />
+                                                            </ActionBtn>
+                                                        ) : (
+                                                            <ActionBtn title="Denetim Formu" color="#14b8a6" onClick={() => navigate("/denetim")}>
+                                                                <ClipboardCheck size={16} />
+                                                            </ActionBtn>
+                                                        )}
                                                         <ActionBtn title="Görevi Düzenle" color="#f59e0b" onClick={() => isElectron ? setEditingTask(task) : toast.error("Düzenleme sadece masaüstü uygulamasında aktiftir.")}>
                                                             <Edit3 size={16} />
                                                         </ActionBtn>
@@ -2547,6 +2563,30 @@ export default function Tasks() {
                                 Web sürümünde rapor oluşturma kapalıdır. Sadece mevcut raporlar görüntülenebilir.
                             </p>
                         )}
+                    </div>
+                </div>
+            , document.body)}
+
+            {tutanakGorevi && createPortal(
+                <div style={overlayStyle} onClick={() => setTutanakGorevi(null)}>
+                    <div
+                        onClick={e => e.stopPropagation()}
+                        className="bg-white dark:bg-slate-950 rounded-2xl shadow-2xl w-[min(1100px,96vw)] max-h-[92vh] overflow-y-auto p-5 sm:p-6"
+                    >
+                        <div className="flex items-start justify-between gap-3 mb-4">
+                            <div>
+                                <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2"><FileSignature size={18} className="text-violet-600" /> İfade ve Tutanaklar</h2>
+                                <p className="text-xs text-slate-500 mt-0.5">{tutanakGorevi.rapor_turu} · {tutanakGorevi.rapor_adi}</p>
+                            </div>
+                            <button type="button" onClick={() => setTutanakGorevi(null)} className="text-slate-400 hover:text-slate-700" title="Kapat"><X size={20} /></button>
+                        </div>
+                        <Suspense fallback={<div className="py-10 text-center text-sm text-slate-400">Yükleniyor…</div>}>
+                            <TutanaklarLazy
+                                taskId={tutanakGorevi.id}
+                                mufettisAdi={profile?.full_name || user?.displayName || ""}
+                                gorevAdi={tutanakGorevi.rapor_adi || ""}
+                            />
+                        </Suspense>
                     </div>
                 </div>
             , document.body)}

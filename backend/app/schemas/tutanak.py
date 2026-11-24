@@ -34,7 +34,8 @@ class TutanakAlanlari(BaseModel):
 
 
 class TutanakCreate(TutanakAlanlari):
-    audit_id: str = Field(..., min_length=1, max_length=200)
+    # İfade/tutanak inceleme-soruşturma görevine aittir (genel denetimde alınmaz)
+    task_id: str = Field(..., min_length=1, max_length=200)
     tur: TutanakTuru
 
 

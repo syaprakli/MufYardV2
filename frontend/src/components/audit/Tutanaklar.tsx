@@ -13,9 +13,11 @@ import { GORUSME_KAPANIS, IFADE_KAPANIS, TESPIT_KAPANIS, tutanakWordIndir, tutan
 import { useSesKaydi } from "../../lib/hooks/useSesKaydi";
 
 interface Props {
-    auditId?: string | null;
+    /** İnceleme / soruşturma görevi */
+    taskId?: string | null;
     mufettisAdi?: string;
-    birimAdi?: string;
+    /** Görevin adı: yeni tutanağın "Konu" alanına önerilir */
+    gorevAdi?: string;
 }
 
 const inputCls = "w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500/20";
@@ -34,16 +36,16 @@ const bugun = () => {
 };
 const simdi = () => new Date().toTimeString().slice(0, 5);
 
-function yeniTutanak(auditId: string, tur: TutanakTuru, mufettisAdi: string, birimAdi: string): Tutanak {
+function yeniTutanak(taskId: string, tur: TutanakTuru, mufettisAdi: string, gorevAdi: string): Tutanak {
     const mufettis: TutanakKisi = { ad: mufettisAdi || "", unvan: "Müfettiş", rol: "mufettis" };
     return {
         id: yerelId(),
-        audit_id: auditId,
+        task_id: taskId,
         tur,
         tarih: bugun(),
         saat: simdi(),
-        yer: birimAdi || "",
-        konu: "",
+        yer: "",
+        konu: gorevAdi || "",
         kisiler: tur === "ifade" ? [{ ad: "", unvan: "", rol: "ifade_veren" }, mufettis] : [mufettis],
         sorular: tur === "ifade" ? IFADE_SORULARI.map(soru => ({ soru, cevap: "" })) : [],
         metin: "",
@@ -257,7 +259,7 @@ function TutanakDuzenleyici({ t, onChange, kayitDurumu, onKapat }: {
 }
 
 // ------------------------------------------------------------------ liste + senkron
-export function Tutanaklar({ auditId, mufettisAdi = "", birimAdi = "" }: Props) {
+export function Tutanaklar({ taskId, mufettisAdi = "", gorevAdi = "" }: Props) {
     const [liste, setListe] = useState<Tutanak[]>([]);
     const [yukleniyor, setYukleniyor] = useState(false);
     const [aktifId, setAktifId] = useState<string | null>(null);
@@ -267,24 +269,24 @@ export function Tutanaklar({ auditId, mufettisAdi = "", birimAdi = "" }: Props) 
     const hataBildirildi = useRef<Set<string>>(new Set());
 
     const taslaklarlaBirlestir = useCallback((sunucu: Tutanak[]) => {
-        if (!auditId) return sunucu;
-        const t = taslaklar(auditId);
+        if (!taskId) return sunucu;
+        const t = taslaklar(taskId);
         const harita = new Map(sunucu.map(x => [x.id, x]));
         t.forEach(d => harita.set(d.veri.id, d.veri));
         return Array.from(harita.values());
-    }, [auditId]);
+    }, [taskId]);
 
     const senkronize = useCallback(async () => {
-        if (!auditId || senkronda.current) return;
+        if (!taskId || senkronda.current) return;
         senkronda.current = true;
         const baslangic = Date.now();
         try {
-            for (const d of taslaklar(auditId)) {
+            for (const d of taslaklar(taskId)) {
                 const id = d.veri.id;
                 setDurumlar(s => ({ ...s, [id]: "bekliyor" }));
                 try {
                     if (yerelMi(id)) {
-                        const yeni = await createTutanak(auditId, d.veri.tur, d.veri);
+                        const yeni = await createTutanak(taskId, d.veri.tur, d.veri);
                         taslakTasi(id, yeni.id, d.zaman);
                         const tasinan = taslakAl(yeni.id);
                         setListe(l => l.map(x => (x.id === id ? { ...(tasinan?.veri || x), id: yeni.id, created_at: yeni.created_at } : x)));
@@ -311,41 +313,41 @@ export function Tutanaklar({ auditId, mufettisAdi = "", birimAdi = "" }: Props) 
             senkronda.current = false;
         }
         // Senkron sürerken yazılan değişiklikler hemen ardından gönderilir
-        if (taslaklar(auditId).some(d => d.zaman >= baslangic)) {
+        if (taslaklar(taskId).some(d => d.zaman >= baslangic)) {
             if (zamanlayici.current) window.clearTimeout(zamanlayici.current);
             zamanlayici.current = window.setTimeout(() => void senkronize(), 1500);
         }
-    }, [auditId]);
+    }, [taskId]);
 
     const yukle = useCallback(async () => {
-        if (!auditId) return;
+        if (!taskId) return;
         setYukleniyor(true);
         try {
-            const sunucu = await fetchTutanaklar(auditId);
-            try { localStorage.setItem(LISTE_ONBELLEK(auditId), JSON.stringify(sunucu)); } catch { /* depolama dolu */ }
+            const sunucu = await fetchTutanaklar(taskId);
+            try { localStorage.setItem(LISTE_ONBELLEK(taskId), JSON.stringify(sunucu)); } catch { /* depolama dolu */ }
             setListe(taslaklarlaBirlestir(sunucu));
         } catch {
             let onbellek: Tutanak[] = [];
-            try { onbellek = JSON.parse(localStorage.getItem(LISTE_ONBELLEK(auditId)) || "[]"); } catch { /* yok */ }
+            try { onbellek = JSON.parse(localStorage.getItem(LISTE_ONBELLEK(taskId)) || "[]"); } catch { /* yok */ }
             setListe(taslaklarlaBirlestir(onbellek));
         } finally {
             setYukleniyor(false);
         }
         void senkronize();
-    }, [auditId, taslaklarlaBirlestir, senkronize]);
+    }, [taskId, taslaklarlaBirlestir, senkronize]);
 
     useEffect(() => { void yukle(); }, [yukle]);
     useEffect(() => {
         const calistir = () => void senkronize();
         window.addEventListener("online", calistir);
         // Zayıf sinyalde "online" olayı gelmeyebilir: bekleyen taslak varsa periyodik dene
-        const aralik = window.setInterval(() => { if (auditId && taslaklar(auditId).length) calistir(); }, 30000);
+        const aralik = window.setInterval(() => { if (taskId && taslaklar(taskId).length) calistir(); }, 30000);
         return () => {
             window.removeEventListener("online", calistir);
             window.clearInterval(aralik);
             if (zamanlayici.current) window.clearTimeout(zamanlayici.current);
         };
-    }, [senkronize, auditId]);
+    }, [senkronize, taskId]);
 
     const degistir = (t: Tutanak) => {
         setListe(l => l.map(x => (x.id === t.id ? t : x)));
@@ -356,8 +358,8 @@ export function Tutanaklar({ auditId, mufettisAdi = "", birimAdi = "" }: Props) 
     };
 
     const yeni = (tur: TutanakTuru) => {
-        if (!auditId) return;
-        const t = yeniTutanak(auditId, tur, mufettisAdi, birimAdi);
+        if (!taskId) return;
+        const t = yeniTutanak(taskId, tur, mufettisAdi, gorevAdi);
         taslakKaydet(t);
         setListe(l => [...l, t]);
         setAktifId(t.id);
@@ -379,8 +381,8 @@ export function Tutanaklar({ auditId, mufettisAdi = "", birimAdi = "" }: Props) 
 
     const aktif = useMemo(() => liste.find(x => x.id === aktifId) || null, [liste, aktifId]);
 
-    if (!auditId) {
-        return <p className="text-sm text-slate-500 py-12 text-center">Tutanak yazmak için önce bu görevde denetimi başlatın.</p>;
+    if (!taskId) {
+        return <p className="text-sm text-slate-500 py-12 text-center">Tutanak için bir inceleme/soruşturma görevi seçin.</p>;
     }
     if (aktif) {
         return <TutanakDuzenleyici t={aktif} onChange={degistir} kayitDurumu={durumlar[aktif.id] || "kaydedildi"} onKapat={() => setAktifId(null)} />;

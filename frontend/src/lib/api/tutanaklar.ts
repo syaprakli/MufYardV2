@@ -19,7 +19,9 @@ export interface SoruCevap {
 
 export interface Tutanak {
     id: string;
-    audit_id: string;
+    /** İnceleme / soruşturma / ön inceleme / araştırma görevi */
+    task_id: string;
+    audit_id?: string | null;
     tur: TutanakTuru;
     baslik?: string | null;
     tarih?: string | null;
@@ -65,17 +67,17 @@ async function hata(res: Response, varsayilan: string): Promise<never> {
     throw err;
 }
 
-export async function fetchTutanaklar(auditId: string): Promise<Tutanak[]> {
-    const res = await fetchWithTimeout(`${API_URL}/tutanaklar/?audit_id=${encodeURIComponent(auditId)}`, { headers: await getAuthHeaders() });
+export async function fetchTutanaklar(taskId: string): Promise<Tutanak[]> {
+    const res = await fetchWithTimeout(`${API_URL}/tutanaklar/?task_id=${encodeURIComponent(taskId)}`, { headers: await getAuthHeaders() });
     if (!res.ok) return hata(res, "Tutanaklar alınamadı.");
     return res.json();
 }
 
-export async function createTutanak(auditId: string, tur: TutanakTuru, alanlar: Partial<Tutanak>): Promise<Tutanak> {
+export async function createTutanak(taskId: string, tur: TutanakTuru, alanlar: Partial<Tutanak>): Promise<Tutanak> {
     const res = await fetchWithTimeout(`${API_URL}/tutanaklar/`, {
         method: "POST",
         headers: await getAuthHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ ...alanlariAl(alanlar), audit_id: auditId, tur }),
+        body: JSON.stringify({ ...alanlariAl(alanlar), task_id: taskId, tur }),
     });
     if (!res.ok) return hata(res, "Tutanak oluşturulamadı.");
     return res.json();

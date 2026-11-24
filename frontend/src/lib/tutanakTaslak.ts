@@ -32,8 +32,8 @@ function yaz(t: Record<string, Taslak>): boolean {
     }
 }
 
-export function taslaklar(auditId: string): Taslak[] {
-    return Object.values(oku()).filter(t => t.veri.audit_id === auditId).sort((a, b) => a.zaman - b.zaman);
+export function taslaklar(taskId: string): Taslak[] {
+    return Object.values(oku()).filter(t => t.veri.task_id === taskId).sort((a, b) => a.zaman - b.zaman);
 }
 
 export function taslakAl(id: string): Taslak | undefined {
