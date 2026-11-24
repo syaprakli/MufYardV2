@@ -88,7 +88,11 @@ function TenkitKarti({ tenkit, photos, photoDescriptions, onChange, onDelete }: 
                             <span className="text-[10px] font-bold text-amber-600">• Kanıt yok</span>
                         )}
                     </div>
-                    <p className="text-sm font-bold text-slate-900 dark:text-white leading-snug">{tenkit.baslik}</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                        {tenkit.baslik}
+                        <a href={`#/emsal?q=${encodeURIComponent(tenkit.baslik.slice(0, 120))}`} title="Eski raporlarda benzerini ara"
+                            className="ml-2 align-middle text-[10px] font-bold text-blue-600 hover:underline whitespace-nowrap">Emsal ara</a>
+                    </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                     <select

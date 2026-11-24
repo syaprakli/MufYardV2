@@ -18,6 +18,7 @@ import {
     ClipboardCheck,
     Globe,
     Shield,
+    Search,
     X
 } from "lucide-react";
 import { cn } from "../../lib/utils";
@@ -37,6 +38,7 @@ const navItems: Array<{ icon: any; label: string; href: string }> = [
     { icon: ClipboardCheck, label: "Denetim Formları", href: "/denetim" },
     { icon: ClipboardCheck, label: "Görev Analizleri", href: "/report-analytics" },
     { icon: FileText, label: "Raporlar", href: "/audit" },
+    { icon: Search, label: "Emsal Arama", href: "/emsal" },
     { icon: StickyNote, label: "Hızlı Notlar", href: "/notes" },
     { icon: FolderTree, label: "Dosyalar", href: "/files" },
     { icon: FolderOpen, label: "Diğer İşlem ve Belgeler", href: "/files?scope=other" },

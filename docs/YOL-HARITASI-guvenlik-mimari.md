@@ -109,5 +109,10 @@ Harcırah (e-Yolluk) ve süre uzatma (EBYS) kapsam dışı.
 | F3 | Sahada internetsiz çalışma + fotoğraf tarih/konum damgası: çevrimdışı fotoğraf kuyruğu (IndexedDB, İl'deki base64 yedeği kaldırıldı), EXIF/cihaz tarih-konum damgası + `photo_meta`, kuyrukta denetim güncellemelerinin birleştirilmesi, senkron sırasında eklenenin kaybolma yarışı, bekleyen değişikliğin sayfa açılışında uygulanması | ✅ Canlıda, kullanıcı testi bekleniyor |
 | F4 | Rapor öncesi kalite kontrol + kişisel veri karartma: işlenmemiş "Hayır" maddesi, kanıtsız/dayanaksız tenkit, raporda geçmeyen tenkit, olmayan fotoğrafa atıf, doldurulmamış şablon yeri, ileri tarih; TCKN (algoritmalı)/telefon/e-posta/IBAN tespiti ve karartılmış kopya (pano / Word). Uygulamadaki rapor değiştirilmez. Tarayıcı testi: 21/21 | ✅ Canlıda |
 | F5 | İfade/tutanak modülü: ifade (SORULDU/CEVABEN), tespit, görüşme tutanağı; cevaba mikrofonla ses → metin (mevcut /ai/transcribe, ses saklanmaz); internetsiz yazma (cihazda taslak, bağlantıda gönderim); Word/yazdır, imza blokları. Ayrı `tutanaklar` koleksiyonu, yetki denetimden; 900 KB belge sınırı. Tarayıcı testi 23/23 | ✅ Canlıda |
-| F6 | Mali denetim yardımcıları (mizan → kırmızı bayrak, örneklem, 7405 borçlanma sınırı) | ⏳ Sırada |
-| F7 | Eski raporlarda arama (emsal) | ⏳ |
+| F6 | Mali denetim yardımcıları (mizan → kırmızı bayrak, örneklem, 7405 borçlanma sınırı) | ➖ Kapsam dışı (24.11.2026): kullanıcı başka bir projeyle birleştirip ayrıca yapacak |
+| F7 | Emsal arama: erişilen denetimlerin rapor metinleri + tenkitler (birim cevabı, dayanak); Türkçe normalleştirme, çok kelime (VE), tırnaklı ifade, tür filtresi, vurgulu alıntı; kullanıcı başına 2 dk önbellek. `/emsal` sayfası, tenkit kartında "Emsal ara". Tarayıcı testi 10/10 | ✅ Canlıda |
+
+**Güvenlik (F7 sırasında bulundu, 24.11.2026):** `GET /api/search/search-reports` tüm kullanıcıların denetimlerini yetki
+kontrolü olmadan tarıyor ve rapor metninden alıntı döndürüyordu (giriş yapmış herkes başkasının raporunu okuyabiliyordu).
+Tüm arama uçları artık yalnızca kullanıcının erişebildiği denetimlerde arıyor (`emsal_service`), testle doğrulandı.
+Görevler sayfasının çağırdığı `/api/search/reports` adresi hiç yoktu (arama hep hata veriyordu); eklendi.

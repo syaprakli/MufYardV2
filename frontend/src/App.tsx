@@ -45,6 +45,7 @@ const Messages = lazy(() => import("./pages/Messages"));
 const Feedback = lazy(() => import("./pages/Feedback"));
 const Reminders = lazy(() => import("./pages/Reminders"));
 const ReportAnalytics = lazy(() => import("./pages/ReportAnalytics"));
+const EmsalArama = lazy(() => import("./pages/EmsalArama"));
 const FounderHub = lazy(() => import("./pages/FounderHub"));
 const AdminFeedback = lazy(() => import("./pages/AdminFeedback"));
 const AdminInspectors = lazy(() => import("./pages/AdminInspectors"));
@@ -240,6 +241,7 @@ function App() {
                         <Route path="messages" element={<Messages />} />
                         <Route path="feedback" element={<Feedback />} />
                         <Route path="report-analytics" element={<ReportAnalytics />} />
+                        <Route path="emsal" element={<EmsalArama />} />
                         <Route path="admin" element={<FounderHub />} />
                         <Route path="admin/feedback" element={<AdminFeedback />} />
                         <Route path="admin/inspectors" element={<AdminInspectors />} />

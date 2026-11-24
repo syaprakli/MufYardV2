@@ -2,6 +2,7 @@ import { Plus, Search, Filter, FileText, Loader2, FileSpreadsheet, Shield, Chevr
 import { toast } from "react-hot-toast";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { API_URL as API_BASE_URL } from "../lib/config";
+import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
 import { Suspense, lazy, useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
@@ -148,7 +149,7 @@ export default function Audit() {
 
         setGlobalSearchLoading(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/search/search-reports?q=${encodeURIComponent(globalSearchQuery.trim())}`);
+            const res = await fetchWithTimeout(`${API_BASE_URL}/search/search-reports?q=${encodeURIComponent(globalSearchQuery.trim())}`, { headers: await getAuthHeaders(), timeout: 45000 });
             if (!res.ok) throw new Error("Arama servisinde hata oluştu.");
             const data = await res.json();
             setGlobalSearchResults(data.results || []);
