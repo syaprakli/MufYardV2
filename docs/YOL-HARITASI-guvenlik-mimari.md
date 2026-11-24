@@ -116,3 +116,12 @@ Harcırah (e-Yolluk) ve süre uzatma (EBYS) kapsam dışı.
 kontrolü olmadan tarıyor ve rapor metninden alıntı döndürüyordu (giriş yapmış herkes başkasının raporunu okuyabiliyordu).
 Tüm arama uçları artık yalnızca kullanıcının erişebildiği denetimlerde arıyor (`emsal_service`), testle doğrulandı.
 Görevler sayfasının çağırdığı `/api/search/reports` adresi hiç yoktu (arama hep hata veriyordu); eklendi.
+
+## 9. Ayarlar ve tutanak şablonu (24.11.2026)
+
+| # | Konu | Durum |
+|---|---|---|
+| A1 | Değiştirilebilir klavye kısayolları (Ctrl+Shift+rakam ile sayfalar, F1 liste); standart (Ctrl+C/V/S/R…), AltGr (Ctrl+Alt) ve çakışan kısayollar reddedilir. Ayarlar > Kısayol ve Masaüstü | ✅ Canlıda |
+| A2 | Masaüstü: bilgisayar açılınca başlat (eskiden zorla açıktı), açılışta simge olarak başlat, kapatınca arka planda çalış, her yerden göster/gizle kısayolu. `%LOCALAPPDATA%\MufYardV2\masaustu-ayarlar.json`. Gerçek Electron ile test (14/14) | ✅ Kodda; masaüstüne gelmesi için yeni kurulum dosyası gerekir 👤 |
+| A3 | İfade tutanağı kullanıcının şablonuna göre (`ifade tutanagi ornegi.docx`): kimlik satırları, otomatik giriş (gün adı, saat eki), SORU/CEVAP, şablon kapanışı, İfade Veren + müfettiş imzaları; Word çıktısı şablon doldurularak gerçek .docx (JSZip). Gerçek Word ile açılıp PDF'e çevrilerek doğrulandı | ✅ Canlıda |
+

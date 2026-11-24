@@ -13,6 +13,13 @@ class TutanakKisi(BaseModel):
     rol: KisiRolu = "katilan"
     tckn: Optional[str] = Field(None, max_length=11, pattern=r"^\d{0,11}$")
     adres: Optional[str] = Field(None, max_length=500)
+    # İfade verenin kimlik bilgileri (ifade tutanağı şablonu)
+    baba_adi: Optional[str] = Field(None, max_length=100)
+    ana_adi: Optional[str] = Field(None, max_length=100)
+    dogum_yeri: Optional[str] = Field(None, max_length=100)
+    dogum_yili: Optional[str] = Field(None, max_length=20)
+    nufus_yeri: Optional[str] = Field(None, max_length=200)
+    telefon: Optional[str] = Field(None, max_length=30)
 
 
 class SoruCevap(BaseModel):

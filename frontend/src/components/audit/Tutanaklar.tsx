@@ -11,6 +11,7 @@ import { isNetworkError } from "../../lib/api/utils";
 import { taslakAl, taslakKaydet, taslaklar, taslakSil, taslakTasi, yerelId, yerelMi } from "../../lib/tutanakTaslak";
 import { GORUSME_KAPANIS, IFADE_KAPANIS, TESPIT_KAPANIS, tutanakWordIndir, tutanakYazdir } from "../../lib/tutanakBelge";
 import { useSesKaydi } from "../../lib/hooks/useSesKaydi";
+import { IFADE_SORULARI_VARSAYILAN, MUFETTIS_UNVANLARI, otomatikGiris } from "../../lib/ifadeMetni";
 
 interface Props {
     /** İnceleme / soruşturma görevi */
@@ -24,11 +25,12 @@ const inputCls = "w-full rounded-xl border border-slate-200 dark:border-slate-70
 const etiketCls = "text-[10px] font-black uppercase tracking-wider text-slate-400";
 const LISTE_ONBELLEK = (a: string) => `mufyard_tutanak_liste_${a}`;
 
-const IFADE_SORULARI = [
-    "Kimlik bilgilerinizi, görev yerinizi, unvanınızı ve bu görevde ne zamandan beri çalıştığınızı söyler misiniz?",
-    "İnceleme konusu hakkında bilginiz nedir? Açıklar mısınız?",
-    "Eklemek istediğiniz başka bir husus var mı?",
-];
+/** Şablondaki varsayılan sorular; ilk soru görevin konusuyla başlar. */
+const ifadeSorulari = (konu: string) => IFADE_SORULARI_VARSAYILAN.map((s, i) => ({
+    soru: i === 0 && konu ? `${konu} konusu hakkında bildiklerinizi anlatınız.` : s.soru,
+    cevap: s.cevap,
+}));
+const SON_SORU = IFADE_SORULARI_VARSAYILAN[IFADE_SORULARI_VARSAYILAN.length - 1].soru;
 
 const bugun = () => {
     const d = new Date();
@@ -47,7 +49,7 @@ function yeniTutanak(taskId: string, tur: TutanakTuru, mufettisAdi: string, gore
         yer: "",
         konu: gorevAdi || "",
         kisiler: tur === "ifade" ? [{ ad: "", unvan: "", rol: "ifade_veren" }, mufettis] : [mufettis],
-        sorular: tur === "ifade" ? IFADE_SORULARI.map(soru => ({ soru, cevap: "" })) : [],
+        sorular: tur === "ifade" ? ifadeSorulari(gorevAdi) : [],
         metin: "",
         kapanis: tur === "ifade" ? IFADE_KAPANIS : tur === "tespit" ? TESPIT_KAPANIS : GORUSME_KAPANIS,
         tamamlandi: false,
@@ -162,7 +164,7 @@ function TutanakDuzenleyici({ t, onChange, kayitDurumu, onKapat }: {
                     <button type="button" onClick={() => tutanakYazdir(t)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
                         <Printer size={13} /> Yazdır
                     </button>
-                    <button type="button" onClick={() => tutanakWordIndir(t)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white">
+                    <button type="button" onClick={() => void tutanakWordIndir(t).catch(() => toast.error("Word dosyası oluşturulamadı."))} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white">
                         <Download size={13} /> Word
                     </button>
                 </div>
@@ -175,8 +177,9 @@ function TutanakDuzenleyici({ t, onChange, kayitDurumu, onKapat }: {
                     <input type="date" className={inputCls} value={t.tarih || ""} onChange={e => guncelle({ tarih: e.target.value })} /></label>
                 <label className="space-y-1"><span className={etiketCls}>Saat</span>
                     <input type="time" className={inputCls} value={t.saat || ""} onChange={e => guncelle({ saat: e.target.value })} /></label>
-                <label className="space-y-1 col-span-2"><span className={etiketCls}>Yer</span>
-                    <input className={inputCls} value={t.yer || ""} onChange={e => guncelle({ yer: e.target.value })} placeholder="Ör. Van Gençlik ve Spor İl Müdürlüğü toplantı salonu" /></label>
+                <label className="space-y-1 col-span-2"><span className={etiketCls}>{t.tur === "ifade" ? "Davet edildiği yer" : "Yer"}</span>
+                    <input className={inputCls} value={t.yer || ""} onChange={e => guncelle({ yer: e.target.value })}
+                        placeholder={t.tur === "ifade" ? "Ör. Müfettişlik odasına" : "Ör. Van Gençlik ve Spor İl Müdürlüğü toplantı salonu"} /></label>
                 <label className="space-y-1 col-span-2 md:col-span-4"><span className={etiketCls}>Konu</span>
                     <input className={inputCls} value={t.konu || ""} onChange={e => guncelle({ konu: e.target.value })} placeholder="Ör. Kantin kira sözleşmesinin uzatılması" /></label>
             </div>
@@ -196,11 +199,9 @@ function TutanakDuzenleyici({ t, onChange, kayitDurumu, onKapat }: {
                             {(Object.keys(ROL_ADI) as KisiRolu[]).map(r => <option key={r} value={r}>{ROL_ADI[r]}</option>)}
                         </select>
                         <input className={inputCls + " col-span-6 md:col-span-3"} placeholder="Ad Soyad" value={k.ad} onChange={e => kisiGuncelle(i, { ad: e.target.value })} />
-                        <input className={inputCls + " col-span-6 md:col-span-3"} placeholder="Unvan / görev" value={k.unvan || ""} onChange={e => kisiGuncelle(i, { unvan: e.target.value })} />
-                        {k.rol === "ifade_veren" ? (
-                            <input className={inputCls + " col-span-5 md:col-span-3"} placeholder="T.C. Kimlik No (isteğe bağlı)" inputMode="numeric"
-                                value={k.tckn || ""} onChange={e => kisiGuncelle(i, { tckn: e.target.value.replace(/\D/g, "").slice(0, 11) })} />
-                        ) : <span className="col-span-5 md:col-span-3" />}
+                        <input className={inputCls + " col-span-6 md:col-span-3"} placeholder={k.rol === "ifade_veren" ? "Görevi" : "Unvan"} value={k.unvan || ""}
+                            list={k.rol === "mufettis" ? "mufettis-unvanlari" : undefined} onChange={e => kisiGuncelle(i, { unvan: e.target.value })} />
+                        <span className="col-span-5 md:col-span-3 text-[10px] text-slate-400">{k.rol === "ifade_veren" ? "Kimlik bilgileri aşağıda" : ""}</span>
                         <button type="button" title="Kişiyi çıkar" onClick={() => guncelle({ kisiler: (t.kisiler || []).filter((_, j) => j !== i) })}
                             className="col-span-1 h-8 flex items-center justify-center text-slate-400 hover:text-rose-600">
                             <Trash2 size={14} />
@@ -209,14 +210,58 @@ function TutanakDuzenleyici({ t, onChange, kayitDurumu, onKapat }: {
                 ))}
             </div>
 
+            <datalist id="mufettis-unvanlari">{MUFETTIS_UNVANLARI.map(u => <option key={u} value={u} />)}</datalist>
+
+            {/* İfade verenin kimlik bilgileri (şablondaki satırlar) */}
+            {t.tur === "ifade" && (() => {
+                const i = (t.kisiler || []).findIndex(k => k.rol === "ifade_veren");
+                if (i < 0) {
+                    return (
+                        <button type="button" onClick={() => guncelle({ kisiler: [{ ad: "", unvan: "", rol: "ifade_veren" }, ...(t.kisiler || [])] })}
+                            className="self-start text-[11px] font-bold text-blue-600 hover:underline">+ İfade veren ekle</button>
+                    );
+                }
+                const k = (t.kisiler || [])[i];
+                const alan = (ad: string, key: keyof TutanakKisi, ph = "", ek: Partial<React.InputHTMLAttributes<HTMLInputElement>> = {}, temiz?: (v: string) => string) => (
+                    <label className="space-y-1">
+                        <span className={etiketCls}>{ad}</span>
+                        <input className={inputCls} placeholder={ph} value={(k[key] as string) || ""} {...ek}
+                            onChange={e => kisiGuncelle(i, { [key]: temiz ? temiz(e.target.value) : e.target.value } as Partial<TutanakKisi>)} />
+                    </label>
+                );
+                return (
+                    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-3 space-y-2">
+                        <span className={etiketCls}>İfade verenin kimlik bilgileri</span>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            {alan("Adı ve soyadı", "ad")}
+                            {alan("T.C. kimlik numarası", "tckn", "", { inputMode: "numeric" }, v => v.replace(/\D/g, "").slice(0, 11))}
+                            {alan("Baba adı", "baba_adi")}
+                            {alan("Ana adı", "ana_adi")}
+                            {alan("Doğum yeri", "dogum_yeri")}
+                            {alan("Doğum yılı", "dogum_yili", "", { inputMode: "numeric" }, v => v.replace(/[^\d./]/g, "").slice(0, 10))}
+                            {alan("Nüfusa kayıtlı olduğu yer", "nufus_yeri")}
+                            {alan("Görevi", "unvan")}
+                            <div className="col-span-2 md:col-span-3">{alan("Adresi", "adres")}</div>
+                            {alan("Cep telefonu", "telefon", "05xx xxx xx xx", { inputMode: "tel" })}
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* Gövde */}
             <div className="space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                    <span className={etiketCls}>{t.tur === "ifade" ? "Giriş / ön açıklama (isteğe bağlı)" : t.tur === "tespit" ? "Tespitler" : "Görüşme notları"}</span>
+                    <span className={etiketCls}>{t.tur === "ifade" ? "Giriş paragrafı" : t.tur === "tespit" ? "Tespitler" : "Görüşme notları"}</span>
                     <MikrofonDugmesi {...mikProps("metin")} />
                 </div>
                 <textarea rows={t.tur === "ifade" ? 3 : 10} className={inputCls} value={t.metin || ""} onChange={e => guncelle({ metin: e.target.value })}
-                    placeholder={t.tur === "ifade" ? "Ör. … konusunda yürütülen inceleme kapsamında bilgisine başvurulmuştur." : "Yerinde yapılan tespitleri yazın veya sesle yazdırın."} />
+                    placeholder={t.tur === "ifade" ? "Boş bırakırsanız aşağıdaki standart giriş metni kullanılır." : "Yerinde yapılan tespitleri yazın veya sesle yazdırın."} />
+                {t.tur === "ifade" && !(t.metin || "").trim() && (
+                    <div className="rounded-xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-700 p-2.5 text-[11px] text-slate-600 dark:text-slate-300">
+                        <span className="font-bold text-slate-400">Yazılacak giriş: </span>{otomatikGiris(t)}
+                        <button type="button" onClick={() => guncelle({ metin: otomatikGiris(t) })} className="ml-2 font-bold text-blue-600 hover:underline">Düzenle</button>
+                    </div>
+                )}
             </div>
 
             {t.tur === "ifade" && (
@@ -225,19 +270,24 @@ function TutanakDuzenleyici({ t, onChange, kayitDurumu, onKapat }: {
                     {(t.sorular || []).map((s, i) => (
                         <div key={i} className="rounded-2xl border border-slate-200 dark:border-slate-800 p-3 space-y-2 bg-white dark:bg-slate-900/60">
                             <div className="flex items-start gap-2">
-                                <span className="text-[10px] font-black text-blue-600 pt-2 w-20 shrink-0">SORULDU {i + 1}</span>
+                                <span className="text-[10px] font-black text-blue-600 pt-2 w-20 shrink-0">SORU {i + 1})</span>
                                 <textarea rows={2} className={inputCls} value={s.soru} onChange={e => soruGuncelle(i, { soru: e.target.value })} placeholder="Soru" />
                                 <button type="button" title="Soruyu sil" onClick={() => guncelle({ sorular: (t.sorular || []).filter((_, j) => j !== i) })}
                                     className="h-8 w-8 flex items-center justify-center text-slate-400 hover:text-rose-600 shrink-0"><Trash2 size={14} /></button>
                             </div>
                             <div className="flex items-start gap-2">
-                                <span className="text-[10px] font-black text-emerald-600 pt-2 w-20 shrink-0">CEVABEN</span>
+                                <span className="text-[10px] font-black text-emerald-600 pt-2 w-20 shrink-0">CEVAP {i + 1})</span>
                                 <textarea rows={3} className={inputCls} value={s.cevap} onChange={e => soruGuncelle(i, { cevap: e.target.value })} placeholder="Cevap (yazın veya Ses ile kaydedin)" />
                                 <MikrofonDugmesi {...mikProps(`cevap:${i}`)} />
                             </div>
                         </div>
                     ))}
-                    <button type="button" onClick={() => guncelle({ sorular: [...(t.sorular || []), { soru: "", cevap: "" }] })}
+                    <button type="button" onClick={() => {
+                        const s = [...(t.sorular || [])];
+                        const sonda = s.length && s[s.length - 1].soru.trim() === SON_SORU;
+                        s.splice(sonda ? s.length - 1 : s.length, 0, { soru: "", cevap: "" });
+                        guncelle({ sorular: s });
+                    }}
                         className="flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:underline">
                         <Plus size={13} /> Soru ekle
                     </button>
@@ -425,7 +475,7 @@ export function Tutanaklar({ taskId, mufettisAdi = "", gorevAdi = "" }: Props) {
                                 </p>
                                 <div className="flex items-center gap-2 pt-1">
                                     <button type="button" onClick={() => setAktifId(t.id)} className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 hover:bg-blue-100">Aç</button>
-                                    <button type="button" onClick={() => tutanakWordIndir(t)} className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-1"><Download size={12} /> Word</button>
+                                    <button type="button" onClick={() => void tutanakWordIndir(t).catch(() => toast.error("Word dosyası oluşturulamadı."))} className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-1"><Download size={12} /> Word</button>
                                     <button type="button" onClick={() => sil(t)} className="ml-auto text-slate-400 hover:text-rose-600" title="Sil"><Trash2 size={14} /></button>
                                 </div>
                             </div>

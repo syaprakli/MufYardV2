@@ -10,6 +10,12 @@ export interface TutanakKisi {
     rol: KisiRolu;
     tckn?: string | null;
     adres?: string | null;
+    baba_adi?: string | null;
+    ana_adi?: string | null;
+    dogum_yeri?: string | null;
+    dogum_yili?: string | null;
+    nufus_yeri?: string | null;
+    telefon?: string | null;
 }
 
 export interface SoruCevap {
