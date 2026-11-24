@@ -16,7 +16,15 @@ export const yerelId = () => `yerel_${Date.now().toString(36)}${Math.random().to
 
 function oku(): Record<string, Taslak> {
     try {
-        return JSON.parse(localStorage.getItem(ANAHTAR) || "{}") || {};
+        const t: Record<string, Taslak> = JSON.parse(localStorage.getItem(ANAHTAR) || "{}") || {};
+        // Tutanaklar denetim sayfasındayken (göreve bağlanmadan önce) kalmış taslaklar artık hiçbir yerde
+        // görünmez ve gönderilemez: temizlenir.
+        const sahipsiz = Object.keys(t).filter(k => !t[k]?.veri?.task_id);
+        if (sahipsiz.length) {
+            sahipsiz.forEach(k => delete t[k]);
+            yaz(t);
+        }
+        return t;
     } catch {
         return {};
     }
