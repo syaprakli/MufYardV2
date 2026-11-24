@@ -2079,7 +2079,7 @@ export default function Tasks() {
                                                     <FileText size={14} />
                                                 </ActionBtn>
                                                 {TUTANAK_GOREV_TURLERI.includes(task.rapor_turu || "") ? (
-                                                    <ActionBtn title="İfade ve Tutanaklar" color="#7c3aed" onClick={() => setTutanakGorevi(task)}>
+                                                    <ActionBtn title="İfade Tutanakları" color="#7c3aed" onClick={() => setTutanakGorevi(task)}>
                                                         <FileSignature size={14} />
                                                     </ActionBtn>
                                                 ) : (
@@ -2316,7 +2316,7 @@ export default function Tasks() {
                                                             <FileText size={16} />
                                                         </ActionBtn>
                                                         {TUTANAK_GOREV_TURLERI.includes(task.rapor_turu || "") ? (
-                                                            <ActionBtn title="İfade ve Tutanaklar" color="#7c3aed" onClick={() => setTutanakGorevi(task)}>
+                                                            <ActionBtn title="İfade Tutanakları" color="#7c3aed" onClick={() => setTutanakGorevi(task)}>
                                                                 <FileSignature size={16} />
                                                             </ActionBtn>
                                                         ) : (
@@ -2575,7 +2575,7 @@ export default function Tasks() {
                     >
                         <div className="flex items-start justify-between gap-3 mb-4">
                             <div>
-                                <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2"><FileSignature size={18} className="text-violet-600" /> İfade ve Tutanaklar</h2>
+                                <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2"><FileSignature size={18} className="text-violet-600" /> İfade Tutanakları</h2>
                                 <p className="text-xs text-slate-500 mt-0.5">{tutanakGorevi.rapor_turu} · {tutanakGorevi.rapor_adi}</p>
                             </div>
                             <button type="button" onClick={() => setTutanakGorevi(null)} className="text-slate-400 hover:text-slate-700" title="Kapat"><X size={20} /></button>

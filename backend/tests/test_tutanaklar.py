@@ -66,7 +66,7 @@ class TutanakTests(unittest.TestCase):
         """Ekranın 'yeni tutanak' anında gönderdiği gövde birebir kabul edilmeli
         (gerçek hata: yeni ifadede 'İfade veren' adı boş olduğu için 422)."""
         mufettis = {"ad": "", "unvan": "Müfettiş", "rol": "mufettis"}
-        for tur in ("ifade", "tespit", "gorusme"):
+        for tur in ("ifade",):
             body = {
                 "task_id": "inc1", "tur": tur, "tarih": "2026-11-24", "saat": "10:25", "yer": "", "konu": "X",
                 "kisiler": ([{"ad": "", "unvan": "", "rol": "ifade_veren"}] if tur == "ifade" else []) + [mufettis],
@@ -99,8 +99,9 @@ class TutanakTests(unittest.TestCase):
         self.assertEqual(self._ifade().status_code, 403)
         # Paylaşılan görevde (e-posta ile) düzenleme yetkisi
         self.as_user("ortak", email="ortak@gsb.gov.tr")
-        t = self.client.post("/api/tutanaklar/", json={"task_id": "sor1", "tur": "tespit", "metin": "x"})
+        t = self.client.post("/api/tutanaklar/", json={"task_id": "sor1", "metin": "x"})  # tür verilmezse ifade
         self.assertEqual(t.status_code, 200, t.text)
+        self.assertEqual(t.json()["tur"], "ifade")
         tid = t.json()["id"]
         # Moderatör görür ama değiştiremez (ifade kişisel veri içerir)
         self.as_user("mod", role="moderator")
@@ -115,7 +116,9 @@ class TutanakTests(unittest.TestCase):
         self.assertEqual(self.client.patch(f"/api/tutanaklar/{tid}", json={"metin": "y"}).status_code, 404)
 
     def test_validation_and_size_limit(self):
-        self.assertEqual(self._ifade(tur="sorgu").status_code, 422)
+        # Tek tutanak türü ifadedir: tespit/görüşme kabul edilmez
+        for tur in ("sorgu", "tespit", "gorusme"):
+            self.assertEqual(self._ifade(tur=tur).status_code, 422, tur)
         self.assertEqual(self._ifade(kisiler=[{"ad": "A", "tckn": "12ab"}]).status_code, 422)
         self.assertEqual(self._ifade(task_id="yok").status_code, 404)
         self.assertEqual(self.client.post("/api/tutanaklar/", json={"tur": "ifade"}).status_code, 422)  # görevsiz olmaz

@@ -1,7 +1,8 @@
 import { API_URL } from "../config";
 import { fetchWithTimeout, getAuthHeaders } from "./utils";
 
-export type TutanakTuru = "ifade" | "tespit" | "gorusme";
+/** İnceleme/soruşturmada alınan tek tutanak türü ifadedir. */
+export type TutanakTuru = "ifade";
 export type KisiRolu = "ifade_veren" | "mufettis" | "katilan" | "tanik" | "yazman";
 
 export interface TutanakKisi {
@@ -45,8 +46,6 @@ export interface Tutanak {
 
 export const TUR_ADI: Record<TutanakTuru, string> = {
     ifade: "İfade Tutanağı",
-    tespit: "Tespit Tutanağı",
-    gorusme: "Görüşme Tutanağı",
 };
 
 export const ROL_ADI: Record<KisiRolu, string> = {

@@ -5,11 +5,11 @@ import {
 } from "lucide-react";
 import {
     createTutanak, deleteTutanak, fetchTutanaklar, ROL_ADI, sesiMetneCevir, TUR_ADI, updateTutanak,
-    type KisiRolu, type Tutanak, type TutanakKisi, type TutanakTuru,
+    type KisiRolu, type Tutanak, type TutanakKisi,
 } from "../../lib/api/tutanaklar";
 import { isNetworkError } from "../../lib/api/utils";
 import { taslakAl, taslakKaydet, taslaklar, taslakSil, taslakTasi, yerelId, yerelMi } from "../../lib/tutanakTaslak";
-import { GORUSME_KAPANIS, IFADE_KAPANIS, TESPIT_KAPANIS, tutanakWordIndir, tutanakYazdir } from "../../lib/tutanakBelge";
+import { IFADE_KAPANIS, tutanakWordIndir, tutanakYazdir } from "../../lib/tutanakBelge";
 import { useSesKaydi } from "../../lib/hooks/useSesKaydi";
 import { IFADE_SORULARI_VARSAYILAN, MUFETTIS_UNVANLARI, otomatikGiris } from "../../lib/ifadeMetni";
 
@@ -38,20 +38,20 @@ const bugun = () => {
 };
 const simdi = () => new Date().toTimeString().slice(0, 5);
 
-function yeniTutanak(taskId: string, tur: TutanakTuru, mufettisAdi: string, gorevAdi: string): Tutanak {
+function yeniTutanak(taskId: string, mufettisAdi: string, gorevAdi: string): Tutanak {
     const mufettis: TutanakKisi = { ad: mufettisAdi || "", unvan: "Müfettiş", rol: "mufettis" };
     return {
         id: yerelId(),
         task_id: taskId,
-        tur,
+        tur: "ifade",
         tarih: bugun(),
         saat: simdi(),
         yer: "",
         konu: gorevAdi || "",
-        kisiler: tur === "ifade" ? [{ ad: "", unvan: "", rol: "ifade_veren" }, mufettis] : [mufettis],
-        sorular: tur === "ifade" ? ifadeSorulari(gorevAdi) : [],
+        kisiler: [{ ad: "", unvan: "", rol: "ifade_veren" }, mufettis],
+        sorular: ifadeSorulari(gorevAdi),
         metin: "",
-        kapanis: tur === "ifade" ? IFADE_KAPANIS : tur === "tespit" ? TESPIT_KAPANIS : GORUSME_KAPANIS,
+        kapanis: IFADE_KAPANIS,
         tamamlandi: false,
     };
 }
@@ -177,9 +177,9 @@ function TutanakDuzenleyici({ t, onChange, kayitDurumu, onKapat }: {
                     <input type="date" className={inputCls} value={t.tarih || ""} onChange={e => guncelle({ tarih: e.target.value })} /></label>
                 <label className="space-y-1"><span className={etiketCls}>Saat</span>
                     <input type="time" className={inputCls} value={t.saat || ""} onChange={e => guncelle({ saat: e.target.value })} /></label>
-                <label className="space-y-1 col-span-2"><span className={etiketCls}>{t.tur === "ifade" ? "Davet edildiği yer" : "Yer"}</span>
+                <label className="space-y-1 col-span-2"><span className={etiketCls}>Davet edildiği yer</span>
                     <input className={inputCls} value={t.yer || ""} onChange={e => guncelle({ yer: e.target.value })}
-                        placeholder={t.tur === "ifade" ? "Ör. Müfettişlik odasına" : "Ör. Van Gençlik ve Spor İl Müdürlüğü toplantı salonu"} /></label>
+                        placeholder="Ör. Müfettişlik odasına" /></label>
                 <label className="space-y-1 col-span-2 md:col-span-4"><span className={etiketCls}>Konu</span>
                     <input className={inputCls} value={t.konu || ""} onChange={e => guncelle({ konu: e.target.value })} placeholder="Ör. Kantin kira sözleşmesinin uzatılması" /></label>
             </div>
@@ -213,7 +213,7 @@ function TutanakDuzenleyici({ t, onChange, kayitDurumu, onKapat }: {
             <datalist id="mufettis-unvanlari">{MUFETTIS_UNVANLARI.map(u => <option key={u} value={u} />)}</datalist>
 
             {/* İfade verenin kimlik bilgileri (şablondaki satırlar) */}
-            {t.tur === "ifade" && (() => {
+            {(() => {
                 const i = (t.kisiler || []).findIndex(k => k.rol === "ifade_veren");
                 if (i < 0) {
                     return (
@@ -251,12 +251,12 @@ function TutanakDuzenleyici({ t, onChange, kayitDurumu, onKapat }: {
             {/* Gövde */}
             <div className="space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                    <span className={etiketCls}>{t.tur === "ifade" ? "Giriş paragrafı" : t.tur === "tespit" ? "Tespitler" : "Görüşme notları"}</span>
+                    <span className={etiketCls}>Giriş paragrafı</span>
                     <MikrofonDugmesi {...mikProps("metin")} />
                 </div>
-                <textarea rows={t.tur === "ifade" ? 3 : 10} className={inputCls} value={t.metin || ""} onChange={e => guncelle({ metin: e.target.value })}
-                    placeholder={t.tur === "ifade" ? "Boş bırakırsanız aşağıdaki standart giriş metni kullanılır." : "Yerinde yapılan tespitleri yazın veya sesle yazdırın."} />
-                {t.tur === "ifade" && !(t.metin || "").trim() && (
+                <textarea rows={3} className={inputCls} value={t.metin || ""} onChange={e => guncelle({ metin: e.target.value })}
+                    placeholder="Boş bırakırsanız aşağıdaki standart giriş metni kullanılır." />
+                {!(t.metin || "").trim() && (
                     <div className="rounded-xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-700 p-2.5 text-[11px] text-slate-600 dark:text-slate-300">
                         <span className="font-bold text-slate-400">Yazılacak giriş: </span>{otomatikGiris(t)}
                         <button type="button" onClick={() => guncelle({ metin: otomatikGiris(t) })} className="ml-2 font-bold text-blue-600 hover:underline">Düzenle</button>
@@ -264,7 +264,7 @@ function TutanakDuzenleyici({ t, onChange, kayitDurumu, onKapat }: {
                 )}
             </div>
 
-            {t.tur === "ifade" && (
+            {(
                 <div className="space-y-3">
                     <span className={etiketCls}>Sorular ve cevaplar</span>
                     {(t.sorular || []).map((s, i) => (
@@ -407,9 +407,9 @@ export function Tutanaklar({ taskId, mufettisAdi = "", gorevAdi = "" }: Props) {
         zamanlayici.current = window.setTimeout(() => void senkronize(), 1500);
     };
 
-    const yeni = (tur: TutanakTuru) => {
+    const yeni = () => {
         if (!taskId) return;
-        const t = yeniTutanak(taskId, tur, mufettisAdi, gorevAdi);
+        const t = yeniTutanak(taskId, mufettisAdi, gorevAdi);
         taslakKaydet(t);
         setListe(l => [...l, t]);
         setAktifId(t.id);
@@ -441,18 +441,16 @@ export function Tutanaklar({ taskId, mufettisAdi = "", gorevAdi = "" }: Props) {
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-black uppercase tracking-wider text-slate-500 mr-2">Tutanaklar ({liste.length})</span>
-                {(Object.keys(TUR_ADI) as TutanakTuru[]).map(tur => (
-                    <button key={tur} type="button" onClick={() => yeni(tur)}
-                        className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white">
-                        <Plus size={13} /> {TUR_ADI[tur]}
-                    </button>
-                ))}
+                <span className="text-xs font-black uppercase tracking-wider text-slate-500 mr-2">İfade Tutanakları ({liste.length})</span>
+                <button type="button" onClick={yeni}
+                    className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white">
+                    <Plus size={13} /> Yeni İfade Tutanağı
+                </button>
             </div>
             {yukleniyor && liste.length === 0 ? (
                 <div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-500" /></div>
             ) : liste.length === 0 ? (
-                <p className="text-xs text-slate-400 py-8 text-center">Henüz tutanak yok. Yukarıdan türünü seçerek başlayın.</p>
+                <p className="text-xs text-slate-400 py-8 text-center">Henüz ifade tutanağı yok.</p>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {liste.map(t => {
@@ -471,7 +469,7 @@ export function Tutanaklar({ taskId, mufettisAdi = "", gorevAdi = "" }: Props) {
                                 </p>
                                 <p className="text-[10px] text-slate-400">
                                     {(t.tarih || "").split("-").reverse().join(".")} {t.saat || ""} · {t.yer || "Yer girilmedi"}
-                                    {t.tur === "ifade" ? ` · ${(t.sorular || []).filter(s => s.cevap.trim()).length}/${(t.sorular || []).length} cevap` : ""}
+                                    {` · ${(t.sorular || []).filter(s => s.cevap.trim()).length}/${(t.sorular || []).length} cevap`}
                                 </p>
                                 <div className="flex items-center gap-2 pt-1">
                                     <button type="button" onClick={() => setAktifId(t.id)} className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 hover:bg-blue-100">Aç</button>

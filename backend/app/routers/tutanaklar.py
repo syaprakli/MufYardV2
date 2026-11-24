@@ -1,4 +1,4 @@
-"""İfade / tespit / görüşme tutanakları (inceleme, soruşturma, ön inceleme, araştırma görevleri).
+"""İfade tutanakları (inceleme, soruşturma, ön inceleme, araştırma görevleri).
 
 Yetki göreve bağlıdır: görevin sahibi, atanan, paylaşılan ve kabul eden müfettişler ile yönetici
 düzenler; moderatör yalnızca görür. İfadeler kişisel veri içerdiği için moderatöre düzenleme verilmez

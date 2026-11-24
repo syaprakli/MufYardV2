@@ -2,16 +2,12 @@
 import { escapeHtml } from "./sanitize";
 import { TUR_ADI, type Tutanak } from "./api/tutanaklar";
 import { ifadeDocxUret } from "./ifadeDocx";
-import { girisMetni, ifadeVeren, IFADE_KAPANIS_SABLON, imzaUnvani, kimlikSatirlari, saatEkli, tarihNoktali } from "./ifadeMetni";
+import { girisMetni, ifadeVeren, IFADE_KAPANIS_SABLON, imzaUnvani, kimlikSatirlari, tarihNoktali } from "./ifadeMetni";
 
 const e = (s?: string | null) => escapeHtml(s || "");
 const satirSonu = (s?: string | null) => e(s).replace(/\n/g, "<br>");
-const paragraf = (s?: string | null) =>
-    (s || "").split(/\n{2,}/).map(p => `<p style="text-align:justify;margin:0 0 8pt">${satirSonu(p)}</p>`).join("");
 
 export const IFADE_KAPANIS = IFADE_KAPANIS_SABLON;
-export const TESPIT_KAPANIS = "Durumu tespit eden bu tutanak birlikte düzenlendi, okundu ve müştereken imzalandı.";
-export const GORUSME_KAPANIS = "Görüşme sonunda bu tutanak birlikte düzenlendi, okundu ve müştereken imzalandı.";
 
 // Şablondaki başlık: T.C. / GENÇLİK VE SPOR BAKANLIĞI / MÜFETTİŞLİĞİ
 const BASLIK = `
@@ -33,28 +29,18 @@ function imzaTablosu(t: Tutanak) {
 }
 
 export function tutanakHtml(t: Tutanak): string {
-    if (t.tur === "ifade") {
-        const kimlik = kimlikSatirlari(ifadeVeren(t)).map(([etiket, deger]) =>
-            `<tr><td style="width:42%;padding:1pt 0">${e(etiket)}</td><td style="padding:1pt 0">: ${e(deger)}</td></tr>`).join("");
-        const sorular = (t.sorular || []).filter(s => s.soru.trim() || s.cevap.trim()).map((s, i) => `
-            <p style="text-align:justify;margin:12pt 0 0"><b>SORU ${i + 1}) ${satirSonu(s.soru.trim())}</b></p>
-            <p style="text-align:justify;margin:12pt 0 0"><b>CEVAP ${i + 1})</b> ${satirSonu(s.cevap.trim())}</p>`).join("");
-        return `${BASLIK}
-            <p style="font-weight:bold;margin:0 0 12pt">İFADE TUTANAĞI:</p>
-            <table style="border-collapse:collapse;margin:0 0 12pt">${kimlik}</table>
-            <p style="text-align:justify;margin:0 0 8pt">${satirSonu(girisMetni(t))}</p>
-            ${sorular}
-            <p style="text-align:justify;margin:24pt 0 0">${satirSonu((t.kapanis || "").trim() || IFADE_KAPANIS_SABLON)}</p>
-            ${imzaTablosu(t)}`;
-    }
-    const ust = `${BASLIK}
-        <p style="font-weight:bold;margin:0 0 12pt">${e(TUR_ADI[t.tur]).toLocaleUpperCase("tr-TR")}:</p>
-        <table style="border-collapse:collapse;margin:0 0 12pt">
-            <tr><td style="width:42%;padding:1pt 0">Tarih / Saat</td><td>: ${e(tarihNoktali(t.tarih))}${t.saat ? ` – ${e(saatEkli(t.saat).split("’")[0])}` : ""}</td></tr>
-            <tr><td style="padding:1pt 0">Yer</td><td>: ${e(t.yer)}</td></tr>
-            ${t.konu ? `<tr><td style="padding:1pt 0;vertical-align:top">Konu</td><td>: ${e(t.konu)}</td></tr>` : ""}
-        </table>`;
-    return `${ust}${paragraf(t.metin)}${t.kapanis ? paragraf(t.kapanis) : ""}${imzaTablosu(t)}`;
+    const kimlik = kimlikSatirlari(ifadeVeren(t)).map(([etiket, deger]) =>
+        `<tr><td style="width:42%;padding:1pt 0">${e(etiket)}</td><td style="padding:1pt 0">: ${e(deger)}</td></tr>`).join("");
+    const sorular = (t.sorular || []).filter(s => s.soru.trim() || s.cevap.trim()).map((s, i) => `
+        <p style="text-align:justify;margin:12pt 0 0"><b>SORU ${i + 1}) ${satirSonu(s.soru.trim())}</b></p>
+        <p style="text-align:justify;margin:12pt 0 0"><b>CEVAP ${i + 1})</b> ${satirSonu(s.cevap.trim())}</p>`).join("");
+    return `${BASLIK}
+        <p style="font-weight:bold;margin:0 0 12pt">İFADE TUTANAĞI:</p>
+        <table style="border-collapse:collapse;margin:0 0 12pt">${kimlik}</table>
+        <p style="text-align:justify;margin:0 0 8pt">${satirSonu(girisMetni(t))}</p>
+        ${sorular}
+        <p style="text-align:justify;margin:24pt 0 0">${satirSonu((t.kapanis || "").trim() || IFADE_KAPANIS_SABLON)}</p>
+        ${imzaTablosu(t)}`;
 }
 
 export function tutanakDosyaAdi(t: Tutanak) {
@@ -76,7 +62,7 @@ function indir(blob: Blob, ad: string) {
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
-/** İfade tutanağı: kullanıcının Word şablonundan gerçek .docx; diğerleri: Word'ün açtığı .doc (HTML). */
+/** İfade tutanağı: kullanıcının Word şablonu doldurularak gerçek .docx. */
 export async function tutanakWordIndir(t: Tutanak) {
     const ad = tutanakDosyaAdi(t);
     if (t.tur === "ifade") {

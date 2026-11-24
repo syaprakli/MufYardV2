@@ -1,9 +1,9 @@
-"""İfade / tespit / görüşme tutanakları."""
+"""İfade tutanakları (inceleme/soruşturmada tek tutanak türü ifadedir)."""
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-TutanakTuru = Literal["ifade", "tespit", "gorusme"]
+TutanakTuru = Literal["ifade"]
 KisiRolu = Literal["ifade_veren", "mufettis", "katilan", "tanik", "yazman"]
 
 
@@ -43,7 +43,7 @@ class TutanakAlanlari(BaseModel):
 class TutanakCreate(TutanakAlanlari):
     # İfade/tutanak inceleme-soruşturma görevine aittir (genel denetimde alınmaz)
     task_id: str = Field(..., min_length=1, max_length=200)
-    tur: TutanakTuru
+    tur: TutanakTuru = "ifade"
 
 
 class TutanakUpdate(TutanakAlanlari):
