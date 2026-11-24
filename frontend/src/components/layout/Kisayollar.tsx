@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Keyboard, X } from "lucide-react";
 import {
-    atamalar, DEGISTI_OLAYI, duzenlenebilirAlanda, ISLEMLER, kayitModundaMi, olaydanKisayol, tuslar,
+    atamalar, DEGISTI_OLAYI, duzenlenebilirAlanda, ISLEMLER, kayitModundaMi, olaydanKisayol, tuslar, yaziAlanindaCalisir,
 } from "../../lib/kisayollar";
 
 export function TusKutulari({ kisayol }: { kisayol: string }) {
@@ -43,8 +43,8 @@ export function KisayolDinleyici() {
             if (!k) return;
             const id = ters.get(k);
             if (!id) return;
-            // Yazı alanındayken yalnızca Ctrl/Alt'lı ve F tuşlu kısayollar çalışır (zaten geçerlilik kuralı bu)
-            if (duzenlenebilirAlanda(e.target) && !e.ctrlKey && !e.altKey && !/^F\d/.test(k)) return;
+            // Tek tuş / Shift+tuş kısayolları yazı yazarken çalışmaz; Ctrl/Alt'lı ve F tuşlu olanlar her yerde çalışır
+            if (duzenlenebilirAlanda(e.target) && !yaziAlanindaCalisir(k)) return;
             const islem = ISLEMLER.find(i => i.id === id);
             if (!islem) return;
             e.preventDefault();

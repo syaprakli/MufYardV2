@@ -83,3 +83,28 @@ export function kimlikSatirlari(k?: TutanakKisi): [string, string][] {
         ["Cep Telefonu", d(k?.telefon)],
     ];
 }
+
+// ---------------------------------------------------------------- imza sırası (kıdem)
+
+/** Kıdem derecesi (küçük = kıdemli): Baş Müfettiş > Müfettiş > Müfettiş Yardımcısı > diğerleri > İfade Veren. */
+function kidemDerecesi(k: TutanakKisi): number {
+    if (k.rol === "ifade_veren") return 9; // ifade veren her zaman en kıdemsiz
+    if (k.rol !== "mufettis") return 5;
+    const u = (k.unvan || "").toLocaleLowerCase("tr-TR").replace(/\s+/g, " ");
+    if (u.includes("baş")) return 0;
+    if (u.includes("yard") || u.includes("yrd")) return 2;
+    return 1; // "Müfettiş" ya da boş
+}
+
+/**
+ * İmza bloğundaki soldan sağa sıra.
+ * Kıdem: unvana göre; aynı unvanda kişiler listesinde üstte olan kıdemli.
+ * Yerleşim: 2 kişi imzalıyorsa kıdemli sağda; 3 (ve daha fazla) kişide kıdemli en solda.
+ */
+export function imzaSirasi(kisiler: TutanakKisi[]): TutanakKisi[] {
+    const kidemli = kisiler
+        .map((k, i) => ({ k, i }))
+        .sort((a, b) => kidemDerecesi(a.k) - kidemDerecesi(b.k) || a.i - b.i)
+        .map(x => x.k);
+    return kidemli.length === 2 ? kidemli.reverse() : kidemli;
+}

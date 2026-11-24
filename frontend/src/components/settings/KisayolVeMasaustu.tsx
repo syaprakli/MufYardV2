@@ -121,8 +121,9 @@ export function KisayolBolumu() {
                 </button>
             </div>
             <p className="text-xs text-slate-500 mb-3">
-                Değiştirmek için kısayola tıklayıp yeni tuşlara basın. Kaldırmak için tıklayıp Backspace'e basın. Ayarlar bu cihazda saklanır.
+                Değiştirmek için kısayola tıklayıp yeni tuşlara basın (tek tuş da olur). Kaldırmak için tıklayıp Backspace'e basın. Ayarlar bu cihazda saklanır.
                 Uygulama içindeyken <b>F1</b> tüm kısayolları gösterir.
+                <br /><span className="text-slate-400">Tek tuş veya Shift'li kısayollar yazı yazarken çalışmaz (yazdığınız harfler sayfa değiştirmesin); Ctrl/Alt'lı olanlar her yerde çalışır.</span>
             </p>
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {ISLEMLER.map(i => (
@@ -210,7 +211,8 @@ export function MasaustuBolumu() {
                             onKaydet={k => {
                                 const sorun = kisayolSorunu(k);
                                 if (sorun) return sorun;
-                                if (!/^(Ctrl|Alt)/.test(k) || !/\+([A-Z0-9]|F\d{1,2})$/.test(k)) return "Ctrl veya Alt ile bir harf, rakam ya da F tuşu seçin.";
+                                // Windows genelinde geçerli: tek tuş olursa o harf başka programlarda yazılamaz
+                                if (!/^(Ctrl|Alt)/.test(k) || !/\+([A-Z0-9]|F\d{1,2})$/.test(k)) return "Bu kısayol Windows'un her yerinde çalıştığı için Ctrl veya Alt ile birlikte bir harf, rakam ya da F tuşu olmalı (yoksa o harfi başka programlarda yazamazsınız).";
                                 void kaydet({ genelKisayol: k });
                                 return null;
                             }}

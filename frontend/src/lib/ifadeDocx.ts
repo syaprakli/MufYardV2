@@ -5,7 +5,7 @@
 import JSZip from "jszip";
 import type { Tutanak } from "./api/tutanaklar";
 import { IFADE_SABLON_B64 } from "./sablonlar/ifadeTutanagiSablon";
-import { girisMetni, ifadeVeren, imzaUnvani, kimlikSatirlari } from "./ifadeMetni";
+import { girisMetni, ifadeVeren, imzaSirasi, imzaUnvani, kimlikSatirlari } from "./ifadeMetni";
 
 const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const XML_NS = "http://www.w3.org/XML/1998/namespace";
@@ -72,9 +72,8 @@ function bosParagraf(doc: Document, prototip: Element): Element {
 }
 
 function imzaTablosu(doc: Document, t: Tutanak, rPr: Element | null): Element {
-    // İfade veren önce, sonra müfettişler, sonra diğerleri; satır başına en fazla 3 kişi
-    const sira = { ifade_veren: 0, mufettis: 1 } as Record<string, number>;
-    const kisiler = [...(t.kisiler || [])].sort((a, b) => (sira[a.rol] ?? 2) - (sira[b.rol] ?? 2));
+    // Kıdem sırası (2 kişide kıdemli sağda, 3 kişide en solda); satır başına en fazla 3 kişi
+    const kisiler = imzaSirasi(t.kisiler || []);
     const tbl = el(doc, "tbl");
     const tblPr = el(doc, "tblPr");
     const tblW = el(doc, "tblW");

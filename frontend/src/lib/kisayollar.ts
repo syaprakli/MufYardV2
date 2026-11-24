@@ -110,13 +110,19 @@ const AYRILMIS = new Set([
     "Alt+F4", "F5", "F11", "F12", "Ctrl+F5", "Alt+Left", "Alt+Right",
 ]);
 
+const KAYDIRMA = new Set(["Space", "Up", "Down", "Left", "Right", "Home", "End", "PageUp", "PageDown"]);
+
+/** Ctrl/Alt içermeyen kısayol yazı alanındayken çalışmaz (yazarken harf tuşları sayfa değiştirmesin). */
+export const yaziAlanindaCalisir = (k: string) => /(^|\+)(Ctrl|Alt)\+/.test(k) || /^F\d{1,2}$/.test(k);
+
 /** Atanabilir mi? Değilse sebebini döner. */
 export function kisayolSorunu(k: string): string | null {
     const p = k.split("+");
     const tus = p[p.length - 1];
     const ctrl = p.includes("Ctrl"), alt = p.includes("Alt");
     if (ctrl && alt) return "Ctrl+Alt (AltGr) Türkçe klavyede @, € gibi karakterleri yazar; kullanılamaz.";
-    if (!ctrl && !alt && !/^F\d{1,2}$/.test(tus)) return "Ctrl veya Alt ile birlikte basın (F1–F12 tek başına da olur).";
+    // Tek tuş / Shift+tuş serbest (yazı alanındayken çalışmaz); yalnızca sayfayı kaydıran tuşlar tek başına atanamaz
+    if (!ctrl && !alt && KAYDIRMA.has(tus)) return `${tus} sayfayı kaydırır; tek başına kısayol olamaz (Ctrl, Alt veya Shift ile birlikte basın).`;
     if (AYRILMIS.has(k)) return `${k} kopyala/yapıştır/kaydet/yenile gibi standart bir kısayol; değiştirilemez.`;
     return null;
 }

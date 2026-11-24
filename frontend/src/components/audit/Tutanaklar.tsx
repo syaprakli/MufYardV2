@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import {
-    ArrowLeft, CheckCircle2, CloudOff, Download, FileSignature, Loader2, Mic, Plus, Printer, Square, Trash2, UserPlus,
+    ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, CloudOff, Download, FileSignature, Loader2, Mic, Plus, Printer, Square, Trash2, UserPlus,
 } from "lucide-react";
 import {
     createTutanak, deleteTutanak, fetchTutanaklar, ROL_ADI, sesiMetneCevir, TUR_ADI, updateTutanak,
@@ -11,7 +11,7 @@ import { isNetworkError } from "../../lib/api/utils";
 import { taslakAl, taslakKaydet, taslaklar, taslakSil, taslakTasi, yerelId, yerelMi } from "../../lib/tutanakTaslak";
 import { IFADE_KAPANIS, tutanakWordIndir, tutanakYazdir } from "../../lib/tutanakBelge";
 import { useSesKaydi } from "../../lib/hooks/useSesKaydi";
-import { IFADE_SORULARI_VARSAYILAN, MUFETTIS_UNVANLARI, otomatikGiris } from "../../lib/ifadeMetni";
+import { IFADE_SORULARI_VARSAYILAN, imzaSirasi, imzaUnvani, MUFETTIS_UNVANLARI, otomatikGiris } from "../../lib/ifadeMetni";
 
 interface Props {
     /** İnceleme / soruşturma görevi */
@@ -202,14 +202,28 @@ function TutanakDuzenleyici({ t, onChange, kayitDurumu, onKapat }: {
                         <input className={inputCls + " col-span-6 md:col-span-3"} placeholder={k.rol === "ifade_veren" ? "Görevi" : "Unvan"} value={k.unvan || ""}
                             list={k.rol === "mufettis" ? "mufettis-unvanlari" : undefined} onChange={e => kisiGuncelle(i, { unvan: e.target.value })} />
                         <span className="col-span-5 md:col-span-3 text-[10px] text-slate-400">{k.rol === "ifade_veren" ? "Kimlik bilgileri aşağıda" : ""}</span>
-                        <button type="button" title="Kişiyi çıkar" onClick={() => guncelle({ kisiler: (t.kisiler || []).filter((_, j) => j !== i) })}
-                            className="col-span-1 h-8 flex items-center justify-center text-slate-400 hover:text-rose-600">
-                            <Trash2 size={14} />
-                        </button>
+                        <div className="col-span-1 flex items-center justify-end gap-0.5">
+                            <button type="button" title="Yukarı taşı (aynı unvanda üstteki kıdemli sayılır)" disabled={i === 0}
+                                onClick={() => { const k = [...(t.kisiler || [])]; [k[i - 1], k[i]] = [k[i], k[i - 1]]; guncelle({ kisiler: k }); }}
+                                className="h-8 w-6 flex items-center justify-center text-slate-400 hover:text-blue-600 disabled:opacity-30"><ChevronUp size={14} /></button>
+                            <button type="button" title="Aşağı taşı" disabled={i === (t.kisiler || []).length - 1}
+                                onClick={() => { const k = [...(t.kisiler || [])]; [k[i + 1], k[i]] = [k[i], k[i + 1]]; guncelle({ kisiler: k }); }}
+                                className="h-8 w-6 flex items-center justify-center text-slate-400 hover:text-blue-600 disabled:opacity-30"><ChevronDown size={14} /></button>
+                            <button type="button" title="Kişiyi çıkar" onClick={() => guncelle({ kisiler: (t.kisiler || []).filter((_, j) => j !== i) })}
+                                className="h-8 w-6 flex items-center justify-center text-slate-400 hover:text-rose-600">
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
                     </div>
                 ))}
             </div>
 
+            {(t.kisiler || []).length > 0 && (
+                <p className="text-[11px] text-slate-500 -mt-2">
+                    <b>İmza sırası (soldan sağa):</b> {imzaSirasi(t.kisiler || []).map(k => `${k.ad || "…"} (${imzaUnvani(k)})`).join("  |  ")}
+                    <span className="block text-[10px] text-slate-400">Kıdem: Baş Müfettiş › Müfettiş › Müfettiş Yardımcısı › İfade Veren; aynı unvanda listede üstteki kıdemli. 2 imzada kıdemli sağda, 3 imzada en solda.</span>
+                </p>
+            )}
             <datalist id="mufettis-unvanlari">{MUFETTIS_UNVANLARI.map(u => <option key={u} value={u} />)}</datalist>
 
             {/* İfade verenin kimlik bilgileri (şablondaki satırlar) */}

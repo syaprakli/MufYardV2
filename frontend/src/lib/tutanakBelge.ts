@@ -2,7 +2,7 @@
 import { escapeHtml } from "./sanitize";
 import { TUR_ADI, type Tutanak } from "./api/tutanaklar";
 import { ifadeDocxUret } from "./ifadeDocx";
-import { girisMetni, ifadeVeren, IFADE_KAPANIS_SABLON, imzaUnvani, kimlikSatirlari, tarihNoktali } from "./ifadeMetni";
+import { girisMetni, ifadeVeren, IFADE_KAPANIS_SABLON, imzaSirasi, imzaUnvani, kimlikSatirlari, tarihNoktali } from "./ifadeMetni";
 
 const e = (s?: string | null) => escapeHtml(s || "");
 const satirSonu = (s?: string | null) => e(s).replace(/\n/g, "<br>");
@@ -16,8 +16,7 @@ const BASLIK = `
     <p style="text-align:center;font-weight:bold;margin:0 0 28pt">MÜFETTİŞLİĞİ</p>`;
 
 function imzaTablosu(t: Tutanak) {
-    const sira = { ifade_veren: 0, mufettis: 1 } as Record<string, number>;
-    const kisiler = [...(t.kisiler || [])].sort((a, b) => (sira[a.rol] ?? 2) - (sira[b.rol] ?? 2));
+    const kisiler = imzaSirasi(t.kisiler || []);
     if (!kisiler.length) return "";
     const SUTUN = Math.min(3, kisiler.length);
     const satirlar: typeof kisiler[] = [];
