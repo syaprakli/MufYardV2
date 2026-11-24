@@ -8,7 +8,7 @@ KisiRolu = Literal["ifade_veren", "mufettis", "katilan", "tanik", "yazman"]
 
 
 class TutanakKisi(BaseModel):
-    ad: str = Field(..., min_length=1, max_length=200)
+    ad: str = Field("", max_length=200)  # düzenleme sırasında boş olabilir (yeni ifadede "İfade veren" boş başlar)
     unvan: Optional[str] = Field(None, max_length=200)
     rol: KisiRolu = "katilan"
     tckn: Optional[str] = Field(None, max_length=11, pattern=r"^\d{0,11}$")

@@ -58,6 +58,24 @@ class TutanakTests(unittest.TestCase):
         lst = self.client.get("/api/tutanaklar/?audit_id=a2026").json()
         self.assertEqual([x["id"] for x in lst], [t["id"]])
 
+    def test_screen_default_payloads_are_accepted(self):
+        """Ekranın 'yeni tutanak' anında gönderdiği gövde (Tutanaklar.tsx yeniTutanak) birebir kabul edilmeli.
+        Gerçek hata: yeni ifadede 'İfade veren' adı boş olduğu için sunucu 422 veriyordu."""
+        mufettis = {"ad": "", "unvan": "Müfettiş", "rol": "mufettis"}  # profil adı yoksa boş gelir
+        for tur in ("ifade", "tespit", "gorusme"):
+            body = {
+                "audit_id": "a2026", "tur": tur, "tarih": "2026-11-24", "saat": "10:25", "yer": "", "konu": "",
+                "kisiler": ([{"ad": "", "unvan": "", "rol": "ifade_veren"}] if tur == "ifade" else []) + [mufettis],
+                "sorular": [{"soru": "Kimlik bilgileriniz?", "cevap": ""}] if tur == "ifade" else [],
+                "metin": "", "kapanis": "Kapanış", "tamamlandi": False,
+            }
+            r = self.client.post("/api/tutanaklar/", json=body)
+            self.assertEqual(r.status_code, 200, f"{tur}: {r.text}")
+            # Düzenleme sırasında ara durumlar da kaydedilebilmeli (boş satır, kısmi TC)
+            u = self.client.patch(f"/api/tutanaklar/{r.json()['id']}", json={
+                "kisiler": [{"ad": "", "unvan": "", "rol": "katilan", "tckn": "1000"}], "tarih": "", "saat": ""})
+            self.assertEqual(u.status_code, 200, f"{tur}: {u.text}")
+
     def test_permissions(self):
         self.as_user("yabanci")
         self.assertEqual(self.client.get("/api/tutanaklar/?audit_id=a2026").status_code, 403)

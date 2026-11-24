@@ -56,7 +56,11 @@ export const alanlariAl = (t: Partial<Tutanak>) =>
 
 async function hata(res: Response, varsayilan: string): Promise<never> {
     const e = await res.json().catch(() => ({}));
-    const err: any = new Error(typeof e?.detail === "string" ? e.detail : varsayilan);
+    // 422'de detail bir liste gelir: hangi alanın kabul edilmediğini göster
+    const ayrinti = Array.isArray(e?.detail)
+        ? `${varsayilan} Kabul edilmeyen alan: ${e.detail.slice(0, 3).map((d: any) => `${(d?.loc || []).slice(1).join(" › ")} (${d?.msg || "geçersiz"})`).join("; ")}`
+        : typeof e?.detail === "string" ? e.detail : varsayilan;
+    const err: any = new Error(ayrinti);
     err.status = res.status;
     throw err;
 }
