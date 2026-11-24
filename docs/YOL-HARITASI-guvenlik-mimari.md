@@ -108,6 +108,6 @@ Harcırah (e-Yolluk) ve süre uzatma (EBYS) kapsam dışı.
 | F2 | Tespit → kanıt → tenkit zinciri: tenkite galeriden fotoğraf / belge / not bağlama, kanıtsız tenkit uyarısı, "Rapora kopyala" (numaralı tenkit + dayanak + "Fotoğraf N") | ✅ Canlıda, kullanıcı testi bekleniyor |
 | F3 | Sahada internetsiz çalışma + fotoğraf tarih/konum damgası: çevrimdışı fotoğraf kuyruğu (IndexedDB, İl'deki base64 yedeği kaldırıldı), EXIF/cihaz tarih-konum damgası + `photo_meta`, kuyrukta denetim güncellemelerinin birleştirilmesi, senkron sırasında eklenenin kaybolma yarışı, bekleyen değişikliğin sayfa açılışında uygulanması | ✅ Canlıda, kullanıcı testi bekleniyor |
 | F4 | Rapor öncesi kalite kontrol + kişisel veri karartma: işlenmemiş "Hayır" maddesi, kanıtsız/dayanaksız tenkit, raporda geçmeyen tenkit, olmayan fotoğrafa atıf, doldurulmamış şablon yeri, ileri tarih; TCKN (algoritmalı)/telefon/e-posta/IBAN tespiti ve karartılmış kopya (pano / Word). Uygulamadaki rapor değiştirilmez. Tarayıcı testi: 21/21 | ✅ Canlıda |
-| F5 | İfade/tutanak modülü (ses → metin ile) | ⏳ Sırada |
-| F6 | Mali denetim yardımcıları (mizan → kırmızı bayrak, örneklem, 7405 borçlanma sınırı) | ⏳ |
+| F5 | İfade/tutanak modülü: ifade (SORULDU/CEVABEN), tespit, görüşme tutanağı; cevaba mikrofonla ses → metin (mevcut /ai/transcribe, ses saklanmaz); internetsiz yazma (cihazda taslak, bağlantıda gönderim); Word/yazdır, imza blokları. Ayrı `tutanaklar` koleksiyonu, yetki denetimden; 900 KB belge sınırı. Tarayıcı testi 23/23 | ✅ Canlıda |
+| F6 | Mali denetim yardımcıları (mizan → kırmızı bayrak, örneklem, 7405 borçlanma sınırı) | ⏳ Sırada |
 | F7 | Eski raporlarda arama (emsal) | ⏳ |
