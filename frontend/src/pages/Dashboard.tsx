@@ -7,6 +7,7 @@ import { cn } from "../lib/utils";
 import DOMPurify from "dompurify";
 import { fetchWithTimeout, getAuthHeaders } from "../lib/api/utils";
 import { useAuth } from "../lib/hooks/useAuth";
+import { onekiEsitle, onekUyarisiGerekli } from "../lib/raporOnek";
 import { useTheme } from "../lib/context/ThemeContext";
 import { toast } from "react-hot-toast";
 import { Card } from "../components/ui/Card";
@@ -126,7 +127,7 @@ const IdentitySelectionModalLazy = lazy(() => import("../components/IdentitySele
 
 export default function Dashboard() {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, profile: tazeProfil } = useAuth();
     const { theme } = useTheme();
     const { data: cachedData, refreshAll, isOffline } = useGlobalData();
     
@@ -584,11 +585,9 @@ Lütfen şunları analiz et:
     const filteredCurrentSummaryTasks = currentSummaryTasks.filter(matchesSummaryRole);
     const filteredArchivedSummaryTasks = archivedSummaryTasks.filter(matchesSummaryRole);
     const archivedPreviewTasks = filteredArchivedSummaryTasks.slice(0, 25);
-    const defaultPrefix = "S.Y.64";
-    const userEmail = user?.email?.toLowerCase();
-    const isSefa = userEmail === "sefa.yaprakli@gsb.gov.tr";
-    const hasDefaultPrefix = profile?.report_prefix === defaultPrefix || localStorage.getItem('raporKoduOnek') === defaultPrefix;
-    const shouldPromptPrefix = profile && !isSefa && hasDefaultPrefix;
+    // Yalnızca sunucudan gelen profile göre karar verilir (önbellekteki eski bilgi uyarıyı bir an gösteriyordu)
+    onekiEsitle(tazeProfil);
+    const shouldPromptPrefix = onekUyarisiGerekli(tazeProfil, user?.email);
 
     if (!user) return null;
 

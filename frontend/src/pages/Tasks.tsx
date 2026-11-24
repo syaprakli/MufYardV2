@@ -8,6 +8,7 @@ import {
 import { toast } from "react-hot-toast";
 
 import { useAuth } from "../lib/hooks/useAuth";
+import { onekiEsitle, onekUyarisiGerekli } from "../lib/raporOnek";
 import { useConfirm } from "../lib/context/ConfirmContext";
 import { useTheme } from "../lib/context/ThemeContext";
 import { isElectron } from "../lib/firebase";
@@ -406,7 +407,8 @@ export default function Tasks() {
         return inv.owner_id;
     };
 
-    const raporOnek = localStorage.getItem('raporKoduOnek') || 'S.Y.64';
+    onekiEsitle(profile);
+    const raporOnek = (profile?.report_prefix || "").trim() || localStorage.getItem('raporKoduOnek') || 'S.Y.64';
     const currentYear = new Date().getFullYear();
     const autoKodu = useMemo(() => {
         const allCodes = [...tasks, ...invitations]
@@ -1499,11 +1501,8 @@ export default function Tasks() {
         toast.success(`${baseTasks.length} görev CSV olarak dışa aktarıldı.`);
     };
 
-    const defaultPrefix = "S.Y.64";
-    const userEmail = user?.email?.toLowerCase();
-    const isSefa = userEmail === "sefa.yaprakli@gsb.gov.tr";
-    const hasDefaultPrefix = profile?.report_prefix === defaultPrefix || cachedData.profile?.report_prefix === defaultPrefix || localStorage.getItem('raporKoduOnek') === defaultPrefix;
-    const shouldPromptPrefix = (profile || cachedData.profile) && !isSefa && hasDefaultPrefix;
+    // Yalnızca sunucudan gelen profile göre karar verilir (önbellekteki eski bilgi uyarıyı bir an gösteriyordu)
+    const shouldPromptPrefix = onekUyarisiGerekli(profile, user?.email);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 max-w-full overflow-x-hidden">
